@@ -3,6 +3,6 @@ const { signup, login } = require('../controller/user.js'); // Ensure this path 
 const router = express.Router()
 
 router.post('/signup', signup);
-router.post('/login', login);
+router.get('/login', login);
 
 module.exports = router;
