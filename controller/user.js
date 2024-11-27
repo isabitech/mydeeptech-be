@@ -44,5 +44,31 @@ const login = async (req, res) => {
         res.status(500).json({ message: 'Server error', error });
     }
 };
+const getUser = async (req, res) => {
+    const user = await User.find({});
+    try {
+        if (!user) {
+            return res.status(400).send({
+              responseCode: "90",
+              responseMessage: "No user found",
+              data: null,
+            });
+          }
+    
+          res.status(200).send({
+            responseCode: "90",
+            responseMessage: "User retrieved successfully",
+            data: user
+          });
+        } catch (error) {
+          res.status(500).send({
+            responseCode: "90",
+            responseMessage: "Internal server error",
+            data: error.message,
+          });
+    
+          console.log(error);
+        }
+    };
 
-module.exports = { signup, login };
+module.exports = { signup, login, getUser };
