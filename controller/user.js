@@ -1,5 +1,7 @@
+const { response } = require('express');
 const User = require('../models/user');
 const { signupSchema, loginSchema } = require('../utils/authValidator');
+const {RoleType} = require('../utils/role')
 const bcrypt = require('bcrypt');
 
 // Signup controller
@@ -11,14 +13,18 @@ const signup = async (req, res) => {
         const { firstname, lastname, username, email, password, phone } = req.body;
 
         const existingUser = await User.findOne({email: req.body.email})
+        const admin = await User.findOne({ role: RoleType.ADMIN })
         if (existingUser) return res.status(400).json({ message: 'Email already in use' });
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        const newUser = new User({ firstname, lastname, username, email, password: hashedPassword, phone });
+        const newUser = new User({ firstname, lastname, username, email, password: hashedPassword, phone, role: RoleType.USER });
         await newUser.save();
 
-        res.status(200).json({ message: 'User registered successfully' });
+        res.status(200).send({ 
+          responseCode: "90",
+          responseMessage: 'User registered successfully',
+          data: newUser });
     } catch (error) {
         console.error('Error during signup:', error); // Log the error
         res.status(500).json({ message: 'Server error', error: error.message });
@@ -44,8 +50,8 @@ const login = async (req, res) => {
         res.status(500).json({ message: 'Server error', error });
     }
 };
-const getUser = async (req, res) => {
-    const user = await User.find({});
+const getAllUsers = async (req, res) => {
+    const user = await User.find({role: req.params.role});
     try {
         if (!user) {
             return res.status(400).send({
@@ -54,7 +60,7 @@ const getUser = async (req, res) => {
               data: null,
             });
           }
-    
+        
           res.status(200).send({
             responseCode: "90",
             responseMessage: "User retrieved successfully",
@@ -70,5 +76,32 @@ const getUser = async (req, res) => {
           console.log(error);
         }
     };
+    const getUsers = async (req, res) => {
+      const user = await User.find({role: 'USER'});
+      try {
+          if (!user || user.length === 0) {
+              return res.status(400).send({
+                responseCode: "90",
+                responseMessage: "No user found",
+                data: null,
+              });
+            }
 
-module.exports = { signup, login, getUser };
+      
+            res.status(200).send({
+              responseCode: "90",
+              responseMessage: "User retrieved successfully",
+              data: user
+            });
+          } catch (error) {
+            res.status(500).send({
+              responseCode: "90",
+              responseMessage: "Internal server error",
+              data: error.message,
+            });
+      
+            console.log(error);
+          }
+      };
+
+module.exports = { signup, login, getAllUsers, getUsers };
