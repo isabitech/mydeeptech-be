@@ -7,6 +7,7 @@ const bodyParser = require('body-parser');
 dotenv.config();
 
 const userRoute = require('./routes/auth');
+const project = require('./routes/auth')
 
 const app = express();
 
@@ -18,6 +19,7 @@ app.use(bodyParser.json());
 
 // Routes
 app.use('/api/auth', userRoute);
+app.use('/api/auth', project);
 
 // Database Connection
 mongoose.connect(process.env.MONGO_URI)

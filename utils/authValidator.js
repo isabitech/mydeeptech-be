@@ -16,4 +16,16 @@ const loginSchema = Joi.object({
     password: Joi.string().required()
 });
 
-module.exports = { signupSchema, loginSchema };
+// Project validation schema
+const projectSchema = Joi.object({
+    projectName: Joi.string().min(4).required(),
+    company: Joi.string().min(3).required(),
+    dueDate: Joi.date()
+        .greater('now') // Ensure the date is in the future
+        .required() // Ensure the field is mandatory
+        .messages({
+            'date.greater': 'Due date must be in the future', // Custom error message for invalid due date
+            'any.required': 'Due date is required', // Custom error message for missing due date
+        }),
+});
+module.exports = { signupSchema, loginSchema, projectSchema};

@@ -102,6 +102,8 @@ const getUsers = async (req, res) => {
     //   return userObj;
     // });
   
+
+    
     res.status(200).send({
       responseCode: "90",
       responseMessage: "User retrieved successfully",
