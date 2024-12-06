@@ -1,5 +1,6 @@
 const  projects = require('../models/projects.model');
-const {projectSchema} = require('../utils/authValidator')
+const {projectSchema} = require('../utils/authValidator');
+const { ObjectId } = require('mongoose').Types;
 
 
 
@@ -37,7 +38,7 @@ const getProject = async (req, res)  => {
 
 const updateProject = async (req, res) => {
     try {
-        const { error } = loginSchema.validate(req.body);
+        const { error } = projectSchema.validate(req.body);
         if (error) return res.status(400).json({ message: error.details[0].message });
 
         const { id } = req.params
@@ -58,7 +59,7 @@ const updateProject = async (req, res) => {
         res.status(200).send({ message: 'Project updated successfully', project: updatedProject });
     } catch (error) {
         console.error(error);
-        res.status(500).send('An error occurred while updating the project');
+        res.status(500).json({ message: error.details[0].message });
     } 
 };
 
