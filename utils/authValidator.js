@@ -28,4 +28,30 @@ const projectSchema = Joi.object({
             'any.required': 'Due date is required', // Custom error message for missing due date
         }),
 });
-module.exports = { signupSchema, loginSchema, projectSchema};
+
+const taskSchema = Joi.object({
+    tasklink: Joi.string().uri({ scheme: ['http', 'https'] }) // Validates URLs with http/https
+    .required()
+    .messages({
+        'string.base': 'URL must be a string.',
+        'string.uri': 'Invalid URL format.',
+        'any.required': 'URL is required.',
+    }),
+    taskGuidelineLink: Joi.string().uri({ scheme: ['http', 'https'] }) // Validates URLs with http/https
+    .required()
+    .messages({
+        'string.base': 'URL must be a string.',
+        'string.uri': 'Invalid URL format.',
+        'any.required': 'URL is required.',
+    }),
+    taskName: Joi.string().min(4).required(),
+    createdBy: Joi.string().min(4).required(),
+    dueDate: Joi.date()
+    .greater('now') // Ensure the date is in the future
+    .required() // Ensure the field is mandatory
+    .messages({
+        'date.greater': 'Due date must be in the future', // Custom error message for invalid due date
+        'any.required': 'Due date is required', // Custom error message for missing due date
+    }),
+});
+module.exports = { signupSchema, loginSchema, projectSchema, taskSchema};

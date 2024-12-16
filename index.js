@@ -11,6 +11,10 @@ const route = require('./routes/auth');
 
 const app = express();
 
+app.get(  "/",(req, res) => {
+    res.send('Welcome to Deep Tech')
+});
+
 // Middleware
 app.use(cors());
 app.use(express.json());
