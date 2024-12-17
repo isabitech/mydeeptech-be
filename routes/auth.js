@@ -1,7 +1,7 @@
 const express = require('express');
 const { signup, login, getAllUsers, getUsers } = require('../controller/user.js'); // Ensure this path is correct
 const { createProject, getProject, updateProject, deleteProject } = require('../controller/project.js')
-const { createTask} = require('../controller/task.js')
+const { createTask, getTask, getAllTasks, assignTask} = require('../controller/task.js')
 
 
 
@@ -16,6 +16,9 @@ router.get('/getProject', getProject)
 router.put('/updateProject/:id', updateProject)
 router.delete('/deleteProject/:id', deleteProject)
 router.post('/createTasks', createTask);
+router.get('/getTask/:id', getTask);
+router.get('/getAllTasks', getAllTasks);
+router.post('/assignTask', assignTask);
 
 
 module.exports = router;

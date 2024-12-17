@@ -5,7 +5,6 @@ const taskSchema = new mongoose.Schema({
     taskLink: {
         type: String,
         required: true,
-        unique: true,
         validate: {
             validator: function (v) {
                 return /^(http|https):\/\/[^\s$.?#].[^\s]*$/.test(v); // Regex for URL validation

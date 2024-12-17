@@ -30,7 +30,7 @@ const projectSchema = Joi.object({
 });
 
 const taskSchema = Joi.object({
-    tasklink: Joi.string().uri({ scheme: ['http', 'https'] }) // Validates URLs with http/https
+    taskLink: Joi.string().uri({ scheme: ['http', 'https'] }) // Validates URLs with http/https
     .required()
     .messages({
         'string.base': 'URL must be a string.',
@@ -54,4 +54,8 @@ const taskSchema = Joi.object({
         'any.required': 'Due date is required', // Custom error message for missing due date
     }),
 });
-module.exports = { signupSchema, loginSchema, projectSchema, taskSchema};
+const taskAssignmentSchema = Joi.object({
+    taskId: Joi.string().min(5).required(),
+    userId: Joi.string().min(5).required()
+})
+module.exports = { signupSchema, loginSchema, projectSchema, taskSchema, taskAssignmentSchema};
