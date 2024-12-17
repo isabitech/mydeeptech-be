@@ -11,7 +11,7 @@ const createTask = async (req, res) =>  {
         const {taskLink, taskGuidelineLink, taskName, createdBy,  dueDate} = req.body
         const task = {taskLink, taskGuidelineLink, taskName, createdBy, dueDate}
 
-        const newTask = new tasks(task)
+        const newTask = new Tasks(task)
         await newTask.save();
 
         res.status(200).send({
@@ -30,7 +30,7 @@ const createTask = async (req, res) =>  {
 
 const getTask = async (req, res) => {
     try {
-        const task = tasks.findById({ id : req.params.id})
+        const task = Tasks.findById({ id : req.params.id})
         if (!task) 
             return res.status(404).send('Task not found')
 
@@ -47,7 +47,7 @@ const getTask = async (req, res) => {
 
 const getAllTasks = async (req, res) => {
     try {
-        const task = tasks.find()
+        const task = Tasks.find()
         if(!task)
             return res.status(404).send('Task not found')
 
