@@ -30,7 +30,7 @@ const createTask = async (req, res) =>  {
 
 const getTask = async (req, res) => {
     try {
-        const task = Tasks.findById({ id : req.params.id})
+        const task = await Tasks.findById({ id : req.params.id })
         if (!task) 
             return res.status(404).send('Task not found')
 
@@ -47,7 +47,7 @@ const getTask = async (req, res) => {
 
 const getAllTasks = async (req, res) => {
     try {
-        const task = Tasks.find()
+        const task = await Tasks.find()
         if(!task)
             return res.status(404).send('Task not found')
 
