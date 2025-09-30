@@ -2,27 +2,24 @@ const mongoose = require("mongoose");
 
 const dtUserSchema = new mongoose.Schema(
   {
-    fullName: {     
+    fullName: { 
         type: String, 
-        required: true, 
-        trim: true
+        required: true 
     },
     phone: { 
         type: String, 
-        required: true, 
-        trim: true
+        required: true 
     },
     email: { 
         type: String, 
         required: true, 
-        unique: true, 
-        trim: true 
+        unique: true 
     },
     domains: { 
         type: [String], 
         default: [] 
     },
-    socialsFollowed: {
+    socialsFollowed: { 
         type: [String], 
         default: [] 
     },
@@ -30,10 +27,23 @@ const dtUserSchema = new mongoose.Schema(
         type: Boolean, 
         required: true 
     },
+
+    // Default statuses
+    annotatorStatus: {
+      type: String,
+      enum: ["pending", "submitted", "verified", "approved"],
+      default: "pending",
+    },
+    microTaskerStatus: {
+      type: String,
+      enum: ["pending", "submitted", "verified", "approved"],
+      default: "pending",
+    },
+
+    resultLink: { type: String, default: "" },
+    isEmailVerified: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
 
-const DTUser = mongoose.model("DTUser", dtUserSchema);
-
-module.exports = DTUser;
+module.exports = mongoose.model("DTUser", dtUserSchema);

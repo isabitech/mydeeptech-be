@@ -4,6 +4,7 @@ const { createProject, getProject, updateProject, deleteProject } = require('../
 const { createTask, getTask, getAllTasks, assignTask} = require('../controller/task.js')
 const {validateVisitor} = require('../controller/validateuser.js')
 const dtUserController = require("../controller/dtUser.controller.js");
+const { createDTUser, verifyEmail, submitResult, getAllDTUsers, getDTUser,updateUserStatus,} = require("../controller/dtUser.controller.js");
 
 
 
@@ -22,8 +23,11 @@ router.get('/getTask/:id', getTask);
 router.get('/getAllTasks', getAllTasks);
 router.post('/assignTask', assignTask);
 router.post('/emailValidation', validateVisitor);
-router.post("/createdtusers", dtUserController.createDTUser); 
-router.get("/getAllDTUsers", dtUserController.getAllDTUsers);
-
+router.post("/createDTuser", createDTUser);
+router.get("/verifyDTusermail/:id", verifyEmail);
+router.post("/:id/DTusertosubmitresult", submitResult);
+router.get("/allDTusers", getAllDTUsers);
+router.put("/Dtuserstatusupdate/:id/status", updateUserStatus);
+router.get("/DTsingleuser/:id", getDTUser);
 
 module.exports = router;
