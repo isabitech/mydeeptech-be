@@ -23,7 +23,7 @@ const createDTUser = async (req, res) => {
     await newUser.save();
 
 // send verification email
-const verifyLink = `http://localhost:5000/api/dt-users/verify-email/${newUser._id}`;
+const verifyLink = `https://my-deep-tech.onrender.com/api/auth/dt-users/verify-email/${newUser._id}`;
 
 await transporter.sendMail({
   from: process.env.MAIL_USER,
