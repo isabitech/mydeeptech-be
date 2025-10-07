@@ -76,19 +76,16 @@ await transporter.sendMail({
 // Verify Email
 const verifyEmail = async (req, res) => {
   try {
-    const user = await DTUser.findById(req.params.id);
+    const user = await User.findById(req.params.id);
     if (!user) return res.status(404).send("User not found");
 
-    user.isEmailVerified = true;
+    user.isVerified = true;
     await user.save();
 
-    res.status(200).json({
-      responseCode: "90",
-      responseMessage: "Email verified successfully",
-      data: user,
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+    return res.send("Email verified successfully!");
+  } catch (err) {
+    console.error(err);
+    return res.status(500).send("Server error");
   }
 };
 
