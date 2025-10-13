@@ -12,7 +12,7 @@ const route = require('./routes/auth');
 const app = express();
 
 app.get(  "/",(req, res) => {
-    res.send('Welcome to Deep Tech')
+    res.send('Welcome to My Deep Tech')
 });
 
 // Middleware
