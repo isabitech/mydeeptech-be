@@ -4,7 +4,12 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const bodyParser = require('body-parser');
 
-dotenv.config();
+
+dotenv.config({ path: './.env' });
+
+
+//console.log("Loaded BREVO_API_KEY:", process.env.BREVO_API_KEY ? "✅ Yes" : "❌ No");
+
 
 const route = require('./routes/auth');
 
@@ -23,6 +28,7 @@ app.use(bodyParser.json());
 
 // Routes
 app.use('/api/auth', route);
+
 
 
 // Database Connection

@@ -24,10 +24,10 @@ router.get('/getAllTasks', getAllTasks);
 router.post('/assignTask', assignTask);
 router.post('/emailValidation', validateVisitor);
 router.post("/createDTuser", createDTUser);
-router.get("/verifyDTusermail/:id", verifyEmail);
+/*router.get("/verifyDTusermail/:id", verifyEmail);
 router.post("/:id/DTusertosubmitresult", submitResult);
 router.get("/allDTusers", getAllDTUsers);
 router.put("/Dtuserstatusupdate/:id/status", updateUserStatus);
-router.get("/DTsingleuser/:id", getDTUser);
+router.get("/DTsingleuser/:id", getDTUser); */
 
 module.exports = router;
