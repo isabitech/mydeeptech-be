@@ -15,7 +15,7 @@ const sendVerificationEmail = async (email, name) => {
     subject: "Verify Your Email Address",
     html: `
       <h2>Hello ${name},</h2>
-      <p>Thank you for signing up. Please click the link below to verify your email:</p>
+      <p>Thank you for signing up. Please click the link below to verify your email You are very welcome.:</p>
       <a href="https://yourfrontend.com/verify?email=${encodeURIComponent(email)}">Verify Email</a>
     `,
   };
