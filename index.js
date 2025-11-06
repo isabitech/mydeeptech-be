@@ -16,12 +16,20 @@ const route = require('./routes/auth');
 
 const app = express();
 
+// CORS Configuration
+const corsOptions = {
+    origin: ['http://localhost:5173', 'http://127.0.0.1:5173', 'https://mydeeptech.ng', 'https://www.mydeeptech.ng'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With']
+};
+
 app.get(  "/",(req, res) => {
     res.send('Welcome to My Deep Tech')
 });
 
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({extended: true}));
 app.use(bodyParser.json());
