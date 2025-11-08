@@ -4,11 +4,19 @@ const testDTUserLoginWithJWT = async () => {
     try {
         console.log('🚀 Testing DTUser Login with JWT...\n');
 
-        // Test data - use a user you've already created and verified
+        // Test data - use environment variables or prompt for real credentials
         const loginData = {
-            email: "dammy_5@mailinator.com", // Replace with actual verified user email
-            password: "@Coolguy001" // Replace with actual password
+            email: process.env.TEST_USER_EMAIL || "test@example.com", // Use env variable or placeholder
+            password: process.env.TEST_USER_PASSWORD || "your-password-here" // Use env variable or placeholder
         };
+
+        // Security check - prevent running with placeholder values
+        if (loginData.email === "test@example.com" || loginData.password === "your-password-here") {
+            console.log('❌ Please set TEST_USER_EMAIL and TEST_USER_PASSWORD environment variables');
+            console.log('Example: set TEST_USER_EMAIL=your-email@example.com');
+            console.log('Example: set TEST_USER_PASSWORD=your-actual-password');
+            return;
+        }
 
         console.log('📤 Sending login request...');
         console.log('Email:', loginData.email);
