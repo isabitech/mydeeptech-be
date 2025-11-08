@@ -22,7 +22,7 @@ const createBrevoSMTPTransporter = () => {
 };
 
 // Send email via Brevo SMTP
-const sendVerificationEmailBrevoSMTP = async (email, name) => {
+const sendVerificationEmailBrevoSMTP = async (email, name, userId) => {
   const transporter = createBrevoSMTPTransporter();
   
   const mailOptions = {
@@ -62,10 +62,10 @@ const sendVerificationEmailBrevoSMTP = async (email, name) => {
             <p>Thank you for signing up with MyDeepTech! We're excited to have you on board.</p>
             <p>To complete your registration and verify your email address, please click the button below:</p>
             <div style="text-align: center;">
-              <a href="https://mydeeptech.ng/verify?email=${encodeURIComponent(email)}" class="button">Verify Email Address</a>
+              <a href="https://mydeeptech.ng/verify-email/${userId}?email=${encodeURIComponent(email)}" class="button">Verify Email Address</a>
             </div>
             <p>If the button doesn't work, you can copy and paste this link into your browser:</p>
-            <p class="link">https://mydeeptech.ng/verify?email=${encodeURIComponent(email)}</p>
+            <p class="link">https://mydeeptech.ng/verify-email/${userId}?email=${encodeURIComponent(email)}</p>
             <p>If you didn't create an account with us, please ignore this email.</p>
             <p>Best regards,<br>The MyDeepTech Team</p>
           </div>
@@ -84,7 +84,7 @@ const sendVerificationEmailBrevoSMTP = async (email, name) => {
       Thank you for signing up with MyDeepTech!
       
       To verify your email address, please visit:
-      https://mydeeptech.ng/verify?email=${encodeURIComponent(email)}
+      https://mydeeptech.ng/verify-email/${userId}?email=${encodeURIComponent(email)}
       
       If you didn't create an account with us, please ignore this email.
       

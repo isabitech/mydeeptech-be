@@ -57,5 +57,31 @@ const taskSchema = Joi.object({
 const taskAssignmentSchema = Joi.object({
     taskId: Joi.string().min(5).required(),
     userId: Joi.string().min(5).required()
-})
-module.exports = { signupSchema, loginSchema, projectSchema, taskSchema, taskAssignmentSchema};
+});
+
+// DTUser password setup schema
+const dtUserPasswordSchema = Joi.object({
+    userId: Joi.string().required(),
+    email: Joi.string().email().required(),
+    password: Joi.string().min(8).required(),
+    confirmPassword: Joi.string().valid(Joi.ref('password')).required()
+        .messages({
+            'any.only': 'Passwords do not match'
+        })
+});
+
+// DTUser login validation schema
+const dtUserLoginSchema = Joi.object({
+    email: Joi.string().email().required(),
+    password: Joi.string().required()
+});
+
+module.exports = { 
+    signupSchema, 
+    loginSchema, 
+    projectSchema, 
+    taskSchema, 
+    taskAssignmentSchema, 
+    dtUserPasswordSchema, 
+    dtUserLoginSchema 
+};
