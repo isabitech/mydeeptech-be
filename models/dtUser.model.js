@@ -42,6 +42,14 @@ const dtUserSchema = new mongoose.Schema(
 
     resultLink: { type: String, default: "" },
     isEmailVerified: { type: Boolean, default: false },
+    password: { 
+      type: String, 
+      default: null 
+    },
+    hasSetPassword: { 
+      type: Boolean, 
+      default: false 
+    },
   },
   { timestamps: true }
 );

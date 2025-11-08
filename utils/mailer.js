@@ -20,7 +20,7 @@ const transporter = nodemailer.createTransport({
 });
 
 // Gmail SMTP fallback function
-const sendVerificationEmailGmail = async (email, name) => {
+const sendVerificationEmailGmail = async (email, name, userId) => {
   const mailOptions = {
     from: `"MyDeepTech Team" <${process.env.EMAIL_USER}>`,
     to: email,
@@ -28,7 +28,7 @@ const sendVerificationEmailGmail = async (email, name) => {
     html: `
       <h2>Hello ${name},</h2>
       <p>Thank you for signing up. Please click the link below to verify your email:</p>
-      <a href="https://mydeeptech.ng/verify?email=${encodeURIComponent(email)}">Verify Email</a>
+      <a href="https://mydeeptech.ng/api/auth/verifyDTusermail/${userId}?email=${encodeURIComponent(email)}">Verify Email</a>
     `,
   };
 
@@ -43,14 +43,14 @@ const sendVerificationEmailGmail = async (email, name) => {
 };
 
 // Main email function with priorities: Brevo SMTP > Brevo API > Gmail
-const sendVerificationEmail = async (email, name) => {
+const sendVerificationEmail = async (email, name, userId) => {
   console.log(`📧 Sending verification email to ${email}...`);
   
   // 1st Priority: Try Brevo SMTP (fastest and most reliable)
   if (process.env.SMTP_LOGIN && process.env.SMTP_KEY) {
     try {
       console.log("� Attempting to send email via Brevo SMTP...");
-      const result = await sendVerificationEmailBrevoSMTP(email, name);
+      const result = await sendVerificationEmailBrevoSMTP(email, name, userId);
       console.log(`✅ Email sent successfully via ${result.provider}`);
       return result;
     } catch (brevoSMTPError) {
@@ -62,7 +62,7 @@ const sendVerificationEmail = async (email, name) => {
   if (process.env.BREVO_API_KEY && process.env.BREVO_API_KEY !== 'your-brevo-api-key-here') {
     try {
       console.log("📨 Attempting to send email via Brevo API...");
-      const result = await sendVerificationEmailBrevo(email, name);
+      const result = await sendVerificationEmailBrevo(email, name, userId);
       console.log(`✅ Email sent successfully via ${result.provider}`);
       return result;
     } catch (brevoAPIError) {
@@ -74,7 +74,7 @@ const sendVerificationEmail = async (email, name) => {
   if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
     try {
       console.log("� Attempting to send email via Gmail...");
-      const result = await sendVerificationEmailGmail(email, name);
+      const result = await sendVerificationEmailGmail(email, name, userId);
       console.log(`✅ Email sent successfully via ${result.provider}`);
       return result;
     } catch (gmailError) {
