@@ -44,9 +44,9 @@ const sendVerificationEmailBrevo = async (email, name) => {
             <h2>Hello ${name},</h2>
             <p>Thank you for signing up with MyDeepTech! We're excited to have you on board.</p>
             <p>To complete your registration and verify your email address, please click the button below:</p>
-            <a href="https://yourfrontend.com/verify?email=${encodeURIComponent(email)}" class="button">Verify Email Address</a>
+            <a href="https://mydeeptech.ng/verify?email=${encodeURIComponent(email)}" class="button">Verify Email Address</a>
             <p>If the button doesn't work, you can copy and paste this link into your browser:</p>
-            <p><a href="https://yourfrontend.com/verify?email=${encodeURIComponent(email)}">https://yourfrontend.com/verify?email=${encodeURIComponent(email)}</a></p>
+            <p><a href="https://mydeeptech.ng/verify?email=${encodeURIComponent(email)}">https://mydeeptech.ng/verify?email=${encodeURIComponent(email)}</a></p>
             <p>If you didn't create an account with us, please ignore this email.</p>
             <p>Best regards,<br>The MyDeepTech Team</p>
           </div>
