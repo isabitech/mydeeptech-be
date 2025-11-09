@@ -1,10 +1,16 @@
 const DTUser = require("../models/dtUser.model");
+const AnnotationProject = require("../models/annotationProject.model");
+const ProjectApplication = require("../models/projectApplication.model");
+const Invoice = require("../models/invoice.model");
+const mongoose = require("mongoose");
 const { sendVerificationEmail } = require("../utils/mailer");
 const { emailQueue } = require("../utils/emailQueue");
-const { dtUserPasswordSchema, dtUserLoginSchema } = require("../utils/authValidator");
+const { dtUserPasswordSchema, dtUserLoginSchema, dtUserProfileUpdateSchema, adminCreateSchema, adminVerificationRequestSchema, adminVerificationConfirmSchema, dtUserPasswordResetSchema } = require("../utils/authValidator");
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const jwt = require('jsonwebtoken');
+const { sendAdminVerificationEmail } = require("../utils/adminMailer");
+const { sendAnnotatorApprovalEmail, sendAnnotatorRejectionEmail } = require("../utils/annotatorMailer");
+const adminVerificationStore = require("../utils/adminVerificationStore");
 
 // Option 1: Send email with timeout (current implementation)
 const createDTUser = async (req, res) => {
@@ -302,10 +308,37 @@ const dtUserLogin = async (req, res) => {
     // Check if email is verified
     if (!user.isEmailVerified) {
       console.log(`❌ Email not verified for user: ${email}`);
-      return res.status(400).json({ 
-        success: false,
-        message: "Please verify your email first" 
-      });
+      
+      // Automatically resend verification email
+      try {
+        console.log(`📧 Resending verification email to: ${email}`);
+        
+        // Send verification email with timeout
+        const emailPromise = Promise.race([
+          sendVerificationEmail(user.email, user.fullName, user._id),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Email sending timeout')), 10000)
+          )
+        ]);
+        
+        await emailPromise;
+        console.log(`✅ Verification email resent successfully to: ${email}`);
+        
+        return res.status(400).json({ 
+          success: false,
+          message: "Please verify your email first. A new verification email has been sent to your inbox.",
+          emailResent: true
+        });
+        
+      } catch (emailError) {
+        console.error(`❌ Failed to resend verification email to ${email}:`, emailError.message);
+        
+        return res.status(400).json({ 
+          success: false,
+          message: "Please verify your email first. Unable to resend verification email at this time.",
+          emailResent: false
+        });
+      }
     }
 
     // Check if password is set
@@ -344,11 +377,14 @@ const dtUserLogin = async (req, res) => {
 
     console.log(`🎟️ JWT token generated for user: ${email}`);
 
-    // Return user data with JWT token
+    // Return user data with JWT token in frontend-expected format
     res.status(200).json({
       success: true,
       message: "Login successful",
-      token: token,
+      _usrinfo: {
+        data: token // Token stored in the format frontend expects for sessionStorage
+      },
+      token: token, // Also include token directly for backwards compatibility
       user: {
         id: user._id,
         fullName: user.fullName,
@@ -377,4 +413,2430 @@ const dtUserLogin = async (req, res) => {
   }
 };
 
-module.exports = { createDTUser, createDTUserWithBackgroundEmail, verifyEmail, setupPassword, dtUserLogin };
+// Get DTUser profile by userId
+const getDTUserProfile = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    console.log(`📋 Fetching profile for user ID: ${userId}`);
+
+    // Find user by ID
+    const user = await DTUser.findById(userId);
+    
+    if (!user) {
+      console.log(`❌ User not found with ID: ${userId}`);
+      return res.status(404).json({ 
+        success: false,
+        message: "User not found" 
+      });
+    }
+
+    console.log(`✅ Profile found for user: ${user.email}`);
+
+    // Structure the response in camelCase format with all requested fields
+    const profileData = {
+      // Basic user information
+      id: user._id,
+      fullName: user.fullName,
+      email: user.email,
+      phone: user.phone,
+      domains: user.domains,
+      consent: user.consent,
+      annotatorStatus: user.annotatorStatus,
+      microTaskerStatus: user.microTaskerStatus,
+      isEmailVerified: user.isEmailVerified,
+      hasSetPassword: user.hasSetPassword,
+      resultLink: user.resultLink,
+
+      // Extended profile information in camelCase
+      personalInfo: {
+        fullName: user.fullName,
+        email: user.email,
+        phoneNumber: user.phone,
+        country: user.personal_info?.country || "",
+        timeZone: user.personal_info?.time_zone || "",
+        availableHoursPerWeek: user.personal_info?.available_hours_per_week || 0,
+        preferredCommunicationChannel: user.personal_info?.preferred_communication_channel || ""
+      },
+      paymentInfo: {
+        accountName: user.payment_info?.account_name || "",
+        accountNumber: user.payment_info?.account_number || "",
+        bankName: user.payment_info?.bank_name || "",
+        paymentMethod: user.payment_info?.payment_method || "",
+        paymentCurrency: user.payment_info?.payment_currency || ""
+      },
+      professionalBackground: {
+        educationField: user.professional_background?.education_field || "",
+        yearsOfExperience: user.professional_background?.years_of_experience || 0,
+        annotationExperienceTypes: user.professional_background?.annotation_experience_types || []
+      },
+      toolExperience: user.tool_experience || [],
+      annotationSkills: user.annotation_skills || [],
+      languageProficiency: {
+        primaryLanguage: user.language_proficiency?.primary_language || "",
+        otherLanguages: user.language_proficiency?.other_languages || [],
+        englishFluencyLevel: user.language_proficiency?.english_fluency_level || ""
+      },
+      systemInfo: {
+        deviceType: user.system_info?.device_type || "",
+        operatingSystem: user.system_info?.operating_system || "",
+        internetSpeedMbps: user.system_info?.internet_speed_mbps || 0,
+        powerBackup: user.system_info?.power_backup || false,
+        hasWebcam: user.system_info?.has_webcam || false,
+        hasMicrophone: user.system_info?.has_microphone || false
+      },
+      projectPreferences: {
+        domainsOfInterest: user.project_preferences?.domains_of_interest || user.domains || [],
+        availabilityType: user.project_preferences?.availability_type || "",
+        ndaSigned: user.project_preferences?.nda_signed || false
+      },
+      attachments: {
+        resumeUrl: user.attachments?.resume_url || "",
+        idDocumentUrl: user.attachments?.id_document_url || "",
+        workSamplesUrl: user.attachments?.work_samples_url || []
+      },
+      accountMetadata: {
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        status: user.annotatorStatus,
+        isEmailVerified: user.isEmailVerified,
+        hasSetPassword: user.hasSetPassword
+      }
+    };
+
+    res.status(200).json({
+      success: true,
+      message: "Profile retrieved successfully",
+      profile: profileData
+    });
+
+  } catch (error) {
+    console.error("❌ Error fetching DTUser profile:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error fetching profile",
+      error: error.message,
+    });
+  }
+};
+
+// Update DTUser profile (PATCH endpoint)
+const updateDTUserProfile = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    // Validate input
+    const { error } = dtUserProfileUpdateSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ 
+        success: false,
+        message: error.details[0].message 
+      });
+    }
+
+    console.log(`📝 Profile update request for user ID: ${userId}`);
+
+    // Check if requesting user can update this profile (from auth middleware)
+    if (req.user.userId !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. You can only update your own profile.",
+        code: 'ACCESS_DENIED'
+      });
+    }
+
+    // Find the user
+    const user = await DTUser.findById(userId);
+    if (!user) {
+      console.log(`❌ User not found with ID: ${userId}`);
+      return res.status(404).json({ 
+        success: false,
+        message: "User not found" 
+      });
+    }
+
+    // Check if user is verified to make profile updates
+    if (user.annotatorStatus !== 'verified' && user.annotatorStatus !== 'approved') {
+      return res.status(403).json({
+        success: false,
+        message: "Profile updates are only allowed for verified annotators",
+        code: 'NOT_VERIFIED',
+        currentStatus: user.annotatorStatus
+      });
+    }
+
+    console.log(`✅ User ${user.email} is ${user.annotatorStatus}, proceeding with update`);
+
+    // Prepare update object
+    const updateData = {};
+    
+    // Update personal info
+    if (req.body.personalInfo) {
+      updateData.personal_info = {
+        ...user.personal_info?.toObject(),
+        ...req.body.personalInfo
+      };
+    }
+
+    // Update payment info
+    if (req.body.paymentInfo) {
+      updateData.payment_info = {
+        ...user.payment_info?.toObject(),
+        ...req.body.paymentInfo
+      };
+    }
+
+    // Update professional background
+    if (req.body.professionalBackground) {
+      updateData.professional_background = {
+        ...user.professional_background?.toObject(),
+        ...req.body.professionalBackground
+      };
+    }
+
+    // Update tool experience
+    if (req.body.toolExperience !== undefined) {
+      updateData.tool_experience = req.body.toolExperience;
+    }
+
+    // Update annotation skills
+    if (req.body.annotationSkills !== undefined) {
+      updateData.annotation_skills = req.body.annotationSkills;
+    }
+
+    // Update language proficiency
+    if (req.body.languageProficiency) {
+      updateData.language_proficiency = {
+        ...user.language_proficiency?.toObject(),
+        ...req.body.languageProficiency
+      };
+    }
+
+    // Update system info
+    if (req.body.systemInfo) {
+      updateData.system_info = {
+        ...user.system_info?.toObject(),
+        ...req.body.systemInfo
+      };
+    }
+
+    // Update project preferences
+    if (req.body.projectPreferences) {
+      updateData.project_preferences = {
+        ...user.project_preferences?.toObject(),
+        ...req.body.projectPreferences
+      };
+    }
+
+    // Update attachments
+    if (req.body.attachments) {
+      updateData.attachments = {
+        ...user.attachments?.toObject(),
+        ...req.body.attachments
+      };
+    }
+
+    // Perform the update
+    const updatedUser = await DTUser.findByIdAndUpdate(
+      userId,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    );
+
+    console.log(`✅ Profile updated successfully for user: ${user.email}`);
+
+    // Return updated profile in the same format as getDTUserProfile
+    const profileData = {
+      id: updatedUser._id,
+      fullName: updatedUser.fullName,
+      email: updatedUser.email,
+      phone: updatedUser.phone,
+      domains: updatedUser.domains,
+      consent: updatedUser.consent,
+      annotatorStatus: updatedUser.annotatorStatus,
+      microTaskerStatus: updatedUser.microTaskerStatus,
+      isEmailVerified: updatedUser.isEmailVerified,
+      hasSetPassword: updatedUser.hasSetPassword,
+      resultLink: updatedUser.resultLink,
+
+      personalInfo: {
+        fullName: updatedUser.fullName,
+        email: updatedUser.email,
+        phoneNumber: updatedUser.phone,
+        country: updatedUser.personal_info?.country || "",
+        timeZone: updatedUser.personal_info?.time_zone || "",
+        availableHoursPerWeek: updatedUser.personal_info?.available_hours_per_week || 0,
+        preferredCommunicationChannel: updatedUser.personal_info?.preferred_communication_channel || ""
+      },
+      paymentInfo: {
+        accountName: updatedUser.payment_info?.account_name || "",
+        accountNumber: updatedUser.payment_info?.account_number || "",
+        bankName: updatedUser.payment_info?.bank_name || "",
+        paymentMethod: updatedUser.payment_info?.payment_method || "",
+        paymentCurrency: updatedUser.payment_info?.payment_currency || ""
+      },
+      professionalBackground: {
+        educationField: updatedUser.professional_background?.education_field || "",
+        yearsOfExperience: updatedUser.professional_background?.years_of_experience || 0,
+        annotationExperienceTypes: updatedUser.professional_background?.annotation_experience_types || []
+      },
+      toolExperience: updatedUser.tool_experience || [],
+      annotationSkills: updatedUser.annotation_skills || [],
+      languageProficiency: {
+        primaryLanguage: updatedUser.language_proficiency?.primary_language || "",
+        otherLanguages: updatedUser.language_proficiency?.other_languages || [],
+        englishFluencyLevel: updatedUser.language_proficiency?.english_fluency_level || ""
+      },
+      systemInfo: {
+        deviceType: updatedUser.system_info?.device_type || "",
+        operatingSystem: updatedUser.system_info?.operating_system || "",
+        internetSpeedMbps: updatedUser.system_info?.internet_speed_mbps || 0,
+        powerBackup: updatedUser.system_info?.power_backup || false,
+        hasWebcam: updatedUser.system_info?.has_webcam || false,
+        hasMicrophone: updatedUser.system_info?.has_microphone || false
+      },
+      projectPreferences: {
+        domainsOfInterest: updatedUser.project_preferences?.domains_of_interest || updatedUser.domains || [],
+        availabilityType: updatedUser.project_preferences?.availability_type || "",
+        ndaSigned: updatedUser.project_preferences?.nda_signed || false
+      },
+      attachments: {
+        resumeUrl: updatedUser.attachments?.resume_url || "",
+        idDocumentUrl: updatedUser.attachments?.id_document_url || "",
+        workSamplesUrl: updatedUser.attachments?.work_samples_url || []
+      },
+      accountMetadata: {
+        createdAt: updatedUser.createdAt,
+        updatedAt: updatedUser.updatedAt,
+        status: updatedUser.annotatorStatus,
+        isEmailVerified: updatedUser.isEmailVerified,
+        hasSetPassword: updatedUser.hasSetPassword
+      }
+    };
+
+    res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      profile: profileData,
+      fieldsUpdated: Object.keys(req.body)
+    });
+
+  } catch (error) {
+    console.error("❌ Error updating DTUser profile:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error updating profile",
+      error: error.message,
+    });
+  }
+};
+
+// DTUser password reset function (requires old password)
+const resetDTUserPassword = async (req, res) => {
+  try {
+    // Validate input
+    const { error } = dtUserPasswordResetSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ 
+        success: false,
+        message: error.details[0].message 
+      });
+    }
+
+    const { oldPassword, newPassword } = req.body;
+    const userId = req.user.userId; // From JWT token via authenticateToken middleware
+
+    console.log(`🔐 Password reset request for user ID: ${userId}`);
+
+    // Find user by ID
+    const user = await DTUser.findById(userId);
+    
+    if (!user) {
+      console.log(`❌ User not found with ID: ${userId}`);
+      return res.status(404).json({ 
+        success: false,
+        message: "User not found" 
+      });
+    }
+
+    // Check if user has a password set
+    if (!user.hasSetPassword || !user.password) {
+      console.log(`❌ User ${user.email} does not have a password set`);
+      return res.status(400).json({ 
+        success: false,
+        message: "No password is currently set. Please use the setup password endpoint instead.",
+        requiresPasswordSetup: true
+      });
+    }
+
+    // Verify old password
+    const isOldPasswordValid = await bcrypt.compare(oldPassword, user.password);
+    if (!isOldPasswordValid) {
+      console.log(`❌ Invalid old password for user: ${user.email}`);
+      return res.status(400).json({ 
+        success: false,
+        message: "Current password is incorrect" 
+      });
+    }
+
+    // Check if new password is different from old password
+    const isSamePassword = await bcrypt.compare(newPassword, user.password);
+    if (isSamePassword) {
+      console.log(`❌ New password same as old password for user: ${user.email}`);
+      return res.status(400).json({ 
+        success: false,
+        message: "New password must be different from current password" 
+      });
+    }
+
+    // Hash new password
+    const saltRounds = 12;
+    const hashedNewPassword = await bcrypt.hash(newPassword, saltRounds);
+
+    // Update user password
+    user.password = hashedNewPassword;
+    await user.save();
+
+    console.log(`✅ Password successfully reset for user: ${user.email}`);
+
+    res.status(200).json({
+      success: true,
+      message: "Password reset successfully",
+      user: {
+        id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        hasSetPassword: true,
+        updatedAt: user.updatedAt
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error resetting DTUser password:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error during password reset",
+      error: error.message,
+    });
+  }
+};
+
+// Get single DTUser (public endpoint)
+const getDTUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    console.log(`👤 Fetching DTUser details for ID: ${id}`);
+
+    const user = await DTUser.findById(id).select('-password'); // Exclude password for security
+    
+    if (!user) {
+      console.log(`❌ User not found with ID: ${id}`);
+      return res.status(404).json({ 
+        success: false,
+        message: "User not found" 
+      });
+    }
+
+    console.log(`✅ Retrieved DTUser details for: ${user.email}`);
+
+    res.status(200).json({
+      success: true,
+      message: "User details retrieved successfully",
+      user: {
+        id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        phone: user.phone,
+        domains: user.domains,
+        consent: user.consent,
+        annotatorStatus: user.annotatorStatus,
+        microTaskerStatus: user.microTaskerStatus,
+        isEmailVerified: user.isEmailVerified,
+        hasSetPassword: user.hasSetPassword,
+        resultLink: user.resultLink,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error fetching DTUser details:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error fetching user details",
+      error: error.message,
+    });
+  }
+};
+
+// Admin function: Get all DTUsers
+const getAllDTUsers = async (req, res) => {
+  try {
+    console.log(`👥 Admin ${req.admin.email} requesting all DTUsers`);
+
+    // Query parameters for filtering and pagination
+    const { 
+      page = 1, 
+      limit = 20, 
+      status,
+      verified,
+      hasPassword,
+      search 
+    } = req.query;
+
+    // Build filter object
+    const filter = {};
+    
+    // Exclude admin users (those with admin email domains or admin-related domains)
+    filter.$and = [
+      { 
+        $nor: [
+          { email: { $regex: /@mydeeptech\.ng$/, $options: 'i' } }, // Exclude @mydeeptech.ng emails
+          { domains: { $in: ['Administration', 'Management'] } } // Exclude admin domains
+        ]
+      }
+    ];
+    
+    if (status) {
+      filter.annotatorStatus = status;
+    }
+    
+    if (verified !== undefined) {
+      filter.isEmailVerified = verified === 'true';
+    }
+    
+    if (hasPassword !== undefined) {
+      filter.hasSetPassword = hasPassword === 'true';
+    }
+    
+    if (search) {
+      filter.$or = [
+        { fullName: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Calculate pagination
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    
+    // Get users with pagination
+    const users = await DTUser.find(filter)
+      .select('-password') // Exclude password field
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    // Get total count for pagination
+    const totalUsers = await DTUser.countDocuments(filter);
+    const totalPages = Math.ceil(totalUsers / parseInt(limit));
+
+    // Get status summary (excluding admin users)
+    const statusSummary = await DTUser.aggregate([
+      { 
+        $match: {
+          $nor: [
+            { email: { $regex: /@mydeeptech\.ng$/, $options: 'i' } }, // Exclude @mydeeptech.ng emails
+            { domains: { $in: ['Administration', 'Management'] } } // Exclude admin domains
+          ]
+        }
+      },
+      { $group: { _id: '$annotatorStatus', count: { $sum: 1 } } }
+    ]);
+
+    console.log(`✅ Retrieved ${users.length} DTUsers (Page ${page}/${totalPages})`);
+
+    res.status(200).json({
+      success: true,
+      message: "DTUsers retrieved successfully",
+      data: {
+        users: users,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: totalPages,
+          totalUsers: totalUsers,
+          usersPerPage: parseInt(limit),
+          hasNextPage: parseInt(page) < totalPages,
+          hasPreviousPage: parseInt(page) > 1
+        },
+        summary: {
+          totalUsers: totalUsers,
+          statusBreakdown: statusSummary.reduce((acc, item) => {
+            acc[item._id] = item.count;
+            return acc;
+          }, {}),
+          filters: filter
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error fetching all DTUsers:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error fetching DTUsers",
+      error: error.message,
+    });
+  }
+};
+
+// Admin function: Get all admin users
+const getAllAdminUsers = async (req, res) => {
+  try {
+    console.log(`🔍 Admin ${req.admin.email} requesting admin users list`);
+
+    // Build filter for admin users only
+    const filter = {
+      $or: [
+        { email: /@mydeeptech\.ng$/i }, // Users with @mydeeptech.ng emails
+        { domains: { $in: ['Administration', 'Management'] } } // Users with admin domains
+      ]
+    };
+
+    // Get query parameters
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+    const sortBy = req.query.sortBy || 'createdAt';
+    const sortOrder = req.query.sortOrder === 'asc' ? 1 : -1;
+    const search = req.query.search;
+
+    // Add search functionality if provided
+    if (search) {
+      const searchRegex = new RegExp(search, 'i');
+      filter.$and = filter.$and || [];
+      filter.$and.push({
+        $or: [
+          { fullName: searchRegex },
+          { email: searchRegex },
+          { phone: searchRegex }
+        ]
+      });
+    }
+
+    console.log('🔍 Admin users filter:', JSON.stringify(filter, null, 2));
+
+    // Get admin users with pagination
+    const adminUsers = await DTUser.find(filter)
+      .sort({ [sortBy]: sortOrder })
+      .skip(skip)
+      .limit(limit)
+      .select('-password') // Exclude password field
+      .lean();
+
+    // Get total count for pagination
+    const totalAdminUsers = await DTUser.countDocuments(filter);
+
+    console.log(`✅ Found ${adminUsers.length} admin users (${totalAdminUsers} total)`);
+
+    // Get role/status summary for admin users
+    const roleSummary = await DTUser.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: {
+            hasAdminDomains: {
+              $cond: {
+                if: { $setIsSubset: [['Administration', 'Management'], { $ifNull: ['$domains', []] }] },
+                then: true,
+                else: false
+              }
+            },
+            emailDomain: { $substr: ['$email', { $indexOfCP: ['$email', '@'] }, -1] }
+          },
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(totalAdminUsers / limit);
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
+
+    res.status(200).json({
+      success: true,
+      message: `Retrieved ${adminUsers.length} admin users`,
+      data: {
+        adminUsers: adminUsers,
+        pagination: {
+          currentPage: page,
+          totalPages: totalPages,
+          totalAdminUsers: totalAdminUsers,
+          hasNextPage: hasNextPage,
+          hasPrevPage: hasPrevPage,
+          limit: limit
+        },
+        summary: {
+          totalAdminUsers: totalAdminUsers,
+          roleSummary: roleSummary,
+          filters: filter
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error fetching admin users:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error fetching admin users",
+      error: error.message,
+    });
+  }
+};
+
+// Admin function: Approve annotator
+const approveAnnotator = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { newStatus = 'approved' } = req.body;
+
+    console.log(`✅ Admin ${req.admin.email} attempting to approve annotator: ${userId} with status: ${newStatus}`);
+
+    // Validate new status
+    const validStatuses = ['pending', 'submitted', 'verified', 'approved', 'rejected'];
+    if (!validStatuses.includes(newStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid status. Must be one of: ${validStatuses.join(', ')}`,
+        validStatuses: validStatuses
+      });
+    }
+
+    // Find the user
+    const user = await DTUser.findById(userId);
+    if (!user) {
+      console.log(`❌ User not found with ID: ${userId}`);
+      return res.status(404).json({ 
+        success: false,
+        message: "User not found" 
+      });
+    }
+
+    const previousStatus = user.annotatorStatus;
+    
+    // Update the statuses based on approval/rejection
+    if (newStatus === 'approved') {
+      // Approved annotator: both statuses set to approved
+      user.annotatorStatus = 'approved';
+      user.microTaskerStatus = 'approved';
+      
+      console.log(`✅ Setting ${user.email} as approved annotator (both statuses approved)`);
+      
+    } else if (newStatus === 'rejected') {
+      // Rejected annotator: annotator rejected but micro tasker approved
+      user.annotatorStatus = 'rejected';
+      user.microTaskerStatus = 'approved';
+      
+      console.log(`❌ Setting ${user.email} as rejected annotator but approved micro tasker`);
+      
+    } else {
+      // Other statuses: only update annotator status
+      user.annotatorStatus = newStatus;
+      
+      console.log(`🔄 Setting ${user.email} annotator status to: ${newStatus}`);
+    }
+
+    await user.save();
+
+    console.log(`✅ Successfully updated ${user.email} from ${previousStatus} to ${newStatus}`);
+
+    // Send appropriate email notification
+    try {
+      if (newStatus === 'approved') {
+        // Send annotator approval email
+        await sendAnnotatorApprovalEmail(user.email, user.fullName);
+        console.log(`📧 Annotator approval email sent to: ${user.email}`);
+        
+      } else if (newStatus === 'rejected') {
+        // Send micro tasker approval email (rejection from annotator but approval for micro tasks)
+        await sendAnnotatorRejectionEmail(user.email, user.fullName);
+        console.log(`📧 Micro tasker approval email sent to: ${user.email}`);
+      }
+    } catch (emailError) {
+      console.error(`❌ Failed to send notification email to ${user.email}:`, emailError);
+      // Don't fail the status update if email fails, but log it
+    }
+
+    // Return updated user info
+    res.status(200).json({
+      success: true,
+      message: `Annotator status updated successfully from ${previousStatus} to ${newStatus}`,
+      data: {
+        userId: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        previousStatus: previousStatus,
+        newStatus: newStatus,
+        annotatorStatus: user.annotatorStatus,
+        microTaskerStatus: user.microTaskerStatus,
+        emailNotificationSent: newStatus === 'approved' || newStatus === 'rejected',
+        updatedAt: user.updatedAt,
+        updatedBy: req.admin.email
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error approving annotator:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error updating annotator status",
+      error: error.message,
+    });
+  }
+};
+
+// Admin function: Reject annotator (dedicated endpoint)
+const rejectAnnotator = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { reason = '' } = req.body; // Optional rejection reason
+
+    console.log(`❌ Admin ${req.admin.email} rejecting annotator: ${userId} ${reason ? 'with reason: ' + reason : ''}`);
+
+    // Find the user
+    const user = await DTUser.findById(userId);
+    if (!user) {
+      console.log(`❌ User not found with ID: ${userId}`);
+      return res.status(404).json({ 
+        success: false,
+        message: "User not found" 
+      });
+    }
+
+    const previousStatus = user.annotatorStatus;
+    
+    // Reject annotator: annotator rejected but micro tasker approved
+    user.annotatorStatus = 'rejected';
+    user.microTaskerStatus = 'approved';
+
+    await user.save();
+
+    console.log(`❌ ${user.email} annotator rejected, micro tasker approved`);
+    console.log(`📊 Status change: ${previousStatus} → rejected (annotator), approved (micro tasker)`);
+
+    // Send micro tasker approval email (soft rejection - they can still do micro tasks)
+    try {
+      const { sendAnnotatorRejectionEmail } = require('../utils/annotatorMailer');
+      await sendAnnotatorRejectionEmail(user.email, user.fullName);
+      console.log(`📧 Micro tasker approval email sent to: ${user.email}`);
+    } catch (emailError) {
+      console.error(`❌ Failed to send notification email to ${user.email}:`, emailError);
+      // Don't fail the status update if email fails, but log it
+    }
+
+    // Return updated user info
+    res.status(200).json({
+      success: true,
+      message: `Annotator rejected successfully. User approved as micro tasker.`,
+      data: {
+        userId: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        previousStatus: previousStatus,
+        annotatorStatus: user.annotatorStatus,
+        microTaskerStatus: user.microTaskerStatus,
+        reason: reason || 'No reason provided',
+        emailNotificationSent: true,
+        updatedAt: user.updatedAt,
+        rejectedBy: req.admin.email
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error rejecting annotator:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error rejecting annotator",
+      error: error.message,
+    });
+  }
+};
+
+// Admin function: Get single DTUser details
+const getDTUserAdmin = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    console.log(`👤 Admin ${req.admin.email} requesting details for user: ${userId}`);
+
+    const user = await DTUser.findById(userId).select('-password');
+    
+    if (!user) {
+      console.log(`❌ User not found with ID: ${userId}`);
+      return res.status(404).json({ 
+        success: false,
+        message: "User not found" 
+      });
+    }
+
+    console.log(`✅ Retrieved user details for: ${user.email}`);
+
+    res.status(200).json({
+      success: true,
+      message: "User details retrieved successfully",
+      data: {
+        user: user
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error fetching DTUser details:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error fetching user details",
+      error: error.message,
+    });
+  }
+};
+
+// Admin function: Request admin verification (Step 1)
+const requestAdminVerification = async (req, res) => {
+  try {
+    // Validate input
+    const { error } = adminVerificationRequestSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ 
+        success: false,
+        message: error.details[0].message 
+      });
+    }
+
+    const { fullName, email, phone, password, adminKey } = req.body;
+
+    console.log(`📧 Admin verification request for: ${email}`);
+
+    // Verify admin creation key
+    const validAdminKey = process.env.ADMIN_CREATION_KEY || 'super-secret-admin-key-2024';
+    if (adminKey !== validAdminKey) {
+      console.log(`❌ Invalid admin creation key provided`);
+      return res.status(403).json({
+        success: false,
+        message: "Invalid admin creation key",
+        code: 'INVALID_ADMIN_KEY'
+      });
+    }
+
+    // Check if admin email is valid
+    const adminEmails = process.env.ADMIN_EMAILS ? process.env.ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase()) : [];
+    const isValidAdminEmail = email.toLowerCase().endsWith('@mydeeptech.ng') || adminEmails.includes(email.toLowerCase());
+    
+    if (!isValidAdminEmail) {
+      console.log(`❌ Invalid admin email domain: ${email}`);
+      return res.status(400).json({
+        success: false,
+        message: "Admin email must end with @mydeeptech.ng or be in approved admin list",
+        code: 'INVALID_ADMIN_EMAIL'
+      });
+    }
+
+    // Check if admin already exists
+    const existingAdmin = await DTUser.findOne({ email: email.toLowerCase() });
+    if (existingAdmin) {
+      console.log(`❌ Admin already exists: ${email}`);
+      return res.status(409).json({
+        success: false,
+        message: "Admin account already exists with this email",
+        code: 'ADMIN_EXISTS'
+      });
+    }
+
+    // Generate 6-digit verification code
+    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Store admin data temporarily with verification code
+    const adminData = { fullName, email, phone, password };
+    adminVerificationStore.setVerificationCode(email, verificationCode, adminData);
+
+    // Send verification email
+    try {
+      await sendAdminVerificationEmail(email, verificationCode, fullName);
+      
+      console.log(`✅ Admin verification email sent to: ${email}`);
+
+      res.status(200).json({
+        success: true,
+        message: "Verification code sent to admin email",
+        data: {
+          email: email,
+          expiresIn: "15 minutes",
+          nextStep: "Use the verification code from your email to complete admin account creation"
+        }
+      });
+
+    } catch (emailError) {
+      console.error(`❌ Failed to send verification email:`, emailError);
+      
+      // Clean up stored verification data if email fails
+      adminVerificationStore.removeVerificationCode(email);
+      
+      res.status(500).json({
+        success: false,
+        message: "Failed to send verification email. Please try again.",
+        error: emailError.message
+      });
+    }
+
+  } catch (error) {
+    console.error("❌ Error requesting admin verification:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error requesting admin verification",
+      error: error.message,
+    });
+  }
+};
+
+// Admin function: Confirm verification and create admin (Step 2)
+const confirmAdminVerification = async (req, res) => {
+  try {
+    // Validate input
+    const { error } = adminVerificationConfirmSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ 
+        success: false,
+        message: error.details[0].message 
+      });
+    }
+
+    const { email, verificationCode, adminKey } = req.body;
+
+    console.log(`✅ Admin verification confirmation for: ${email}`);
+
+    // Verify admin creation key again
+    const validAdminKey = process.env.ADMIN_CREATION_KEY || 'super-secret-admin-key-2024';
+    if (adminKey !== validAdminKey) {
+      console.log(`❌ Invalid admin creation key provided`);
+      return res.status(403).json({
+        success: false,
+        message: "Invalid admin creation key",
+        code: 'INVALID_ADMIN_KEY'
+      });
+    }
+
+    // Get verification data
+    const verificationData = adminVerificationStore.getVerificationData(email);
+    if (!verificationData) {
+      console.log(`❌ No verification request found for: ${email}`);
+      return res.status(404).json({
+        success: false,
+        message: "No verification request found or verification expired",
+        code: 'VERIFICATION_NOT_FOUND'
+      });
+    }
+
+    // Check if verification code has expired
+    if (Date.now() > verificationData.expiresAt) {
+      console.log(`❌ Verification code expired for: ${email}`);
+      adminVerificationStore.removeVerificationCode(email);
+      return res.status(400).json({
+        success: false,
+        message: "Verification code has expired. Please request a new one.",
+        code: 'VERIFICATION_EXPIRED'
+      });
+    }
+
+    // Check verification attempts
+    if (verificationData.attempts >= 3) {
+      console.log(`❌ Too many verification attempts for: ${email}`);
+      adminVerificationStore.removeVerificationCode(email);
+      return res.status(429).json({
+        success: false,
+        message: "Too many verification attempts. Please request a new verification code.",
+        code: 'TOO_MANY_ATTEMPTS'
+      });
+    }
+
+    // Verify the code
+    if (verificationCode !== verificationData.code) {
+      console.log(`❌ Invalid verification code for: ${email}`);
+      const attempts = adminVerificationStore.incrementAttempts(email);
+      return res.status(400).json({
+        success: false,
+        message: "Invalid verification code",
+        code: 'INVALID_VERIFICATION_CODE',
+        attemptsRemaining: 3 - attempts
+      });
+    }
+
+    // Verification successful - create admin account
+    const { fullName, phone, password } = verificationData.adminData;
+
+    // Hash password
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // Create admin user (with unverified email - they need to verify via email link)
+    const newAdmin = new DTUser({
+      fullName,
+      phone,
+      email: email.toLowerCase(),
+      domains: ['Administration', 'Management'],
+      socialsFollowed: [],
+      consent: true,
+      password: hashedPassword,
+      hasSetPassword: true,
+      isEmailVerified: false, // Requires email verification via link
+      annotatorStatus: 'approved', // Admins are pre-approved
+      microTaskerStatus: 'approved',
+      resultLink: ''
+    });
+
+    await newAdmin.save();
+
+    // Generate and send OTP code for email verification
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
+    
+    // Store OTP in Redis with user data
+    try {
+      await adminVerificationStore.setVerificationCode(newAdmin.email, otpCode, {
+        userId: newAdmin._id,
+        fullName: newAdmin.fullName,
+        email: newAdmin.email,
+        purpose: 'email_verification'
+      });
+      
+      // Send OTP email using admin mailer
+      await sendAdminVerificationEmail(newAdmin.email, otpCode, newAdmin.fullName);
+      console.log(`✅ OTP code sent to admin email: ${email}`);
+    } catch (emailError) {
+      console.error(`❌ Failed to send OTP to admin: ${email}`, emailError);
+      // Don't fail the admin creation if email fails, but log it
+    }
+
+    // Clean up verification data
+    adminVerificationStore.removeVerificationCode(email);
+
+    console.log(`✅ Admin account created successfully: ${email}`);
+
+    // Return admin data (note: no token provided since email needs OTP verification)
+    res.status(201).json({
+      success: true,
+      message: "Admin account created successfully! Please check your email for the OTP code to verify your account.",
+      otpVerificationRequired: true,
+      admin: {
+        id: newAdmin._id,
+        fullName: newAdmin.fullName,
+        email: newAdmin.email,
+        phone: newAdmin.phone,
+        domains: newAdmin.domains,
+        isEmailVerified: newAdmin.isEmailVerified,
+        hasSetPassword: newAdmin.hasSetPassword,
+        annotatorStatus: newAdmin.annotatorStatus,
+        microTaskerStatus: newAdmin.microTaskerStatus,
+        createdAt: newAdmin.createdAt,
+        isAdmin: true
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error confirming admin verification:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error creating admin account",
+      error: error.message,
+    });
+  }
+};
+
+// Legacy admin creation function (kept for backward compatibility)
+const createAdmin = async (req, res) => {
+  try {
+    // Validate input
+    const { error } = adminCreateSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ 
+        success: false,
+        message: error.details[0].message 
+      });
+    }
+
+    const { fullName, email, phone, password, adminKey } = req.body;
+
+    console.log(`👑 Direct admin creation request for: ${email} (legacy method)`);
+
+    // Verify admin creation key
+    const validAdminKey = process.env.ADMIN_CREATION_KEY || 'super-secret-admin-key-2024';
+    if (adminKey !== validAdminKey) {
+      console.log(`❌ Invalid admin creation key provided`);
+      return res.status(403).json({
+        success: false,
+        message: "Invalid admin creation key",
+        code: 'INVALID_ADMIN_KEY'
+      });
+    }
+
+    // Check if admin email is valid (must end with @mydeeptech.ng or be in admin emails)
+    const adminEmails = process.env.ADMIN_EMAILS ? process.env.ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase()) : [];
+    const isValidAdminEmail = email.toLowerCase().endsWith('@mydeeptech.ng') || adminEmails.includes(email.toLowerCase());
+    
+    if (!isValidAdminEmail) {
+      console.log(`❌ Invalid admin email domain: ${email}`);
+      return res.status(400).json({
+        success: false,
+        message: "Admin email must end with @mydeeptech.ng or be in approved admin list",
+        code: 'INVALID_ADMIN_EMAIL'
+      });
+    }
+
+    // Check if admin already exists
+    const existingAdmin = await DTUser.findOne({ email: email.toLowerCase() });
+    if (existingAdmin) {
+      console.log(`❌ Admin already exists: ${email}`);
+      return res.status(409).json({
+        success: false,
+        message: "Admin account already exists with this email",
+        code: 'ADMIN_EXISTS'
+      });
+    }
+
+    // Hash password
+    const saltRounds = 12;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // Create admin user (with unverified email - they need to verify via email link)
+    const newAdmin = new DTUser({
+      fullName,
+      phone,
+      email: email.toLowerCase(),
+      domains: ['Administration', 'Management'], // Default admin domains
+      socialsFollowed: [],
+      consent: true,
+      password: hashedPassword,
+      hasSetPassword: true,
+      isEmailVerified: false, // Requires email verification via link
+      annotatorStatus: 'approved', // Admins are pre-approved
+      microTaskerStatus: 'approved',
+      resultLink: ''
+    });
+
+    await newAdmin.save();
+
+    // Generate and send OTP code for email verification
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
+    
+    // Store OTP in Redis with user data
+    try {
+      await adminVerificationStore.setVerificationCode(newAdmin.email, otpCode, {
+        userId: newAdmin._id,
+        fullName: newAdmin.fullName,
+        email: newAdmin.email,
+        purpose: 'email_verification'
+      });
+      
+      // Send OTP email using admin mailer
+      await sendAdminVerificationEmail(newAdmin.email, otpCode, newAdmin.fullName);
+      console.log(`✅ OTP code sent to admin email: ${email}`);
+    } catch (emailError) {
+      console.error(`❌ Failed to send OTP to admin: ${email}`, emailError);
+      // Don't fail the admin creation if email fails, but log it
+    }
+
+    console.log(`✅ Admin account created successfully: ${email}`);
+
+    // Return admin data (note: no token provided since email needs OTP verification)  
+    res.status(201).json({
+      success: true,
+      message: "Admin account created successfully! Please check your email for the OTP code to verify your account.",
+      otpVerificationRequired: true,
+      admin: {
+        id: newAdmin._id,
+        fullName: newAdmin.fullName,
+        email: newAdmin.email,
+        phone: newAdmin.phone,
+        domains: newAdmin.domains,
+        isEmailVerified: newAdmin.isEmailVerified,
+        hasSetPassword: newAdmin.hasSetPassword,
+        annotatorStatus: newAdmin.annotatorStatus,
+        microTaskerStatus: newAdmin.microTaskerStatus,
+        createdAt: newAdmin.createdAt,
+        isAdmin: true
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error creating admin account:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error creating admin account",
+      error: error.message,
+    });
+  }
+};
+
+// Verify Admin Account with OTP
+const verifyAdminOTP = async (req, res) => {
+  try {
+    console.log("🔐 Admin OTP verification attempt");
+
+    // Validate request data
+    const { error } = adminVerificationConfirmSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation error",
+        errors: error.details.map(detail => detail.message)
+      });
+    }
+
+    const { email, verificationCode, adminKey } = req.body;
+
+    // Verify admin creation key
+    const validAdminKey = process.env.ADMIN_CREATION_KEY || 'super-secret-admin-key-2024';
+    if (adminKey !== validAdminKey) {
+      return res.status(403).json({
+        success: false,
+        message: "Invalid admin creation key",
+        code: 'INVALID_ADMIN_KEY'
+      });
+    }
+
+    // Get OTP verification data from Redis
+    const verificationData = await adminVerificationStore.getVerificationData(email);
+    if (!verificationData) {
+      return res.status(404).json({
+        success: false,
+        message: "No OTP verification request found or OTP expired",
+        code: 'OTP_NOT_FOUND'
+      });
+    }
+
+    // Check if OTP has expired
+    if (Date.now() > verificationData.expiresAt) {
+      await adminVerificationStore.removeVerificationCode(email);
+      return res.status(400).json({
+        success: false,
+        message: "OTP has expired. Please request a new one.",
+        code: 'OTP_EXPIRED'
+      });
+    }
+
+    // Verify the OTP code
+    if (verificationCode !== verificationData.code) {
+      const attempts = await adminVerificationStore.incrementAttempts(email);
+      return res.status(400).json({
+        success: false,
+        message: "Invalid OTP code",
+        code: 'INVALID_OTP',
+        attemptsRemaining: 3 - attempts
+      });
+    }
+
+    // OTP is valid - verify the admin's email
+    const admin = await DTUser.findById(verificationData.adminData.userId);
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message: "Admin account not found",
+        code: 'ADMIN_NOT_FOUND'
+      });
+    }
+
+    // Update admin to verified status
+    admin.isEmailVerified = true;
+    await admin.save();
+
+    // Clean up OTP data
+    await adminVerificationStore.removeVerificationCode(email);
+
+    // Generate JWT token for login
+    const token = jwt.sign(
+      { 
+        userId: admin._id, 
+        email: admin.email,
+        isAdmin: true,
+        role: admin.role || 'admin'
+      },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '7d' }
+    );
+
+    console.log(`✅ Admin account verified successfully: ${email}`);
+
+    res.status(200).json({
+      success: true,
+      message: "Admin account verified successfully! You are now logged in.",
+      _usrinfo: {
+        data: token
+      },
+      token: token,
+      admin: {
+        id: admin._id,
+        fullName: admin.fullName,
+        email: admin.email,
+        phone: admin.phone,
+        domains: admin.domains,
+        isEmailVerified: admin.isEmailVerified,
+        hasSetPassword: admin.hasSetPassword,
+        annotatorStatus: admin.annotatorStatus,
+        microTaskerStatus: admin.microTaskerStatus,
+        createdAt: admin.createdAt,
+        isAdmin: true
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error during admin OTP verification:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error during OTP verification",
+      error: error.message,
+    });
+  }
+};
+
+// Admin Login
+const adminLogin = async (req, res) => {
+  try {
+    console.log("🔐 Admin login attempt for:", req.body.email);
+
+    // 1️⃣ Validate request data
+    const { error } = dtUserLoginSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation error",
+        errors: error.details.map(detail => detail.message)
+      });
+    }
+
+    const { email, password } = req.body;
+
+    // 2️⃣ Find admin by email with @mydeeptech.ng domain
+    if (!email.endsWith('@mydeeptech.ng')) {
+      return res.status(400).json({
+        success: false,
+        message: "Admin login is restricted to @mydeeptech.ng domain"
+      });
+    }
+
+    const admin = await DTUser.findOne({ 
+      email: email.toLowerCase(),
+      isEmailVerified: true,
+      hasSetPassword: true
+    });
+
+    if (!admin) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid credentials or account not verified"
+      });
+    }
+
+    // 3️⃣ Verify password
+    const isPasswordValid = await bcrypt.compare(password, admin.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid credentials"
+      });
+    }
+
+    // 4️⃣ Generate JWT token
+    const token = jwt.sign(
+      { 
+        userId: admin._id, 
+        email: admin.email,
+        isAdmin: true,
+        role: admin.role || 'admin'
+      },
+      process.env.JWT_SECRET || 'your-secret-key',
+      { expiresIn: '7d' }
+    );
+
+    console.log("✅ Admin login successful for:", email);
+
+    // 5️⃣ Return success response
+    res.status(200).json({
+      success: true,
+      message: "Admin login successful",
+      _usrinfo: {
+        data: token
+      },
+      token: token,
+      admin: {
+        id: admin._id,
+        fullName: admin.fullName,
+        email: admin.email,
+        phone: admin.phone,
+        domains: admin.domains,
+        isEmailVerified: admin.isEmailVerified,
+        hasSetPassword: admin.hasSetPassword,
+        annotatorStatus: admin.annotatorStatus,
+        microTaskerStatus: admin.microTaskerStatus,
+        createdAt: admin.createdAt,
+        isAdmin: true,
+        role: admin.role || 'admin'
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error during admin login:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error during admin login",
+      error: error.message,
+    });
+  }
+};
+
+// Resend verification email endpoint
+const resendVerificationEmail = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required"
+      });
+    }
+
+    console.log(`📧 Resend verification email request for: ${email}`);
+
+    // Find user by email
+    const user = await DTUser.findOne({ email });
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    // Check if email is already verified
+    if (user.isEmailVerified) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is already verified"
+      });
+    }
+
+    // Send verification email with timeout
+    try {
+      const emailPromise = Promise.race([
+        sendVerificationEmail(user.email, user.fullName, user._id),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Email sending timeout')), 15000)
+        )
+      ]);
+      
+      await emailPromise;
+      console.log(`✅ Verification email resent successfully to: ${email}`);
+      
+      res.status(200).json({
+        success: true,
+        message: "Verification email sent successfully. Please check your inbox.",
+        emailSent: true
+      });
+      
+    } catch (emailError) {
+      console.error(`❌ Failed to resend verification email to ${email}:`, emailError.message);
+      
+      res.status(500).json({
+        success: false,
+        message: "Failed to send verification email. Please try again later.",
+        emailSent: false,
+        error: emailError.message
+      });
+    }
+
+  } catch (error) {
+    console.error("❌ Error in resendVerificationEmail:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while resending verification email",
+      error: error.message
+    });
+  }
+};
+
+// DTUser function: Get available projects (only for approved annotators)
+const getAvailableProjects = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    console.log(`🔍 User ${req.user.email} requesting available projects`);
+    console.log(`📋 User data from middleware:`, {
+      userId: req.user.userId,
+      email: req.user.email,
+      fullName: req.user.fullName,
+      userDocStatus: req.user.userDoc?.annotatorStatus
+    });
+
+    // Get fresh user data to ensure we have the latest status
+    const user = await DTUser.findById(userId);
+    if (!user) {
+      console.log(`❌ User ${req.user.email} not found in database`);
+      return res.status(404).json({
+        success: false,
+        message: "User not found."
+      });
+    }
+
+    console.log(`📋 Fresh user data from DB:`, {
+      userId: user._id,
+      email: user.email,
+      annotatorStatus: user.annotatorStatus,
+      isEmailVerified: user.isEmailVerified
+    });
+
+    if (user.annotatorStatus !== 'approved') {
+      console.log(`❌ User ${req.user.email} access denied - Status: ${user.annotatorStatus}`);
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Only approved annotators can view projects."
+      });
+    }
+
+    console.log(`✅ User ${req.user.email} approved - Status: ${user.annotatorStatus}`);
+
+    // Get query parameters
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+    const category = req.query.category;
+    const search = req.query.search;
+    const minPayRate = req.query.minPayRate;
+    const maxPayRate = req.query.maxPayRate;
+    const difficultyLevel = req.query.difficultyLevel;
+    const view = req.query.view || 'available'; // 'available', 'applied', 'all'
+    const applicationStatus = req.query.status; // 'pending', 'approved', 'rejected'
+
+    console.log(`🔍 Projects view requested: ${view}, status filter: ${applicationStatus || 'none'}`);
+
+    // Build base filter for projects
+    const filter = {
+      status: 'active',
+      isPublic: true
+    };
+
+    // Only apply application deadline filter for available projects
+    if (view === 'available') {
+      filter.$or = [
+        { applicationDeadline: { $gt: new Date() } },
+        { applicationDeadline: null }
+      ];
+    }
+
+    if (category) filter.projectCategory = category;
+    if (difficultyLevel) filter.difficultyLevel = difficultyLevel;
+    
+    if (minPayRate || maxPayRate) {
+      filter.payRate = {};
+      if (minPayRate) filter.payRate.$gte = parseFloat(minPayRate);
+      if (maxPayRate) filter.payRate.$lte = parseFloat(maxPayRate);
+    }
+
+    if (search) {
+      const searchRegex = new RegExp(search, 'i');
+      filter.$and = filter.$and || [];
+      filter.$and.push({
+        $or: [
+          { projectName: searchRegex },
+          { projectDescription: searchRegex },
+          { tags: { $in: [searchRegex] } }
+        ]
+      });
+    }
+
+    console.log('🔍 Projects filter:', JSON.stringify(filter, null, 2));
+
+    // Get user's existing applications with details
+    let userApplicationsQuery = { applicantId: userId };
+    
+    // If viewing applied projects with specific status, filter applications first
+    if (view === 'applied' && applicationStatus) {
+      userApplicationsQuery.status = applicationStatus;
+    }
+
+    const userApplications = await ProjectApplication.find(userApplicationsQuery)
+      .populate('projectId').lean();
+    
+    const appliedProjectIds = userApplications.map(app => app.projectId._id);
+    const applicationMap = new Map();
+    userApplications.forEach(app => {
+      if (app.projectId) {
+        applicationMap.set(app.projectId._id.toString(), {
+          applicationId: app._id,
+          status: app.status,
+          appliedAt: app.appliedAt,
+          approvedAt: app.approvedAt,
+          rejectedAt: app.rejectedAt,
+          rejectionReason: app.rejectionReason,
+          reviewNotes: app.reviewNotes,
+          coverLetter: app.coverLetter,
+          availability: app.availability
+        });
+      }
+    });
+
+    // Also get ALL user applications for statistics (regardless of view filter)
+    const allUserApplications = await ProjectApplication.find({ applicantId: userId }).lean();
+
+    let finalFilter = { ...filter };
+    let projects = [];
+    let totalProjects = 0;
+
+    if (view === 'available') {
+      // Show only projects user hasn't applied to (need all applications for this)
+      const allUserApps = await ProjectApplication.find({ applicantId: userId }).select('projectId').lean();
+      const allAppliedProjectIds = allUserApps.map(app => app.projectId);
+      
+      if (allAppliedProjectIds.length > 0) {
+        finalFilter._id = { $nin: allAppliedProjectIds };
+      }
+      
+      projects = await AnnotationProject.find(finalFilter)
+        .populate('createdBy', 'fullName email')
+        .select('-assignedAdmins')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean();
+
+      totalProjects = await AnnotationProject.countDocuments(finalFilter);
+
+    } else if (view === 'applied') {
+      // Show only projects user has applied to (filtered by status if specified)
+      if (appliedProjectIds.length === 0) {
+        projects = [];
+        totalProjects = 0;
+      } else {
+        finalFilter._id = { $in: appliedProjectIds };
+
+        projects = await AnnotationProject.find(finalFilter)
+          .populate('createdBy', 'fullName email')
+          .select('-assignedAdmins')
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .lean();
+
+        totalProjects = await AnnotationProject.countDocuments(finalFilter);
+      }
+
+    } else if (view === 'all') {
+      // Show all active projects with application status
+      projects = await AnnotationProject.find(finalFilter)
+        .populate('createdBy', 'fullName email')
+        .select('-assignedAdmins')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean();
+
+      totalProjects = await AnnotationProject.countDocuments(finalFilter);
+    }
+
+    // Add application and project metadata
+    for (let project of projects) {
+      // Add application count
+      const appCount = await ProjectApplication.countDocuments({ 
+        projectId: project._id,
+        status: { $in: ['pending', 'approved'] }
+      });
+      project.currentApplications = appCount;
+      project.availableSlots = project.maxAnnotators ? Math.max(0, project.maxAnnotators - appCount) : null;
+      project.canApply = !project.maxAnnotators || appCount < project.maxAnnotators;
+
+      // Add user's application status if exists
+      const userApp = applicationMap.get(project._id.toString());
+      if (userApp) {
+        project.userApplication = userApp;
+        project.hasApplied = true;
+        project.canApply = false; // Can't apply if already applied
+      } else {
+        project.hasApplied = false;
+      }
+
+      // Add application deadline status
+      if (project.applicationDeadline) {
+        project.applicationOpen = new Date() < new Date(project.applicationDeadline);
+        project.daysUntilDeadline = Math.ceil((new Date(project.applicationDeadline) - new Date()) / (1000 * 60 * 60 * 24));
+        if (!project.applicationOpen) {
+          project.canApply = false;
+        }
+      } else {
+        project.applicationOpen = true;
+        project.daysUntilDeadline = null;
+      }
+    }
+
+    console.log(`✅ Found ${projects.length} projects for view: ${view}`);
+
+    // Calculate pagination info
+    const totalPages = Math.ceil(totalProjects / limit);
+
+    res.status(200).json({
+      success: true,
+      message: `Found ${projects.length} projects (view: ${view}${applicationStatus ? `, status: ${applicationStatus}` : ''})`,
+      data: {
+        projects: projects,
+        pagination: {
+          currentPage: page,
+          totalPages: totalPages,
+          totalProjects: totalProjects,
+          hasNextPage: page < totalPages,
+          hasPrevPage: page > 1,
+          limit: limit
+        },
+        filters: {
+          view: view,
+          applicationStatus: applicationStatus,
+          category: category,
+          difficultyLevel: difficultyLevel
+        },
+        userInfo: {
+          annotatorStatus: user.annotatorStatus,
+          appliedProjects: allUserApplications.length,
+          totalApplications: allUserApplications.length,
+          applicationStats: {
+            pending: allUserApplications.filter(app => app.status === 'pending').length,
+            approved: allUserApplications.filter(app => app.status === 'approved').length,
+            rejected: allUserApplications.filter(app => app.status === 'rejected').length
+          }
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error fetching available projects:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error fetching available projects",
+      error: error.message
+    });
+  }
+};
+
+// DTUser function: Apply to a project
+const applyToProject = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const userId = req.user.userId;
+    console.log(`📝 User ${req.user.email} applying to project: ${projectId}`);
+
+    // Check if user is an approved annotator
+    const user = await DTUser.findById(userId);
+    console.log(`👤 User status check:`, {
+      found: !!user,
+      email: user?.email,
+      annotatorStatus: user?.annotatorStatus
+    });
+    
+    if (!user || user.annotatorStatus !== 'approved') {
+      console.log(`❌ User ${req.user.email} access denied - Status: ${user?.annotatorStatus || 'unknown'}`);
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Only approved annotators can apply to projects."
+      });
+    }
+
+    console.log(`✅ User ${req.user.email} approved for project application`);
+
+    // Check if project exists and is available
+    const AnnotationProject = require('../models/annotationProject.model');
+    const project = await AnnotationProject.findById(projectId);
+    
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found"
+      });
+    }
+
+    if (project.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        message: "Project is not currently accepting applications"
+      });
+    }
+
+    // Check application deadline
+    if (project.applicationDeadline && project.applicationDeadline < new Date()) {
+      return res.status(400).json({
+        success: false,
+        message: "Application deadline has passed"
+      });
+    }
+
+    // Check if user has already applied
+    const ProjectApplication = require('../models/projectApplication.model');
+    const existingApplication = await ProjectApplication.findOne({
+      projectId: projectId,
+      applicantId: userId
+    });
+
+    if (existingApplication) {
+      return res.status(400).json({
+        success: false,
+        message: "You have already applied to this project",
+        applicationStatus: existingApplication.status
+      });
+    }
+
+    // Check if project is full
+    if (project.maxAnnotators) {
+      const currentApplications = await ProjectApplication.countDocuments({
+        projectId: projectId,
+        status: { $in: ['pending', 'approved'] }
+      });
+
+      if (currentApplications >= project.maxAnnotators) {
+        return res.status(400).json({
+          success: false,
+          message: "Project has reached maximum number of applicants"
+        });
+      }
+    }
+
+    // Validate application data
+    const { coverLetter, proposedRate, availability, estimatedCompletionTime } = req.body;
+
+    // Create application
+    const application = new ProjectApplication({
+      projectId: projectId,
+      applicantId: userId,
+      coverLetter: coverLetter || "",
+      proposedRate: proposedRate || project.payRate,
+      availability: availability || "flexible",
+      estimatedCompletionTime: estimatedCompletionTime || "",
+      status: 'pending'
+    });
+
+    await application.save();
+
+    // Update project application count
+    await AnnotationProject.findByIdAndUpdate(projectId, {
+      $inc: { totalApplications: 1 }
+    });
+
+    // Populate application details for response
+    await application.populate('projectId', 'projectName projectCategory payRate');
+
+    // Send email notification to admin(s)
+    try {
+      const { sendProjectApplicationNotification } = require('../utils/projectMailer');
+      
+      // Get project creator and assigned admins
+      const projectWithAdmins = await AnnotationProject.findById(projectId)
+        .populate('createdBy', 'fullName email')
+        .populate('assignedAdmins', 'fullName email');
+      
+      const applicationData = {
+        applicantName: user.fullName,
+        applicantEmail: user.email,
+        projectName: project.projectName,
+        projectCategory: project.projectCategory,
+        payRate: project.payRate,
+        coverLetter: coverLetter || '',
+        appliedAt: application.appliedAt
+      };
+
+      // Send notification to project creator
+      if (projectWithAdmins.createdBy) {
+        await sendProjectApplicationNotification(
+          projectWithAdmins.createdBy.email,
+          projectWithAdmins.createdBy.fullName,
+          applicationData
+        );
+      }
+
+      // Send notification to assigned admins (excluding creator to avoid duplicate)
+      for (const admin of projectWithAdmins.assignedAdmins) {
+        if (admin._id.toString() !== projectWithAdmins.createdBy._id.toString()) {
+          await sendProjectApplicationNotification(
+            admin.email,
+            admin.fullName,
+            applicationData
+          );
+        }
+      }
+
+      console.log(`✅ Admin notifications sent for project application: ${project.projectName}`);
+      
+    } catch (emailError) {
+      console.error(`⚠️ Failed to send admin notification for application:`, emailError.message);
+      // Don't fail the request if email fails
+    }
+
+    console.log(`✅ Application submitted successfully for project: ${project.projectName}`);
+
+    res.status(201).json({
+      success: true,
+      message: "Application submitted successfully",
+      data: {
+        application: application,
+        projectName: project.projectName
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error applying to project:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while applying to project",
+      error: error.message
+    });
+  }
+};
+
+// DTUser function: Get user's active projects
+const getUserActiveProjects = async (req, res) => {
+  try {
+    const userId = req.params.userId || req.user.userId;
+    console.log(`🔍 Getting active projects for user: ${userId}`);
+
+    // Verify user has access to this data
+    if (req.user.userId.toString() !== userId && !req.admin) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. You can only view your own projects."
+      });
+    }
+
+    const ProjectApplication = require('../models/projectApplication.model');
+    
+    // Get all user's applications with project details
+    const applications = await ProjectApplication.find({ applicantId: userId })
+      .populate({
+        path: 'projectId',
+        select: 'projectName projectDescription projectCategory payRate payRateType status createdBy',
+        populate: {
+          path: 'createdBy',
+          select: 'fullName email'
+        }
+      })
+      .sort({ appliedAt: -1 })
+      .lean();
+
+    // Separate applications by status
+    const activeProjects = applications.filter(app => app.status === 'approved');
+    const pendingApplications = applications.filter(app => app.status === 'pending');
+    const rejectedApplications = applications.filter(app => app.status === 'rejected');
+
+    // Calculate statistics
+    const stats = {
+      totalApplications: applications.length,
+      activeProjects: activeProjects.length,
+      pendingApplications: pendingApplications.length,
+      rejectedApplications: rejectedApplications.length
+    };
+
+    console.log(`✅ Found ${applications.length} applications for user`);
+
+    res.status(200).json({
+      success: true,
+      message: "User projects retrieved successfully",
+      data: {
+        activeProjects: activeProjects,
+        pendingApplications: pendingApplications,
+        rejectedApplications: rejectedApplications,
+        statistics: stats
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error fetching user active projects:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error fetching user projects",
+      error: error.message
+    });
+  }
+};
+
+// ===== INVOICE MANAGEMENT FUNCTIONS =====
+
+// DTUser function: Get all invoices for the user
+const getUserInvoices = async (req, res) => {
+  try {
+    const userId = req.user.userId; // From JWT token
+    const { 
+      page = 1, 
+      limit = 20, 
+      paymentStatus, 
+      projectId,
+      startDate,
+      endDate
+    } = req.query;
+
+    console.log(`📄 DTUser ${userId} fetching invoices`);
+
+    // Build filter object
+    const filter = { dtUserId: userId };
+    if (paymentStatus) filter.paymentStatus = paymentStatus;
+    if (projectId) filter.projectId = projectId;
+
+    // Date range filter
+    if (startDate || endDate) {
+      filter.invoiceDate = {};
+      if (startDate) filter.invoiceDate.$gte = new Date(startDate);
+      if (endDate) filter.invoiceDate.$lte = new Date(endDate);
+    }
+
+    // Calculate pagination
+    const skip = (page - 1) * limit;
+
+    // Get invoices with populated data
+    const invoices = await Invoice.find(filter)
+      .populate('projectId', 'projectName projectCategory payRate')
+      .populate('createdBy', 'fullName email')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    // Get total count for pagination
+    const totalInvoices = await Invoice.countDocuments(filter);
+
+    // Get user invoice statistics
+    const stats = await Invoice.getInvoiceStats(userId);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        invoices,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(totalInvoices / limit),
+          totalInvoices,
+          invoicesPerPage: parseInt(limit)
+        },
+        statistics: {
+          totalInvoices: stats.totalInvoices,
+          totalEarnings: stats.totalAmount,
+          paidAmount: stats.paidAmount,
+          unpaidAmount: stats.unpaidAmount,
+          overdueAmount: stats.overdueAmount,
+          unpaidCount: stats.unpaidCount,
+          paidCount: stats.paidCount,
+          overdueCount: stats.overdueCount
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error fetching user invoices:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error fetching invoices",
+      error: error.message
+    });
+  }
+};
+
+// DTUser function: Get unpaid invoices specifically
+const getUnpaidInvoices = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { page = 1, limit = 10 } = req.query;
+
+    console.log(`💰 DTUser ${userId} fetching unpaid invoices`);
+
+    const skip = (page - 1) * limit;
+
+    // Get unpaid and overdue invoices
+    const unpaidInvoices = await Invoice.find({ 
+      dtUserId: userId, 
+      paymentStatus: { $in: ['unpaid', 'overdue'] }
+    })
+      .populate('projectId', 'projectName projectCategory')
+      .populate('createdBy', 'fullName email')
+      .sort({ dueDate: 1 }) // Sort by due date ascending (most urgent first)
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const totalUnpaid = await Invoice.countDocuments({ 
+      dtUserId: userId, 
+      paymentStatus: { $in: ['unpaid', 'overdue'] }
+    });
+
+    // Calculate total amount due
+    const totalAmountDue = await Invoice.aggregate([
+      { 
+        $match: { 
+          dtUserId: new mongoose.Types.ObjectId(userId), 
+          paymentStatus: { $in: ['unpaid', 'overdue'] }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalDue: { $sum: '$invoiceAmount' },
+          overdueAmount: {
+            $sum: {
+              $cond: [{ $eq: ['$paymentStatus', 'overdue'] }, '$invoiceAmount', 0]
+            }
+          }
+        }
+      }
+    ]);
+
+    const amountSummary = totalAmountDue[0] || { totalDue: 0, overdueAmount: 0 };
+
+    res.status(200).json({
+      success: true,
+      data: {
+        unpaidInvoices,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(totalUnpaid / limit),
+          totalUnpaidInvoices: totalUnpaid,
+          invoicesPerPage: parseInt(limit)
+        },
+        summary: {
+          totalAmountDue: amountSummary.totalDue,
+          overdueAmount: amountSummary.overdueAmount,
+          unpaidCount: totalUnpaid
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error fetching unpaid invoices:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error fetching unpaid invoices",
+      error: error.message
+    });
+  }
+};
+
+// DTUser function: Get paid invoices specifically  
+const getPaidInvoices = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { page = 1, limit = 20 } = req.query;
+
+    console.log(`✅ DTUser ${userId} fetching paid invoices`);
+
+    const skip = (page - 1) * limit;
+
+    // Get paid invoices
+    const paidInvoices = await Invoice.find({ 
+      dtUserId: userId, 
+      paymentStatus: 'paid'
+    })
+      .populate('projectId', 'projectName projectCategory')
+      .populate('createdBy', 'fullName email')
+      .sort({ paidAt: -1 }) // Sort by payment date descending
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const totalPaid = await Invoice.countDocuments({ 
+      dtUserId: userId, 
+      paymentStatus: 'paid'
+    });
+
+    // Calculate total earnings
+    const totalEarnings = await Invoice.aggregate([
+      { 
+        $match: { 
+          dtUserId: new mongoose.Types.ObjectId(userId), 
+          paymentStatus: 'paid'
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalEarnings: { $sum: '$invoiceAmount' }
+        }
+      }
+    ]);
+
+    const earnings = totalEarnings[0]?.totalEarnings || 0;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        paidInvoices,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(totalPaid / limit),
+          totalPaidInvoices: totalPaid,
+          invoicesPerPage: parseInt(limit)
+        },
+        summary: {
+          totalEarnings: earnings,
+          paidCount: totalPaid
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error fetching paid invoices:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error fetching paid invoices",
+      error: error.message
+    });
+  }
+};
+
+// DTUser function: Get specific invoice details
+const getInvoiceDetails = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { invoiceId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(invoiceId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid invoice ID"
+      });
+    }
+
+    // Find invoice and ensure it belongs to the user
+    const invoice = await Invoice.findOne({ 
+      _id: invoiceId, 
+      dtUserId: userId 
+    })
+      .populate('projectId', 'projectName projectDescription projectCategory')
+      .populate('createdBy', 'fullName email')
+      .populate('approvedBy', 'fullName email');
+
+    if (!invoice) {
+      return res.status(404).json({
+        success: false,
+        message: "Invoice not found or access denied"
+      });
+    }
+
+    // Mark invoice as viewed if not already
+    if (!invoice.emailViewedAt) {
+      invoice.emailViewedAt = new Date();
+      await invoice.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        invoice,
+        computedFields: {
+          daysOverdue: invoice.daysOverdue,
+          amountDue: invoice.amountDue,
+          formattedInvoiceNumber: invoice.formattedInvoiceNumber
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error fetching invoice details:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error fetching invoice details",
+      error: error.message
+    });
+  }
+};
+
+// DTUser function: Get invoice dashboard summary
+const getInvoiceDashboard = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    console.log(`📊 DTUser ${userId} fetching invoice dashboard`);
+
+    // Get comprehensive statistics
+    const stats = await Invoice.getInvoiceStats(userId);
+
+    // Get recent invoices (last 5)
+    const recentInvoices = await Invoice.find({ dtUserId: userId })
+      .populate('projectId', 'projectName')
+      .sort({ createdAt: -1 })
+      .limit(5);
+
+    // Get overdue invoices
+    const overdueInvoices = await Invoice.find({ 
+      dtUserId: userId, 
+      paymentStatus: 'overdue' 
+    })
+      .populate('projectId', 'projectName')
+      .sort({ dueDate: 1 });
+
+    // Get earnings by month (last 6 months)
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+    const monthlyEarnings = await Invoice.aggregate([
+      {
+        $match: {
+          dtUserId: new mongoose.Types.ObjectId(userId),
+          paymentStatus: 'paid',
+          paidAt: { $gte: sixMonthsAgo }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$paidAt' },
+            month: { $month: '$paidAt' }
+          },
+          totalEarnings: { $sum: '$invoiceAmount' },
+          invoiceCount: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { '_id.year': 1, '_id.month': 1 }
+      }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        statistics: stats,
+        recentInvoices,
+        overdueInvoices,
+        monthlyEarnings,
+        summary: {
+          totalEarned: stats.paidAmount,
+          pendingPayments: stats.unpaidAmount,
+          overduePayments: stats.overdueAmount,
+          totalInvoices: stats.totalInvoices,
+          unpaidCount: stats.unpaidCount,
+          overdueCount: stats.overdueCount
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error fetching invoice dashboard:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error fetching invoice dashboard",
+      error: error.message
+    });
+  }
+};
+
+module.exports = { 
+  createDTUser, 
+  createDTUserWithBackgroundEmail, 
+  verifyEmail, 
+  setupPassword, 
+  dtUserLogin, 
+  getDTUserProfile, 
+  updateDTUserProfile,
+  resetDTUserPassword,
+  resendVerificationEmail,
+  getDTUser,
+  getAllDTUsers,
+  getAllAdminUsers,
+  approveAnnotator,
+  rejectAnnotator,
+  getDTUserAdmin,
+  requestAdminVerification,
+  confirmAdminVerification,
+  createAdmin,
+  verifyAdminOTP,
+  adminLogin,
+  getAvailableProjects,
+  applyToProject,
+  getUserActiveProjects,
+  getUserInvoices,
+  getUnpaidInvoices,
+  getPaidInvoices,
+  getInvoiceDetails,
+  getInvoiceDashboard
+};

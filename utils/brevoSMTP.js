@@ -120,7 +120,63 @@ const testBrevoSMTPConnection = async () => {
   }
 };
 
+// Admin verification email function via Brevo SMTP
+// Generic send email function for any email content
+const sendEmail = async ({ to, subject, html, text }) => {
+  try {
+    const transporter = createBrevoSMTPTransporter();
+    
+    const mailOptions = {
+      from: `"${process.env.BREVO_SENDER_NAME || 'MyDeepTech Team'}" <${process.env.BREVO_SENDER_EMAIL}>`,
+      to: to,
+      subject: subject,
+      html: html,
+      text: text
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`✅ Brevo SMTP email sent to ${to}`, info.messageId);
+    return { 
+      success: true, 
+      messageId: info.messageId,
+      provider: 'brevo-smtp'
+    };
+  } catch (error) {
+    console.error("❌ Error sending Brevo SMTP email:", error);
+    throw new Error(`Failed to send email via Brevo SMTP: ${error.message}`);
+  }
+};
+
+// Send project notification emails with projects@mydeeptech.ng sender
+const sendProjectEmail = async ({ to, subject, html, text }) => {
+  try {
+    const transporter = createBrevoSMTPTransporter();
+    
+    const mailOptions = {
+      from: `"${process.env.BREVO_PROJECT_SENDER_NAME || 'MyDeepTech Projects'}" <${process.env.BREVO_PROJECT_SENDER_EMAIL || 'projects@mydeeptech.ng'}>`,
+      to: to,
+      subject: subject,
+      html: html,
+      text: text
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`✅ Brevo SMTP project email sent to ${to} from ${process.env.BREVO_PROJECT_SENDER_EMAIL}`, info.messageId);
+    return { 
+      success: true, 
+      messageId: info.messageId,
+      provider: 'brevo-smtp',
+      sender: process.env.BREVO_PROJECT_SENDER_EMAIL
+    };
+  } catch (error) {
+    console.error("❌ Error sending Brevo SMTP project email:", error);
+    throw new Error(`Failed to send project email via Brevo SMTP: ${error.message}`);
+  }
+};
+
 module.exports = { 
   sendVerificationEmailBrevoSMTP, 
-  testBrevoSMTPConnection 
+  testBrevoSMTPConnection,
+  sendEmail,
+  sendProjectEmail
 };
