@@ -53,6 +53,38 @@ const dtUserSchema = new mongoose.Schema(
     },
     resultLink: { type: String, default: "" },
 
+    // Result submissions and storage
+    resultSubmissions: [{
+      originalResultLink: { type: String, default: '' }, // Empty for direct uploads
+      cloudinaryResultData: {
+        publicId: { type: String, required: true },
+        url: { type: String, required: true },
+        optimizedUrl: { type: String, default: "" },
+        thumbnailUrl: { type: String, default: "" },
+        originalName: { type: String, default: "" },
+        size: { type: Number, default: 0 },
+        format: { type: String, default: "" }
+      },
+      submissionDate: { type: Date, default: Date.now },
+      projectId: { 
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "AnnotationProject",
+        default: null
+      },
+      taskId: { type: String, default: "" }, // For future task tracking
+      status: { 
+        type: String, 
+        enum: ["pending", "processing", "stored", "failed"],
+        default: "pending"
+      },
+      uploadMethod: {
+        type: String,
+        enum: ["url_submission", "direct_upload"],
+        default: "direct_upload"
+      },
+      notes: { type: String, default: "" }
+    }],
+
     // Extended profile information
     personal_info: {
       country: { type: String, default: "" },
@@ -144,6 +176,14 @@ const dtUserSchema = new mongoose.Schema(
       resume_url: { type: String, default: "" },
       id_document_url: { type: String, default: "" },
       work_samples_url: { type: [String], default: [] }
+    },
+
+    // Profile picture and media
+    profilePicture: {
+      publicId: { type: String, default: "" },
+      url: { type: String, default: "" },
+      thumbnail: { type: String, default: "" },
+      optimizedUrl: { type: String, default: "" }
     }
   },
   { timestamps: true }

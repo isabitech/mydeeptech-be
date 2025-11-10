@@ -260,10 +260,20 @@ invoiceSchema.pre('save', async function(next) {
 
 // Static method to get invoice statistics
 invoiceSchema.statics.getInvoiceStats = async function(dtUserId, adminId = null) {
-  const matchCondition = dtUserId ? { dtUserId } : {};
-  if (adminId) {
-    matchCondition.createdBy = adminId;
+  // Ensure dtUserId is ObjectId if provided
+  const matchCondition = {};
+  if (dtUserId) {
+    matchCondition.dtUserId = mongoose.Types.ObjectId.isValid(dtUserId) 
+      ? new mongoose.Types.ObjectId(dtUserId) 
+      : dtUserId;
   }
+  if (adminId) {
+    matchCondition.createdBy = mongoose.Types.ObjectId.isValid(adminId) 
+      ? new mongoose.Types.ObjectId(adminId) 
+      : adminId;
+  }
+  
+  console.log(`🔍 Invoice stats match condition:`, matchCondition);
   
   const stats = await this.aggregate([
     { $match: matchCondition },
@@ -306,7 +316,9 @@ invoiceSchema.statics.getInvoiceStats = async function(dtUserId, adminId = null)
     }
   ]);
   
-  return stats[0] || {
+  console.log(`📊 Raw aggregation result:`, stats);
+  
+  const result = stats[0] || {
     totalInvoices: 0,
     totalAmount: 0,
     paidAmount: 0,
@@ -316,6 +328,9 @@ invoiceSchema.statics.getInvoiceStats = async function(dtUserId, adminId = null)
     paidCount: 0,
     overdueCount: 0
   };
+  
+  console.log(`📈 Final stats result:`, result);
+  return result;
 };
 
 // Instance method to mark as paid

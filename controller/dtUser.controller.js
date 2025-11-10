@@ -2737,19 +2737,33 @@ const getInvoiceDashboard = async (req, res) => {
     const userId = req.user.userId;
 
     console.log(`📊 DTUser ${userId} fetching invoice dashboard`);
+    console.log(`🔍 User ID type: ${typeof userId}, value: ${userId}`);
+
+    // Convert userId to ObjectId if it's a string
+    const objectId = new mongoose.Types.ObjectId(userId);
+    console.log(`🔍 ObjectId: ${objectId}`);
+
+    // Debug: Check if any invoices exist for this user
+    const totalInvoices = await Invoice.countDocuments({ dtUserId: objectId });
+    console.log(`🔍 Total invoices found for user: ${totalInvoices}`);
+
+    // Debug: Get all invoices for this user to inspect their paymentStatus
+    const allInvoices = await Invoice.find({ dtUserId: objectId }).select('invoiceAmount paymentStatus paidAt createdAt');
+    console.log(`🔍 All user invoices:`, allInvoices);
 
     // Get comprehensive statistics
-    const stats = await Invoice.getInvoiceStats(userId);
+    const stats = await Invoice.getInvoiceStats(objectId);
+    console.log(`📈 Calculated stats:`, stats);
 
     // Get recent invoices (last 5)
-    const recentInvoices = await Invoice.find({ dtUserId: userId })
+    const recentInvoices = await Invoice.find({ dtUserId: objectId })
       .populate('projectId', 'projectName')
       .sort({ createdAt: -1 })
       .limit(5);
 
     // Get overdue invoices
     const overdueInvoices = await Invoice.find({ 
-      dtUserId: userId, 
+      dtUserId: objectId, 
       paymentStatus: 'overdue' 
     })
       .populate('projectId', 'projectName')
@@ -2762,7 +2776,7 @@ const getInvoiceDashboard = async (req, res) => {
     const monthlyEarnings = await Invoice.aggregate([
       {
         $match: {
-          dtUserId: new mongoose.Types.ObjectId(userId),
+          dtUserId: objectId,
           paymentStatus: 'paid',
           paidAt: { $gte: sixMonthsAgo }
         }
@@ -2782,6 +2796,13 @@ const getInvoiceDashboard = async (req, res) => {
       }
     ]);
 
+    console.log(`📊 Dashboard response data:`, {
+      statistics: stats,
+      recentInvoicesCount: recentInvoices.length,
+      overdueInvoicesCount: overdueInvoices.length,
+      monthlyEarningsCount: monthlyEarnings.length
+    });
+
     res.status(200).json({
       success: true,
       data: {
@@ -2796,6 +2817,10 @@ const getInvoiceDashboard = async (req, res) => {
           totalInvoices: stats.totalInvoices,
           unpaidCount: stats.unpaidCount,
           overdueCount: stats.overdueCount
+        },
+        debug: {
+          totalInvoicesInDb: totalInvoices,
+          allInvoices: allInvoices
         }
       }
     });
@@ -2805,6 +2830,391 @@ const getInvoiceDashboard = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error fetching invoice dashboard",
+      error: error.message
+    });
+  }
+};
+
+// Submit result file upload and store in Cloudinary
+const submitResultWithCloudinary = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { projectId, notes } = req.body;
+    
+    console.log(`📤 User ${req.user.email} uploading result file`);
+
+    // Validate that a file was uploaded
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Result file is required. Please upload a file.'
+      });
+    }
+
+    // Get user details
+    const user = await DTUser.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    console.log(`📁 Processing uploaded file: ${req.file.originalname}`);
+
+    // Import cloudinary functions
+    const { generateOptimizedUrl, generateThumbnail } = require('../config/cloudinary');
+
+    try {
+      // The file is already uploaded to Cloudinary via multer middleware
+      const uploadResult = req.file;
+      
+      console.log(`✅ Result uploaded to Cloudinary: ${uploadResult.filename}`);
+
+      // Generate optimized URLs based on file type
+      let optimizedUrl = uploadResult.path;
+      let thumbnailUrl = null;
+
+      if (uploadResult.mimetype && uploadResult.mimetype.startsWith('image/')) {
+        optimizedUrl = generateOptimizedUrl(uploadResult.filename, {
+          width: 1200,
+          height: 800,
+          crop: 'limit',
+          quality: 'auto'
+        });
+
+        thumbnailUrl = generateThumbnail(uploadResult.filename, 300);
+      }
+
+      // Create result submission object
+      const resultSubmission = {
+        originalResultLink: '', // Not applicable for direct uploads
+        cloudinaryResultData: {
+          publicId: uploadResult.filename,
+          url: uploadResult.path,
+          optimizedUrl: optimizedUrl,
+          thumbnailUrl: thumbnailUrl,
+          originalName: uploadResult.originalname,
+          size: uploadResult.size,
+          format: uploadResult.format || uploadResult.filename.split('.').pop()
+        },
+        submissionDate: new Date(),
+        projectId: projectId || null,
+        status: 'stored',
+        notes: notes || '',
+        uploadMethod: 'direct_upload' // Track that this was a direct upload
+      };
+
+      // Add to user's result submissions
+      if (!user.resultSubmissions) {
+        user.resultSubmissions = [];
+      }
+      user.resultSubmissions.push(resultSubmission);
+
+      // Update the main resultLink field with the Cloudinary URL (for backward compatibility)
+      user.resultLink = uploadResult.path;
+
+      // Update annotatorStatus to "submitted" when user submits a result
+      if (user.annotatorStatus === "pending" || user.annotatorStatus === "verified") {
+        user.annotatorStatus = "submitted";
+        console.log(`📊 Updated annotatorStatus to "submitted" for user: ${user.email}`);
+      }
+
+      // Save user with new result
+      await user.save();
+
+      console.log(`✅ Result submission saved for user: ${user.email}`);
+
+      res.status(200).json({
+        success: true,
+        message: 'Result file uploaded and stored successfully in Cloudinary',
+        data: {
+          resultSubmission: {
+            id: user.resultSubmissions[user.resultSubmissions.length - 1]._id,
+            originalFileName: uploadResult.originalname,
+            cloudinaryUrl: uploadResult.path,
+            optimizedUrl: optimizedUrl,
+            thumbnailUrl: thumbnailUrl,
+            submissionDate: resultSubmission.submissionDate,
+            status: 'stored',
+            fileSize: uploadResult.size,
+            fileFormat: resultSubmission.cloudinaryResultData.format
+          },
+          totalResultSubmissions: user.resultSubmissions.length,
+          updatedResultLink: user.resultLink, // The main resultLink field
+          updatedAnnotatorStatus: user.annotatorStatus // Include updated status
+        }
+      });
+
+    } catch (cloudinaryError) {
+      console.error('❌ Cloudinary processing error:', cloudinaryError);
+      
+      // Create a failed submission record
+      const failedSubmission = {
+        originalResultLink: '',
+        cloudinaryResultData: {
+          publicId: '',
+          url: '',
+          optimizedUrl: '',
+          thumbnailUrl: '',
+          originalName: req.file?.originalname || 'unknown_file',
+          size: req.file?.size || 0,
+          format: ''
+        },
+        submissionDate: new Date(),
+        projectId: projectId || null,
+        status: 'failed',
+        notes: `Upload processing failed: ${cloudinaryError.message}. ${notes || ''}`,
+        uploadMethod: 'direct_upload'
+      };
+
+      if (!user.resultSubmissions) {
+        user.resultSubmissions = [];
+      }
+      user.resultSubmissions.push(failedSubmission);
+      await user.save();
+
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to process uploaded file',
+        error: cloudinaryError.message,
+        data: {
+          originalFileName: req.file?.originalname,
+          status: 'failed',
+          submissionDate: failedSubmission.submissionDate
+        }
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Error processing result upload:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error processing result upload',
+      error: error.message
+    });
+  }
+};
+
+// Upload ID Document and store in user profile
+const uploadIdDocument = async (req, res) => {
+  try {
+    const user = req.user;
+    console.log(`🆔 User ${user.email} uploading ID document`);
+
+    if (!req.file) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'ID document file is required. Please upload a file.'
+      });
+    }
+
+    // Find the user in the database
+    const dtUser = await DTUser.findOne({ 
+      email: user.email,
+      _id: user.userId 
+    });
+
+    if (!dtUser) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'User not found' 
+      });
+    }
+
+    try {
+      const uploadResult = req.file;
+      console.log(`✅ ID document uploaded to Cloudinary: ${uploadResult.filename}`);
+
+      // Update user's attachments with ID document URL
+      dtUser.attachments.id_document_url = uploadResult.path;
+
+      // Save the updated user
+      const updatedUser = await dtUser.save();
+
+      console.log(`✅ ID document saved for user: ${user.email}`);
+      
+      res.status(200).json({
+        success: true,
+        message: 'ID document uploaded and stored successfully',
+        data: {
+          id_document_url: updatedUser.attachments.id_document_url,
+          cloudinaryData: {
+            url: uploadResult.path,
+            publicId: uploadResult.filename,
+            originalName: uploadResult.originalname,
+            fileSize: uploadResult.size,
+            format: uploadResult.format || uploadResult.mimetype
+          }
+        }
+      });
+
+    } catch (cloudinaryError) {
+      console.error('❌ Cloudinary processing error:', cloudinaryError);
+      return res.status(500).json({ 
+        success: false,
+        message: 'Failed to process uploaded ID document',
+        error: cloudinaryError.message
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Error in ID document upload:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error during ID document upload',
+      error: error.message
+    });
+  }
+};
+
+// Upload Resume and store in user profile
+const uploadResume = async (req, res) => {
+  try {
+    const user = req.user;
+    console.log(`📄 User ${user.email} uploading resume`);
+
+    if (!req.file) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Resume file is required. Please upload a file.'
+      });
+    }
+
+    // Find the user in the database
+    const dtUser = await DTUser.findOne({ 
+      email: user.email,
+      _id: user.userId 
+    });
+
+    if (!dtUser) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'User not found' 
+      });
+    }
+
+    try {
+      const uploadResult = req.file;
+      console.log(`✅ Resume uploaded to Cloudinary: ${uploadResult.filename}`);
+
+      // Update user's attachments with resume URL
+      dtUser.attachments.resume_url = uploadResult.path;
+
+      // Save the updated user
+      const updatedUser = await dtUser.save();
+
+      console.log(`✅ Resume saved for user: ${user.email}`);
+      
+      res.status(200).json({
+        success: true,
+        message: 'Resume uploaded and stored successfully',
+        data: {
+          resume_url: updatedUser.attachments.resume_url,
+          cloudinaryData: {
+            url: uploadResult.path,
+            publicId: uploadResult.filename,
+            originalName: uploadResult.originalname,
+            fileSize: uploadResult.size,
+            format: uploadResult.format || uploadResult.mimetype
+          }
+        }
+      });
+
+    } catch (cloudinaryError) {
+      console.error('❌ Cloudinary processing error:', cloudinaryError);
+      return res.status(500).json({ 
+        success: false,
+        message: 'Failed to process uploaded resume',
+        error: cloudinaryError.message
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Error in resume upload:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Server error during resume upload',
+      error: error.message
+    });
+  }
+};
+
+// Get all result submissions for a user
+const getUserResultSubmissions = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { page = 1, limit = 10, status } = req.query;
+    
+    console.log(`📋 User ${req.user.email} requesting result submissions`);
+
+    const user = await DTUser.findById(userId).populate('resultSubmissions.projectId', 'projectName projectCategory');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    let resultSubmissions = user.resultSubmissions || [];
+    
+    // Filter by status if provided
+    if (status && ['pending', 'processing', 'stored', 'failed'].includes(status)) {
+      resultSubmissions = resultSubmissions.filter(submission => submission.status === status);
+    }
+
+    // Sort by submission date (newest first)
+    resultSubmissions.sort((a, b) => new Date(b.submissionDate) - new Date(a.submissionDate));
+
+    // Pagination
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + parseInt(limit);
+    const paginatedResults = resultSubmissions.slice(startIndex, endIndex);
+
+    // Format results for response
+    const formattedResults = paginatedResults.map(submission => ({
+      id: submission._id,
+      originalLink: submission.originalResultLink,
+      cloudinaryData: submission.cloudinaryResultData,
+      submissionDate: submission.submissionDate,
+      projectInfo: submission.projectId ? {
+        id: submission.projectId._id,
+        name: submission.projectId.projectName,
+        category: submission.projectId.projectCategory
+      } : null,
+      status: submission.status,
+      notes: submission.notes
+    }));
+
+    // Calculate statistics
+    const stats = {
+      total: resultSubmissions.length,
+      stored: resultSubmissions.filter(s => s.status === 'stored').length,
+      failed: resultSubmissions.filter(s => s.status === 'failed').length,
+      pending: resultSubmissions.filter(s => s.status === 'pending').length
+    };
+
+    res.status(200).json({
+      success: true,
+      message: 'Result submissions retrieved successfully',
+      data: {
+        submissions: formattedResults,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(resultSubmissions.length / limit),
+          totalSubmissions: resultSubmissions.length,
+          hasMore: endIndex < resultSubmissions.length
+        },
+        statistics: stats
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error getting result submissions:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error retrieving result submissions',
       error: error.message
     });
   }
@@ -2838,5 +3248,9 @@ module.exports = {
   getUnpaidInvoices,
   getPaidInvoices,
   getInvoiceDetails,
-  getInvoiceDashboard
+  getInvoiceDashboard,
+  submitResultWithCloudinary,
+  getUserResultSubmissions,
+  uploadIdDocument,
+  uploadResume
 };

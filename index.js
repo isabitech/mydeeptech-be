@@ -11,6 +11,7 @@ dotenv.config({ path: './.env' });
 
 const route = require('./routes/auth');
 const adminRoute = require('./routes/admin');
+const mediaRoute = require('./routes/media');
 
 const app = express();
 
@@ -61,6 +62,7 @@ app.use(bodyParser.json());
 // Routes
 app.use('/api/auth', route);
 app.use('/api/admin', adminRoute);
+app.use('/api/media', mediaRoute);
 
 // Initialize Redis connection
 const initializeRedis = async () => {

@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Result Upload Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+        }
+        input[type="file"], textarea, input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .message {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .progress {
+            width: 100%;
+            height: 25px;
+            background-color: #f0f0f0;
+            border-radius: 12px;
+            overflow: hidden;
+            margin: 10px 0;
+            display: none;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: #28a745;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        .file-info {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .test-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .test-buttons button {
+            width: auto;
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Result File Upload Test</h1>
+        <p>Test the result submission endpoint with different field names and file types.</p>
+        
+        <!-- Test Buttons -->
+        <div class="test-buttons">
+            <button onclick="testDebugEndpoint()">Test Debug Endpoint</button>
+            <button onclick="testWithDifferentFields()">Test Different Field Names</button>
+        </div>
+
+        <!-- Main Upload Form -->
+        <form id="uploadForm">
+            <div class="form-group">
+                <label for="uploadType">Upload Type:</label>
+                <select id="uploadType" onchange="updateFormFields()">
+                    <option value="result">Result File</option>
+                    <option value="id-document">ID Document</option>
+                    <option value="resume">Resume/CV</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="token">JWT Token:</label>
+                <input type="text" id="token" placeholder="Your JWT token here" required>
+                <div class="file-info">Get this from login response or browser storage</div>
+            </div>
+
+            <div class="form-group">
+                <label for="fieldName">Field Name to Use:</label>
+                <select id="fieldName">
+                    <option value="resultFile">resultFile (expected)</option>
+                    <option value="screenshots">screenshots (frontend uses)</option>
+                    <option value="file">file (common)</option>
+                    <option value="result">result</option>
+                    <option value="upload">upload</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="fileInput">Select File:</label>
+                <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.gif,.pdf,.doc,.docx,.txt,.csv,.json,.mp4,.mp3" required>
+                <div class="file-info" id="fileInfo"></div>
+            </div>
+            
+            <div class="form-group">
+                <label for="notes">Notes (optional):</label>
+                <textarea id="notes" rows="3" placeholder="Additional notes about this result..."></textarea>
+            </div>
+            
+            <div class="progress" id="progress">
+                <div class="progress-bar" id="progressBar">0%</div>
+            </div>
+            
+            <button type="submit" id="submitBtn">Upload File</button>
+        </form>
+        
+        <div id="message" class="message" style="display: none;"></div>
+    </div>
+
+    <script>
+        // API base URL
+        const API_BASE = '/api/auth';
+        
+        // Form configuration for different upload types
+        const uploadConfigs = {
+            'result': {
+                endpoint: '/submit-result',
+                fieldOptions: ['resultFile', 'file', 'result', 'upload', 'screenshots'],
+                buttonText: 'Upload Result File',
+                title: '🎯 Result File Upload'
+            },
+            'id-document': {
+                endpoint: '/upload-id-document', 
+                fieldOptions: ['idDocument', 'id_document', 'document', 'file'],
+                buttonText: 'Upload ID Document',
+                title: '🆔 ID Document Upload'
+            },
+            'resume': {
+                endpoint: '/upload-resume',
+                fieldOptions: ['resume', 'cv', 'document', 'file'],
+                buttonText: 'Upload Resume/CV', 
+                title: '📄 Resume/CV Upload'
+            }
+        };
+
+        // Update form fields based on upload type
+        function updateFormFields() {
+            const uploadType = document.getElementById('uploadType').value;
+            const config = uploadConfigs[uploadType];
+            
+            // Update page title
+            document.querySelector('h1').textContent = config.title;
+            
+            // Update field name options
+            const fieldSelect = document.getElementById('fieldName');
+            fieldSelect.innerHTML = '';
+            config.fieldOptions.forEach(option => {
+                const optionElement = document.createElement('option');
+                optionElement.value = option;
+                optionElement.textContent = option + (option === config.fieldOptions[0] ? ' (expected)' : '');
+                fieldSelect.appendChild(optionElement);
+            });
+            
+            // Update button text
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.textContent = config.buttonText;
+        }
+        
+        // Initialize form on page load
+        document.addEventListener('DOMContentLoaded', updateFormFields);
+        
+        // File input change handler
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const fileInfo = document.getElementById('fileInfo');
+            
+            if (file) {
+                const size = (file.size / 1024).toFixed(2);
+                fileInfo.textContent = `Selected: ${file.name} (${size} KB, ${file.type})`;
+            } else {
+                fileInfo.textContent = '';
+            }
+        });
+
+        // Test debug endpoint
+        async function testDebugEndpoint() {
+            const token = document.getElementById('token').value;
+            
+            if (!token) {
+                showMessage('Please enter your JWT token first', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/debug-upload`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ test: 'debug' })
+                });
+
+                const result = await response.json();
+                showMessage(`Debug Response:\n${JSON.stringify(result, null, 2)}`, 'info');
+            } catch (error) {
+                showMessage(`Debug Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Test with different field names
+        async function testWithDifferentFields() {
+            const file = document.getElementById('fileInput').files[0];
+            const token = document.getElementById('token').value;
+            
+            if (!token) {
+                showMessage('Please enter your JWT token first', 'error');
+                return;
+            }
+            
+            if (!file) {
+                showMessage('Please select a file first', 'error');
+                return;
+            }
+
+            const fieldNames = ['screenshots', 'resultFile', 'file', 'result', 'upload'];
+            let results = [];
+
+            for (const fieldName of fieldNames) {
+                try {
+                    const formData = new FormData();
+                    formData.append(fieldName, file);
+                    formData.append('notes', `Test with field name: ${fieldName}`);
+
+                    const response = await fetch(`${API_BASE}/submit-result`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: formData
+                    });
+
+                    const result = await response.json();
+                    results.push(`Field "${fieldName}": ${result.success ? '✅ SUCCESS' : '❌ FAILED - ' + result.message}`);
+                    
+                    if (result.success) {
+                        break; // Stop on first success
+                    }
+                } catch (error) {
+                    results.push(`Field "${fieldName}": ❌ ERROR - ${error.message}`);
+                }
+            }
+
+            showMessage(`Field Name Test Results:\n${results.join('\n')}`, 'info');
+        }
+
+        // Main form submission
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const uploadType = document.getElementById('uploadType').value;
+            const config = uploadConfigs[uploadType];
+            const token = document.getElementById('token').value;
+            const fieldName = document.getElementById('fieldName').value;
+            const fileInput = document.getElementById('fileInput');
+            const notes = document.getElementById('notes').value;
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                showMessage('Please select a file to upload', 'error');
+                return;
+            }
+            
+            // Prepare form data
+            const formData = new FormData();
+            formData.append(fieldName, file);
+            if (notes) formData.append('notes', notes);
+            
+            // Show progress and disable button
+            const submitBtn = document.getElementById('submitBtn');
+            const progress = document.getElementById('progress');
+            const progressBar = document.getElementById('progressBar');
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Uploading...';
+            progress.style.display = 'block';
+            
+            try {
+                // Create XMLHttpRequest for progress tracking
+                const xhr = new XMLHttpRequest();
+                
+                // Track upload progress
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        const percentComplete = Math.round((e.loaded / e.total) * 100);
+                        progressBar.style.width = percentComplete + '%';
+                        progressBar.textContent = percentComplete + '%';
+                    }
+                });
+
+                // Promise wrapper for XMLHttpRequest
+                const uploadPromise = new Promise((resolve, reject) => {
+                    xhr.addEventListener('load', () => {
+                        try {
+                            const result = JSON.parse(xhr.responseText);
+                            resolve(result);
+                        } catch (error) {
+                            reject(new Error('Failed to parse response: ' + xhr.responseText));
+                        }
+                    });
+
+                    xhr.addEventListener('error', () => {
+                        reject(new Error('Network error occurred'));
+                    });
+
+                    xhr.open('POST', `${API_BASE}${config.endpoint}`);
+                    xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                    xhr.send(formData);
+                });
+
+                const result = await uploadPromise;
+                
+                if (result.success) {
+                    let message = `✅ Upload Successful!\n\nFile: ${file.name}\n`;
+                    
+                    if (uploadType === 'result' && result.data.resultSubmission) {
+                        const submission = result.data.resultSubmission;
+                        message += `Size: ${submission.fileSize} bytes\nCloudinary URL: ${submission.cloudinaryUrl}\nProfile resultLink updated: ${result.data.updatedResultLink}`;
+                        
+                        // Show updated annotator status if available
+                        if (result.data.updatedAnnotatorStatus) {
+                            message += `\nAnnotator Status: ${result.data.updatedAnnotatorStatus}`;
+                        }
+                    } else if (uploadType === 'id-document' && result.data.id_document_url) {
+                        message += `ID Document URL: ${result.data.id_document_url}\nStored in profile attachments`;
+                    } else if (uploadType === 'resume' && result.data.resume_url) {
+                        message += `Resume URL: ${result.data.resume_url}\nStored in profile attachments`;
+                    }
+                    
+                    showMessage(message, 'success');
+                    
+                    // Reset form
+                    fileInput.value = '';
+                    document.getElementById('notes').value = '';
+                    document.getElementById('fileInfo').textContent = '';
+                } else {
+                    showMessage(`❌ Upload Failed: ${result.message}`, 'error');
+                }
+                
+            } catch (error) {
+                console.error('Upload error:', error);
+                showMessage(`❌ Upload Error: ${error.message}`, 'error');
+            } finally {
+                // Reset UI
+                submitBtn.disabled = false;
+                submitBtn.textContent = config.buttonText;
+                progress.style.display = 'none';
+                progressBar.style.width = '0%';
+                progressBar.textContent = '0%';
+            }
+        });
+
+        // Show message helper
+        function showMessage(text, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = text;
+            messageDiv.className = `message ${type}`;
+            messageDiv.style.display = 'block';
+            
+            // Auto-hide success messages after 10 seconds
+            if (type === 'success') {
+                setTimeout(() => {
+                    messageDiv.style.display = 'none';
+                }, 10000);
+            }
+        }
+    </script>
+</body>
+</html>
