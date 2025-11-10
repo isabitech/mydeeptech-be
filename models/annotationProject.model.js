@@ -126,6 +126,45 @@ const annotationProjectSchema = new mongoose.Schema(
     applicationDeadline: {
       type: Date,
       default: null
+    },
+
+    // Project media and attachments
+    media: [{
+      publicId: { type: String, required: true },
+      url: { type: String, required: true },
+      originalName: { type: String, required: true },
+      size: { type: Number, required: true },
+      format: { type: String, required: true },
+      resourceType: { type: String, enum: ["image", "video", "raw"], required: true },
+      thumbnail: { type: String, default: null },
+      optimizedUrl: { type: String, default: null },
+      uploadedBy: { 
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "DTUser",
+        required: true 
+      },
+      uploadedAt: { type: Date, default: Date.now }
+    }],
+
+    projectFiles: {
+      instructionDocuments: [{
+        publicId: { type: String, required: true },
+        url: { type: String, required: true },
+        originalName: { type: String, required: true },
+        uploadedAt: { type: Date, default: Date.now }
+      }],
+      sampleData: [{
+        publicId: { type: String, required: true },
+        url: { type: String, required: true },
+        originalName: { type: String, required: true },
+        uploadedAt: { type: Date, default: Date.now }
+      }],
+      guidelines: [{
+        publicId: { type: String, required: true },
+        url: { type: String, required: true },
+        originalName: { type: String, required: true },
+        uploadedAt: { type: Date, default: Date.now }
+      }]
     }
   },
   { timestamps: true }
