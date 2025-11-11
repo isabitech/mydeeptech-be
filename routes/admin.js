@@ -1,6 +1,6 @@
 const express = require('express');
-const { getAllDTUsers, getAllAdminUsers, approveAnnotator, rejectAnnotator, getDTUserAdmin, createAdmin, requestAdminVerification, confirmAdminVerification, verifyAdminOTP, adminLogin } = require('../controller/dtUser.controller.js');
-const { createAnnotationProject, getAllAnnotationProjects, getAnnotationProjectDetails, updateAnnotationProject, deleteAnnotationProject, getAnnotationProjectApplications, approveAnnotationProjectApplication, rejectAnnotationProjectApplication } = require('../controller/annotationProject.controller.js');
+const { getAllDTUsers, getAllAdminUsers, getAdminDashboard, approveAnnotator, rejectAnnotator, getDTUserAdmin, createAdmin, requestAdminVerification, confirmAdminVerification, verifyAdminOTP, adminLogin } = require('../controller/dtUser.controller.js');
+const { createAnnotationProject, getAllAnnotationProjects, getAnnotationProjectDetails, updateAnnotationProject, deleteAnnotationProject, requestProjectDeletionOTP, verifyOTPAndDeleteProject, getAnnotationProjectApplications, approveAnnotationProjectApplication, rejectAnnotationProjectApplication } = require('../controller/annotationProject.controller.js');
 const { createInvoice, getAllInvoices, getInvoiceDetails, updatePaymentStatus, sendInvoiceReminder, deleteInvoice } = require('../controller/invoice.controller.js');
 const { authenticateAdmin } = require('../middleware/adminAuth.js');
 
@@ -21,6 +21,7 @@ router.post('/verify-otp', verifyAdminOTP);  // Verify OTP and complete account 
 router.post('/create', createAdmin);
 
 // Admin Routes - All require admin authentication
+router.get('/dashboard', authenticateAdmin, getAdminDashboard);
 router.get('/dtusers', authenticateAdmin, getAllDTUsers);
 router.get('/admin-users', authenticateAdmin, getAllAdminUsers);
 router.get('/dtusers/:userId', authenticateAdmin, getDTUserAdmin);
@@ -33,6 +34,10 @@ router.get('/projects', authenticateAdmin, getAllAnnotationProjects);
 router.get('/projects/:projectId', authenticateAdmin, getAnnotationProjectDetails);
 router.patch('/projects/:projectId', authenticateAdmin, updateAnnotationProject);
 router.delete('/projects/:projectId', authenticateAdmin, deleteAnnotationProject);
+
+// Project Deletion with OTP Routes (Projects Officer Authorization)
+router.post('/projects/:projectId/request-deletion-otp', authenticateAdmin, requestProjectDeletionOTP);
+router.post('/projects/:projectId/verify-deletion-otp', authenticateAdmin, verifyOTPAndDeleteProject);
 
 // Application Management Routes
 router.get('/applications', authenticateAdmin, getAnnotationProjectApplications);

@@ -165,6 +165,25 @@ const annotationProjectSchema = new mongoose.Schema(
         originalName: { type: String, required: true },
         uploadedAt: { type: Date, default: Date.now }
       }]
+    },
+
+    // Project deletion OTP (for Projects Officer authorization)
+    deletionOTP: {
+      code: { type: String, default: null },
+      expiresAt: { type: Date, default: null },
+      requestedBy: { 
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "DTUser",
+        default: null 
+      },
+      requestedAt: { type: Date, default: null },
+      verified: { type: Boolean, default: false },
+      verifiedAt: { type: Date, default: null },
+      verifiedBy: { 
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "DTUser",
+        default: null 
+      }
     }
   },
   { timestamps: true }

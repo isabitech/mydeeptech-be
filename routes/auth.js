@@ -4,7 +4,7 @@ const { createProject, getProject, updateProject, deleteProject } = require('../
 const { createTask, getTask, getAllTasks, assignTask} = require('../controller/task.js')
 const {validateVisitor} = require('../controller/validateuser.js')
 const dtUserController = require("../controller/dtUser.controller.js");
-const { createDTUser, verifyEmail, submitResult, updateUserStatus, setupPassword, dtUserLogin, getDTUserProfile, updateDTUserProfile, resetDTUserPassword, resendVerificationEmail, getAvailableProjects, applyToProject, getUserActiveProjects, getUserInvoices, getUnpaidInvoices, getPaidInvoices, getInvoiceDetails, getInvoiceDashboard, submitResultWithCloudinary, getUserResultSubmissions, uploadIdDocument, uploadResume } = require("../controller/dtUser.controller.js");
+const { createDTUser, verifyEmail, submitResult, updateUserStatus, setupPassword, dtUserLogin, getDTUserProfile, updateDTUserProfile, resetDTUserPassword, resendVerificationEmail, getAvailableProjects, applyToProject, getUserActiveProjects, getUserInvoices, getUnpaidInvoices, getPaidInvoices, getInvoiceDetails, getInvoiceDashboard, getDTUserDashboard, submitResultWithCloudinary, getUserResultSubmissions, uploadIdDocument, uploadResume } = require("../controller/dtUser.controller.js");
 const { authenticateToken, authorizeProfileAccess } = require('../middleware/auth.js');
 
 // Import Cloudinary upload middleware for result submissions
@@ -47,6 +47,9 @@ router.get('/invoices/unpaid', authenticateToken, getUnpaidInvoices);
 router.get('/invoices/paid', authenticateToken, getPaidInvoices);
 router.get('/invoices/dashboard', authenticateToken, getInvoiceDashboard);
 router.get('/invoices/:invoiceId', authenticateToken, getInvoiceDetails);
+
+// DTUser Dashboard Route - Personal overview for authenticated DTUsers
+router.get('/dashboard', authenticateToken, getDTUserDashboard);
 
 // DTUser Result Submission Routes (NEW) - flexible field names
 router.post('/submit-result', authenticateToken, (req, res, next) => {

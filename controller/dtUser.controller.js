@@ -1086,6 +1086,356 @@ const getAllAdminUsers = async (req, res) => {
   }
 };
 
+// Admin function: Get comprehensive admin dashboard overview
+const getAdminDashboard = async (req, res) => {
+  try {
+    console.log(`📊 Admin ${req.admin.email} requesting dashboard overview`);
+
+    // Get current date for time-based filtering
+    const currentDate = new Date();
+    const thirtyDaysAgo = new Date(currentDate);
+    thirtyDaysAgo.setDate(currentDate.getDate() - 30);
+    const sevenDaysAgo = new Date(currentDate);
+    sevenDaysAgo.setDate(currentDate.getDate() - 7);
+
+    // ===== DTUSER STATISTICS =====
+    const dtUserStats = await DTUser.aggregate([
+      {
+        $match: {
+          $nor: [
+            { email: /@mydeeptech\.ng$/i },
+            { domains: { $in: ['Administration', 'Management'] } }
+          ]
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalUsers: { $sum: 1 },
+          pendingAnnotators: { 
+            $sum: { $cond: [{ $eq: ['$annotatorStatus', 'pending'] }, 1, 0] }
+          },
+          submittedAnnotators: { 
+            $sum: { $cond: [{ $eq: ['$annotatorStatus', 'submitted'] }, 1, 0] }
+          },
+          verifiedAnnotators: { 
+            $sum: { $cond: [{ $eq: ['$annotatorStatus', 'verified'] }, 1, 0] }
+          },
+          approvedAnnotators: { 
+            $sum: { $cond: [{ $eq: ['$annotatorStatus', 'approved'] }, 1, 0] }
+          },
+          rejectedAnnotators: { 
+            $sum: { $cond: [{ $eq: ['$annotatorStatus', 'rejected'] }, 1, 0] }
+          },
+          pendingMicroTaskers: { 
+            $sum: { $cond: [{ $eq: ['$microTaskerStatus', 'pending'] }, 1, 0] }
+          },
+          approvedMicroTaskers: { 
+            $sum: { $cond: [{ $eq: ['$microTaskerStatus', 'approved'] }, 1, 0] }
+          },
+          verifiedEmails: { 
+            $sum: { $cond: ['$isEmailVerified', 1, 0] }
+          },
+          usersWithPasswords: { 
+            $sum: { $cond: ['$hasSetPassword', 1, 0] }
+          },
+          usersWithResults: { 
+            $sum: { $cond: [{ $ne: ['$resultLink', ''] }, 1, 0] }
+          }
+        }
+      }
+    ]);
+
+    // Recent DTUser registrations (last 30 days)
+    const recentRegistrations = await DTUser.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: thirtyDaysAgo },
+          $nor: [
+            { email: /@mydeeptech\.ng$/i },
+            { domains: { $in: ['Administration', 'Management'] } }
+          ]
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$createdAt' },
+            month: { $month: '$createdAt' },
+            day: { $dayOfMonth: '$createdAt' }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 }
+      }
+    ]);
+
+    // ===== PROJECT STATISTICS =====
+    const projectStats = await AnnotationProject.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalProjects: { $sum: 1 },
+          activeProjects: { 
+            $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] }
+          },
+          completedProjects: { 
+            $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] }
+          },
+          pausedProjects: { 
+            $sum: { $cond: [{ $eq: ['$status', 'paused'] }, 1, 0] }
+          },
+          totalBudget: { $sum: '$budget' },
+          totalSpent: { $sum: '$spentBudget' }
+        }
+      }
+    ]);
+
+    // ===== APPLICATION STATISTICS =====
+    const applicationStats = await ProjectApplication.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalApplications: { $sum: 1 },
+          pendingApplications: { 
+            $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] }
+          },
+          approvedApplications: { 
+            $sum: { $cond: [{ $eq: ['$status', 'approved'] }, 1, 0] }
+          },
+          rejectedApplications: { 
+            $sum: { $cond: [{ $eq: ['$status', 'rejected'] }, 1, 0] }
+          }
+        }
+      }
+    ]);
+
+    // ===== INVOICE STATISTICS =====
+    const invoiceStats = await Invoice.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalInvoices: { $sum: 1 },
+          totalAmount: { $sum: '$invoiceAmount' },
+          paidAmount: { 
+            $sum: { $cond: [{ $eq: ['$paymentStatus', 'paid'] }, '$invoiceAmount', 0] }
+          },
+          unpaidAmount: { 
+            $sum: { $cond: [{ $eq: ['$paymentStatus', 'unpaid'] }, '$invoiceAmount', 0] }
+          },
+          overdueAmount: { 
+            $sum: { $cond: [{ $eq: ['$paymentStatus', 'overdue'] }, '$invoiceAmount', 0] }
+          },
+          paidCount: { 
+            $sum: { $cond: [{ $eq: ['$paymentStatus', 'paid'] }, 1, 0] }
+          },
+          unpaidCount: { 
+            $sum: { $cond: [{ $eq: ['$paymentStatus', 'unpaid'] }, 1, 0] }
+          },
+          overdueCount: { 
+            $sum: { $cond: [{ $eq: ['$paymentStatus', 'overdue'] }, 1, 0] }
+          }
+        }
+      }
+    ]);
+
+    // Recent invoice activities (last 7 days)
+    const recentInvoiceActivity = await Invoice.aggregate([
+      {
+        $match: {
+          $or: [
+            { createdAt: { $gte: sevenDaysAgo } },
+            { paidAt: { $gte: sevenDaysAgo } }
+          ]
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: { $ifNull: ['$paidAt', '$createdAt'] } },
+            month: { $month: { $ifNull: ['$paidAt', '$createdAt'] } },
+            day: { $dayOfMonth: { $ifNull: ['$paidAt', '$createdAt'] } }
+          },
+          invoicesCreated: { 
+            $sum: { $cond: [{ $gte: ['$createdAt', sevenDaysAgo] }, 1, 0] }
+          },
+          invoicesPaid: { 
+            $sum: { $cond: [{ $and: [{ $gte: ['$paidAt', sevenDaysAgo] }, { $ne: ['$paidAt', null] }] }, 1, 0] }
+          },
+          amountPaid: { 
+            $sum: { $cond: [{ $and: [{ $gte: ['$paidAt', sevenDaysAgo] }, { $ne: ['$paidAt', null] }] }, '$invoiceAmount', 0] }
+          }
+        }
+      },
+      {
+        $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 }
+      }
+    ]);
+
+    // ===== TOP PERFORMING ANNOTATORS =====
+    const topAnnotators = await DTUser.aggregate([
+      {
+        $match: {
+          annotatorStatus: 'approved',
+          resultSubmissions: { $exists: true, $ne: [] }
+        }
+      },
+      {
+        $project: {
+          fullName: 1,
+          email: 1,
+          submissionCount: { $size: '$resultSubmissions' },
+          lastSubmission: { $max: '$resultSubmissions.submissionDate' }
+        }
+      },
+      {
+        $sort: { submissionCount: -1 }
+      },
+      {
+        $limit: 10
+      }
+    ]);
+
+    // ===== RECENT ACTIVITIES =====
+    const recentUsers = await DTUser.find({
+      $nor: [
+        { email: /@mydeeptech\.ng$/i },
+        { domains: { $in: ['Administration', 'Management'] } }
+      ]
+    })
+    .sort({ createdAt: -1 })
+    .limit(10)
+    .select('fullName email annotatorStatus microTaskerStatus createdAt isEmailVerified');
+
+    const recentProjects = await AnnotationProject.find()
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .select('projectName status budget spentBudget createdAt');
+
+    // ===== DOMAIN STATISTICS =====
+    const domainStats = await DTUser.aggregate([
+      {
+        $match: {
+          $nor: [
+            { email: /@mydeeptech\.ng$/i },
+            { domains: { $in: ['Administration', 'Management'] } }
+          ]
+        }
+      },
+      { $unwind: '$domains' },
+      {
+        $group: {
+          _id: '$domains',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } },
+      { $limit: 10 }
+    ]);
+
+    // Prepare response
+    const dashboardData = {
+      overview: {
+        totalUsers: dtUserStats[0]?.totalUsers || 0,
+        totalProjects: projectStats[0]?.totalProjects || 0,
+        totalInvoices: invoiceStats[0]?.totalInvoices || 0,
+        totalRevenue: invoiceStats[0]?.paidAmount || 0,
+        pendingApplications: applicationStats[0]?.pendingApplications || 0
+      },
+      dtUserStatistics: dtUserStats[0] || {
+        totalUsers: 0,
+        pendingAnnotators: 0,
+        submittedAnnotators: 0,
+        verifiedAnnotators: 0,
+        approvedAnnotators: 0,
+        rejectedAnnotators: 0,
+        pendingMicroTaskers: 0,
+        approvedMicroTaskers: 0,
+        verifiedEmails: 0,
+        usersWithPasswords: 0,
+        usersWithResults: 0
+      },
+      projectStatistics: projectStats[0] || {
+        totalProjects: 0,
+        activeProjects: 0,
+        completedProjects: 0,
+        pausedProjects: 0,
+        totalBudget: 0,
+        totalSpent: 0
+      },
+      applicationStatistics: applicationStats[0] || {
+        totalApplications: 0,
+        pendingApplications: 0,
+        approvedApplications: 0,
+        rejectedApplications: 0
+      },
+      invoiceStatistics: invoiceStats[0] || {
+        totalInvoices: 0,
+        totalAmount: 0,
+        paidAmount: 0,
+        unpaidAmount: 0,
+        overdueAmount: 0,
+        paidCount: 0,
+        unpaidCount: 0,
+        overdueCount: 0
+      },
+      trends: {
+        recentRegistrations,
+        recentInvoiceActivity
+      },
+      topPerformers: {
+        topAnnotators
+      },
+      recentActivities: {
+        recentUsers,
+        recentProjects
+      },
+      insights: {
+        domainDistribution: domainStats,
+        conversionRates: {
+          emailVerificationRate: dtUserStats[0]?.totalUsers ? 
+            ((dtUserStats[0]?.verifiedEmails || 0) / dtUserStats[0].totalUsers * 100).toFixed(1) : '0',
+          passwordSetupRate: dtUserStats[0]?.totalUsers ? 
+            ((dtUserStats[0]?.usersWithPasswords || 0) / dtUserStats[0].totalUsers * 100).toFixed(1) : '0',
+          resultSubmissionRate: dtUserStats[0]?.totalUsers ? 
+            ((dtUserStats[0]?.usersWithResults || 0) / dtUserStats[0].totalUsers * 100).toFixed(1) : '0',
+          approvalRate: (dtUserStats[0]?.pendingAnnotators || 0) + (dtUserStats[0]?.submittedAnnotators || 0) + (dtUserStats[0]?.verifiedAnnotators || 0) + (dtUserStats[0]?.approvedAnnotators || 0) + (dtUserStats[0]?.rejectedAnnotators || 0) > 0 ?
+            ((dtUserStats[0]?.approvedAnnotators || 0) / ((dtUserStats[0]?.pendingAnnotators || 0) + (dtUserStats[0]?.submittedAnnotators || 0) + (dtUserStats[0]?.verifiedAnnotators || 0) + (dtUserStats[0]?.approvedAnnotators || 0) + (dtUserStats[0]?.rejectedAnnotators || 0)) * 100).toFixed(1) : '0'
+        },
+        financialHealth: {
+          paymentRate: invoiceStats[0]?.totalInvoices ? 
+            ((invoiceStats[0]?.paidCount || 0) / invoiceStats[0].totalInvoices * 100).toFixed(1) : '0',
+          averageInvoiceAmount: invoiceStats[0]?.totalInvoices ? 
+            (invoiceStats[0]?.totalAmount / invoiceStats[0].totalInvoices).toFixed(2) : '0',
+          outstandingBalance: (invoiceStats[0]?.unpaidAmount || 0) + (invoiceStats[0]?.overdueAmount || 0)
+        }
+      },
+      generatedAt: new Date(),
+      timeframe: {
+        registrationData: '30 days',
+        invoiceActivity: '7 days'
+      }
+    };
+
+    console.log(`📊 Dashboard data generated for admin: ${req.admin.email}`);
+
+    res.status(200).json({
+      success: true,
+      data: dashboardData
+    });
+
+  } catch (error) {
+    console.error("❌ Error generating admin dashboard:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error generating admin dashboard",
+      error: error.message
+    });
+  }
+};
+
 // Admin function: Approve annotator
 const approveAnnotator = async (req, res) => {
   try {
@@ -2835,6 +3185,354 @@ const getInvoiceDashboard = async (req, res) => {
   }
 };
 
+// DTUser Dashboard - Personal overview for authenticated users
+const getDTUserDashboard = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const userEmail = req.user.email;
+
+    console.log(`📊 DTUser ${userEmail} requesting personal dashboard`);
+
+    // Get current date for time-based filtering
+    const currentDate = new Date();
+    const thirtyDaysAgo = new Date(currentDate);
+    thirtyDaysAgo.setDate(currentDate.getDate() - 30);
+    const sevenDaysAgo = new Date(currentDate);
+    sevenDaysAgo.setDate(currentDate.getDate() - 7);
+
+    // ===== GET USER PROFILE =====
+    const user = await DTUser.findById(userId).select('-password');
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // ===== PROFILE COMPLETION ANALYSIS =====
+    const profileCompletion = {
+      basicInfo: {
+        completed: !!(user.fullName && user.email && user.phone),
+        fields: ['fullName', 'email', 'phone']
+      },
+      personalInfo: {
+        completed: !!(user.personal_info?.country && user.personal_info?.time_zone && user.personal_info?.available_hours_per_week),
+        fields: ['country', 'time_zone', 'available_hours_per_week']
+      },
+      professionalBackground: {
+        completed: !!(user.professional_background?.education_field && user.professional_background?.years_of_experience),
+        fields: ['education_field', 'years_of_experience']
+      },
+      paymentInfo: {
+        completed: !!(user.payment_info?.account_name && user.payment_info?.account_number && user.payment_info?.bank_name),
+        fields: ['account_name', 'account_number', 'bank_name']
+      },
+      attachments: {
+        completed: !!(user.attachments?.resume_url && user.attachments?.id_document_url),
+        fields: ['resume_url', 'id_document_url']
+      },
+      profilePicture: {
+        completed: !!(user.profilePicture?.url),
+        fields: ['profile_picture']
+      }
+    };
+
+    // Calculate overall completion percentage
+    const completionSections = Object.values(profileCompletion);
+    const completedSections = completionSections.filter(section => section.completed).length;
+    const completionPercentage = Math.round((completedSections / completionSections.length) * 100);
+
+    // ===== PROJECT APPLICATIONS =====
+    const applicationStats = await ProjectApplication.aggregate([
+      {
+        $match: { dtUserId: new mongoose.Types.ObjectId(userId) }
+      },
+      {
+        $group: {
+          _id: null,
+          totalApplications: { $sum: 1 },
+          pendingApplications: { 
+            $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] }
+          },
+          approvedApplications: { 
+            $sum: { $cond: [{ $eq: ['$status', 'approved'] }, 1, 0] }
+          },
+          rejectedApplications: { 
+            $sum: { $cond: [{ $eq: ['$status', 'rejected'] }, 1, 0] }
+          }
+        }
+      }
+    ]);
+
+    // Recent applications
+    const recentApplications = await ProjectApplication.find({ dtUserId: userId })
+      .populate('projectId', 'projectName budget timeline status')
+      .sort({ appliedAt: -1 })
+      .limit(5)
+      .select('status appliedAt projectId');
+
+    // ===== INVOICE STATISTICS =====
+    const invoiceStats = await Invoice.aggregate([
+      {
+        $match: { dtUserId: new mongoose.Types.ObjectId(userId) }
+      },
+      {
+        $group: {
+          _id: null,
+          totalInvoices: { $sum: 1 },
+          totalEarnings: { $sum: '$invoiceAmount' },
+          paidEarnings: { 
+            $sum: { $cond: [{ $eq: ['$paymentStatus', 'paid'] }, '$invoiceAmount', 0] }
+          },
+          pendingEarnings: { 
+            $sum: { $cond: [{ $eq: ['$paymentStatus', 'unpaid'] }, '$invoiceAmount', 0] }
+          },
+          overdueEarnings: { 
+            $sum: { $cond: [{ $eq: ['$paymentStatus', 'overdue'] }, '$invoiceAmount', 0] }
+          },
+          paidInvoices: { 
+            $sum: { $cond: [{ $eq: ['$paymentStatus', 'paid'] }, 1, 0] }
+          },
+          pendingInvoices: { 
+            $sum: { $cond: [{ $eq: ['$paymentStatus', 'unpaid'] }, 1, 0] }
+          },
+          overdueInvoices: { 
+            $sum: { $cond: [{ $eq: ['$paymentStatus', 'overdue'] }, 1, 0] }
+          }
+        }
+      }
+    ]);
+
+    // Recent payments (last 30 days)
+    const recentPayments = await Invoice.aggregate([
+      {
+        $match: {
+          dtUserId: new mongoose.Types.ObjectId(userId),
+          paymentStatus: 'paid',
+          paidAt: { $gte: thirtyDaysAgo }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$paidAt' },
+            month: { $month: '$paidAt' },
+            day: { $dayOfMonth: '$paidAt' }
+          },
+          dailyEarnings: { $sum: '$invoiceAmount' },
+          invoiceCount: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1 }
+      }
+    ]);
+
+    // Recent invoices
+    const recentInvoices = await Invoice.find({ dtUserId: userId })
+      .populate('projectId', 'projectName')
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .select('invoiceAmount paymentStatus dueDate paidAt createdAt projectId');
+
+    // ===== RESULT SUBMISSIONS =====
+    const resultSubmissions = {
+      totalSubmissions: user.resultSubmissions?.length || 0,
+      recentSubmissions: user.resultSubmissions?.slice(-5) || [],
+      lastSubmissionDate: user.resultSubmissions?.length > 0 ? 
+        Math.max(...user.resultSubmissions.map(sub => new Date(sub.submissionDate))) : null
+    };
+
+    // ===== AVAILABLE PROJECTS =====
+    const availableProjects = await AnnotationProject.find({
+      status: 'active',
+      'requirements.maxAnnotators': { $gt: 0 }
+    })
+    .select('projectName description budget timeline requirements status')
+    .sort({ createdAt: -1 })
+    .limit(5);
+
+    // Check which projects user has already applied to
+    const userApplications = await ProjectApplication.find({ dtUserId: userId })
+      .select('projectId status');
+    
+    const appliedProjectIds = userApplications.map(app => app.projectId.toString());
+    
+    // Mark available projects with application status
+    const availableProjectsWithStatus = availableProjects.map(project => ({
+      ...project.toObject(),
+      hasApplied: appliedProjectIds.includes(project._id.toString()),
+      applicationStatus: userApplications.find(app => 
+        app.projectId.toString() === project._id.toString()
+      )?.status || null
+    }));
+
+    // ===== PERFORMANCE METRICS =====
+    const performanceMetrics = {
+      profileCompletionPercentage: completionPercentage,
+      applicationSuccessRate: (applicationStats[0]?.totalApplications || 0) > 0 ? 
+        Math.round(((applicationStats[0]?.approvedApplications || 0) / applicationStats[0].totalApplications) * 100) : 0,
+      paymentRate: (invoiceStats[0]?.totalInvoices || 0) > 0 ? 
+        Math.round(((invoiceStats[0]?.paidInvoices || 0) / invoiceStats[0].totalInvoices) * 100) : 0,
+      avgEarningsPerInvoice: (invoiceStats[0]?.totalInvoices || 0) > 0 ? 
+        Math.round((invoiceStats[0]?.totalEarnings || 0) / invoiceStats[0].totalInvoices) : 0,
+      accountStatus: {
+        annotatorStatus: user.annotatorStatus,
+        microTaskerStatus: user.microTaskerStatus,
+        isEmailVerified: user.isEmailVerified,
+        hasSetPassword: user.hasSetPassword
+      }
+    };
+
+    // ===== NEXT STEPS RECOMMENDATIONS =====
+    const nextSteps = [];
+    
+    if (!user.isEmailVerified) {
+      nextSteps.push({
+        priority: 'high',
+        action: 'verify_email',
+        title: 'Verify Your Email',
+        description: 'Complete email verification to unlock all features'
+      });
+    }
+    
+    if (!user.hasSetPassword) {
+      nextSteps.push({
+        priority: 'high',
+        action: 'setup_password',
+        title: 'Set Up Password',
+        description: 'Create a secure password for your account'
+      });
+    }
+    
+    if (completionPercentage < 80) {
+      nextSteps.push({
+        priority: 'medium',
+        action: 'complete_profile',
+        title: 'Complete Your Profile',
+        description: `Your profile is ${completionPercentage}% complete. Add missing information to improve your chances of approval.`
+      });
+    }
+    
+    if (!user.attachments?.resume_url) {
+      nextSteps.push({
+        priority: 'medium',
+        action: 'upload_resume',
+        title: 'Upload Resume',
+        description: 'Upload your resume to showcase your experience'
+      });
+    }
+    
+    if (!user.attachments?.id_document_url) {
+      nextSteps.push({
+        priority: 'medium',
+        action: 'upload_id',
+        title: 'Upload ID Document',
+        description: 'Upload a valid ID document for verification'
+      });
+    }
+    
+    if (user.annotatorStatus === 'pending' && !user.resultLink) {
+      nextSteps.push({
+        priority: 'high',
+        action: 'submit_result',
+        title: 'Submit Work Sample',
+        description: 'Upload a work sample to demonstrate your skills'
+      });
+    }
+    
+    if (user.annotatorStatus === 'approved' && (applicationStats[0]?.totalApplications || 0) === 0) {
+      nextSteps.push({
+        priority: 'medium',
+        action: 'apply_projects',
+        title: 'Apply to Projects',
+        description: 'Browse and apply to available annotation projects'
+      });
+    }
+
+    // ===== COMPILE DASHBOARD DATA =====
+    const dashboardData = {
+      userProfile: {
+        id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        annotatorStatus: user.annotatorStatus,
+        microTaskerStatus: user.microTaskerStatus,
+        isEmailVerified: user.isEmailVerified,
+        hasSetPassword: user.hasSetPassword,
+        joinedDate: user.createdAt,
+        profilePicture: user.profilePicture?.url || null
+      },
+      
+      profileCompletion: {
+        percentage: completionPercentage,
+        sections: profileCompletion,
+        completedSections: completedSections,
+        totalSections: completionSections.length
+      },
+      
+      applicationStatistics: applicationStats[0] || {
+        totalApplications: 0,
+        pendingApplications: 0,
+        approvedApplications: 0,
+        rejectedApplications: 0
+      },
+      
+      financialSummary: invoiceStats[0] || {
+        totalInvoices: 0,
+        totalEarnings: 0,
+        paidEarnings: 0,
+        pendingEarnings: 0,
+        overdueEarnings: 0,
+        paidInvoices: 0,
+        pendingInvoices: 0,
+        overdueInvoices: 0
+      },
+      
+      resultSubmissions: resultSubmissions,
+      
+      recentActivity: {
+        recentApplications: recentApplications,
+        recentInvoices: recentInvoices,
+        recentPayments: recentPayments
+      },
+      
+      availableOpportunities: {
+        availableProjects: availableProjectsWithStatus,
+        projectCount: availableProjectsWithStatus.length
+      },
+      
+      performanceMetrics: performanceMetrics,
+      
+      recommendations: {
+        nextSteps: nextSteps,
+        priorityActions: nextSteps.filter(step => step.priority === 'high').length
+      },
+      
+      generatedAt: new Date(),
+      timeframe: {
+        recentActivity: '30 days',
+        availableProjects: 'current active projects'
+      }
+    };
+
+    console.log(`✅ Dashboard generated for user: ${userEmail}`);
+
+    res.status(200).json({
+      success: true,
+      data: dashboardData
+    });
+
+  } catch (error) {
+    console.error("❌ Error generating DTUser dashboard:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error generating user dashboard",
+      error: error.message
+    });
+  }
+};
+
 // Submit result file upload and store in Cloudinary
 const submitResultWithCloudinary = async (req, res) => {
   try {
@@ -3233,6 +3931,8 @@ module.exports = {
   getDTUser,
   getAllDTUsers,
   getAllAdminUsers,
+  getAdminDashboard,
+  getDTUserDashboard,
   approveAnnotator,
   rejectAnnotator,
   getDTUserAdmin,
