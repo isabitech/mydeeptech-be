@@ -1,5 +1,303 @@
 const { sendProjectEmail } = require('./brevoSMTP');
 
+// Send project deletion OTP to Projects Officer
+const sendProjectDeletionOTP = async (projectsOfficerEmail, deletionData) => {
+  const {
+    projectName,
+    projectId,
+    projectCategory,
+    requestedBy,
+    requestedByEmail,
+    activeApplications,
+    totalApplications,
+    otp,
+    expiryTime,
+    reason
+  } = deletionData;
+
+  const subject = `🚨 PROJECT DELETION AUTHORIZATION REQUIRED - ${projectName}`;
+  
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Project Deletion Authorization - MyDeeptech</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #e74c3c; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+          .content { background: #f9f9f9; padding: 20px; border: 1px solid #ddd; }
+          .otp-box { 
+            background: #fff; 
+            border: 2px solid #e74c3c; 
+            border-radius: 10px; 
+            padding: 20px; 
+            text-align: center; 
+            margin: 20px 0; 
+          }
+          .otp-code { 
+            font-size: 36px; 
+            font-weight: bold; 
+            color: #e74c3c; 
+            letter-spacing: 5px; 
+            font-family: 'Courier New', monospace;
+          }
+          .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 15px 0; }
+          .details { background: #e8f4f8; padding: 15px; border-radius: 5px; margin: 15px 0; }
+          .footer { background: #2c3e50; color: white; padding: 15px; text-align: center; border-radius: 0 0 5px 5px; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+          <div class="header">
+            <h1>🚨 PROJECT DELETION AUTHORIZATION</h1>
+            <p>Critical Action Requires Your Approval</p>
+          </div>
+          
+          <div class="content">
+            <div class="warning">
+              <strong>⚠️ URGENT AUTHORIZATION REQUIRED</strong><br>
+              An administrator has requested to delete a project with active applications. 
+              This action requires your explicit approval as Projects Officer.
+            </div>
+
+            <div class="details">
+              <h3>📋 Project Deletion Request Details</h3>
+              <p><strong>Project Name:</strong> ${projectName}</p>
+              <p><strong>Project ID:</strong> ${projectId}</p>
+              <p><strong>Category:</strong> ${projectCategory}</p>
+              <p><strong>Total Applications:</strong> ${totalApplications}</p>
+              <p><strong>Active Applications:</strong> <span style="color: #e74c3c; font-weight: bold;">${activeApplications}</span></p>
+              <p><strong>Requested By:</strong> ${requestedBy} (${requestedByEmail})</p>
+              <p><strong>Reason:</strong> ${reason}</p>
+              <p><strong>Request Time:</strong> ${new Date().toLocaleString()}</p>
+            </div>
+
+            <div class="otp-box">
+              <h3>🔐 Authorization Code</h3>
+              <div class="otp-code">${otp}</div>
+              <p><strong>Expires:</strong> ${expiryTime}</p>
+              <p><em>Valid for 15 minutes only</em></p>
+            </div>
+
+            <div class="warning">
+              <h4>⚠️ CRITICAL WARNING</h4>
+              <p>Deleting this project will permanently remove:</p>
+              <ul>
+                <li><strong>${totalApplications} application(s)</strong> including ${activeApplications} active ones</li>
+                <li>All project data and files</li>
+                <li>All related records and history</li>
+                <li>This action cannot be undone</li>
+              </ul>
+            </div>
+
+            <h4>📝 How to Authorize:</h4>
+            <ol>
+              <li>Review the project deletion request carefully</li>
+              <li>If you approve this deletion, provide the authorization code above to the requesting administrator</li>
+              <li>The administrator will use this code to complete the deletion process</li>
+              <li>If you do NOT approve, simply ignore this email (code will expire in 15 minutes)</li>
+            </ol>
+
+            <div class="details">
+              <h4>🔍 Security Information</h4>
+              <p><strong>OTP Code:</strong> ${otp}</p>
+              <p><strong>Valid Until:</strong> ${expiryTime}</p>
+              <p><strong>Requested From:</strong> Admin Panel</p>
+            </div>
+          </div>
+          
+          <div class="footer">
+            <p><strong>MyDeepTech Projects Officer Authorization System</strong></p>
+            <p>This email was automatically generated for security purposes.</p>
+            <p>Do not share this OTP code unless you approve the project deletion.</p>
+          </div>
+        </div>
+    </body>
+    </html>
+  `;
+
+  const textContent = `
+🚨 PROJECT DELETION AUTHORIZATION REQUIRED
+
+An administrator has requested to delete a project with active applications.
+
+Project Details:
+- Project: ${projectName} (ID: ${projectId})
+- Category: ${projectCategory}
+- Total Applications: ${totalApplications}
+- Active Applications: ${activeApplications}
+- Requested By: ${requestedBy} (${requestedByEmail})
+- Reason: ${reason}
+
+AUTHORIZATION CODE: ${otp}
+Expires: ${expiryTime}
+
+⚠️ WARNING: This will permanently delete ${totalApplications} applications including ${activeApplications} active ones.
+
+To authorize: Provide the code above to the administrator.
+To deny: Ignore this email (expires in 15 minutes).
+
+MyDeepTech Projects Officer Authorization System
+  `;
+
+  try {
+    await sendProjectEmail({
+      to: projectsOfficerEmail,
+      subject: subject,
+      html: htmlContent,
+      text: textContent
+    });
+    
+    console.log(`✅ Project deletion OTP sent to: ${projectsOfficerEmail}`);
+  } catch (error) {
+    console.error(`❌ Failed to send deletion OTP:`, error);
+    throw error;
+  }
+};
+
+// Send project deletion confirmation to Projects Officer
+const sendProjectDeletionConfirmation = async (projectsOfficerEmail, confirmationData) => {
+  const {
+    projectName,
+    projectId,
+    deletedBy,
+    deletedByEmail,
+    deletedAt,
+    applicationsDeleted,
+    activeApplicationsDeleted,
+    confirmationMessage,
+    deletedApplications
+  } = confirmationData;
+
+  const subject = `✅ PROJECT DELETION COMPLETED - ${projectName}`;
+  
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Project Deletion Completed - MyDeeptech</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: #27ae60; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+          .content { background: #f9f9f9; padding: 20px; border: 1px solid #ddd; }
+          .details { background: #e8f6f3; padding: 15px; border-radius: 5px; margin: 15px 0; }
+          .applications-list { background: #fff; border: 1px solid #ddd; padding: 15px; border-radius: 5px; max-height: 200px; overflow-y: auto; }
+          .footer { background: #2c3e50; color: white; padding: 15px; text-align: center; border-radius: 0 0 5px 5px; }
+          .success { background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 5px; margin: 15px 0; color: #155724; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+          <div class="header">
+            <h1>✅ PROJECT DELETION COMPLETED</h1>
+            <p>Authorized Deletion Successfully Executed</p>
+          </div>
+          
+          <div class="content">
+            <div class="success">
+              <strong>✅ DELETION CONFIRMED</strong><br>
+              The project deletion has been completed successfully with your authorization.
+            </div>
+
+            <div class="details">
+              <h3>📋 Deletion Summary</h3>
+              <p><strong>Deleted Project:</strong> ${projectName}</p>
+              <p><strong>Project ID:</strong> ${projectId}</p>
+              <p><strong>Deleted By:</strong> ${deletedBy} (${deletedByEmail})</p>
+              <p><strong>Deletion Time:</strong> ${new Date(deletedAt).toLocaleString()}</p>
+              <p><strong>Applications Deleted:</strong> ${applicationsDeleted} total (${activeApplicationsDeleted} were active)</p>
+              <p><strong>Confirmation:</strong> ${confirmationMessage}</p>
+            </div>
+
+            ${deletedApplications && deletedApplications.length > 0 ? `
+            <div class="details">
+              <h4>📋 Deleted Applications</h4>
+              <div class="applications-list">
+                ${deletedApplications.map(app => `
+                  <div style="border-bottom: 1px solid #eee; padding: 8px 0;">
+                    <strong>${app.applicantName}</strong> (${app.applicantEmail})<br>
+                    Status: ${app.status} | Applied: ${new Date(app.appliedAt).toLocaleDateString()}
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+            ` : ''}
+
+            <div class="details">
+              <h4>🔒 Security Log</h4>
+              <p><strong>Authorization Method:</strong> OTP Verification</p>
+              <p><strong>Authorized By:</strong> Projects Officer (${projectsOfficerEmail})</p>
+              <p><strong>Executed By:</strong> ${deletedBy}</p>
+              <p><strong>Timestamp:</strong> ${new Date(deletedAt).toLocaleString()}</p>
+              <p><strong>Action:</strong> Force Delete with Applications</p>
+            </div>
+
+            <div class="success">
+              <h4>📝 Next Steps</h4>
+              <ul>
+                <li>All project data has been permanently removed</li>
+                <li>This action has been logged in the system audit trail</li>
+                <li>No further action required from Projects Officer</li>
+              </ul>
+            </div>
+          </div>
+          
+          <div class="footer">
+            <p><strong>MyDeepTech Project Management System</strong></p>
+            <p>Deletion completed and confirmed at ${new Date().toLocaleString()}</p>
+            <p>This is an automated confirmation for audit purposes.</p>
+          </div>
+        </div>
+    </body>
+    </html>
+  `;
+
+  const textContent = `
+✅ PROJECT DELETION COMPLETED
+
+The authorized project deletion has been successfully executed.
+
+Deletion Summary:
+- Project: ${projectName} (ID: ${projectId})
+- Deleted By: ${deletedBy} (${deletedByEmail})
+- Deletion Time: ${new Date(deletedAt).toLocaleString()}
+- Applications Deleted: ${applicationsDeleted} (${activeApplicationsDeleted} active)
+
+${deletedApplications && deletedApplications.length > 0 ? `
+Deleted Applications:
+${deletedApplications.map(app => `- ${app.applicantName} (${app.applicantEmail}) - ${app.status}`).join('\n')}
+` : ''}
+
+Security Log:
+- Authorization: OTP Verification
+- Authorized By: Projects Officer
+- Method: Force Delete with Applications
+
+MyDeepTech Project Management System
+Completed: ${new Date().toLocaleString()}
+  `;
+
+  try {
+    await sendProjectEmail({
+      to: projectsOfficerEmail,
+      subject: subject,
+      html: htmlContent,
+      text: textContent
+    });
+    
+    console.log(`✅ Project deletion confirmation sent to: ${projectsOfficerEmail}`);
+  } catch (error) {
+    console.error(`❌ Failed to send deletion confirmation:`, error);
+    throw error;
+  }
+};
+
 /**
  * Send notification to admin when a user applies to a project
  * @param {string} adminEmail - Admin's email address
@@ -416,5 +714,7 @@ https://mydeeptech.ng
 module.exports = {
   sendProjectApplicationNotification,
   sendProjectApprovalNotification,
-  sendProjectRejectionNotification
+  sendProjectRejectionNotification,
+  sendProjectDeletionOTP,
+  sendProjectDeletionConfirmation
 };

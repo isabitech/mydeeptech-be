@@ -211,6 +211,113 @@ const getAnnotationProjectDetails = async (req, res) => {
       .sort({ appliedAt: -1 })
       .limit(5);
 
+    // Get approved annotators (approved applications with detailed info)
+    const approvedAnnotators = await ProjectApplication.find({ 
+      projectId: project._id,
+      status: 'approved'
+    })
+    .populate({
+      path: 'applicantId',
+      select: 'fullName email phone annotatorStatus microTaskerStatus personal_info professional_background payment_info attachments profilePicture createdAt'
+    })
+    .populate('reviewedBy', 'fullName email')
+    .sort({ reviewedAt: -1 });
+
+    // Get rejected annotators (rejected applications with detailed info)
+    const rejectedAnnotators = await ProjectApplication.find({ 
+      projectId: project._id,
+      status: 'rejected'
+    })
+    .populate({
+      path: 'applicantId',
+      select: 'fullName email phone annotatorStatus microTaskerStatus personal_info professional_background attachments profilePicture createdAt'
+    })
+    .populate('reviewedBy', 'fullName email')
+    .sort({ reviewedAt: -1 });
+
+    // Get pending annotators for completeness
+    const pendingAnnotators = await ProjectApplication.find({ 
+      projectId: project._id,
+      status: 'pending'
+    })
+    .populate({
+      path: 'applicantId',
+      select: 'fullName email phone annotatorStatus microTaskerStatus personal_info professional_background attachments profilePicture createdAt'
+    })
+    .sort({ appliedAt: -1 });
+
+    // Format annotators data with application details
+    const formatAnnotatorData = (applications) => {
+      return applications.map(app => ({
+        applicationId: app._id,
+        applicationStatus: app.status,
+        appliedAt: app.appliedAt,
+        reviewedAt: app.reviewedAt,
+        reviewedBy: app.reviewedBy,
+        reviewNotes: app.reviewNotes,
+        rejectionReason: app.rejectionReason,
+        coverLetter: app.coverLetter,
+        workStartedAt: app.workStartedAt,
+        annotator: {
+          id: app.applicantId._id,
+          fullName: app.applicantId.fullName,
+          email: app.applicantId.email,
+          phone: app.applicantId.phone,
+          annotatorStatus: app.applicantId.annotatorStatus,
+          microTaskerStatus: app.applicantId.microTaskerStatus,
+          profilePicture: app.applicantId.profilePicture?.url || null,
+          joinedDate: app.applicantId.createdAt,
+          personalInfo: {
+            country: app.applicantId.personal_info?.country || null,
+            timeZone: app.applicantId.personal_info?.time_zone || null,
+            availableHours: app.applicantId.personal_info?.available_hours_per_week || null,
+            languages: app.applicantId.personal_info?.languages || []
+          },
+          professionalBackground: {
+            educationField: app.applicantId.professional_background?.education_field || null,
+            yearsOfExperience: app.applicantId.professional_background?.years_of_experience || null,
+            previousProjects: app.applicantId.professional_background?.previous_annotation_projects || [],
+            skills: app.applicantId.professional_background?.skills || []
+          },
+          paymentInfo: {
+            hasPaymentInfo: !!(app.applicantId.payment_info?.account_name && app.applicantId.payment_info?.account_number),
+            accountName: app.applicantId.payment_info?.account_name || null,
+            bankName: app.applicantId.payment_info?.bank_name || null
+          },
+          attachments: {
+            hasResume: !!(app.applicantId.attachments?.resume_url),
+            hasIdDocument: !!(app.applicantId.attachments?.id_document_url),
+            resumeUrl: app.applicantId.attachments?.resume_url || null,
+            idDocumentUrl: app.applicantId.attachments?.id_document_url || null
+          }
+        }
+      }));
+    };
+
+    // Calculate annotator statistics
+    const annotatorStats = {
+      total: approvedAnnotators.length + rejectedAnnotators.length + pendingAnnotators.length,
+      approved: approvedAnnotators.length,
+      rejected: rejectedAnnotators.length,
+      pending: pendingAnnotators.length,
+      approvalRate: (approvedAnnotators.length + rejectedAnnotators.length) > 0 ? 
+        Math.round((approvedAnnotators.length / (approvedAnnotators.length + rejectedAnnotators.length)) * 100) : 0
+    };
+
+    // Get annotator activity summary (recent reviews)
+    const recentReviewActivity = await ProjectApplication.find({ 
+      projectId: project._id,
+      status: { $in: ['approved', 'rejected'] },
+      reviewedAt: { $exists: true }
+    })
+    .populate('applicantId', 'fullName email')
+    .populate('reviewedBy', 'fullName email')
+    .sort({ reviewedAt: -1 })
+    .limit(10)
+    .select('status reviewedAt reviewedBy applicantId reviewNotes rejectionReason');
+
+    console.log(`✅ Found project with ${annotatorStats.total} total annotators (${annotatorStats.approved} approved, ${annotatorStats.rejected} rejected, ${annotatorStats.pending} pending)`);
+
     res.status(200).json({
       success: true,
       message: "Annotation project details retrieved successfully",
@@ -220,7 +327,14 @@ const getAnnotationProjectDetails = async (req, res) => {
           acc[item._id] = item.count;
           return acc;
         }, {}),
-        recentApplications: recentApplications
+        annotatorStats: annotatorStats,
+        recentApplications: recentApplications,
+        annotators: {
+          approved: formatAnnotatorData(approvedAnnotators),
+          rejected: formatAnnotatorData(rejectedAnnotators),
+          pending: formatAnnotatorData(pendingAnnotators)
+        },
+        recentReviewActivity: recentReviewActivity
       }
     });
 
@@ -309,7 +423,13 @@ const deleteAnnotationProject = async (req, res) => {
     if (activeApplications > 0) {
       return res.status(400).json({
         success: false,
-        message: `Cannot delete project with ${activeApplications} active applications. Please resolve all applications first.`
+        message: `Cannot delete project with ${activeApplications} active applications. Please resolve all applications first or use force delete with OTP verification.`,
+        data: {
+          activeApplications: activeApplications,
+          requiresOTP: true,
+          projectName: project.projectName,
+          projectId: projectId
+        }
       });
     }
 
@@ -329,6 +449,252 @@ const deleteAnnotationProject = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error deleting annotation project",
+      error: error.message
+    });
+  }
+};
+
+// Admin function: Request OTP for project deletion (Projects Officer authorization)
+const requestProjectDeletionOTP = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    console.log(`🔐 Admin ${req.admin.email} requesting deletion OTP for project: ${projectId}`);
+
+    const project = await AnnotationProject.findById(projectId);
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Annotation project not found"
+      });
+    }
+
+    // Check if project has active applications
+    const activeApplications = await ProjectApplication.countDocuments({
+      projectId: projectId,
+      status: { $in: ['pending', 'approved'] }
+    });
+
+    const allApplications = await ProjectApplication.countDocuments({ projectId: projectId });
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes expiry
+
+    // Store OTP in project document temporarily
+    project.deletionOTP = {
+      code: otp,
+      expiresAt: otpExpiry,
+      requestedBy: req.admin.userId,
+      requestedAt: new Date(),
+      verified: false
+    };
+
+    await project.save();
+
+    // Send OTP to Projects Officer email
+    const projectsOfficerEmail = 'projects@mydeeptech.ng';
+    
+    try {
+      const { sendProjectDeletionOTP } = require('../utils/projectMailer');
+      
+      const deletionData = {
+        projectName: project.projectName,
+        projectId: projectId,
+        projectCategory: project.projectCategory,
+        requestedBy: req.admin.fullName || req.admin.email,
+        requestedByEmail: req.admin.email,
+        activeApplications: activeApplications,
+        totalApplications: allApplications,
+        otp: otp,
+        expiryTime: otpExpiry.toLocaleString(),
+        reason: req.body.reason || 'Administrative deletion'
+      };
+
+      await sendProjectDeletionOTP(projectsOfficerEmail, deletionData);
+      
+      console.log(`✅ Deletion OTP sent to Projects Officer: ${projectsOfficerEmail}`);
+
+      res.status(200).json({
+        success: true,
+        message: "Deletion OTP sent to Projects Officer for approval",
+        data: {
+          projectName: project.projectName,
+          projectId: projectId,
+          activeApplications: activeApplications,
+          totalApplications: allApplications,
+          otpSentTo: projectsOfficerEmail,
+          expiresAt: otpExpiry,
+          requestedBy: req.admin.email,
+          otpExpiryMinutes: 15
+        }
+      });
+
+    } catch (emailError) {
+      console.error(`❌ Failed to send deletion OTP:`, emailError.message);
+      
+      // Remove OTP from project if email failed
+      project.deletionOTP = undefined;
+      await project.save();
+      
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send deletion OTP to Projects Officer",
+        error: emailError.message
+      });
+    }
+
+  } catch (error) {
+    console.error("❌ Error requesting deletion OTP:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error requesting deletion OTP",
+      error: error.message
+    });
+  }
+};
+
+// Admin function: Verify OTP and force delete project with applications
+const verifyOTPAndDeleteProject = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { otp, confirmationMessage } = req.body;
+    
+    console.log(`🔐 Admin ${req.admin.email} verifying deletion OTP for project: ${projectId}`);
+
+    // Validate input
+    if (!otp) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP code is required"
+      });
+    }
+
+    const project = await AnnotationProject.findById(projectId);
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Annotation project not found"
+      });
+    }
+
+    // Check if OTP exists and is valid
+    if (!project.deletionOTP || !project.deletionOTP.code) {
+      return res.status(400).json({
+        success: false,
+        message: "No deletion OTP found. Please request a new OTP first."
+      });
+    }
+
+    // Check if OTP has expired
+    if (new Date() > project.deletionOTP.expiresAt) {
+      // Clear expired OTP
+      project.deletionOTP = undefined;
+      await project.save();
+      
+      return res.status(400).json({
+        success: false,
+        message: "OTP has expired. Please request a new OTP."
+      });
+    }
+
+    // Verify OTP
+    if (project.deletionOTP.code !== otp.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid OTP code. Please check and try again."
+      });
+    }
+
+    // Check if OTP was already verified (prevent reuse)
+    if (project.deletionOTP.verified) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP has already been used. Please request a new OTP."
+      });
+    }
+
+    // Get application data before deletion for logging
+    const activeApplications = await ProjectApplication.countDocuments({
+      projectId: projectId,
+      status: { $in: ['pending', 'approved'] }
+    });
+
+    const allApplications = await ProjectApplication.find({ projectId: projectId })
+      .populate('applicantId', 'fullName email')
+      .select('status applicantId appliedAt');
+
+    // Mark OTP as verified
+    project.deletionOTP.verified = true;
+    project.deletionOTP.verifiedAt = new Date();
+    project.deletionOTP.verifiedBy = req.admin.userId;
+    await project.save();
+
+    // FORCE DELETE: Delete the project and all its applications
+    await AnnotationProject.findByIdAndDelete(projectId);
+    await ProjectApplication.deleteMany({ projectId: projectId });
+
+    console.log(`✅ Project FORCE DELETED with OTP verification: ${project.projectName}`);
+    console.log(`📊 Deleted ${allApplications.length} applications (${activeApplications} were active)`);
+
+    // Send notification to Projects Officer about successful deletion
+    try {
+      const { sendProjectDeletionConfirmation } = require('../utils/projectMailer');
+      
+      const confirmationData = {
+        projectName: project.projectName,
+        projectId: projectId,
+        deletedBy: req.admin.fullName || req.admin.email,
+        deletedByEmail: req.admin.email,
+        deletedAt: new Date(),
+        applicationsDeleted: allApplications.length,
+        activeApplicationsDeleted: activeApplications,
+        confirmationMessage: confirmationMessage || 'Project deleted with all applications',
+        deletedApplications: allApplications.map(app => ({
+          applicantName: app.applicantId?.fullName || 'Unknown',
+          applicantEmail: app.applicantId?.email || 'Unknown',
+          status: app.status,
+          appliedAt: app.appliedAt
+        }))
+      };
+
+      await sendProjectDeletionConfirmation('projects@mydeeptech.ng', confirmationData);
+      
+      console.log(`✅ Deletion confirmation sent to Projects Officer`);
+
+    } catch (emailError) {
+      console.warn(`⚠️ Failed to send deletion confirmation:`, emailError.message);
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Project deleted successfully with OTP verification",
+      data: {
+        deletedProject: {
+          id: projectId,
+          name: project.projectName,
+          category: project.projectCategory
+        },
+        deletedApplications: {
+          total: allApplications.length,
+          active: activeApplications,
+          applications: allApplications.map(app => ({
+            applicantName: app.applicantId?.fullName || 'Unknown',
+            status: app.status,
+            appliedAt: app.appliedAt
+          }))
+        },
+        deletedBy: req.admin.email,
+        deletedAt: new Date(),
+        otpVerified: true,
+        confirmationSent: true
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error verifying OTP and deleting project:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error verifying OTP and deleting project",
       error: error.message
     });
   }
@@ -609,6 +975,8 @@ module.exports = {
   getAnnotationProjectDetails,
   updateAnnotationProject,
   deleteAnnotationProject,
+  requestProjectDeletionOTP,
+  verifyOTPAndDeleteProject,
   getAnnotationProjectApplications,
   approveAnnotationProjectApplication,
   rejectAnnotationProjectApplication

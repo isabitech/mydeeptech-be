@@ -193,7 +193,7 @@ const sendPaymentConfirmation = async (dtUserEmail, dtUserName, invoiceData, pay
     </head>
     <body>
         <div class="header">
-            <h1>✅ Payment Received!</h1>
+            <h1>✅ Payment Sent!</h1>
             <p>Invoice #${invoiceNumber} has been paid</p>
         </div>
         
@@ -202,7 +202,7 @@ const sendPaymentConfirmation = async (dtUserEmail, dtUserName, invoiceData, pay
             
             <h2>Hello ${dtUserName},</h2>
             
-            <p>Great news! We've received your payment for invoice #${invoiceNumber}. Thank you for your prompt payment.</p>
+            <p>Great news! We've sent your payment for invoice #${invoiceNumber}. Thank you for your prompt payment.</p>
             
             <div class="payment-details">
                 <h3>💳 Payment Confirmation</h3>
@@ -259,11 +259,11 @@ const sendPaymentConfirmation = async (dtUserEmail, dtUserName, invoiceData, pay
   `;
 
   const textContent = `
-    Payment Received - Invoice #${invoiceNumber}
+    Payment Sent - Invoice #${invoiceNumber}
     
     Hello ${dtUserName},
     
-    Great news! We've received your payment.
+    Great news! We've sent your payment.
     
     Payment Details:
     - Invoice Number: INV-${invoiceNumber}
@@ -282,7 +282,7 @@ const sendPaymentConfirmation = async (dtUserEmail, dtUserName, invoiceData, pay
   `;
 
   const sendSmtpEmail = new brevo.SendSmtpEmail();
-  sendSmtpEmail.subject = `Payment Received - Invoice #${invoiceNumber} (${formattedAmount})`;
+  sendSmtpEmail.subject = `Payment Sent - Invoice #${invoiceNumber} (${formattedAmount})`;
   sendSmtpEmail.htmlContent = htmlContent;
   sendSmtpEmail.textContent = textContent;
   sendSmtpEmail.sender = {
