@@ -711,10 +711,358 @@ https://mydeeptech.ng
   }
 };
 
+/**
+ * Send removal notification to removed applicant
+ * @param {string} applicantEmail - Applicant's email address
+ * @param {string} applicantName - Applicant's full name
+ * @param {object} removalData - Removal details
+ */
+const sendApplicantRemovalNotification = async (applicantEmail, applicantName, removalData) => {
+  const { projectName, projectCategory, adminName, removalReason, removalNotes, workStartedAt, totalWorkDays } = removalData;
+  
+  const reasonText = {
+    'performance_issues': 'Performance did not meet project standards',
+    'project_cancelled': 'Project has been cancelled',
+    'violates_guidelines': 'Violated project or platform guidelines',
+    'unavailable': 'No longer available for the project',
+    'quality_concerns': 'Quality of work did not meet requirements',
+    'admin_decision': 'Administrative decision',
+    'other': 'Other reasons (see admin notes)'
+  };
+  
+  const subject = `Project Assignment Update: ${projectName}`;
+  
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Project Assignment Update - MyDeeptech</title>
+    </head>
+    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+            <h1 style="margin: 0; font-size: 28px;">📋 Project Assignment Update</h1>
+            <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Important notification about your project</p>
+        </div>
+        
+        <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e9ecef;">
+            <p style="font-size: 18px; margin-bottom: 20px;">Hi <strong>${applicantName}</strong>,</p>
+            
+            <p style="font-size: 16px; margin-bottom: 20px;">
+                We want to inform you that your assignment on the project <strong>${projectName}</strong> 
+                has been concluded. Your access to this project has been removed from the system.
+            </p>
+            
+            <div style="background: #f8d7da; border: 2px solid #dc3545; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                <h3 style="margin-top: 0; color: #721c24;">📋 Assignment Details</h3>
+                
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: bold; width: 40%;">Project:</td>
+                        <td style="padding: 8px 0;">${projectName}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: bold;">Category:</td>
+                        <td style="padding: 8px 0;">${projectCategory}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: bold;">Removed By:</td>
+                        <td style="padding: 8px 0;">${adminName}</td>
+                    </tr>
+                    ${workStartedAt ? `
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: bold;">Work Period:</td>
+                        <td style="padding: 8px 0;">${totalWorkDays} days</td>
+                    </tr>
+                    ` : ''}
+                    ${removalReason ? `
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: bold;">Reason:</td>
+                        <td style="padding: 8px 0;">${reasonText[removalReason] || removalReason}</td>
+                    </tr>
+                    ` : ''}
+                </table>
+                
+                ${removalNotes ? `
+                <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #f5c6cb;">
+                    <h4 style="margin-bottom: 10px; color: #721c24;">💬 Admin Notes</h4>
+                    <p style="font-style: italic; background: #ffffff; padding: 15px; border-radius: 5px; margin: 0;">
+                        "${removalNotes}"
+                    </p>
+                </div>
+                ` : ''}
+            </div>
+            
+            <div style="background: #d1ecf1; border-left: 4px solid #17a2b8; padding: 15px; margin: 20px 0;">
+                <h3 style="margin-top: 0; color: #0c5460;">🌟 Moving Forward</h3>
+                <ul style="margin-bottom: 0; padding-left: 20px;">
+                    <li>Your account remains active on the platform</li>
+                    <li>You can continue applying to other projects</li>
+                    <li>This action does not affect your overall standing</li>
+                    <li>Consider the feedback for future applications</li>
+                </ul>
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="https://mydeeptech.ng/projects" style="background: #007bff; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+                    Browse New Projects
+                </a>
+            </div>
+            
+            <p style="font-size: 14px; color: #666; margin-top: 30px;">
+                If you have any questions about this decision, please contact our support team.
+            </p>
+            
+            <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+            
+            <p style="font-size: 14px; color: #666; text-align: center; margin: 0;">
+                Best regards,<br>
+                <strong>MyDeeptech Team</strong><br>
+                <a href="https://mydeeptech.ng" style="color: #dc3545;">mydeeptech.ng</a>
+            </p>
+        </div>
+    </body>
+    </html>
+  `;
+
+  const textContent = `
+Hi ${applicantName},
+
+We want to inform you that your assignment on the project "${projectName}" has been concluded. Your access to this project has been removed from the system.
+
+Assignment Details:
+- Project: ${projectName}
+- Category: ${projectCategory}
+- Removed By: ${adminName}
+${workStartedAt ? `- Work Period: ${totalWorkDays} days` : ''}
+${removalReason ? `- Reason: ${reasonText[removalReason] || removalReason}` : ''}
+
+${removalNotes ? `Admin Notes: "${removalNotes}"` : ''}
+
+Moving Forward:
+- Your account remains active on the platform
+- You can continue applying to other projects
+- This action does not affect your overall standing
+- Consider the feedback for future applications
+
+Browse new projects: https://mydeeptech.ng/projects
+
+If you have any questions about this decision, please contact our support team.
+
+Best regards,
+MyDeeptech Team
+https://mydeeptech.ng
+  `;
+
+  try {
+    await sendProjectEmail({
+      to: applicantEmail,
+      subject: subject,
+      html: htmlContent,
+      text: textContent
+    });
+    
+    console.log(`✅ Applicant removal notification sent to: ${applicantEmail}`);
+  } catch (error) {
+    console.error(`❌ Failed to send applicant removal notification to ${applicantEmail}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Send admin notification when annotator is removed from project
+ * @param {string} adminEmail - Admin's email address
+ * @param {string} adminName - Admin's full name
+ * @param {object} removalData - Removal details
+ */
+const sendProjectAnnotatorRemovedNotification = async (adminEmail, adminName, removalData) => {
+  const { 
+    applicantName, 
+    applicantEmail, 
+    projectName, 
+    projectCategory, 
+    removalReason, 
+    removalNotes, 
+    removedBy,
+    workStartedAt,
+    totalWorkDays,
+    tasksCompleted 
+  } = removalData;
+  
+  const reasonText = {
+    'performance_issues': 'Performance did not meet project standards',
+    'project_cancelled': 'Project has been cancelled',
+    'violates_guidelines': 'Violated project or platform guidelines',
+    'unavailable': 'No longer available for the project',
+    'quality_concerns': 'Quality of work did not meet requirements',
+    'admin_decision': 'Administrative decision',
+    'other': 'Other reasons (see admin notes)'
+  };
+  
+  const subject = `Annotator Removed from Project: ${projectName}`;
+  
+  const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Annotator Removal Notification - MyDeeptech</title>
+    </head>
+    <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+            <h1 style="margin: 0; font-size: 28px;">⚠️ Annotator Removed</h1>
+            <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Project team update notification</p>
+        </div>
+        
+        <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e9ecef;">
+            <p style="font-size: 18px; margin-bottom: 20px;">Hi <strong>${adminName}</strong>,</p>
+            
+            <p style="font-size: 16px; margin-bottom: 20px;">
+                This is to notify you that an annotator has been removed from your project <strong>${projectName}</strong>.
+            </p>
+            
+            <div style="background: #fff3cd; border: 2px solid #ffc107; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                <h3 style="margin-top: 0; color: #856404;">📋 Removal Details</h3>
+                
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: bold; width: 40%;">Removed Annotator:</td>
+                        <td style="padding: 8px 0;">${applicantName}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: bold;">Email:</td>
+                        <td style="padding: 8px 0;">${applicantEmail}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: bold;">Project:</td>
+                        <td style="padding: 8px 0;">${projectName}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: bold;">Category:</td>
+                        <td style="padding: 8px 0;">${projectCategory}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: bold;">Removed By:</td>
+                        <td style="padding: 8px 0;">${removedBy}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: bold;">Removal Time:</td>
+                        <td style="padding: 8px 0;">${new Date().toLocaleString()}</td>
+                    </tr>
+                    ${workStartedAt ? `
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: bold;">Work Period:</td>
+                        <td style="padding: 8px 0;">${totalWorkDays} days</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: bold;">Tasks Completed:</td>
+                        <td style="padding: 8px 0;">${tasksCompleted || 0}</td>
+                    </tr>
+                    ` : ''}
+                    ${removalReason ? `
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: bold;">Reason:</td>
+                        <td style="padding: 8px 0;">${reasonText[removalReason] || removalReason}</td>
+                    </tr>
+                    ` : ''}
+                </table>
+                
+                ${removalNotes ? `
+                <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #ffeaa7;">
+                    <h4 style="margin-bottom: 10px; color: #856404;">💬 Removal Notes</h4>
+                    <p style="font-style: italic; background: #ffffff; padding: 15px; border-radius: 5px; margin: 0;">
+                        "${removalNotes}"
+                    </p>
+                </div>
+                ` : ''}
+            </div>
+            
+            <div style="background: #d1ecf1; border-left: 4px solid #17a2b8; padding: 15px; margin: 20px 0;">
+                <h3 style="margin-top: 0; color: #0c5460;">📊 Project Impact</h3>
+                <ul style="margin-bottom: 0; padding-left: 20px;">
+                    <li>The annotator's access has been revoked immediately</li>
+                    <li>Project capacity is now available for new applications</li>
+                    <li>You may need to recruit a replacement annotator</li>
+                    <li>Consider reviewing any incomplete work</li>
+                </ul>
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="https://mydeeptech.ng/admin/projects" style="background: #28a745; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block; margin-right: 10px;">
+                    Manage Project
+                </a>
+                <a href="https://mydeeptech.ng/admin/projects/applications" style="background: #007bff; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+                    Review Applications
+                </a>
+            </div>
+            
+            <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+            
+            <p style="font-size: 14px; color: #666; text-align: center; margin: 0;">
+                Best regards,<br>
+                <strong>MyDeeptech Team</strong><br>
+                <a href="https://mydeeptech.ng" style="color: #ffc107;">mydeeptech.ng</a>
+            </p>
+        </div>
+    </body>
+    </html>
+  `;
+
+  const textContent = `
+Hi ${adminName},
+
+This is to notify you that an annotator has been removed from your project "${projectName}".
+
+Removal Details:
+- Removed Annotator: ${applicantName}
+- Email: ${applicantEmail}
+- Project: ${projectName}
+- Category: ${projectCategory}
+- Removed By: ${removedBy}
+- Removal Time: ${new Date().toLocaleString()}
+${workStartedAt ? `- Work Period: ${totalWorkDays} days` : ''}
+${workStartedAt ? `- Tasks Completed: ${tasksCompleted || 0}` : ''}
+${removalReason ? `- Reason: ${reasonText[removalReason] || removalReason}` : ''}
+
+${removalNotes ? `Removal Notes: "${removalNotes}"` : ''}
+
+Project Impact:
+- The annotator's access has been revoked immediately
+- Project capacity is now available for new applications
+- You may need to recruit a replacement annotator
+- Consider reviewing any incomplete work
+
+Manage project: https://mydeeptech.ng/admin/projects
+Review applications: https://mydeeptech.ng/admin/projects/applications
+
+Best regards,
+MyDeeptech Team
+https://mydeeptech.ng
+  `;
+
+  try {
+    await sendProjectEmail({
+      to: adminEmail,
+      subject: subject,
+      html: htmlContent,
+      text: textContent
+    });
+    
+    console.log(`✅ Project annotator removal notification sent to admin: ${adminEmail}`);
+  } catch (error) {
+    console.error(`❌ Failed to send annotator removal notification to ${adminEmail}:`, error);
+    throw error;
+  }
+};
+
 module.exports = {
   sendProjectApplicationNotification,
   sendProjectApprovalNotification,
   sendProjectRejectionNotification,
   sendProjectDeletionOTP,
-  sendProjectDeletionConfirmation
+  sendProjectDeletionConfirmation,
+  sendApplicantRemovalNotification,
+  sendProjectAnnotatorRemovedNotification
 };

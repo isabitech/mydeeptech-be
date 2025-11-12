@@ -1,6 +1,6 @@
 const express = require('express');
 const { getAllDTUsers, getAllAdminUsers, getAdminDashboard, approveAnnotator, rejectAnnotator, getDTUserAdmin, createAdmin, requestAdminVerification, confirmAdminVerification, verifyAdminOTP, adminLogin } = require('../controller/dtUser.controller.js');
-const { createAnnotationProject, getAllAnnotationProjects, getAnnotationProjectDetails, updateAnnotationProject, deleteAnnotationProject, requestProjectDeletionOTP, verifyOTPAndDeleteProject, getAnnotationProjectApplications, approveAnnotationProjectApplication, rejectAnnotationProjectApplication } = require('../controller/annotationProject.controller.js');
+const { createAnnotationProject, getAllAnnotationProjects, getAnnotationProjectDetails, updateAnnotationProject, deleteAnnotationProject, requestProjectDeletionOTP, verifyOTPAndDeleteProject, getAnnotationProjectApplications, approveAnnotationProjectApplication, rejectAnnotationProjectApplication, removeApprovedApplicant, getRemovableApplicants } = require('../controller/annotationProject.controller.js');
 const { createInvoice, getAllInvoices, getInvoiceDetails, updatePaymentStatus, sendInvoiceReminder, deleteInvoice } = require('../controller/invoice.controller.js');
 const { authenticateAdmin } = require('../middleware/adminAuth.js');
 
@@ -43,6 +43,10 @@ router.post('/projects/:projectId/verify-deletion-otp', authenticateAdmin, verif
 router.get('/applications', authenticateAdmin, getAnnotationProjectApplications);
 router.patch('/applications/:applicationId/approve', authenticateAdmin, approveAnnotationProjectApplication);
 router.patch('/applications/:applicationId/reject', authenticateAdmin, rejectAnnotationProjectApplication);
+router.delete('/applications/:applicationId/remove', authenticateAdmin, removeApprovedApplicant);
+
+// Project Applicant Management Routes
+router.get('/projects/:projectId/removable-applicants', authenticateAdmin, getRemovableApplicants);
 
 // Invoice Management Routes
 router.post('/invoices', authenticateAdmin, createInvoice);
