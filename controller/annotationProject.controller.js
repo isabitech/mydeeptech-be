@@ -27,6 +27,20 @@ const createProjectSchema = Joi.object({
   applicationDeadline: Joi.date().greater('now').allow(null).optional()
 });
 
+// Validation schema for removing approved applicants
+const removeApplicantSchema = Joi.object({
+  removalReason: Joi.string().valid(
+    "performance_issues",
+    "project_cancelled",
+    "violates_guidelines", 
+    "unavailable",
+    "quality_concerns",
+    "admin_decision",
+    "other"
+  ).optional(),
+  removalNotes: Joi.string().max(500).allow('').optional()
+});
+
 // Admin function: Create a new annotation project
 const createAnnotationProject = async (req, res) => {
   try {
@@ -969,6 +983,235 @@ const rejectAnnotationProjectApplication = async (req, res) => {
   }
 };
 
+// Admin function: Remove approved applicant from project
+const removeApprovedApplicant = async (req, res) => {
+  try {
+    const { applicationId } = req.params;
+    const { removalReason, removalNotes } = req.body;
+    
+    console.log(`🗑️  Admin ${req.admin.email} attempting to remove approved applicant: ${applicationId}`);
+
+    // Validate request body
+    const { error, value } = removeApplicantSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation error",
+        errors: error.details.map(detail => detail.message)
+      });
+    }
+
+    // Find the application
+    const application = await ProjectApplication.findById(applicationId)
+      .populate({
+        path: 'projectId',
+        select: 'projectName projectCategory approvedAnnotators'
+      })
+      .populate('applicantId', 'fullName email phone');
+
+    if (!application) {
+      return res.status(404).json({
+        success: false,
+        message: "Application not found"
+      });
+    }
+
+    // Check if application is approved
+    if (application.status !== 'approved') {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot remove applicant. Application status is "${application.status}". Only approved applicants can be removed.`
+      });
+    }
+
+    // Store original data for logging/email
+    const originalData = {
+      applicantName: application.applicantId.fullName,
+      applicantEmail: application.applicantId.email,
+      projectName: application.projectId.projectName,
+      projectId: application.projectId._id,
+      applicationId: application._id,
+      approvedAt: application.reviewedAt,
+      workStartedAt: application.workStartedAt
+    };
+
+    // Update application status to 'removed' with removal details
+    application.status = 'removed';
+    application.removedAt = new Date();
+    application.removedBy = req.admin.userId;
+    application.removalReason = removalReason || 'admin_decision';
+    application.removalNotes = removalNotes || '';
+    application.workEndedAt = new Date(); // Mark end of work period
+
+    await application.save();
+
+    // Update project's approved annotator count
+    await AnnotationProject.findByIdAndUpdate(
+      application.projectId._id,
+      { $inc: { approvedAnnotators: -1 } }
+    );
+
+    console.log(`✅ Successfully removed approved applicant ${originalData.applicantName} from project "${originalData.projectName}"`);
+
+    // Send notification email to the removed applicant
+    try {
+      const { sendApplicantRemovalNotification } = require('../utils/projectMailer');
+      await sendApplicantRemovalNotification(
+        originalData.applicantEmail,
+        originalData.applicantName,
+        {
+          projectName: originalData.projectName,
+          projectId: originalData.projectId,
+          removalReason: application.removalReason,
+          removedBy: req.admin.email,
+          removedAt: application.removedAt,
+          workPeriod: {
+            startedAt: originalData.workStartedAt,
+            endedAt: application.workEndedAt
+          }
+        }
+      );
+      console.log(`📧 Removal notification sent to ${originalData.applicantEmail}`);
+    } catch (emailError) {
+      console.error('❌ Failed to send removal notification email:', emailError);
+      // Don't fail the request if email fails
+    }
+
+    // Send notification to project owner/admin
+    try {
+      const { sendProjectAnnotatorRemovedNotification } = require('../utils/projectMailer');
+      await sendProjectAnnotatorRemovedNotification(
+        req.admin.email,
+        req.admin.fullName || 'Administrator',
+        {
+          projectName: originalData.projectName,
+          projectId: originalData.projectId,
+          removedApplicant: {
+            name: originalData.applicantName,
+            email: originalData.applicantEmail
+          },
+          removalReason: application.removalReason,
+          removedAt: application.removedAt,
+          workDuration: application.workEndedAt - originalData.workStartedAt
+        }
+      );
+    } catch (emailError) {
+      console.error('❌ Failed to send project notification email:', emailError);
+    }
+
+    // Prepare response with detailed information
+    const response = {
+      success: true,
+      message: "Approved applicant successfully removed from project",
+      data: {
+        applicationId: application._id,
+        applicant: {
+          name: originalData.applicantName,
+          email: originalData.applicantEmail
+        },
+        project: {
+          id: originalData.projectId,
+          name: originalData.projectName
+        },
+        removal: {
+          removedAt: application.removedAt,
+          removedBy: req.admin.email,
+          reason: application.removalReason
+        },
+        workPeriod: {
+          startedAt: originalData.workStartedAt,
+          endedAt: application.workEndedAt,
+          duration: application.workEndedAt - originalData.workStartedAt
+        },
+        previousStatus: 'approved',
+        newStatus: 'removed'
+      }
+    };
+
+    res.status(200).json(response);
+
+  } catch (error) {
+    console.error('❌ Error removing approved applicant:', error);
+    res.status(500).json({
+      success: false,
+      message: "Server error removing approved applicant",
+      error: error.message
+    });
+  }
+};
+
+// Admin function: Get removable applicants for a project
+const getRemovableApplicants = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    
+    console.log(`🔍 Admin ${req.admin.email} requesting removable applicants for project: ${projectId}`);
+
+    // Find the project
+    const project = await AnnotationProject.findById(projectId);
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found"
+      });
+    }
+
+    // Find all approved applications for this project
+    const approvedApplications = await ProjectApplication.find({
+      projectId: projectId,
+      status: 'approved'
+    })
+    .populate('applicantId', 'fullName email phone')
+    .sort({ reviewedAt: -1 });
+
+    // Format the data for easy removal management
+    const removableApplicants = approvedApplications.map(app => ({
+      applicationId: app._id,
+      applicant: {
+        id: app.applicantId._id,
+        name: app.applicantId.fullName,
+        email: app.applicantId.email,
+        phone: app.applicantId.phone
+      },
+      applicationDetails: {
+        appliedAt: app.appliedAt,
+        approvedAt: app.reviewedAt,
+        workStartedAt: app.workStartedAt,
+        reviewedBy: app.reviewedBy,
+        reviewNotes: app.reviewNotes
+      },
+      workDuration: app.workStartedAt ? Date.now() - app.workStartedAt.getTime() : 0
+    }));
+
+    res.status(200).json({
+      success: true,
+      message: "Removable applicants retrieved successfully",
+      data: {
+        project: {
+          id: project._id,
+          name: project.projectName,
+          totalApprovedAnnotators: project.approvedAnnotators || 0,
+          maxAnnotators: project.maxAnnotators
+        },
+        removableApplicants: removableApplicants,
+        summary: {
+          totalRemovableApplicants: removableApplicants.length,
+          canRemoveAll: true, // Admins can remove any approved applicant
+          projectStatus: project.status
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching removable applicants:', error);
+    res.status(500).json({
+      success: false,
+      message: "Server error fetching removable applicants",
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   createAnnotationProject,
   getAllAnnotationProjects,
@@ -979,5 +1222,7 @@ module.exports = {
   verifyOTPAndDeleteProject,
   getAnnotationProjectApplications,
   approveAnnotationProjectApplication,
-  rejectAnnotationProjectApplication
+  rejectAnnotationProjectApplication,
+  removeApprovedApplicant,
+  getRemovableApplicants
 };

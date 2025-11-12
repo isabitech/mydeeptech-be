@@ -17,7 +17,7 @@ const projectApplicationSchema = new mongoose.Schema(
     // Application status and timeline
     status: {
       type: String,
-      enum: ["pending", "approved", "rejected", "withdrawn"],
+      enum: ["pending", "approved", "rejected", "withdrawn", "removed"],
       default: "pending"
     },
     appliedAt: {
@@ -102,6 +102,35 @@ const projectApplicationSchema = new mongoose.Schema(
       min: 0,
       max: 100,
       default: null
+    },
+
+    // Removal tracking (for removed approved applicants)
+    removedAt: {
+      type: Date,
+      default: null
+    },
+    removedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'DTUser',
+      default: null
+    },
+    removalReason: {
+      type: String,
+      enum: [
+        "performance_issues",
+        "project_cancelled",
+        "violates_guidelines", 
+        "unavailable",
+        "quality_concerns",
+        "admin_decision",
+        "other"
+      ],
+      default: null
+    },
+    removalNotes: {
+      type: String,
+      maxlength: 500,
+      default: ""
     }
   },
   { timestamps: true }
