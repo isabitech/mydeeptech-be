@@ -2,6 +2,8 @@ const express = require('express');
 const { getAllDTUsers, getAllAdminUsers, getAdminDashboard, approveAnnotator, rejectAnnotator, getDTUserAdmin, createAdmin, requestAdminVerification, confirmAdminVerification, verifyAdminOTP, adminLogin } = require('../controller/dtUser.controller.js');
 const { createAnnotationProject, getAllAnnotationProjects, getAnnotationProjectDetails, updateAnnotationProject, deleteAnnotationProject, requestProjectDeletionOTP, verifyOTPAndDeleteProject, getAnnotationProjectApplications, approveAnnotationProjectApplication, rejectAnnotationProjectApplication, removeApprovedApplicant, getRemovableApplicants } = require('../controller/annotationProject.controller.js');
 const { createInvoice, getAllInvoices, getInvoiceDetails, updatePaymentStatus, sendInvoiceReminder, deleteInvoice } = require('../controller/invoice.controller.js');
+const { getAdminNotifications, createAnnouncement, getNotificationStats, cleanupNotifications } = require('../controller/notification.controller.js');
+const { getAdminAssessments } = require('../controller/assessment.controller.js');
 const { authenticateAdmin } = require('../middleware/adminAuth.js');
 
 const router = express.Router();
@@ -55,5 +57,14 @@ router.get('/invoices/:invoiceId', authenticateAdmin, getInvoiceDetails);
 router.patch('/invoices/:invoiceId/payment-status', authenticateAdmin, updatePaymentStatus);
 router.post('/invoices/:invoiceId/send-reminder', authenticateAdmin, sendInvoiceReminder);
 router.delete('/invoices/:invoiceId', authenticateAdmin, deleteInvoice);
+
+// Notification Management Routes
+router.get('/notifications', authenticateAdmin, getAdminNotifications);
+router.post('/notifications/announcement', authenticateAdmin, createAnnouncement);
+router.get('/notifications/stats', authenticateAdmin, getNotificationStats);
+router.delete('/notifications/cleanup', authenticateAdmin, cleanupNotifications);
+
+// Assessment Management Routes
+router.get('/assessments', authenticateAdmin, getAdminAssessments);
 
 module.exports = router;

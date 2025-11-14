@@ -25,7 +25,8 @@ async function testApplyToProject() {
         console.log('User info:', {
             fullName: loginResponse.data.user?.fullName,
             email: loginResponse.data.user?.email,
-            annotatorStatus: loginResponse.data.user?.annotatorStatus
+            annotatorStatus: loginResponse.data.user?.annotatorStatus,
+            hasResume: !!(loginResponse.data.user?.attachments?.resume_url)
         });
         console.log('');
 
@@ -69,6 +70,14 @@ async function testApplyToProject() {
         } else if (error.response?.status === 400) {
             console.log('⚠️ Application issue (400)');
             console.log('Error message:', error.response.data.message);
+            
+            // Check if it's a resume requirement error
+            if (error.response.data.error?.code === 'RESUME_REQUIRED') {
+                console.log('📄 Resume validation error detected:');
+                console.log('   - Code:', error.response.data.error.code);
+                console.log('   - Reason:', error.response.data.error.reason);
+                console.log('   - Action:', error.response.data.error.action);
+            }
         } else if (error.response?.status === 404) {
             console.log('❌ Project not found (404)');
             console.log('Error message:', error.response.data.message);
