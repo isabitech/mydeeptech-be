@@ -24,7 +24,21 @@ const createProjectSchema = Joi.object({
   minimumExperience: Joi.string().valid("none", "beginner", "intermediate", "advanced").default("none"),
   languageRequirements: Joi.array().items(Joi.string()).default([]),
   tags: Joi.array().items(Joi.string()).default([]),
-  applicationDeadline: Joi.date().greater('now').allow(null).optional()
+  applicationDeadline: Joi.date().greater('now').allow(null).optional(),
+  // Project guidelines
+  projectGuidelineLink: Joi.string().uri().required().messages({
+    'string.uri': 'Project guideline link must be a valid URL',
+    'any.required': 'Project guideline link is required'
+  }),
+  projectGuidelineVideo: Joi.string().uri().allow('').optional().messages({
+    'string.uri': 'Project guideline video must be a valid URL'
+  }),
+  projectCommunityLink: Joi.string().uri().allow('').optional().messages({
+    'string.uri': 'Project community link must be a valid URL'
+  }),
+  projectTrackerLink: Joi.string().uri().allow('').optional().messages({
+    'string.uri': 'Project tracker link must be a valid URL'
+  })
 });
 
 // Validation schema for removing approved applicants
@@ -859,7 +873,11 @@ const approveAnnotationProjectApplication = async (req, res) => {
         projectCategory: project.projectCategory,
         payRate: project.payRate,
         adminName: req.admin.fullName,
-        reviewNotes: reviewNotes || ''
+        reviewNotes: reviewNotes || '',
+        projectGuidelineLink: project.projectGuidelineLink,
+        projectGuidelineVideo: project.projectGuidelineVideo,
+        projectCommunityLink: project.projectCommunityLink,
+        projectTrackerLink: project.projectTrackerLink
       };
 
       await sendProjectApprovalNotification(
@@ -868,7 +886,7 @@ const approveAnnotationProjectApplication = async (req, res) => {
         projectData
       );
 
-      console.log(`✅ Approval notification sent to: ${application.applicantId.email}`);
+      console.log(`✅ Approval notification with guidelines sent to: ${application.applicantId.email}`);
 
     } catch (emailError) {
       console.error(`⚠️ Failed to send approval notification:`, emailError.message);
@@ -958,6 +976,25 @@ const rejectAnnotationProjectApplication = async (req, res) => {
 
     } catch (emailError) {
       console.error(`⚠️ Failed to send rejection notification:`, emailError.message);
+    }
+
+    // Create in-app notification for the rejected applicant
+    try {
+      await NotificationService.createApplicationStatusNotification(
+        application.applicantId._id,
+        'rejected',
+        {
+          _id: application.projectId._id,
+          projectName: application.projectId.projectName,
+          projectCategory: application.projectId.projectCategory
+        },
+        {
+          _id: application._id
+        }
+      );
+      console.log(`✅ In-app notification created for rejected applicant: ${application.applicantId.fullName}`);
+    } catch (notificationError) {
+      console.error(`⚠️ Failed to create rejection notification:`, notificationError.message);
     }
 
     console.log(`✅ Application rejected successfully for project: ${application.projectId.projectName}`);

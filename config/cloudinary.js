@@ -24,33 +24,38 @@ const verifyCloudinaryConfig = () => {
 };
 
 // Storage configuration for different file types
-const createCloudinaryStorage = (folder, allowedFormats = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'mp4', 'mov']) => {
+const createCloudinaryStorage = (folder, allowedFormats = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'mp4', 'mov'], resourceType = 'auto') => {
   return new CloudinaryStorage({
     cloudinary: cloudinary,
     params: {
       folder: `mydeeptech/${folder}`,
       allowed_formats: allowedFormats,
+      resource_type: resourceType,
       use_filename: true,
       unique_filename: true,
-      transformation: [{ quality: 'auto' }]
+      transformation: resourceType === 'raw' ? undefined : [{ quality: 'auto' }]
     }
   });
 };
 
 // Image storage (for profile pictures, project images, etc.)
-const imageStorage = createCloudinaryStorage('images', ['jpg', 'jpeg', 'png', 'gif', 'webp']);
+const imageStorage = createCloudinaryStorage('images', ['jpg', 'jpeg', 'png', 'gif', 'webp'], 'image');
 
-// Document storage (for PDFs, docs, etc.)
-const documentStorage = createCloudinaryStorage('documents', ['pdf', 'doc', 'docx', 'txt']);
+// Document storage (for PDFs, docs, etc.) - using raw resource type
+const documentStorage = createCloudinaryStorage('documents', ['pdf', 'doc', 'docx', 'txt'], 'raw');
 
 // Video storage (for video annotations, tutorials, etc.)
-const videoStorage = createCloudinaryStorage('videos', ['mp4', 'avi', 'mov', 'wmv', 'flv']);
+const videoStorage = createCloudinaryStorage('videos', ['mp4', 'avi', 'mov', 'wmv', 'flv'], 'video');
 
 // Audio storage (for audio annotations, recordings, etc.)
-const audioStorage = createCloudinaryStorage('audio', ['mp3', 'wav', 'aac', 'ogg']);
+const audioStorage = createCloudinaryStorage('audio', ['mp3', 'wav', 'aac', 'ogg'], 'video');
 
-// General file storage
-const generalStorage = createCloudinaryStorage('files', ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx', 'mp4', 'mp3', 'wav']);
+// General file storage - using raw for mixed file types
+const generalStorage = createCloudinaryStorage('files', ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx', 'mp4', 'mp3', 'wav'], 'auto');
+
+// Specialized storage for user documents (ID and Resume)
+const idDocumentStorage = createCloudinaryStorage('user_documents/id_documents', ['pdf', 'jpg', 'jpeg', 'png'], 'raw');
+const resumeStorage = createCloudinaryStorage('user_documents/resumes', ['pdf', 'doc', 'docx'], 'raw');
 
 // Multer configurations
 const imageUpload = multer({
@@ -127,6 +132,38 @@ const generalUpload = multer({
       cb(null, true);
     } else {
       cb(new Error('File type not allowed. Supported formats: Images (jpg, png, gif), Documents (pdf, doc, docx, txt, csv), Videos (mp4, avi, mov), Audio (mp3, wav, aac)'), false);
+    }
+  }
+});
+
+// ID Document Upload - for identification documents
+const idDocumentUpload = multer({
+  storage: idDocumentStorage,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit for ID documents
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedMimes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF, JPG, JPEG, and PNG files are allowed for ID document upload'), false);
+    }
+  }
+});
+
+// Resume Upload - for CV/Resume documents
+const resumeUpload = multer({
+  storage: resumeStorage,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit for resumes
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedMimes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    if (allowedMimes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF, DOC, and DOCX files are allowed for resume upload'), false);
     }
   }
 });
@@ -229,6 +266,8 @@ module.exports = {
   audioUpload,
   generalUpload,
   resultFileUpload,
+  idDocumentUpload,
+  resumeUpload,
   
   // Helper functions
   deleteCloudinaryFile,
@@ -241,5 +280,7 @@ module.exports = {
   documentStorage,
   videoStorage,
   audioStorage,
-  generalStorage
+  generalStorage,
+  idDocumentStorage,
+  resumeStorage
 };

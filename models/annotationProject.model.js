@@ -114,6 +114,52 @@ const annotationProjectSchema = new mongoose.Schema(
       default: 0
     },
     
+    // Project guidelines and resources
+    projectGuidelineLink: {
+      type: String,
+      required: true,
+      trim: true,
+      validate: {
+        validator: function(v) {
+          return /^https?:\/\/.+/.test(v);
+        },
+        message: 'Project guideline link must be a valid URL'
+      }
+    },
+    projectGuidelineVideo: {
+      type: String,
+      trim: true,
+      validate: {
+        validator: function(v) {
+          return !v || /^https?:\/\/.+/.test(v);
+        },
+        message: 'Project guideline video must be a valid URL'
+      },
+      default: null
+    },
+    projectCommunityLink: {
+      type: String,
+      trim: true,
+      validate: {
+        validator: function(v) {
+          return !v || /^https?:\/\/.+/.test(v);
+        },
+        message: 'Project community link must be a valid URL'
+      },
+      default: null
+    },
+    projectTrackerLink: {
+      type: String,
+      trim: true,
+      validate: {
+        validator: function(v) {
+          return !v || /^https?:\/\/.+/.test(v);
+        },
+        message: 'Project tracker link must be a valid URL'
+      },
+      default: null
+    },
+
     // Project metadata
     tags: {
       type: [String],

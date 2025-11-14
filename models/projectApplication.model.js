@@ -40,6 +40,10 @@ const projectApplicationSchema = new mongoose.Schema(
       maxlength: 1000,
       default: ""
     },
+    resumeUrl: {
+      type: String,
+      required: true // Resume is now required for all applications
+    },
     proposedRate: {
       type: Number,
       default: null // User can propose their own rate

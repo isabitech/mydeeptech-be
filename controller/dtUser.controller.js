@@ -2572,7 +2572,8 @@ const applyToProject = async (req, res) => {
     console.log(`👤 User status check:`, {
       found: !!user,
       email: user?.email,
-      annotatorStatus: user?.annotatorStatus
+      annotatorStatus: user?.annotatorStatus,
+      hasResume: !!(user?.attachments?.resume_url)
     });
     
     if (!user || user.annotatorStatus !== 'approved') {
@@ -2583,7 +2584,21 @@ const applyToProject = async (req, res) => {
       });
     }
 
-    console.log(`✅ User ${req.user.email} approved for project application`);
+    // Check if user has uploaded their resume
+    if (!user.attachments?.resume_url || user.attachments.resume_url.trim() === '') {
+      console.log(`❌ User ${req.user.email} application denied - No resume uploaded`);
+      return res.status(400).json({
+        success: false,
+        message: "Please upload your resume in your profile section",
+        error: {
+          code: "RESUME_REQUIRED",
+          reason: "A resume is required to apply to projects",
+          action: "Upload your resume in the profile section before applying"
+        }
+      });
+    }
+
+    console.log(`✅ User ${req.user.email} approved for project application with resume: ${user.attachments.resume_url}`);
 
     // Check if project exists and is available
     const AnnotationProject = require('../models/annotationProject.model');
@@ -2649,6 +2664,7 @@ const applyToProject = async (req, res) => {
       projectId: projectId,
       applicantId: userId,
       coverLetter: coverLetter || "",
+      resumeUrl: user.attachments.resume_url, // Include resume URL from user profile
       proposedRate: proposedRate || project.payRate,
       availability: availability || "flexible",
       estimatedCompletionTime: estimatedCompletionTime || "",
@@ -2677,6 +2693,7 @@ const applyToProject = async (req, res) => {
       const applicationData = {
         applicantName: user.fullName,
         applicantEmail: user.email,
+        resumeUrl: user.attachments.resume_url,
         projectName: project.projectName,
         projectCategory: project.projectCategory,
         payRate: project.payRate,
@@ -3918,6 +3935,103 @@ const getUserResultSubmissions = async (req, res) => {
   }
 };
 
+// Get project guidelines for approved annotators only
+const getProjectGuidelines = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const userId = req.userId || req.user?.userId;
+
+    console.log(`🔍 User ${userId} requesting guidelines for project: ${projectId}`);
+
+    // Check if user is authenticated
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required to access project guidelines"
+      });
+    }
+
+    // Find the project
+    const AnnotationProject = require('../models/annotationProject.model');
+    const project = await AnnotationProject.findById(projectId);
+
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found"
+      });
+    }
+
+    // Check if user has an approved application for this project
+    const ProjectApplication = require('../models/projectApplication.model');
+    const approvedApplication = await ProjectApplication.findOne({
+      projectId: projectId,
+      applicantId: userId,
+      status: 'approved'
+    });
+
+    if (!approvedApplication) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Only approved annotators can access project guidelines.",
+        error: {
+          code: "GUIDELINES_ACCESS_DENIED",
+          reason: "User must have an approved application for this project",
+          userStatus: "not_approved_for_project"
+        }
+      });
+    }
+
+    // Return project guidelines
+    const guidelinesData = {
+      projectInfo: {
+        id: project._id,
+        name: project.projectName,
+        description: project.projectDescription,
+        category: project.projectCategory,
+        payRate: project.payRate,
+        payRateCurrency: project.payRateCurrency,
+        payRateType: project.payRateType,
+        difficultyLevel: project.difficultyLevel,
+        deadline: project.deadline
+      },
+      guidelines: {
+        documentLink: project.projectGuidelineLink,
+        videoLink: project.projectGuidelineVideo || null,
+        communityLink: project.projectCommunityLink || null,
+        trackerLink: project.projectTrackerLink || null
+      },
+      userApplication: {
+        appliedAt: approvedApplication.appliedAt,
+        approvedAt: approvedApplication.reviewedAt,
+        workStartedAt: approvedApplication.workStartedAt,
+        status: approvedApplication.status
+      },
+      accessInfo: {
+        accessGrantedAt: new Date(),
+        accessType: "approved_annotator",
+        userRole: "annotator"
+      }
+    };
+
+    console.log(`✅ Project guidelines provided to approved user: ${userId} for project: ${project.projectName}`);
+
+    res.status(200).json({
+      success: true,
+      message: "Project guidelines retrieved successfully",
+      data: guidelinesData
+    });
+
+  } catch (error) {
+    console.error("❌ Error retrieving project guidelines:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error retrieving project guidelines",
+      error: error.message
+    });
+  }
+};
+
 module.exports = { 
   createDTUser, 
   createDTUserWithBackgroundEmail, 
@@ -3952,5 +4066,6 @@ module.exports = {
   submitResultWithCloudinary,
   getUserResultSubmissions,
   uploadIdDocument,
-  uploadResume
+  uploadResume,
+  getProjectGuidelines
 };

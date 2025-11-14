@@ -4,11 +4,11 @@ const { createProject, getProject, updateProject, deleteProject } = require('../
 const { createTask, getTask, getAllTasks, assignTask} = require('../controller/task.js')
 const {validateVisitor} = require('../controller/validateuser.js')
 const dtUserController = require("../controller/dtUser.controller.js");
-const { createDTUser, verifyEmail, submitResult, updateUserStatus, setupPassword, dtUserLogin, getDTUserProfile, updateDTUserProfile, resetDTUserPassword, resendVerificationEmail, getAvailableProjects, applyToProject, getUserActiveProjects, getUserInvoices, getUnpaidInvoices, getPaidInvoices, getInvoiceDetails, getInvoiceDashboard, getDTUserDashboard, submitResultWithCloudinary, getUserResultSubmissions, uploadIdDocument, uploadResume } = require("../controller/dtUser.controller.js");
+const { createDTUser, verifyEmail, submitResult, updateUserStatus, setupPassword, dtUserLogin, getDTUserProfile, updateDTUserProfile, resetDTUserPassword, resendVerificationEmail, getAvailableProjects, applyToProject, getUserActiveProjects, getUserInvoices, getUnpaidInvoices, getPaidInvoices, getInvoiceDetails, getInvoiceDashboard, getDTUserDashboard, submitResultWithCloudinary, getUserResultSubmissions, uploadIdDocument, uploadResume, getProjectGuidelines } = require("../controller/dtUser.controller.js");
 const { authenticateToken, authorizeProfileAccess } = require('../middleware/auth.js');
 
 // Import Cloudinary upload middleware for result submissions
-const { resultFileUpload } = require('../config/cloudinary');
+const { resultFileUpload, idDocumentUpload, resumeUpload } = require('../config/cloudinary');
 
 
 
@@ -39,6 +39,7 @@ router.patch("/dtUserResetPassword", authenticateToken, resetDTUserPassword);
 // Project routes for DTUsers (approved annotators only)
 router.get("/projects", authenticateToken, getAvailableProjects);
 router.post("/projects/:projectId/apply", authenticateToken, applyToProject);
+router.get("/projects/:projectId/guidelines", authenticateToken, getProjectGuidelines);
 router.get("/activeProjects/:userId", authenticateToken, getUserActiveProjects);
 
 // DTUser Invoice Routes
@@ -91,7 +92,7 @@ router.get('/result-submissions', authenticateToken, getUserResultSubmissions);
 // Upload ID Document Route - adds to profile information
 router.post('/upload-id-document', authenticateToken, (req, res, next) => {
   // Create a flexible upload handler for ID documents
-  const upload = resultFileUpload.fields([
+  const upload = idDocumentUpload.fields([
     { name: 'idDocument', maxCount: 1 },
     { name: 'id_document', maxCount: 1 },
     { name: 'document', maxCount: 1 },
@@ -125,7 +126,7 @@ router.post('/upload-id-document', authenticateToken, (req, res, next) => {
 // Upload Resume Route - adds to profile information  
 router.post('/upload-resume', authenticateToken, (req, res, next) => {
   // Create a flexible upload handler for resumes
-  const upload = resultFileUpload.fields([
+  const upload = resumeUpload.fields([
     { name: 'resume', maxCount: 1 },
     { name: 'cv', maxCount: 1 },
     { name: 'document', maxCount: 1 },

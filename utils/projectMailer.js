@@ -305,7 +305,7 @@ Completed: ${new Date().toLocaleString()}
  * @param {object} applicationData - Application and project details
  */
 const sendProjectApplicationNotification = async (adminEmail, adminName, applicationData) => {
-  const { applicantName, applicantEmail, projectName, projectCategory, payRate, coverLetter, appliedAt } = applicationData;
+  const { applicantName, applicantEmail, resumeUrl, projectName, projectCategory, payRate, coverLetter, appliedAt } = applicationData;
   
   const subject = `New Project Application: ${projectName}`;
   
@@ -341,6 +341,14 @@ const sendProjectApplicationNotification = async (adminEmail, adminName, applica
                     <tr>
                         <td style="padding: 8px 0; font-weight: bold;">Email:</td>
                         <td style="padding: 8px 0;">${applicantEmail}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 8px 0; font-weight: bold;">Resume:</td>
+                        <td style="padding: 8px 0;">
+                            <a href="${resumeUrl}" target="_blank" style="color: #007bff; text-decoration: none; font-weight: bold;">
+                                📄 View Resume
+                            </a>
+                        </td>
                     </tr>
                     <tr>
                         <td style="padding: 8px 0; font-weight: bold;">Project:</td>
@@ -404,6 +412,7 @@ You have received a new application for your project: ${projectName}
 Application Details:
 - Applicant: ${applicantName}
 - Email: ${applicantEmail}
+- Resume: ${resumeUrl}
 - Project: ${projectName}
 - Category: ${projectCategory}
 - Pay Rate: $${payRate}
@@ -443,9 +452,19 @@ https://mydeeptech.ng
  * @param {object} projectData - Project details
  */
 const sendProjectApprovalNotification = async (applicantEmail, applicantName, projectData) => {
-  const { projectName, projectCategory, payRate, adminName, reviewNotes } = projectData;
+  const { 
+    projectName, 
+    projectCategory, 
+    payRate, 
+    adminName, 
+    reviewNotes,
+    projectGuidelineLink,
+    projectGuidelineVideo,
+    projectCommunityLink,
+    projectTrackerLink
+  } = projectData;
   
-  const subject = `Application Approved: ${projectName}`;
+  const subject = `🎉 Welcome to ${projectName} - Let's Get Started!`;
   
   const htmlContent = `
     <!DOCTYPE html>
@@ -457,16 +476,16 @@ const sendProjectApprovalNotification = async (applicantEmail, applicantName, pr
     </head>
     <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-            <h1 style="margin: 0; font-size: 28px;">🎉 Congratulations!</h1>
-            <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">Your application has been approved</p>
+            <h1 style="margin: 0; font-size: 28px;">🎉 Welcome to the Team!</h1>
+            <p style="margin: 10px 0 0 0; font-size: 16px; opacity: 0.9;">You've been approved - let's start annotating!</p>
         </div>
         
         <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e9ecef;">
             <p style="font-size: 18px; margin-bottom: 20px;">Hi <strong>${applicantName}</strong>,</p>
             
             <p style="font-size: 16px; margin-bottom: 20px;">
-                Great news! Your application for <strong>${projectName}</strong> has been approved. 
-                You can now start working on this project.
+                🎊 Fantastic news! Your application for <strong>${projectName}</strong> has been approved, and you're now officially part of our annotation team. 
+                We're excited to have you on board and can't wait to see the amazing work you'll contribute!
             </p>
             
             <div style="background: #d4edda; border: 2px solid #28a745; border-radius: 8px; padding: 20px; margin: 20px 0;">
@@ -501,20 +520,117 @@ const sendProjectApprovalNotification = async (applicantEmail, applicantName, pr
                 ` : ''}
             </div>
             
+            <!-- Project Guidelines Section -->
+            <div style="background: #e3f2fd; border: 2px solid #2196f3; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                <h3 style="margin-top: 0; color: #0d47a1;">🎉 Welcome to the Project Team!</h3>
+                <p style="margin-bottom: 15px; font-weight: bold; color: #1976d2;">
+                    You're now part of this exciting annotation project! To get started and ensure success, please access these essential resources:
+                </p>
+                
+                <div style="background: #ffffff; border-radius: 8px; padding: 20px; margin-bottom: 15px;">
+                    <h4 style="margin-top: 0; color: #1976d2; border-bottom: 2px solid #e3f2fd; padding-bottom: 10px;">� STEP 1: Read the Project Guidelines</h4>
+                    <p style="margin: 10px 0; color: #333;">
+                        Start here! These guidelines contain everything you need to know about the project requirements, annotation standards, and quality expectations.
+                    </p>
+                    <p style="margin: 15px 0;">
+                        <a href="${projectGuidelineLink}" 
+                           target="_blank" 
+                           style="display: inline-block; background: #2196f3; color: white; padding: 12px 25px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+                            📖 Click to Read Guidelines
+                        </a>
+                    </p>
+                    <p style="font-size: 14px; color: #d32f2f; margin: 5px 0; font-weight: bold;">
+                        ⚠️ REQUIRED: You must read these guidelines before starting any work.
+                    </p>
+                </div>
+                    
+                    ${projectGuidelineVideo ? `
+                    <div style="background: #fff3e0; border-radius: 8px; padding: 20px; margin-bottom: 15px;">
+                        <h4 style="margin-top: 0; color: #f57c00; border-bottom: 2px solid #ffcc02; padding-bottom: 10px;">🎥 STEP 2: Watch the Tutorial Video</h4>
+                        <p style="margin: 10px 0; color: #333;">
+                            Want to see the annotation process in action? This optional video tutorial provides a visual walkthrough of the guidelines and demonstrates best practices.
+                        </p>
+                        <p style="margin: 15px 0;">
+                            <a href="${projectGuidelineVideo}" 
+                               target="_blank" 
+                               style="display: inline-block; background: #ff5722; color: white; padding: 12px 25px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+                                ▶️ Watch Tutorial Video
+                            </a>
+                        </p>
+                        <p style="font-size: 14px; color: #bf360c; margin: 5px 0;">
+                            💡 Highly recommended for visual learners and first-time annotators.
+                        </p>
+                    </div>
+                    ` : ''}
+                    
+                    ${projectCommunityLink ? `
+                    <div style="background: #e8f5e8; border-radius: 8px; padding: 20px; margin-bottom: 15px;">
+                        <h4 style="margin-top: 0; color: #2e7d32; border-bottom: 2px solid #a5d6a7; padding-bottom: 10px;">💬 STEP 3: Join the Community Group</h4>
+                        <p style="margin: 10px 0; color: #333;">
+                            Connect with fellow annotators! Join our community group chat to ask questions, share insights, get real-time support, and collaborate with other team members.
+                        </p>
+                        <p style="margin: 15px 0;">
+                            <a href="${projectCommunityLink}" 
+                               target="_blank" 
+                               style="display: inline-block; background: #4caf50; color: white; padding: 12px 25px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+                                💭 Join Community Chat
+                            </a>
+                        </p>
+                        <p style="font-size: 14px; color: #1b5e20; margin: 5px 0;">
+                            🤝 Get support, ask questions, and collaborate with other annotators.
+                        </p>
+                    </div>
+                    ` : ''}
+                    
+                    ${projectTrackerLink ? `
+                    <div style="background: #fff3e0; border-radius: 8px; padding: 20px; margin-bottom: 15px;">
+                        <h4 style="margin-top: 0; color: #e65100; border-bottom: 2px solid #ffb74d; padding-bottom: 10px;">📊 STEP 4: Track Your Progress</h4>
+                        <p style="margin: 10px 0; color: #333;">
+                            Stay organized and motivated! Use our project tracker to monitor your progress, update your status, see project milestones, and track your completion rate.
+                        </p>
+                        <p style="margin: 15px 0;">
+                            <a href="${projectTrackerLink}" 
+                               target="_blank" 
+                               style="display: inline-block; background: #ff9800; color: white; padding: 12px 25px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+                                � Open Progress Tracker
+                            </a>
+                        </p>
+                        <p style="font-size: 14px; color: #bf360c; margin: 5px 0;">
+                            📅 Update your progress regularly to help project managers track overall completion.
+                        </p>
+                    </div>
+                    ` : ''}
+                
+                <div style="background: #ffebee; border-left: 4px solid #f44336; padding: 15px; margin-top: 20px; border-radius: 4px;">
+                    <h4 style="margin-top: 0; color: #c62828;">⚠️ Important Guidelines Notice</h4>
+                    <ul style="margin: 10px 0; padding-left: 20px; color: #d32f2f;">
+                        <li><strong>Quality Standards:</strong> All work must meet the guidelines' quality requirements</li>
+                        <li><strong>Deadline Compliance:</strong> Complete tasks within the specified timeframes</li>
+                        <li><strong>Communication:</strong> Use the community chat for questions and updates</li>
+                        <li><strong>Progress Updates:</strong> Regularly update your status in the project tracker</li>
+                    </ul>
+                    <p style="margin: 10px 0 0 0; color: #b71c1c; font-weight: bold;">
+                        💡 Failure to follow these guidelines may result in work rejection or project removal.
+                    </p>
+                </div>
+            </div>
+            
             <div style="text-align: center; margin: 30px 0;">
-                <a href="https://mydeeptech.ng/projects/dashboard" style="background: #28a745; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
-                    Start Working
+                <a href="https://mydeeptech.ng/projects/dashboard" style="background: #28a745; color: white; padding: 15px 35px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; font-size: 18px;">
+                    🚀 Access My Project Dashboard
                 </a>
             </div>
             
             <div style="background: #d1ecf1; border-left: 4px solid #17a2b8; padding: 15px; margin: 20px 0;">
-                <h3 style="margin-top: 0; color: #0c5460;">🚀 Next Steps</h3>
-                <ul style="margin-bottom: 0; padding-left: 20px;">
-                    <li>Log in to your MyDeeptech dashboard</li>
-                    <li>Access the project workspace</li>
-                    <li>Review project guidelines and requirements</li>
-                    <li>Start working on assigned tasks</li>
-                </ul>
+                <h3 style="margin-top: 0; color: #0c5460;">🚀 Ready to Start? Here's Your Action Plan:</h3>
+                <ol style="margin-bottom: 0; padding-left: 20px;">
+                    <li><strong>📖 Read the guidelines</strong> - Essential first step (required)</li>
+                    <li><strong>🎥 Watch the tutorial video</strong> - Visual guide (highly recommended)</li>
+                    <li><strong>💬 Join the community chat</strong> - Connect with other annotators</li>
+                    <li><strong>📊 Set up progress tracking</strong> - Stay organized and motivated</li>
+                    <li><strong>🎯 Log in to your dashboard</strong> - Access your project workspace</li>
+                    <li><strong>✅ Start your first annotation task</strong> - Begin making an impact!</li>
+                </ol>
             </div>
             
             <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
@@ -532,7 +648,7 @@ const sendProjectApprovalNotification = async (applicantEmail, applicantName, pr
   const textContent = `
 Hi ${applicantName},
 
-Great news! Your application for "${projectName}" has been approved. You can now start working on this project.
+🎊 Fantastic news! Your application for "${projectName}" has been approved, and you're now officially part of our annotation team. We're excited to have you on board and can't wait to see the amazing work you'll contribute!
 
 Project Details:
 - Project: ${projectName}
@@ -542,13 +658,46 @@ Project Details:
 
 ${reviewNotes ? `Admin Notes: "${reviewNotes}"` : ''}
 
-Next Steps:
-1. Log in to your MyDeeptech dashboard
-2. Access the project workspace
-3. Review project guidelines and requirements
-4. Start working on assigned tasks
+🎉 Welcome to the Project Team!
 
-Start working: https://mydeeptech.ng/projects/dashboard
+You're now part of this exciting annotation project! To get started and ensure success, please access these essential resources:
+
+📚 STEP 1: Read the Project Guidelines
+Start here! These guidelines contain everything you need to know about the project requirements, annotation standards, and quality expectations.
+� Project Guidelines Document: ${projectGuidelineLink}
+⚠️ REQUIRED: You must read these guidelines before starting any work.
+
+${projectGuidelineVideo ? `🎥 STEP 2: Watch the Tutorial Video
+Want to see the annotation process in action? This optional video tutorial provides a visual walkthrough of the guidelines.
+▶️ Video Tutorial: ${projectGuidelineVideo}
+💡 Highly recommended for visual learners and first-time annotators.
+
+` : ''}${projectCommunityLink ? `💬 STEP 3: Join the Community Group
+Connect with fellow annotators! Join our community group chat to ask questions, share insights, and get real-time support.
+💭 Community Chat: ${projectCommunityLink}
+🤝 Get support, ask questions, and collaborate with other annotators.
+
+` : ''}${projectTrackerLink ? `📊 STEP 4: Track Your Progress
+Stay organized and motivated! Use our project tracker to monitor your progress and update your status.
+📈 Progress Tracker: ${projectTrackerLink}
+📅 Update your progress regularly to help project managers track overall completion.
+
+` : ''}⚠️ Important Guidelines Notice:
+- Quality Standards: All work must meet the guidelines' quality requirements
+- Deadline Compliance: Complete tasks within the specified timeframes
+- Communication: Use the community chat for questions and updates
+- Progress Updates: Regularly update your status in the project tracker
+💡 Failure to follow these guidelines may result in work rejection or project removal.
+
+🚀 Ready to Start? Here's Your Action Plan:
+1. 📖 Read the guidelines - Essential first step (required)
+2. 🎥 Watch the tutorial video - Visual guide (highly recommended)  
+3. 💬 Join the community chat - Connect with other annotators
+4. 📊 Set up progress tracking - Stay organized and motivated
+5. 🎯 Log in to your dashboard - Access your project workspace
+6. ✅ Start your first annotation task - Begin making an impact!
+
+🚀 Access My Project Dashboard: https://mydeeptech.ng/projects/dashboard
 
 Best regards,
 MyDeeptech Team
@@ -563,7 +712,7 @@ https://mydeeptech.ng
       text: textContent
     });
     
-    console.log(`✅ Project approval notification sent to: ${applicantEmail}`);
+    console.log(`✅ Project approval notification with guidelines sent to: ${applicantEmail}`);
   } catch (error) {
     console.error(`❌ Failed to send project approval notification to ${applicantEmail}:`, error);
     throw error;
