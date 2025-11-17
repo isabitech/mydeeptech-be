@@ -1,0 +1,368 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "MyDeepTech API",
+    "version": "1.0.0",
+    "description": "Comprehensive API for MyDeepTech annotation platform",
+    "contact": {
+      "name": "MyDeepTech Support",
+      "email": "support@mydeeptech.ng"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:5000/api",
+      "description": "Development"
+    },
+    {
+      "url": "https://api.mydeeptech.ng/api",
+      "description": "Production"
+    }
+  ],
+  "paths": {
+    "/auth/dtUserRegister": {
+      "post": {
+        "summary": "Register a new user",
+        "description": "Create a new user account for the annotation platform",
+        "requestBody": {
+          "required": true,
+          "schema": {
+            "type": "object",
+            "required": [
+              "fullName",
+              "email",
+              "phone",
+              "consent"
+            ],
+            "properties": {
+              "fullName": {
+                "type": "string",
+                "example": "John Doe"
+              },
+              "email": {
+                "type": "string",
+                "format": "email",
+                "example": "john@example.com"
+              },
+              "phone": {
+                "type": "string",
+                "example": "+1234567890"
+              },
+              "consent": {
+                "type": "boolean",
+                "example": true
+              },
+              "domains": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "example": [
+                  "technology",
+                  "healthcare"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User registered successfully"
+          },
+          "400": {
+            "description": "Validation error"
+          }
+        }
+      }
+    },
+    "/auth/dtUserLogin": {
+      "post": {
+        "summary": "User login",
+        "description": "Authenticate user and return JWT token",
+        "requestBody": {
+          "required": true,
+          "schema": {
+            "type": "object",
+            "required": [
+              "email",
+              "password"
+            ],
+            "properties": {
+              "email": {
+                "type": "string",
+                "format": "email",
+                "example": "john@example.com"
+              },
+              "password": {
+                "type": "string",
+                "example": "securePassword123"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful, returns JWT token"
+          },
+          "401": {
+            "description": "Invalid credentials"
+          }
+        }
+      }
+    },
+    "/auth/upload-resume": {
+      "post": {
+        "summary": "Upload resume document",
+        "description": "Upload resume file (PDF, DOC, DOCX) to user profile - REQUIRED for project applications",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "contentType": "multipart/form-data",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "resume": {
+                "type": "string",
+                "format": "binary",
+                "description": "Resume file (PDF, DOC, DOCX)"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resume uploaded successfully with accessible URL"
+          },
+          "400": {
+            "description": "File validation error or missing file"
+          },
+          "401": {
+            "description": "Authentication required"
+          }
+        }
+      }
+    },
+    "/auth/upload-id-document": {
+      "post": {
+        "summary": "Upload ID document",
+        "description": "Upload identification document (PDF, JPG, PNG) to user profile",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "contentType": "multipart/form-data",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "idDocument": {
+                "type": "string",
+                "format": "binary",
+                "description": "ID document file (PDF, JPG, PNG)"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "ID document uploaded successfully"
+          },
+          "400": {
+            "description": "File validation error"
+          }
+        }
+      }
+    },
+    "/auth/projects/available": {
+      "get": {
+        "summary": "Get available projects",
+        "description": "Retrieve list of active projects available for applications",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "type": "integer",
+            "default": 1,
+            "description": "Page number"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "type": "integer",
+            "default": 10,
+            "description": "Items per page"
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "type": "string",
+            "description": "Filter by category"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Available projects retrieved successfully"
+          },
+          "403": {
+            "description": "Access denied - user not approved"
+          }
+        }
+      }
+    },
+    "/auth/projects/{projectId}/apply": {
+      "post": {
+        "summary": "Apply to a project",
+        "description": "Submit an application to an annotation project (requires uploaded resume)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "type": "string",
+            "required": true,
+            "description": "Project ID"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "schema": {
+            "type": "object",
+            "properties": {
+              "coverLetter": {
+                "type": "string",
+                "example": "I am interested in this project..."
+              },
+              "proposedRate": {
+                "type": "number",
+                "example": 15
+              },
+              "availability": {
+                "type": "string",
+                "enum": [
+                  "full_time",
+                  "part_time",
+                  "weekends",
+                  "flexible"
+                ]
+              },
+              "estimatedCompletionTime": {
+                "type": "string",
+                "example": "2 weeks"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Application submitted successfully"
+          },
+          "400": {
+            "description": "Resume required or validation error",
+            "examples": {
+              "resumeRequired": {
+                "success": false,
+                "message": "Please upload your resume in your profile section",
+                "error": {
+                  "code": "RESUME_REQUIRED",
+                  "reason": "A resume is required to apply to projects",
+                  "action": "Upload your resume in the profile section before applying"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied - user not approved annotator"
+          },
+          "404": {
+            "description": "Project not found"
+          }
+        }
+      }
+    },
+    "/auth/projects/{projectId}/guidelines": {
+      "get": {
+        "summary": "Get project guidelines",
+        "description": "Access project guidelines and resources (only for approved applicants)",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "path",
+            "type": "string",
+            "required": true,
+            "description": "Project ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Project guidelines retrieved successfully",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "projectInfo": {
+                  "description": "Project details"
+                },
+                "guidelines": {
+                  "type": "object",
+                  "properties": {
+                    "documentLink": {
+                      "type": "string",
+                      "format": "uri",
+                      "description": "Required guidelines document"
+                    },
+                    "videoLink": {
+                      "type": "string",
+                      "format": "uri",
+                      "description": "Optional tutorial video"
+                    },
+                    "communityLink": {
+                      "type": "string",
+                      "format": "uri",
+                      "description": "Optional community chat"
+                    },
+                    "trackerLink": {
+                      "type": "string",
+                      "format": "uri",
+                      "description": "Optional progress tracker"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Access denied - user not approved for this project"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}

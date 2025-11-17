@@ -5,6 +5,18 @@ const dotenv = require('dotenv');
 const bodyParser = require('body-parser');
 const { initRedis, closeRedis, redisHealthCheck } = require('./config/redis');
 
+// Conditionally load Swagger (optional dependency)
+let swaggerUi, specs;
+try {
+  const swagger = require('./config/swagger');
+  swaggerUi = swagger.swaggerUi;
+  specs = swagger.specs;
+} catch (error) {
+  console.log('⚠️ Swagger dependencies not found. API documentation will not be available.');
+  swaggerUi = null;
+  specs = null;
+}
+
 dotenv.config({ path: './.env' });
 
 //console.log("Loaded BREVO_API_KEY:", process.env.BREVO_API_KEY ? "✅ Yes" : "❌ No");
@@ -60,6 +72,19 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({extended: true}));
 app.use(bodyParser.json());
+
+// API Documentation (only if Swagger is available)
+if (swaggerUi && specs) {
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
+    explorer: true,
+    customSiteTitle: "MyDeepTech API Documentation",
+    customfavIcon: "/favicon.ico",
+    customCss: '.swagger-ui .topbar { display: none }'
+  }));
+  console.log('📚 API Documentation available at: http://localhost:5000/api-docs');
+} else {
+  console.log('📚 API Documentation not available (Swagger dependencies missing)');
+}
 
 // Routes
 app.use('/api/auth', route);
