@@ -143,7 +143,7 @@ async function deleteUserAccount(userEmail) {
 }
 
 // Get email from command line arguments
-const userEmail = "confidencechiojiaku@gmail.com";
+const userEmail = "";
 
 if (!userEmail) {
   console.log('❌ Please provide a user email address');
