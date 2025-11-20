@@ -9,37 +9,42 @@ const router = express.Router();
  * Get user's notifications
  * GET /api/notifications
  */
+const Notification = require('../models/notification.model');
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const userId = req.userId || req.user?.userId;
-    
-    console.log(`🔔 User ${userId} requesting notifications`);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
 
-    // For now, return empty notifications until notification model is implemented
-    const notifications = [];
-    const totalNotifications = 0;
+    // Fetch notifications for this user
+    const [notifications, totalNotifications, unreadCount, readCount] = await Promise.all([
+      Notification.find({ userId }).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Notification.countDocuments({ userId }),
+      Notification.countDocuments({ userId, isRead: false }),
+      Notification.countDocuments({ userId, isRead: true })
+    ]);
 
     res.status(200).json({
       success: true,
       message: "User notifications retrieved successfully",
       data: {
-        notifications: notifications,
+        notifications,
         pagination: {
-          currentPage: 1,
-          totalPages: 0,
-          totalNotifications: totalNotifications,
-          hasNextPage: false,
-          hasPrevPage: false,
-          limit: 10
+          currentPage: page,
+          totalPages: Math.ceil(totalNotifications / limit),
+          totalNotifications,
+          hasNextPage: page * limit < totalNotifications,
+          hasPrevPage: page > 1,
+          limit
         },
         summary: {
-          totalNotifications: totalNotifications,
-          unreadNotifications: 0,
-          readNotifications: 0
+          totalNotifications,
+          unreadNotifications: unreadCount,
+          readNotifications: readCount
         }
       }
     });
-
   } catch (error) {
     console.error("❌ Error fetching user notifications:", error);
     res.status(500).json({

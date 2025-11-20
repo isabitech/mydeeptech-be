@@ -39,6 +39,20 @@ const dtUserSchema = new mongoose.Schema(
       default: false 
     },
     isEmailVerified: { type: Boolean, default: false },
+    
+    // Password reset fields
+    passwordResetToken: {
+      type: String,
+      default: null
+    },
+    passwordResetExpires: {
+      type: Date,
+      default: null
+    },
+    passwordResetAttempts: {
+      type: Number,
+      default: 0
+    },
 
     // Default statuses
     annotatorStatus: {

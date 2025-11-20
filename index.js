@@ -3,7 +3,21 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const bodyParser = require('body-parser');
+const { createServer } = require('http');
+const { initializeSocketIO } = require('./utils/chatSocketService');
 const { initRedis, closeRedis, redisHealthCheck } = require('./config/redis');
+
+// Conditionally load Swagger (optional dependency)
+let swaggerUi, specs;
+try {
+  const swagger = require('./config/swagger');
+  swaggerUi = swagger.swaggerUi;
+  specs = swagger.specs;
+} catch (error) {
+  console.log('⚠️ Swagger dependencies not found. API documentation will not be available.');
+  swaggerUi = null;
+  specs = null;
+}
 
 dotenv.config({ path: './.env' });
 
@@ -14,8 +28,14 @@ const adminRoute = require('./routes/admin');
 const mediaRoute = require('./routes/media');
 const notificationRoute = require('./routes/notifications');
 const assessmentRoute = require('./routes/assessment');
+const supportRoute = require('./routes/support');
+const chatRoute = require('./routes/chat');
 
 const app = express();
+const server = createServer(app);
+
+// Initialize Socket.IO for chat functionality
+initializeSocketIO(server);
 
 // CORS Configuration
 const corsOptions = {
@@ -61,12 +81,27 @@ app.use(express.json());
 app.use(express.urlencoded({extended: true}));
 app.use(bodyParser.json());
 
+// API Documentation (only if Swagger is available)
+if (swaggerUi && specs) {
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
+    explorer: true,
+    customSiteTitle: "MyDeepTech API Documentation",
+    customfavIcon: "/favicon.ico",
+    customCss: '.swagger-ui .topbar { display: none }'
+  }));
+  console.log('📚 API Documentation available at: http://localhost:5000/api-docs');
+} else {
+  console.log('📚 API Documentation not available (Swagger dependencies missing)');
+}
+
 // Routes
 app.use('/api/auth', route);
 app.use('/api/admin', adminRoute);
 app.use('/api/media', mediaRoute);
 app.use('/api/notifications', notificationRoute);
 app.use('/api/assessments', assessmentRoute);
+app.use('/api/support', supportRoute);
+app.use('/api/chat', chatRoute);
 
 // Initialize Redis connection
 const initializeRedis = async () => {
@@ -113,7 +148,8 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Start Server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`💬 Socket.IO chat server active`);
     console.log(`🔗 Health check available at: http://localhost:${PORT}/health`);
 });
