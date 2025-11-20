@@ -38,6 +38,19 @@ const userSchema = new mongoose.Schema({
         required: "Role name is required",
         enum: [RoleType.USER, RoleType.ADMIN],
         default: RoleType.USER
+    },
+    // Password reset fields
+    passwordResetToken: {
+        type: String,
+        default: null
+    },
+    passwordResetExpires: {
+        type: Date,
+        default: null
+    },
+    passwordResetAttempts: {
+        type: Number,
+        default: 0
     }
   });
 

@@ -7,6 +7,15 @@ const dtUserController = require("../controller/dtUser.controller.js");
 const { createDTUser, verifyEmail, submitResult, updateUserStatus, setupPassword, dtUserLogin, getDTUserProfile, updateDTUserProfile, resetDTUserPassword, resendVerificationEmail, getAvailableProjects, applyToProject, getUserActiveProjects, getUserInvoices, getUnpaidInvoices, getPaidInvoices, getInvoiceDetails, getInvoiceDashboard, getDTUserDashboard, submitResultWithCloudinary, getUserResultSubmissions, uploadIdDocument, uploadResume, getProjectGuidelines } = require("../controller/dtUser.controller.js");
 const { authenticateToken, authorizeProfileAccess } = require('../middleware/auth.js');
 
+// Import password reset controllers
+const { 
+  forgotPassword, 
+  resetPassword, 
+  dtUserForgotPassword, 
+  dtUserResetPassword, 
+  verifyResetToken 
+} = require('../controller/passwordReset.controller.js');
+
 // Import Cloudinary upload middleware for result submissions
 const { resultFileUpload, idDocumentUpload, resumeUpload } = require('../config/cloudinary');
 
@@ -16,6 +25,26 @@ const router = express.Router()
 
 router.post('/signup', signup);
 router.post('/login', login);
+
+// ======================
+// PASSWORD RESET ROUTES  
+// ======================
+
+// Regular User Password Reset
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
+
+// DTUser Password Reset
+router.post('/dtuser-forgot-password', dtUserForgotPassword);
+router.post('/dtuser-reset-password', dtUserResetPassword);
+
+// Token verification (optional - for frontend validation)
+router.get('/verify-reset-token/:token', verifyResetToken);
+
+// ======================
+// OTHER AUTH ROUTES
+// ======================
+
 router.get('/getAllUsers', getAllUsers);
 router.get('/getUsers', getUsers)
 router.post('/createProject', createProject);

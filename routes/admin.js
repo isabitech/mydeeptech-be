@@ -2,7 +2,7 @@ const express = require('express');
 const { getAllDTUsers, getAllAdminUsers, getAdminDashboard, approveAnnotator, rejectAnnotator, getDTUserAdmin, createAdmin, requestAdminVerification, confirmAdminVerification, verifyAdminOTP, adminLogin } = require('../controller/dtUser.controller.js');
 const { createAnnotationProject, getAllAnnotationProjects, getAnnotationProjectDetails, updateAnnotationProject, deleteAnnotationProject, requestProjectDeletionOTP, verifyOTPAndDeleteProject, getAnnotationProjectApplications, approveAnnotationProjectApplication, rejectAnnotationProjectApplication, removeApprovedApplicant, getRemovableApplicants } = require('../controller/annotationProject.controller.js');
 const { createInvoice, getAllInvoices, getInvoiceDetails, updatePaymentStatus, sendInvoiceReminder, deleteInvoice } = require('../controller/invoice.controller.js');
-const { getAdminNotifications, createAnnouncement, getNotificationStats, cleanupNotifications } = require('../controller/notification.controller.js');
+const { getAdminNotifications, createAnnouncement, getNotificationStats, cleanupNotifications, broadcastNotification } = require('../controller/notification.controller.js');
 const { getAdminAssessments } = require('../controller/assessment.controller.js');
 const { authenticateAdmin } = require('../middleware/adminAuth.js');
 
@@ -60,9 +60,16 @@ router.delete('/invoices/:invoiceId', authenticateAdmin, deleteInvoice);
 
 // Notification Management Routes
 router.get('/notifications', authenticateAdmin, getAdminNotifications);
+router.post('/notifications', authenticateAdmin, require('../controller/notification.controller.js').createAdminNotification);
+router.put('/notifications/:notificationId', authenticateAdmin, require('../controller/notification.controller.js').updateAdminNotification);
+router.delete('/notifications/:notificationId', authenticateAdmin, require('../controller/notification.controller.js').deleteAdminNotification);
 router.post('/notifications/announcement', authenticateAdmin, createAnnouncement);
 router.get('/notifications/stats', authenticateAdmin, getNotificationStats);
 router.delete('/notifications/cleanup', authenticateAdmin, cleanupNotifications);
+router.get('/notifications/analytics', authenticateAdmin, require('../controller/notification.controller.js').getAdminNotificationAnalytics);
+
+// Admin Notification Broadcast Endpoint
+router.post('/notifications/broadcast', authenticateAdmin, broadcastNotification);
 
 // Assessment Management Routes
 router.get('/assessments', authenticateAdmin, getAdminAssessments);

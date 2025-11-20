@@ -3,6 +3,8 @@
  * Handles creation and management of user notifications
  */
 
+const Notification = require('../models/notification.model');
+const mongoose = require('mongoose');
 /**
  * Create a general notification
  * @param {Object} notificationData - Notification details
@@ -10,26 +12,25 @@
  */
 const createNotification = async (notificationData) => {
   try {
-    const { userId, type, title, message, data = {} } = notificationData;
-    
-    console.log(`📔 Creating notification for user ${userId}: ${title}`);
-    
-    // For now, just log the notification until notification model is implemented
-    const notification = {
-      id: new Date().getTime(), // Mock ID
-      userId: userId,
-      type: type,
-      title: title,
-      message: message,
-      data: data,
-      isRead: false,
-      createdAt: new Date()
-    };
-    
-    console.log(`✅ Notification created:`, notification);
-    
+    const { userId, type, title, message, data = {}, priority = 'medium' } = notificationData;
+    // Determine user model type
+    let userModel = 'User';
+    if (mongoose.Types.ObjectId.isValid(userId)) {
+      // Try to infer if it's a DTUser (optional: you can improve this logic)
+      // For now, default to DTUser for all
+      userModel = 'DTUser';
+    }
+    const notification = await Notification.create({
+      userId,
+      userModel,
+      type,
+      title,
+      message,
+      data,
+      priority
+    });
+    console.log(`✅ Notification created in DB:`, notification);
     return notification;
-    
   } catch (error) {
     console.error('❌ Error creating notification:', error);
     throw error;
