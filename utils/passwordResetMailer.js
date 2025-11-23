@@ -1,5 +1,4 @@
-const { sendVerificationEmailBrevoSMTP } = require('./brevoSMTP');
-const brevoTransporter = require('./brevoSMTP');
+const { sendEmail } = require('./brevoSMTP');
 
 /**
  * Send password reset email using Brevo SMTP
@@ -14,10 +13,7 @@ const sendPasswordResetEmail = async (email, name, resetToken, userType = 'user'
       ? `${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/reset-password?token=${resetToken}&type=dtuser`
       : `${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/reset-password?token=${resetToken}&type=user`;
 
-    const emailContent = {
-      to: [{ email, name }],
-      subject: '🔒 Reset Your MyDeepTech Password',
-      htmlContent: `
+    const htmlContent = `
         <!DOCTYPE html>
         <html lang="en">
         <head>
@@ -188,8 +184,9 @@ const sendPasswordResetEmail = async (email, name, resetToken, userType = 'user'
             </div>
         </body>
         </html>
-      `,
-      textContent: `
+      `;
+
+      const textContent = `
 Password Reset Request - MyDeepTech
 
 Hello ${name},
@@ -214,17 +211,21 @@ Need help? Contact: support@mydeeptech.ng
 
 MyDeepTech Security Team
 https://mydeeptech.ng
-      `
-    };
+      `;
 
-    // Send email using Brevo SMTP
-    const response = await brevoTransporter.sendMail(emailContent);
+    // Send email using Brevo API with SMTP fallback
+    const response = await sendEmail({
+      to: email,
+      subject: '🔒 Reset Your MyDeepTech Password',
+      html: htmlContent,
+      text: textContent
+    });
     
-    console.log(`✅ Password reset email sent to ${email} via Brevo SMTP`);
+    console.log(`✅ Password reset email sent to ${email} via ${response.provider}`);
     return { 
       success: true, 
       messageId: response.messageId,
-      provider: 'brevo-smtp',
+      provider: response.provider,
       resetUrl 
     };
 
@@ -246,10 +247,7 @@ const sendPasswordResetConfirmationEmail = async (email, name, userType = 'user'
       ? `${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/dtuser/login`
       : `${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/login`;
 
-    const emailContent = {
-      to: [{ email, name }],
-      subject: '✅ MyDeepTech Password Successfully Changed',
-      htmlContent: `
+    const htmlContent = `
         <!DOCTYPE html>
         <html lang="en">
         <head>
@@ -304,8 +302,9 @@ const sendPasswordResetConfirmationEmail = async (email, name, userType = 'user'
             </div>
         </body>
         </html>
-      `,
-      textContent: `
+      `;
+
+      const textContent = `
 Password Changed Successfully - MyDeepTech
 
 Hello ${name},
@@ -322,12 +321,16 @@ This confirmation was sent on ${new Date().toLocaleString()} as a security measu
 
 MyDeepTech Security Team
 support@mydeeptech.ng
-      `
-    };
+      `;
 
-    const response = await brevoTransporter.sendMail(emailContent);
+    const response = await sendEmail({
+      to: email,
+      subject: '✅ MyDeepTech Password Successfully Changed',
+      html: htmlContent,
+      text: textContent
+    });
     
-    console.log(`✅ Password reset confirmation email sent to ${email}`);
+    console.log(`✅ Password reset confirmation email sent to ${email} via ${response.provider}`);
     return { success: true, messageId: response.messageId };
 
   } catch (error) {
