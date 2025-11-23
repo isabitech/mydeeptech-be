@@ -12,7 +12,7 @@ const createBrevoSMTPTransporter = () => {
     throw new Error("Brevo SMTP credentials missing. Please set SMTP_LOGIN and SMTP_KEY");
   }
 
-  return nodemailer.createTransporter({
+  return nodemailer.createTransport({
     host: process.env.SMTP_SERVER || 'smtp-relay.brevo.com',
     port: parseInt(process.env.SMTP_PORT) || 587,
     secure: false,
@@ -29,6 +29,13 @@ const createBrevoSMTPTransporter = () => {
 
 // Send email via Brevo API (more reliable than SMTP on cloud platforms)
 const sendVerificationEmailBrevoAPI = async (email, name, userId) => {
+  // Validate API key before attempting to send
+  if (!process.env.BREVO_API_KEY || process.env.BREVO_API_KEY.length < 10) {
+    throw new Error("Invalid or missing BREVO_API_KEY");
+  }
+
+  console.log(`🔑 Using Brevo API Key: ${process.env.BREVO_API_KEY.substring(0, 10)}...`);
+
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -239,7 +246,19 @@ const testBrevoSMTPConnection = async () => {
 
 // Generic send email function using Brevo API (primary) with SMTP fallback
 const sendEmail = async ({ to, subject, html, text }) => {
+  console.log(`📧 Attempting to send email to: ${to}`);
+  console.log(`🔑 API Key available: ${process.env.BREVO_API_KEY ? 'YES' : 'NO'}`);
+  console.log(`📬 Sender email: ${process.env.BREVO_SENDER_EMAIL}`);
+  
   try {
+    // Validate required environment variables
+    if (!process.env.BREVO_API_KEY) {
+      throw new Error('BREVO_API_KEY is not set in environment variables');
+    }
+    if (!process.env.BREVO_SENDER_EMAIL) {
+      throw new Error('BREVO_SENDER_EMAIL is not set in environment variables');
+    }
+
     // Try Brevo API first (more reliable on cloud platforms)
     const sendSmtpEmail = new brevo.SendSmtpEmail();
     sendSmtpEmail.subject = subject;
@@ -251,6 +270,7 @@ const sendEmail = async ({ to, subject, html, text }) => {
     };
     sendSmtpEmail.to = [{ email: to }];
 
+    console.log(`🔄 Sending via Brevo API...`);
     const result = await apiInstance.sendTransacEmail(sendSmtpEmail);
     console.log(`✅ Brevo API email sent to ${to}`, result.messageId);
     return { 
@@ -259,10 +279,21 @@ const sendEmail = async ({ to, subject, html, text }) => {
       provider: 'brevo-api'
     };
   } catch (apiError) {
-    console.warn(`⚠️ Brevo API failed (${apiError.message}), trying SMTP fallback...`);
+    console.warn(`⚠️ Brevo API failed: ${apiError.message}`);
+    console.warn(`📊 API Error Details:`, {
+      status: apiError.response?.status,
+      statusText: apiError.response?.statusText,
+      data: apiError.response?.data
+    });
     
     // Fallback to SMTP if API fails
     try {
+      console.log(`🔄 Trying SMTP fallback...`);
+      
+      if (!process.env.SMTP_LOGIN || !process.env.SMTP_KEY) {
+        throw new Error('SMTP credentials missing. Please set SMTP_LOGIN and SMTP_KEY');
+      }
+
       const transporter = createBrevoSMTPTransporter();
       
       const mailOptions = {
@@ -281,7 +312,10 @@ const sendEmail = async ({ to, subject, html, text }) => {
         provider: 'brevo-smtp-fallback'
       };
     } catch (smtpError) {
-      console.error("❌ Both Brevo API and SMTP failed:", { apiError: apiError.message, smtpError: smtpError.message });
+      console.error("❌ Both Brevo API and SMTP failed:", { 
+        apiError: apiError.message, 
+        smtpError: smtpError.message 
+      });
       throw new Error(`Failed to send email via Brevo API and SMTP: API(${apiError.message}) SMTP(${smtpError.message})`);
     }
   }

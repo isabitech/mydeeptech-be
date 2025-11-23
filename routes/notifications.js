@@ -6,6 +6,71 @@ const router = express.Router();
 // User notification endpoints (placeholder for future implementation)
 
 /**
+ * Get notification summary
+ * GET /api/notifications/summary
+ */
+router.get('/summary', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.userId || req.user?.userId;
+    
+    console.log(`📊 User ${userId} requesting notification summary`);
+
+    // Get notification counts and summary data
+    const [totalNotifications, unreadCount, readCount, highPriorityCount, mediumPriorityCount, lowPriorityCount, recentNotifications] = await Promise.all([
+      Notification.countDocuments({ userId }),
+      Notification.countDocuments({ userId, isRead: false }),
+      Notification.countDocuments({ userId, isRead: true }),
+      Notification.countDocuments({ userId, priority: 'high' }),
+      Notification.countDocuments({ userId, priority: 'medium' }),
+      Notification.countDocuments({ userId, priority: 'low' }),
+      Notification.find({ userId, createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } }).countDocuments() // Last 24 hours
+    ]);
+
+    // Get type breakdown
+    const typeBreakdown = await Notification.aggregate([
+      { $match: { userId } },
+      { $group: { _id: '$type', count: { $sum: 1 } } },
+      { $sort: { count: -1 } }
+    ]);
+
+    // Get most recent notifications (last 3)
+    const latestNotifications = await Notification.find({ userId })
+      .sort({ createdAt: -1 })
+      .limit(3)
+      .select('title message type priority createdAt isRead');
+
+    res.status(200).json({
+      success: true,
+      message: "Notification summary retrieved successfully",
+      data: {
+        totalNotifications,
+        unreadCount,
+        readCount,
+        recentCount: recentNotifications,
+        priorityBreakdown: {
+          high: highPriorityCount,
+          medium: mediumPriorityCount,
+          low: lowPriorityCount
+        },
+        typeBreakdown: typeBreakdown.reduce((acc, item) => {
+          acc[item._id] = item.count;
+          return acc;
+        }, {}),
+        latestNotifications,
+        lastUpdated: new Date()
+      }
+    });
+  } catch (error) {
+    console.error("❌ Error fetching notification summary:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error fetching notification summary",
+      error: error.message
+    });
+  }
+});
+
+/**
  * Get user's notifications
  * GET /api/notifications
  */
