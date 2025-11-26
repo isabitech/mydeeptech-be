@@ -574,7 +574,10 @@ const updateDTUserProfile = async (req, res) => {
     if (req.body.personalInfo) {
       updateData.personal_info = {
         ...user.personal_info?.toObject(),
-        ...req.body.personalInfo
+        country: req.body.personalInfo.country !== undefined ? req.body.personalInfo.country : user.personal_info?.country,
+        time_zone: req.body.personalInfo.timeZone !== undefined ? req.body.personalInfo.timeZone : user.personal_info?.time_zone,
+        available_hours_per_week: req.body.personalInfo.availableHoursPerWeek !== undefined ? req.body.personalInfo.availableHoursPerWeek : user.personal_info?.available_hours_per_week,
+        preferred_communication_channel: req.body.personalInfo.preferredCommunicationChannel !== undefined ? req.body.personalInfo.preferredCommunicationChannel : user.personal_info?.preferred_communication_channel
       };
     }
 
@@ -582,7 +585,11 @@ const updateDTUserProfile = async (req, res) => {
     if (req.body.paymentInfo) {
       updateData.payment_info = {
         ...user.payment_info?.toObject(),
-        ...req.body.paymentInfo
+        account_name: req.body.paymentInfo.accountName !== undefined ? req.body.paymentInfo.accountName : user.payment_info?.account_name,
+        account_number: req.body.paymentInfo.accountNumber !== undefined ? req.body.paymentInfo.accountNumber : user.payment_info?.account_number,
+        bank_name: req.body.paymentInfo.bankName !== undefined ? req.body.paymentInfo.bankName : user.payment_info?.bank_name,
+        payment_method: req.body.paymentInfo.paymentMethod !== undefined ? req.body.paymentInfo.paymentMethod : user.payment_info?.payment_method,
+        payment_currency: req.body.paymentInfo.paymentCurrency !== undefined ? req.body.paymentInfo.paymentCurrency : user.payment_info?.payment_currency
       };
     }
 
@@ -590,7 +597,9 @@ const updateDTUserProfile = async (req, res) => {
     if (req.body.professionalBackground) {
       updateData.professional_background = {
         ...user.professional_background?.toObject(),
-        ...req.body.professionalBackground
+        education_field: req.body.professionalBackground.educationField !== undefined ? req.body.professionalBackground.educationField : user.professional_background?.education_field,
+        years_of_experience: req.body.professionalBackground.yearsOfExperience !== undefined ? req.body.professionalBackground.yearsOfExperience : user.professional_background?.years_of_experience,
+        annotation_experience_types: req.body.professionalBackground.annotationExperienceTypes !== undefined ? req.body.professionalBackground.annotationExperienceTypes : user.professional_background?.annotation_experience_types
       };
     }
 
@@ -608,7 +617,9 @@ const updateDTUserProfile = async (req, res) => {
     if (req.body.languageProficiency) {
       updateData.language_proficiency = {
         ...user.language_proficiency?.toObject(),
-        ...req.body.languageProficiency
+        primary_language: req.body.languageProficiency.primaryLanguage !== undefined ? req.body.languageProficiency.primaryLanguage : user.language_proficiency?.primary_language,
+        other_languages: req.body.languageProficiency.otherLanguages !== undefined ? req.body.languageProficiency.otherLanguages : user.language_proficiency?.other_languages,
+        english_fluency_level: req.body.languageProficiency.englishFluencyLevel !== undefined ? req.body.languageProficiency.englishFluencyLevel : user.language_proficiency?.english_fluency_level
       };
     }
 
@@ -616,7 +627,12 @@ const updateDTUserProfile = async (req, res) => {
     if (req.body.systemInfo) {
       updateData.system_info = {
         ...user.system_info?.toObject(),
-        ...req.body.systemInfo
+        device_type: req.body.systemInfo.deviceType !== undefined ? req.body.systemInfo.deviceType : user.system_info?.device_type,
+        operating_system: req.body.systemInfo.operatingSystem !== undefined ? req.body.systemInfo.operatingSystem : user.system_info?.operating_system,
+        internet_speed_mbps: req.body.systemInfo.internetSpeedMbps !== undefined ? req.body.systemInfo.internetSpeedMbps : user.system_info?.internet_speed_mbps,
+        power_backup: req.body.systemInfo.powerBackup !== undefined ? req.body.systemInfo.powerBackup : user.system_info?.power_backup,
+        has_webcam: req.body.systemInfo.hasWebcam !== undefined ? req.body.systemInfo.hasWebcam : user.system_info?.has_webcam,
+        has_microphone: req.body.systemInfo.hasMicrophone !== undefined ? req.body.systemInfo.hasMicrophone : user.system_info?.has_microphone
       };
     }
 
@@ -624,7 +640,9 @@ const updateDTUserProfile = async (req, res) => {
     if (req.body.projectPreferences) {
       updateData.project_preferences = {
         ...user.project_preferences?.toObject(),
-        ...req.body.projectPreferences
+        domains_of_interest: req.body.projectPreferences.domainsOfInterest !== undefined ? req.body.projectPreferences.domainsOfInterest : user.project_preferences?.domains_of_interest,
+        availability_type: req.body.projectPreferences.availabilityType !== undefined ? req.body.projectPreferences.availabilityType : user.project_preferences?.availability_type,
+        nda_signed: req.body.projectPreferences.ndaSigned !== undefined ? req.body.projectPreferences.ndaSigned : user.project_preferences?.nda_signed
       };
     }
 
@@ -632,7 +650,9 @@ const updateDTUserProfile = async (req, res) => {
     if (req.body.attachments) {
       updateData.attachments = {
         ...user.attachments?.toObject(),
-        ...req.body.attachments
+        resume_url: req.body.attachments.resumeUrl !== undefined ? req.body.attachments.resumeUrl : user.attachments?.resume_url,
+        id_document_url: req.body.attachments.idDocumentUrl !== undefined ? req.body.attachments.idDocumentUrl : user.attachments?.id_document_url,
+        work_samples_url: req.body.attachments.workSamplesUrl !== undefined ? req.body.attachments.workSamplesUrl : user.attachments?.work_samples_url
       };
     }
 

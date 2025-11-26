@@ -36,6 +36,7 @@ const initializeSocketIO = (server) => {
       // Check if it's a user or admin
       let user = await DTUser.findById(decoded.userId);
       let userType = 'dtuser';
+      let isAdmin = false;
       
       if (!user) {
         user = await User.findById(decoded.userId);
@@ -46,8 +47,12 @@ const initializeSocketIO = (server) => {
         return next(new Error('User not found'));
       }
 
+      // Check if user is admin by email domain
+      isAdmin = user.email && user.email.includes('@mydeeptech.ng');
+
       socket.userId = decoded.userId;
       socket.userType = userType;
+      socket.isAdmin = isAdmin;
       socket.userEmail = user.email;
       socket.userName = user.fullName || user.username;
       
@@ -61,11 +66,13 @@ const initializeSocketIO = (server) => {
     console.log(`🔗 User connected: ${socket.userName} (${socket.userId})`);
     
     // Track connected users/admins
-    if (socket.userType === 'dtuser') {
+    if (socket.isAdmin) {
       connectedAdmins.set(socket.userId, socket.id);
       socket.join('admins'); // Join admin room for broadcasts
+      console.log(`👨‍💼 Admin connected: ${socket.userName} (${socket.userEmail})`);
     } else {
       connectedUsers.set(socket.userId, socket.id);
+      console.log(`👤 User connected: ${socket.userName} (${socket.userEmail})`);
     }
 
     // Join user to their personal room for targeted messages
@@ -297,12 +304,12 @@ const initializeSocketIO = (server) => {
           return;
         }
 
-        const isAdminReply = connectedAdmins.has(socket.userId);
+        const isAdminReply = socket.isAdmin;
 
         // Add message to ticket
         const newMessage = {
           sender: socket.userId,
-          senderModel: socket.userType === 'dtuser' ? 'DTUser' : 'User',
+          senderModel: socket.isAdmin ? 'Admin' : (socket.userType === 'dtuser' ? 'DTUser' : 'User'),
           message,
           isAdminReply,
           timestamp: new Date(),
@@ -507,7 +514,7 @@ const initializeSocketIO = (server) => {
     socket.on('disconnect', () => {
       console.log(`🔌 User disconnected: ${socket.userName}`);
       
-      if (socket.userType === 'dtuser') {
+      if (socket.isAdmin) {
         connectedAdmins.delete(socket.userId);
       } else {
         connectedUsers.delete(socket.userId);
