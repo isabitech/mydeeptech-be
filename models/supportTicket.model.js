@@ -96,7 +96,7 @@ const supportTicketSchema = new mongoose.Schema({
     senderModel: {
       type: String,
       required: true,
-      enum: ['User', 'DTUser']
+      enum: ['User', 'DTUser', 'Admin']
     },
     message: {
       type: String,

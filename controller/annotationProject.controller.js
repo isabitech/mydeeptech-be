@@ -1249,6 +1249,93 @@ const getRemovableApplicants = async (req, res) => {
   }
 };
 
+// Admin function: Export approved annotators to CSV
+const exportApprovedAnnotatorsCSV = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    
+    console.log(`📊 Admin ${req.admin.email} exporting approved annotators for project: ${projectId}`);
+
+    // Find the project
+    const project = await AnnotationProject.findById(projectId);
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found"
+      });
+    }
+
+    console.log(`📋 Found project: ${project.projectName}`);
+
+    // Get all approved applications for this project
+    const approvedApplications = await ProjectApplication.find({
+      projectId: projectId,
+      status: 'approved'
+    })
+    .populate({
+      path: 'applicantId',
+      select: 'fullName email phone personal_info'
+    })
+    .sort({ reviewedAt: -1 });
+
+    console.log(`✅ Found ${approvedApplications.length} approved annotators`);
+
+    if (approvedApplications.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No approved annotators found for this project"
+      });
+    }
+
+    // Prepare CSV data
+    const csvHeaders = ['Full Name', 'Country', 'Email'];
+    const csvRows = [csvHeaders.join(',')];
+
+    // Process each approved application
+    approvedApplications.forEach(app => {
+      const applicant = app.applicantId;
+      const personalInfo = applicant.personal_info || {};
+      
+      const row = [
+        `"${applicant.fullName || 'N/A'}"`,
+        `"${personalInfo.country || 'N/A'}"`,
+        `"${applicant.email || 'N/A'}"`
+      ];
+      
+      csvRows.push(row.join(','));
+    });
+
+    // Generate CSV content
+    const csvContent = csvRows.join('\n');
+    
+    // Create filename with project name and timestamp
+    const timestamp = new Date().toISOString().split('T')[0];
+    const sanitizedProjectName = project.projectName
+      .replace(/[^a-zA-Z0-9\s]/g, '')
+      .replace(/\s+/g, '_')
+      .toLowerCase();
+    const filename = `${sanitizedProjectName}_approved_annotators_${timestamp}.csv`;
+
+    // Set response headers for CSV download
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+    
+    console.log(`📄 Sending CSV file: ${filename} with ${approvedApplications.length} annotators`);
+
+    // Send CSV content
+    res.status(200).send(csvContent);
+
+  } catch (error) {
+    console.error('❌ Error exporting approved annotators:', error);
+    res.status(500).json({
+      success: false,
+      message: "Server error exporting annotators",
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   createAnnotationProject,
   getAllAnnotationProjects,
@@ -1261,5 +1348,6 @@ module.exports = {
   approveAnnotationProjectApplication,
   rejectAnnotationProjectApplication,
   removeApprovedApplicant,
-  getRemovableApplicants
+  getRemovableApplicants,
+  exportApprovedAnnotatorsCSV
 };
