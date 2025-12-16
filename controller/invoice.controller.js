@@ -206,7 +206,7 @@ const getAllInvoices = async (req, res) => {
     // Get invoices with populated data
     const invoices = await Invoice.find(filter)
       .populate('projectId', 'projectName projectCategory')
-      .populate('dtUserId', 'fullName email phone')
+      .populate('dtUserId', 'fullName email phone payment_info')
       .populate('createdBy', 'fullName email')
       .sort({ createdAt: -1 })
       .skip(skip)
@@ -298,7 +298,7 @@ const getInvoiceDetails = async (req, res) => {
 
     const invoice = await Invoice.findById(invoiceId)
       .populate('projectId', 'projectName projectDescription projectCategory')
-      .populate('dtUserId', 'fullName email phone skills')
+      .populate('dtUserId', 'fullName email phone payment_info')
       .populate('createdBy', 'fullName email')
       .populate('approvedBy', 'fullName email');
 
@@ -346,7 +346,7 @@ const updatePaymentStatus = async (req, res) => {
     }
 
     const invoice = await Invoice.findById(invoiceId)
-      .populate('dtUserId', 'fullName email')
+      .populate('dtUserId', 'fullName email payment_info')
       .populate('projectId', 'projectName');
 
     if (!invoice) {
