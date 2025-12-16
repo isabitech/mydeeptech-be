@@ -566,12 +566,14 @@ const updateDTUserProfile = async (req, res) => {
     }
 
     console.log(`✅ User ${user.email} is ${user.annotatorStatus}, proceeding with update`);
+    console.log(`📊 Request body received:`, JSON.stringify(req.body, null, 2));
 
     // Prepare update object
     const updateData = {};
     
     // Update personal info
     if (req.body.personalInfo) {
+      console.log(`🔄 Updating personal info...`);
       updateData.personal_info = {
         ...user.personal_info?.toObject(),
         country: req.body.personalInfo.country !== undefined ? req.body.personalInfo.country : user.personal_info?.country,
@@ -583,6 +585,10 @@ const updateDTUserProfile = async (req, res) => {
 
     // Update payment info
     if (req.body.paymentInfo) {
+      console.log(`💳 Updating payment info...`);
+      console.log(`💳 Current payment_info:`, user.payment_info);
+      console.log(`💳 Incoming paymentInfo:`, req.body.paymentInfo);
+      
       updateData.payment_info = {
         ...user.payment_info?.toObject(),
         account_name: req.body.paymentInfo.accountName !== undefined ? req.body.paymentInfo.accountName : user.payment_info?.account_name,
@@ -591,6 +597,8 @@ const updateDTUserProfile = async (req, res) => {
         payment_method: req.body.paymentInfo.paymentMethod !== undefined ? req.body.paymentInfo.paymentMethod : user.payment_info?.payment_method,
         payment_currency: req.body.paymentInfo.paymentCurrency !== undefined ? req.body.paymentInfo.paymentCurrency : user.payment_info?.payment_currency
       };
+      
+      console.log(`💳 Prepared payment_info update:`, updateData.payment_info);
     }
 
     // Update professional background
@@ -656,6 +664,8 @@ const updateDTUserProfile = async (req, res) => {
       };
     }
 
+    console.log(`🔄 Final updateData being sent to MongoDB:`, JSON.stringify(updateData, null, 2));
+
     // Perform the update
     const updatedUser = await DTUser.findByIdAndUpdate(
       userId,
@@ -664,6 +674,7 @@ const updateDTUserProfile = async (req, res) => {
     );
 
     console.log(`✅ Profile updated successfully for user: ${user.email}`);
+    console.log(`💳 Final payment_info in database:`, updatedUser.payment_info);
 
     // Return updated profile in the same format as getDTUserProfile
     const profileData = {

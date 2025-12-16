@@ -1,6 +1,6 @@
 const express = require('express');
 const { getAllDTUsers, getAllAdminUsers, getAdminDashboard, approveAnnotator, rejectAnnotator, getDTUserAdmin, createAdmin, requestAdminVerification, confirmAdminVerification, verifyAdminOTP, adminLogin } = require('../controller/dtUser.controller.js');
-const { createAnnotationProject, getAllAnnotationProjects, getAnnotationProjectDetails, updateAnnotationProject, deleteAnnotationProject, requestProjectDeletionOTP, verifyOTPAndDeleteProject, getAnnotationProjectApplications, approveAnnotationProjectApplication, rejectAnnotationProjectApplication, removeApprovedApplicant, getRemovableApplicants } = require('../controller/annotationProject.controller.js');
+const { createAnnotationProject, getAllAnnotationProjects, getAnnotationProjectDetails, updateAnnotationProject, deleteAnnotationProject, requestProjectDeletionOTP, verifyOTPAndDeleteProject, getAnnotationProjectApplications, approveAnnotationProjectApplication, rejectAnnotationProjectApplication, removeApprovedApplicant, getRemovableApplicants, exportApprovedAnnotatorsCSV } = require('../controller/annotationProject.controller.js');
 const { createInvoice, getAllInvoices, getInvoiceDetails, updatePaymentStatus, sendInvoiceReminder, deleteInvoice } = require('../controller/invoice.controller.js');
 const { getAdminNotifications, createAnnouncement, getNotificationStats, cleanupNotifications, broadcastNotification } = require('../controller/notification.controller.js');
 const { getAdminAssessments } = require('../controller/assessment.controller.js');
@@ -49,6 +49,7 @@ router.delete('/applications/:applicationId/remove', authenticateAdmin, removeAp
 
 // Project Applicant Management Routes
 router.get('/projects/:projectId/removable-applicants', authenticateAdmin, getRemovableApplicants);
+router.get('/projects/:projectId/export-approved-csv', authenticateAdmin, exportApprovedAnnotatorsCSV);
 
 // Invoice Management Routes
 router.post('/invoices', authenticateAdmin, createInvoice);
