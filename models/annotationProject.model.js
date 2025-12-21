@@ -230,6 +230,34 @@ const annotationProjectSchema = new mongoose.Schema(
         ref: "DTUser",
         default: null 
       }
+    },
+
+    // Assessment configuration (optional)
+    assessment: {
+      isRequired: {
+        type: Boolean,
+        default: false
+      },
+      assessmentId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "MultimediaAssessmentConfig",
+        default: null
+      },
+      assessmentInstructions: {
+        type: String,
+        maxlength: 1000,
+        default: ''
+      },
+      // When assessment was attached to project
+      attachedAt: {
+        type: Date,
+        default: null
+      },
+      attachedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "DTUser",
+        default: null
+      }
     }
   },
   { timestamps: true }

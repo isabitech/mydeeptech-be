@@ -16,7 +16,10 @@
     "sample-from-file": "node scripts/seedFromFile.js sample",
     "stats-from-file": "node scripts/seedFromFile.js stats",
     "validate-file": "node scripts/seedFromFile.js validate",
-    "manage-questions": "node scripts/questionManager.js"
+    "manage-questions": "node scripts/questionManager.js",
+    "add-qa-status": "node scripts/addQaStatusToUsers.js update",
+    "check-qa-status": "node scripts/addQaStatusToUsers.js check",
+    "update-qa-categories": "node scripts/updateQaStatusToThreeCategories.js"
   },
   "author": "Wura",
   "license": "ISC",

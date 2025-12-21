@@ -1336,6 +1336,182 @@ const exportApprovedAnnotatorsCSV = async (req, res) => {
   }
 };
 
+/**
+ * Admin function: Attach or update multimedia assessment to project
+ */
+const attachAssessmentToProject = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { assessmentId, isRequired = true, assessmentInstructions = '' } = req.body;
+    
+    console.log(`🎯 Admin ${req.admin.email} attaching assessment ${assessmentId} to project: ${projectId}`);
+
+    // Validate inputs
+    if (!assessmentId) {
+      return res.status(400).json({
+        success: false,
+        message: "Assessment ID is required"
+      });
+    }
+
+    // Check if project exists
+    const project = await AnnotationProject.findById(projectId);
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found"
+      });
+    }
+
+    // Check if assessment configuration exists
+    const MultimediaAssessmentConfig = require('../models/multimediaAssessmentConfig.model');
+    const assessmentConfig = await MultimediaAssessmentConfig.findById(assessmentId);
+    if (!assessmentConfig) {
+      return res.status(404).json({
+        success: false,
+        message: "Assessment configuration not found"
+      });
+    }
+
+    // Update project with assessment configuration
+    const adminId = req.admin?.userId || req.userId || req.admin?.userDoc?._id;
+    
+    project.assessment = {
+      isRequired,
+      assessmentId,
+      assessmentInstructions,
+      attachedAt: new Date(),
+      attachedBy: adminId
+    };
+
+    await project.save();
+
+    // Populate the assessment config for response
+    await project.populate('assessment.assessmentId', 'title description numberOfTasks estimatedDuration');
+
+    console.log(`✅ Assessment ${assessmentConfig.title} attached to project: ${project.projectName}`);
+
+    res.json({
+      success: true,
+      message: `Assessment "${assessmentConfig.title}" attached to project successfully`,
+      data: {
+        project: {
+          id: project._id,
+          name: project.projectName,
+          assessment: project.assessment
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error attaching assessment to project:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to attach assessment to project',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Admin function: Remove assessment from project
+ */
+const removeAssessmentFromProject = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    
+    console.log(`🗑️ Admin ${req.admin.email} removing assessment from project: ${projectId}`);
+
+    // Find and update project
+    const project = await AnnotationProject.findById(projectId);
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Project not found"
+      });
+    }
+
+    const wasRequired = project.assessment?.isRequired;
+    
+    // Clear assessment configuration
+    project.assessment = {
+      isRequired: false,
+      assessmentId: null,
+      assessmentInstructions: '',
+      attachedAt: null,
+      attachedBy: null
+    };
+
+    await project.save();
+
+    console.log(`✅ Assessment removed from project: ${project.projectName}`);
+
+    res.json({
+      success: true,
+      message: "Assessment removed from project successfully",
+      data: {
+        project: {
+          id: project._id,
+          name: project.projectName,
+          hadAssessment: wasRequired
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error removing assessment from project:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to remove assessment from project',
+      error: error.message
+    });
+  }
+};
+
+/**
+ * Admin function: Get available assessment configurations
+ */
+const getAvailableAssessments = async (req, res) => {
+  try {
+    console.log(`📋 Admin ${req.admin.email} fetching available assessments`);
+
+    const MultimediaAssessmentConfig = require('../models/multimediaAssessmentConfig.model');
+    
+    const assessments = await MultimediaAssessmentConfig.find({ isActive: true })
+      .populate('projectId', 'projectName')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const formattedAssessments = assessments.map(assessment => ({
+      id: assessment._id,
+      title: assessment.title,
+      description: assessment.description,
+      numberOfTasks: assessment.numberOfTasks,
+      estimatedDuration: assessment.estimatedDuration,
+      maxRetries: assessment.maxRetries,
+      isActive: assessment.isActive,
+      createdAt: assessment.createdAt,
+      // Usage statistics
+      usageCount: assessment.statistics?.totalSubmissions || 0,
+      approvalRate: assessment.statistics?.totalSubmissions > 0 ? 
+        (assessment.statistics.approvedSubmissions / assessment.statistics.totalSubmissions * 100).toFixed(1) : 0
+    }));
+
+    res.json({
+      success: true,
+      message: `Found ${formattedAssessments.length} available assessments`,
+      data: {
+        assessments: formattedAssessments
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching available assessments:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch available assessments',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   createAnnotationProject,
   getAllAnnotationProjects,
@@ -1349,5 +1525,8 @@ module.exports = {
   rejectAnnotationProjectApplication,
   removeApprovedApplicant,
   getRemovableApplicants,
-  exportApprovedAnnotatorsCSV
+  exportApprovedAnnotatorsCSV,
+  attachAssessmentToProject,
+  removeAssessmentFromProject,
+  getAvailableAssessments
 };

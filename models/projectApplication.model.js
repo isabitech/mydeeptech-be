@@ -17,7 +17,7 @@ const projectApplicationSchema = new mongoose.Schema(
     // Application status and timeline
     status: {
       type: String,
-      enum: ["pending", "approved", "rejected", "withdrawn", "removed"],
+      enum: ["pending", "approved", "rejected", "withdrawn", "removed", "assessment_required"],
       default: "pending"
     },
     appliedAt: {
@@ -135,6 +135,22 @@ const projectApplicationSchema = new mongoose.Schema(
       type: String,
       maxlength: 500,
       default: ""
+    },
+
+    // Assessment tracking (for projects that require assessments)
+    assessmentCompletedAt: {
+      type: Date,
+      default: null
+    },
+    assessmentSubmissionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'MultimediaAssessmentSubmission',
+      default: null
+    },
+    assessmentResult: {
+      type: String,
+      enum: ['pending', 'passed', 'failed', 'not_required'],
+      default: 'not_required'
     }
   },
   { timestamps: true }

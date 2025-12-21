@@ -1,9 +1,9 @@
 const express = require('express');
-const { getAllDTUsers, getAllAdminUsers, getAdminDashboard, approveAnnotator, rejectAnnotator, getDTUserAdmin, createAdmin, requestAdminVerification, confirmAdminVerification, verifyAdminOTP, adminLogin } = require('../controller/dtUser.controller.js');
+const { getAllDTUsers, getAllAdminUsers, getAdminDashboard, approveAnnotator, approveUserForQA, rejectUserForQA, getAllQAUsers, rejectAnnotator, getDTUserAdmin, createAdmin, requestAdminVerification, confirmAdminVerification, verifyAdminOTP, adminLogin } = require('../controller/dtUser.controller.js');
 const { createAnnotationProject, getAllAnnotationProjects, getAnnotationProjectDetails, updateAnnotationProject, deleteAnnotationProject, requestProjectDeletionOTP, verifyOTPAndDeleteProject, getAnnotationProjectApplications, approveAnnotationProjectApplication, rejectAnnotationProjectApplication, removeApprovedApplicant, getRemovableApplicants, exportApprovedAnnotatorsCSV } = require('../controller/annotationProject.controller.js');
 const { createInvoice, getAllInvoices, getInvoiceDetails, updatePaymentStatus, sendInvoiceReminder, deleteInvoice } = require('../controller/invoice.controller.js');
 const { getAdminNotifications, createAnnouncement, getNotificationStats, cleanupNotifications, broadcastNotification } = require('../controller/notification.controller.js');
-const { getAdminAssessments } = require('../controller/assessment.controller.js');
+const { getAdminAssessments, getAdminAssessmentsOverview } = require('../controller/assessment.controller.js');
 const { authenticateAdmin } = require('../middleware/adminAuth.js');
 
 const router = express.Router();
@@ -28,6 +28,9 @@ router.get('/dtusers', authenticateAdmin, getAllDTUsers);
 router.get('/admin-users', authenticateAdmin, getAllAdminUsers);
 router.get('/dtusers/:userId', authenticateAdmin, getDTUserAdmin);
 router.patch('/dtusers/:userId/approve', authenticateAdmin, approveAnnotator);
+router.patch('/dtusers/:userId/qa-approve', authenticateAdmin, approveUserForQA);
+router.patch('/dtusers/:userId/qa-reject', authenticateAdmin, rejectUserForQA);
+router.get('/qa-users', authenticateAdmin, getAllQAUsers);
 router.patch('/dtusers/:userId/reject', authenticateAdmin, rejectAnnotator);
 
 // Project Management Routes
@@ -74,5 +77,6 @@ router.post('/notifications/broadcast', authenticateAdmin, broadcastNotification
 
 // Assessment Management Routes
 router.get('/assessments', authenticateAdmin, getAdminAssessments);
+router.get('/assessments/overview', authenticateAdmin, getAdminAssessmentsOverview);
 
 module.exports = router;

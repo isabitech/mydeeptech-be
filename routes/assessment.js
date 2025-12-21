@@ -7,7 +7,12 @@ const {
   getUserAssessmentHistory,
   checkRetakeEligibility,
   getAdminAssessments,
-  getAssessmentQuestions
+  getAssessmentQuestions,
+  getAllAssessments,
+  startAssessmentById,
+  getAssessmentSubmissions,
+  getAdminAssessmentsOverview,
+  getUserAssessmentsOverview
 } = require('../controller/assessment.controller');
 
 // Import middleware
@@ -25,6 +30,31 @@ const { authenticateAdmin } = require('../middleware/adminAuth');
  * @query assessmentType, difficulty, category, limit
  */
 router.get('/questions', authenticateToken, getAssessmentQuestions);
+
+/**
+ * @route GET /api/assessments/available
+ * @desc Get all available assessments (English & Multimedia)
+ * @access Private (User)
+ * @returns List of assessments user can take with status and requirements
+ */
+router.get('/available', authenticateToken, getAllAssessments);
+
+/**
+ * @route POST /api/assessments/start/:assessmentId
+ * @desc Start an assessment by ID (english-proficiency or multimedia ID)
+ * @access Private (User)
+ * @param assessmentId - 'english-proficiency' or multimedia assessment ObjectId
+ * @returns Assessment questions/session or error if not eligible
+ */
+router.post('/start/:assessmentId', authenticateToken, startAssessmentById);
+
+/**
+ * @route GET /api/assessments/overview
+ * @desc Get user's personal assessment overview with progress and recommendations
+ * @access Private (User)
+ * @returns User's assessment progress, scores, and personalized recommendations
+ */
+router.get('/overview', authenticateToken, getUserAssessmentsOverview);
 
 /**
  * @route POST /api/assessments/submit
@@ -69,5 +99,23 @@ router.get('/retake-eligibility', authenticateToken, checkRetakeEligibility);
  * @query page, limit, assessmentType, passed, userId
  */
 router.get('/admin', authenticateAdmin, getAdminAssessments);
+
+/**
+ * @route GET /api/admin/assessments/overview
+ * @desc Get all assessment types with aggregate statistics (Admin only)
+ * @access Private (Admin)
+ * @returns Overview of all assessment types with comprehensive statistics
+ */
+router.get('/admin/overview', authenticateAdmin, getAdminAssessmentsOverview);
+
+/**
+ * @route GET /api/assessments/:assessmentId/submissions
+ * @desc Get assessment submissions by assessment ID
+ * @access Private (User - own submissions, Admin - all submissions)
+ * @param assessmentId - 'english-proficiency' or multimedia assessment ObjectId
+ * @query page, limit, status, userId (admin only), sortBy, sortOrder
+ * @returns List of submissions for the specified assessment
+ */
+router.get('/:assessmentId/submissions', authenticateToken, getAssessmentSubmissions);
 
 module.exports = router;

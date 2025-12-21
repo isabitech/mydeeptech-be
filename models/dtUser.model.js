@@ -65,6 +65,16 @@ const dtUserSchema = new mongoose.Schema(
       enum: ["pending", "submitted", "verified", "approved", "rejected"],
       default: "pending",
     },
+    qaStatus: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
+    },
+    multimediaAssessmentStatus: {
+      type: String,
+      enum: ["not_started", "in_progress", "submitted", "under_review", "passed", "failed"],
+      default: "not_started",
+    },
     resultLink: { type: String, default: "" },
 
     // Result submissions and storage

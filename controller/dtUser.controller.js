@@ -263,6 +263,7 @@ const setupPassword = async (req, res) => {
         hasSetPassword: user.hasSetPassword,
         annotatorStatus: user.annotatorStatus,
         microTaskerStatus: user.microTaskerStatus,
+        qaStatus: user.qaStatus,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt
       }
@@ -397,6 +398,7 @@ const dtUserLogin = async (req, res) => {
         hasSetPassword: user.hasSetPassword,
         annotatorStatus: user.annotatorStatus,
         microTaskerStatus: user.microTaskerStatus,
+        qaStatus: user.qaStatus,
         resultLink: user.resultLink,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt
@@ -444,6 +446,7 @@ const getDTUserProfile = async (req, res) => {
       consent: user.consent,
       annotatorStatus: user.annotatorStatus,
       microTaskerStatus: user.microTaskerStatus,
+      qaStatus: user.qaStatus,
       isEmailVerified: user.isEmailVerified,
       hasSetPassword: user.hasSetPassword,
       resultLink: user.resultLink,
@@ -838,6 +841,7 @@ const resetDTUserPassword = async (req, res) => {
         fullName: user.fullName,
         email: user.email,
         hasSetPassword: true,
+        qaStatus: user.qaStatus,
         updatedAt: user.updatedAt
       }
     });
@@ -1338,7 +1342,7 @@ const getAdminDashboard = async (req, res) => {
     })
     .sort({ createdAt: -1 })
     .limit(10)
-    .select('fullName email annotatorStatus microTaskerStatus createdAt isEmailVerified');
+    .select('fullName email annotatorStatus microTaskerStatus qaStatus createdAt isEmailVerified');
 
     const recentProjects = await AnnotationProject.find()
       .sort({ createdAt: -1 })
@@ -1563,6 +1567,262 @@ const approveAnnotator = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error updating annotator status",
+      error: error.message,
+    });
+  }
+};
+
+// Admin function: Get all QA users with their status
+const getAllQAUsers = async (req, res) => {
+  try {
+    console.log(`🔍 Admin ${req.admin.email} requesting all QA users`);
+
+    // Query parameters for filtering and pagination
+    const { qaStatus, page = 1, limit = 50, search } = req.query;
+    const skip = (page - 1) * limit;
+
+    // Build filter query
+    let filterQuery = {};
+    
+    // Filter by qaStatus if provided
+    if (qaStatus && ['pending', 'approved', 'rejected'].includes(qaStatus)) {
+      filterQuery.qaStatus = qaStatus;
+    }
+
+    // Search functionality (name, email)
+    if (search) {
+      filterQuery.$or = [
+        { fullName: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    console.log(`📊 Filter query:`, JSON.stringify(filterQuery));
+
+    // Get total count for pagination
+    const totalUsers = await DTUser.countDocuments(filterQuery);
+    
+    // Fetch QA users with pagination
+    const qaUsers = await DTUser.find(filterQuery)
+      .select('fullName email qaStatus annotatorStatus microTaskerStatus createdAt updatedAt phoneNumber country')
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    // Calculate status counts
+    const statusCounts = await DTUser.aggregate([
+      { $match: search ? filterQuery : {} },
+      {
+        $group: {
+          _id: '$qaStatus',
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const counts = {
+      pending: 0,
+      approved: 0,
+      rejected: 0,
+      total: totalUsers
+    };
+
+    statusCounts.forEach(status => {
+      counts[status._id] = status.count;
+    });
+
+    console.log(`✅ Retrieved ${qaUsers.length} QA users (page ${page}, total: ${totalUsers})`);
+    console.log(`📊 Status distribution:`, counts);
+
+    // Return paginated results
+    res.status(200).json({
+      success: true,
+      message: `Retrieved ${qaUsers.length} QA users successfully`,
+      data: {
+        qaUsers,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(totalUsers / limit),
+          totalUsers,
+          usersPerPage: parseInt(limit),
+          hasNextPage: page * limit < totalUsers,
+          hasPrevPage: page > 1
+        },
+        statusCounts: counts,
+        filters: {
+          qaStatus: qaStatus || 'all',
+          search: search || null
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error fetching QA users:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error fetching QA users",
+      error: error.message,
+    });
+  }
+};
+
+// Admin function: Approve user for QA status
+const approveUserForQA = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    console.log(`🔍 Admin ${req.admin.email} attempting to approve QA status for user: ${userId}`);
+
+    // Validate user ID format
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID format"
+      });
+    }
+
+    // Find the user
+    const user = await DTUser.findById(userId);
+    if (!user) {
+      console.log(`❌ User not found: ${userId}`);
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    // Check current QA status
+    const previousQAStatus = user.qaStatus;
+    console.log(`📋 Current QA status for ${user.email}: ${previousQAStatus}`);
+
+    // Check if user is already approved for QA
+    if (user.qaStatus === 'approved') {
+      return res.status(400).json({
+        success: false,
+        message: "User is already approved for QA status",
+        data: {
+          userId: user._id,
+          fullName: user.fullName,
+          email: user.email,
+          currentQAStatus: user.qaStatus
+        }
+      });
+    }
+
+    // Update QA status to approved
+    user.qaStatus = 'approved';
+    await user.save();
+
+    console.log(`✅ Successfully approved QA status for ${user.email} (${previousQAStatus} → approved)`);
+
+    // TODO: Send QA approval notification email (implement when QA email templates are ready)
+    // try {
+    //   await sendQAApprovalEmail(user.email, user.fullName);
+    //   console.log(`📧 QA approval email sent to: ${user.email}`);
+    // } catch (emailError) {
+    //   console.error(`❌ Failed to send QA approval email to ${user.email}:`, emailError);
+    // }
+
+    // Return success response
+    res.status(200).json({
+      success: true,
+      message: `QA status approved successfully for ${user.fullName}`,
+      data: {
+        userId: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        previousQAStatus: previousQAStatus,
+        newQAStatus: user.qaStatus,
+        annotatorStatus: user.annotatorStatus,
+        microTaskerStatus: user.microTaskerStatus,
+        updatedAt: user.updatedAt,
+        approvedBy: req.admin.email
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error approving QA status:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error updating QA status",
+      error: error.message,
+    });
+  }
+};
+
+// Admin function: Reject user for QA status
+const rejectUserForQA = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { reason } = req.body; // Optional rejection reason
+
+    console.log(`🔍 Admin ${req.admin.email} attempting to reject QA status for user: ${userId}`);
+
+    // Validate user ID format
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid user ID format"
+      });
+    }
+
+    // Find the user
+    const user = await DTUser.findById(userId);
+    if (!user) {
+      console.log(`❌ User not found: ${userId}`);
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    // Check current QA status
+    const previousQAStatus = user.qaStatus;
+    console.log(`📋 Current QA status for ${user.email}: ${previousQAStatus}`);
+
+    // Check if user is already rejected
+    if (user.qaStatus === 'rejected') {
+      return res.status(400).json({
+        success: false,
+        message: "User QA status is already rejected",
+        data: {
+          userId: user._id,
+          fullName: user.fullName,
+          email: user.email,
+          currentQAStatus: user.qaStatus
+        }
+      });
+    }
+
+    // Update QA status to rejected
+    user.qaStatus = 'rejected';
+    await user.save();
+
+    console.log(`❌ Successfully rejected QA status for ${user.email} (${previousQAStatus} → rejected)`);
+
+    // Return success response
+    res.status(200).json({
+      success: true,
+      message: `QA status rejected for ${user.fullName}`,
+      data: {
+        userId: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        previousQAStatus: previousQAStatus,
+        newQAStatus: user.qaStatus,
+        annotatorStatus: user.annotatorStatus,
+        microTaskerStatus: user.microTaskerStatus,
+        updatedAt: user.updatedAt,
+        rejectedBy: req.admin.email,
+        reason: reason || null
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error rejecting QA status:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error updating QA status",
       error: error.message,
     });
   }
@@ -2152,6 +2412,7 @@ const verifyAdminOTP = async (req, res) => {
         hasSetPassword: admin.hasSetPassword,
         annotatorStatus: admin.annotatorStatus,
         microTaskerStatus: admin.microTaskerStatus,
+        qaStatus: admin.qaStatus,
         createdAt: admin.createdAt,
         isAdmin: true
       }
@@ -2246,6 +2507,7 @@ const adminLogin = async (req, res) => {
         hasSetPassword: admin.hasSetPassword,
         annotatorStatus: admin.annotatorStatus,
         microTaskerStatus: admin.microTaskerStatus,
+        qaStatus: admin.qaStatus,
         createdAt: admin.createdAt,
         isAdmin: true,
         role: admin.role || 'admin'
@@ -2690,7 +2952,94 @@ const applyToProject = async (req, res) => {
     // Validate application data
     const { coverLetter, proposedRate, availability, estimatedCompletionTime } = req.body;
 
-    // Create application
+    // Check if project requires multimedia assessment
+    const requiresAssessment = project.assessment?.isRequired && project.assessment?.assessmentId;
+    let assessmentTriggered = false;
+
+    if (requiresAssessment) {
+      // Check user's multimedia assessment status
+      console.log(`🎯 Project requires multimedia assessment. User status: ${user.multimediaAssessmentStatus}`);
+      
+      if (user.multimediaAssessmentStatus === 'approved') {
+        // User already passed assessment, proceed normally
+        console.log(`✅ User ${user.email} already approved for multimedia assessment`);
+      } else if (user.multimediaAssessmentStatus === 'failed') {
+        // Check if 24-hour cooldown has passed
+        const cooldownHours = 24;
+        const lastFailedAt = user.multimediaAssessmentLastFailedAt || new Date(0);
+        const cooldownEnd = new Date(lastFailedAt.getTime() + cooldownHours * 60 * 60 * 1000);
+        
+        if (new Date() < cooldownEnd) {
+          return res.status(400).json({
+            success: false,
+            message: "Assessment retake cooldown active",
+            error: {
+              code: "ASSESSMENT_COOLDOWN_ACTIVE",
+              cooldownEndsAt: cooldownEnd,
+              hoursRemaining: Math.ceil((cooldownEnd - new Date()) / (60 * 60 * 1000))
+            }
+          });
+        }
+        
+        console.log(`🔄 User ${user.email} eligible for assessment retake after cooldown`);
+      }
+      
+      if (user.multimediaAssessmentStatus !== 'approved') {
+        // User needs to take the assessment
+        try {
+          const MultimediaAssessmentConfig = require('../models/multimediaAssessmentConfig.model');
+          const assessmentConfig = await MultimediaAssessmentConfig.findById(project.assessment.assessmentId)
+            .populate('projectId', 'projectName');
+          
+          if (!assessmentConfig || !assessmentConfig.isActive) {
+            return res.status(400).json({
+              success: false,
+              message: "Assessment configuration not available for this project"
+            });
+          }
+
+          // Update user status to pending assessment
+          await DTUser.findByIdAndUpdate(userId, {
+            multimediaAssessmentStatus: 'pending'
+          });
+
+          // Send assessment invitation email
+          const { sendAssessmentInvitation } = require('../utils/emailService');
+          const assessmentLink = `${process.env.FRONTEND_URL || 'https://app.mydeeptech.ng'}/assessment/${assessmentConfig._id}`;
+          
+          await sendAssessmentInvitation({
+            userEmail: user.email,
+            userName: user.fullName,
+            assessmentTitle: assessmentConfig.title,
+            projectTitle: project.projectName,
+            assessmentLink,
+            estimatedDuration: assessmentConfig.estimatedDuration,
+            numberOfTasks: assessmentConfig.numberOfTasks,
+            deadline: assessmentConfig.deadline,
+            attemptNumber: (user.multimediaAssessmentAttempts || 0) + 1,
+            maxRetries: assessmentConfig.maxRetries
+          });
+
+          assessmentTriggered = true;
+          console.log(`📧 Assessment invitation sent to ${user.email} for project: ${project.projectName}`);
+          
+        } catch (assessmentError) {
+          console.error(`❌ Failed to trigger assessment for user ${user.email}:`, assessmentError);
+          return res.status(500).json({
+            success: false,
+            message: "Failed to initiate required assessment",
+            error: assessmentError.message
+          });
+        }
+      }
+    }
+
+    // Create application with appropriate status
+    let applicationStatus = 'pending';
+    if (requiresAssessment && user.multimediaAssessmentStatus !== 'approved') {
+      applicationStatus = 'assessment_required';
+    }
+
     const application = new ProjectApplication({
       projectId: projectId,
       applicantId: userId,
@@ -2699,7 +3048,7 @@ const applyToProject = async (req, res) => {
       proposedRate: proposedRate || project.payRate,
       availability: availability || "flexible",
       estimatedCompletionTime: estimatedCompletionTime || "",
-      status: 'pending'
+      status: applicationStatus
     });
 
     await application.save();
@@ -2712,61 +3061,76 @@ const applyToProject = async (req, res) => {
     // Populate application details for response
     await application.populate('projectId', 'projectName projectCategory payRate');
 
-    // Send email notification to admin(s)
-    try {
-      const { sendProjectApplicationNotification } = require('../utils/projectMailer');
-      
-      // Get project creator and assigned admins
-      const projectWithAdmins = await AnnotationProject.findById(projectId)
-        .populate('createdBy', 'fullName email')
-        .populate('assignedAdmins', 'fullName email');
-      
-      const applicationData = {
-        applicantName: user.fullName,
-        applicantEmail: user.email,
-        resumeUrl: user.attachments.resume_url,
-        projectName: project.projectName,
-        projectCategory: project.projectCategory,
-        payRate: project.payRate,
-        coverLetter: coverLetter || '',
-        appliedAt: application.appliedAt
-      };
+    // Send email notification to admin(s) only if not assessment-gated
+    if (!assessmentTriggered) {
+      try {
+        const { sendProjectApplicationNotification } = require('../utils/projectMailer');
+        
+        // Get project creator and assigned admins
+        const projectWithAdmins = await AnnotationProject.findById(projectId)
+          .populate('createdBy', 'fullName email')
+          .populate('assignedAdmins', 'fullName email');
+        
+        const applicationData = {
+          applicantName: user.fullName,
+          applicantEmail: user.email,
+          resumeUrl: user.attachments.resume_url,
+          projectName: project.projectName,
+          projectCategory: project.projectCategory,
+          payRate: project.payRate,
+          coverLetter: coverLetter || '',
+          appliedAt: application.appliedAt
+        };
 
-      // Send notification to project creator
-      if (projectWithAdmins.createdBy) {
-        await sendProjectApplicationNotification(
-          projectWithAdmins.createdBy.email,
-          projectWithAdmins.createdBy.fullName,
-          applicationData
-        );
-      }
-
-      // Send notification to assigned admins (excluding creator to avoid duplicate)
-      for (const admin of projectWithAdmins.assignedAdmins) {
-        if (admin._id.toString() !== projectWithAdmins.createdBy._id.toString()) {
+        // Send notification to project creator
+        if (projectWithAdmins.createdBy) {
           await sendProjectApplicationNotification(
-            admin.email,
-            admin.fullName,
+            projectWithAdmins.createdBy.email,
+            projectWithAdmins.createdBy.fullName,
             applicationData
           );
         }
-      }
 
-      console.log(`✅ Admin notifications sent for project application: ${project.projectName}`);
-      
-    } catch (emailError) {
-      console.error(`⚠️ Failed to send admin notification for application:`, emailError.message);
-      // Don't fail the request if email fails
+        // Send notification to assigned admins (excluding creator to avoid duplicate)
+        for (const admin of projectWithAdmins.assignedAdmins) {
+          if (admin._id.toString() !== projectWithAdmins.createdBy._id.toString()) {
+            await sendProjectApplicationNotification(
+              admin.email,
+              admin.fullName,
+              applicationData
+            );
+          }
+        }
+
+        console.log(`✅ Admin notifications sent for project application: ${project.projectName}`);
+        
+      } catch (emailError) {
+        console.error(`⚠️ Failed to send admin notification for application:`, emailError.message);
+        // Don't fail the request if email fails
+      }
     }
 
-    console.log(`✅ Application submitted successfully for project: ${project.projectName}`);
+    let responseMessage = "Application submitted successfully";
+    let additionalData = {};
+
+    if (assessmentTriggered) {
+      responseMessage = "Application submitted. Please check your email for assessment instructions.";
+      additionalData = {
+        assessmentRequired: true,
+        assessmentStatus: 'invitation_sent',
+        message: "You must complete the multimedia assessment before your application can be reviewed."
+      };
+    }
+
+    console.log(`✅ Application submitted successfully for project: ${project.projectName}${assessmentTriggered ? ' (assessment required)' : ''}`);
 
     res.status(201).json({
       success: true,
-      message: "Application submitted successfully",
+      message: responseMessage,
       data: {
         application: application,
-        projectName: project.projectName
+        projectName: project.projectName,
+        ...additionalData
       }
     });
 
@@ -4079,6 +4443,9 @@ module.exports = {
   getAdminDashboard,
   getDTUserDashboard,
   approveAnnotator,
+  approveUserForQA,
+  rejectUserForQA,
+  getAllQAUsers,
   rejectAnnotator,
   getDTUserAdmin,
   requestAdminVerification,
