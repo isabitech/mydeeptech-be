@@ -147,6 +147,9 @@ const initializeRedis = async () => {
     }
 };
 
+// Configure mongoose for production
+mongoose.set('bufferCommands', false); // Disable mongoose buffering for production
+
 // Enhanced MongoDB connection with retry logic and production timeouts
 const connectDB = async () => {
     const maxRetries = 5;
@@ -161,8 +164,6 @@ const connectDB = async () => {
                 serverSelectionTimeoutMS: 60000, // 60 seconds
                 socketTimeoutMS: 60000,          // 60 seconds  
                 connectTimeoutMS: 60000,         // 60 seconds
-                bufferCommands: false,           // Disable mongoose buffering
-                bufferMaxEntries: 0,            // Disable mongoose buffering
                 maxPoolSize: 10,                // Connection pool size
                 minPoolSize: 2,                 // Minimum connections
                 maxIdleTimeMS: 30000,           // Close connections after 30s idle
