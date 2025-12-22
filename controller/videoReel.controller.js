@@ -578,7 +578,7 @@ const bulkAddVideoReels = async (req, res) => {
         successful: results,
         failed: errors,
         summary: {
-          totalFiles: req.files.length,
+          total: youtubeUrls ? youtubeUrls.length : 0,
           successful: results.length,
           failed: errors.length
         }
