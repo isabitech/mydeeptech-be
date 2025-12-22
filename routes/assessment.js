@@ -15,6 +15,16 @@ const {
   getUserAssessmentsOverview
 } = require('../controller/assessment.controller');
 
+const {
+  startAssessmentSession,
+  getAssessmentSession,
+  saveTaskProgress,
+  submitTask,
+  controlTimer,
+  submitAssessment: submitMultimediaAssessment,
+  getAvailableReels
+} = require('../controller/multimediaAssessmentSession.controller');
+
 // Import middleware
 const { authenticateToken } = require('../middleware/auth');
 const { authenticateAdmin } = require('../middleware/adminAuth');
@@ -87,6 +97,59 @@ router.get('/history', authenticateToken, getUserAssessmentHistory);
  * @query assessmentType
  */
 router.get('/retake-eligibility', authenticateToken, checkRetakeEligibility);
+
+// ==========================================
+// MULTIMEDIA ASSESSMENT SESSION ROUTES
+// ==========================================
+
+/**
+ * @route POST /api/assessments/multimedia/:assessmentId/start
+ * @desc Start multimedia assessment session
+ * @access Private (Annotator)
+ */
+router.post('/multimedia/:assessmentId/start', authenticateToken, startAssessmentSession);
+
+/**
+ * @route GET /api/assessments/multimedia/session/:submissionId
+ * @desc Get multimedia assessment session
+ * @access Private (Annotator)
+ */
+router.get('/multimedia/session/:submissionId', authenticateToken, getAssessmentSession);
+
+/**
+ * @route POST /api/assessments/multimedia/:submissionId/save-progress
+ * @desc Save task progress in multimedia assessment
+ * @access Private (Annotator)
+ */
+router.post('/multimedia/:submissionId/save-progress', authenticateToken, saveTaskProgress);
+
+/**
+ * @route POST /api/assessments/multimedia/:submissionId/submit-task
+ * @desc Submit individual task in multimedia assessment
+ * @access Private (Annotator)
+ */
+router.post('/multimedia/:submissionId/submit-task', authenticateToken, submitTask);
+
+/**
+ * @route POST /api/assessments/multimedia/:submissionId/timer
+ * @desc Control timer for multimedia assessment
+ * @access Private (Annotator)
+ */
+router.post('/multimedia/:submissionId/timer', authenticateToken, controlTimer);
+
+/**
+ * @route POST /api/assessments/multimedia/:submissionId/submit
+ * @desc Submit final multimedia assessment
+ * @access Private (Annotator)
+ */
+router.post('/multimedia/:submissionId/submit', authenticateToken, submitMultimediaAssessment);
+
+/**
+ * @route GET /api/assessments/multimedia/reels/:assessmentId
+ * @desc Get available reels for multimedia assessment
+ * @access Private (Annotator)
+ */
+router.get('/multimedia/reels/:assessmentId', authenticateToken, getAvailableReels);
 
 // ==========================================
 // ADMIN ASSESSMENT ROUTES

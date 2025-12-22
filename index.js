@@ -30,6 +30,7 @@ const notificationRoute = require('./routes/notifications');
 const assessmentRoute = require('./routes/assessment');
 const supportRoute = require('./routes/support');
 const chatRoute = require('./routes/chat');
+const qaRoute = require('./routes/qa');
 
 const app = express();
 const server = createServer(app);
@@ -135,6 +136,7 @@ app.use('/api/notifications', notificationRoute);
 app.use('/api/assessments', assessmentRoute);
 app.use('/api/support', supportRoute);
 app.use('/api/chat', chatRoute);
+app.use('/api/qa', qaRoute);
 
 // Initialize Redis connection
 const initializeRedis = async () => {

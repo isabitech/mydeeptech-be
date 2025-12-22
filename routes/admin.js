@@ -1,9 +1,11 @@
 const express = require('express');
 const { getAllDTUsers, getAllAdminUsers, getAdminDashboard, approveAnnotator, approveUserForQA, rejectUserForQA, getAllQAUsers, rejectAnnotator, getDTUserAdmin, createAdmin, requestAdminVerification, confirmAdminVerification, verifyAdminOTP, adminLogin } = require('../controller/dtUser.controller.js');
-const { createAnnotationProject, getAllAnnotationProjects, getAnnotationProjectDetails, updateAnnotationProject, deleteAnnotationProject, requestProjectDeletionOTP, verifyOTPAndDeleteProject, getAnnotationProjectApplications, approveAnnotationProjectApplication, rejectAnnotationProjectApplication, removeApprovedApplicant, getRemovableApplicants, exportApprovedAnnotatorsCSV } = require('../controller/annotationProject.controller.js');
+const { createAnnotationProject, getAllAnnotationProjects, getAnnotationProjectDetails, updateAnnotationProject, deleteAnnotationProject, requestProjectDeletionOTP, verifyOTPAndDeleteProject, getAnnotationProjectApplications, approveAnnotationProjectApplication, rejectAnnotationProjectApplication, removeApprovedApplicant, getRemovableApplicants, exportApprovedAnnotatorsCSV, attachAssessmentToProject, removeAssessmentFromProject, getAvailableAssessments } = require('../controller/annotationProject.controller.js');
 const { createInvoice, getAllInvoices, getInvoiceDetails, updatePaymentStatus, sendInvoiceReminder, deleteInvoice } = require('../controller/invoice.controller.js');
 const { getAdminNotifications, createAnnouncement, getNotificationStats, cleanupNotifications, broadcastNotification } = require('../controller/notification.controller.js');
 const { getAdminAssessments, getAdminAssessmentsOverview } = require('../controller/assessment.controller.js');
+const { addVideoReel, getAllVideoReels, getVideoReelById, updateVideoReel, deleteVideoReel, bulkAddVideoReels, getVideoReelAnalytics } = require('../controller/videoReel.controller.js');
+const { createAssessmentConfig, getAllAssessmentConfigs, getAssessmentConfigById, updateAssessmentConfig, deleteAssessmentConfig, getAssessmentConfigByProject } = require('../controller/multimediaAssessmentConfig.controller.js');
 const { authenticateAdmin } = require('../middleware/adminAuth.js');
 
 const router = express.Router();
@@ -44,6 +46,10 @@ router.delete('/projects/:projectId', authenticateAdmin, deleteAnnotationProject
 router.post('/projects/:projectId/request-deletion-otp', authenticateAdmin, requestProjectDeletionOTP);
 router.post('/projects/:projectId/verify-deletion-otp', authenticateAdmin, verifyOTPAndDeleteProject);
 
+// Project Assessment Integration Routes
+router.post('/projects/:projectId/assessment', authenticateAdmin, attachAssessmentToProject);
+router.delete('/projects/:projectId/assessment', authenticateAdmin, removeAssessmentFromProject);
+
 // Application Management Routes
 router.get('/applications', authenticateAdmin, getAnnotationProjectApplications);
 router.patch('/applications/:applicationId/approve', authenticateAdmin, approveAnnotationProjectApplication);
@@ -78,5 +84,22 @@ router.post('/notifications/broadcast', authenticateAdmin, broadcastNotification
 // Assessment Management Routes
 router.get('/assessments', authenticateAdmin, getAdminAssessments);
 router.get('/assessments/overview', authenticateAdmin, getAdminAssessmentsOverview);
+router.get('/assessments/available', authenticateAdmin, getAllAssessmentConfigs);
+
+// Assessment Configuration Management Routes  
+router.post('/assessments/config', authenticateAdmin, createAssessmentConfig);
+router.get('/assessments/config', authenticateAdmin, getAllAssessmentConfigs);
+router.get('/assessments/config/:assessmentId', authenticateAdmin, getAssessmentConfigById);
+router.patch('/assessments/config/:assessmentId', authenticateAdmin, updateAssessmentConfig);
+router.delete('/assessments/config/:assessmentId', authenticateAdmin, deleteAssessmentConfig);
+
+// Multimedia Assessment - Video Reel Management Routes
+router.post('/multimedia-assessments/reels/add', authenticateAdmin, addVideoReel);
+router.post('/multimedia-assessments/reels/bulk-add', authenticateAdmin, bulkAddVideoReels);
+router.get('/multimedia-assessments/reels', authenticateAdmin, getAllVideoReels);
+router.get('/multimedia-assessments/reels/:reelId', authenticateAdmin, getVideoReelById);
+router.put('/multimedia-assessments/reels/:reelId', authenticateAdmin, updateVideoReel);
+router.delete('/multimedia-assessments/reels/:reelId', authenticateAdmin, deleteVideoReel);
+router.get('/multimedia-assessments/reels/analytics', authenticateAdmin, getVideoReelAnalytics);
 
 module.exports = router;
