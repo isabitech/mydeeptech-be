@@ -81,7 +81,7 @@ const qaReviewSchema = new mongoose.Schema({
   // QA Decision
   decision: {
     type: String,
-    enum: ['approved', 'rejected'],
+    enum: ['Approve', 'Reject', 'Request Revision'],
     required: true
   },
   
@@ -268,7 +268,7 @@ qaReviewSchema.statics.getReviewerStats = async function(reviewerId, startDate, 
         averageScore: { $avg: '$overallScore' },
         averageReviewTime: { $avg: '$reviewTime' },
         approvalRate: {
-          $avg: { $cond: [{ $eq: ['$decision', 'approved'] }, 1, 0] }
+          $avg: { $cond: [{ $eq: ['$decision', 'Approve'] }, 1, 0] }
         },
         totalReviewTime: { $sum: '$reviewTime' },
         scoreDistribution: {
@@ -350,7 +350,8 @@ qaReviewSchema.methods.completeReview = async function() {
   }
   
   // Update submission with QA results
-  submission.status = this.decision === 'approved' ? 'approved' : 'rejected';
+  submission.status = this.decision === 'Approve' ? 'approved' : 
+                     this.decision === 'Request Revision' ? 'revision_requested' : 'rejected';
   submission.totalScore = this.overallScore;
   submission.qaReview = this._id;
   
@@ -377,7 +378,8 @@ qaReviewSchema.methods.completeReview = async function() {
   const user = await DTUser.findById(submission.annotatorId);
   
   if (user) {
-    user.multimediaAssessmentStatus = this.decision === 'approved' ? 'passed' : 'failed';
+    user.multimediaAssessmentStatus = this.decision === 'Approve' ? 'passed' : 
+                                     this.decision === 'Request Revision' ? 'pending' : 'failed';
     await user.save();
   }
   

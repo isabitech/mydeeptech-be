@@ -167,7 +167,7 @@ videoReelSchema.index({ niche: 1, isActive: 1 });
 videoReelSchema.index({ uploadedBy: 1, createdAt: -1 });
 videoReelSchema.index({ usageCount: -1 });
 videoReelSchema.index({ isActive: 1, isApproved: 1 });
-videoReelSchema.index({ 'cloudinaryData.publicId': 1 }, { unique: true });
+// Note: Removed cloudinaryData.publicId unique index as YouTube videos don't have Cloudinary data
 
 // Virtual for formatted duration
 videoReelSchema.virtual('formattedDuration').get(function() {
@@ -200,7 +200,7 @@ videoReelSchema.statics.getRandomReelsByNiche = async function(niche, limit = 5,
       $project: {
         title: 1,
         description: 1,
-        videoUrl: 1,
+        youtubeUrl: 1,
         thumbnailUrl: 1,
         niche: 1,
         duration: 1,

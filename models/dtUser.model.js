@@ -75,6 +75,12 @@ const dtUserSchema = new mongoose.Schema(
       enum: ["not_started", "in_progress", "submitted", "under_review", "passed", "failed"],
       default: "not_started",
     },
+    // Spidey High-Discipline Assessment Status (integrates with existing system)
+    spideyAssessmentStatus: {
+      type: String,
+      enum: ["not_started", "in_progress", "submitted", "under_review", "passed", "failed"],
+      default: "not_started",
+    },
     resultLink: { type: String, default: "" },
 
     // Result submissions and storage

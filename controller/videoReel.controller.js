@@ -494,19 +494,41 @@ const bulkAddVideoReels = async (req, res) => {
     
     for (let i = 0; i < youtubeUrls.length; i++) {
       try {
-        const youtubeUrl = youtubeUrls[i];
+        let youtubeUrl = youtubeUrls[i];
         
-        // Validate URL
-        if (!validateYouTubeUrl(youtubeUrl)) {
+        // Clean URL - trim whitespace and remove trailing punctuation
+        youtubeUrl = youtubeUrl.trim().replace(/[,;.\s]+$/, '');
+        
+        // Skip empty URLs after cleaning
+        if (!youtubeUrl) {
           errors.push({
-            url: youtubeUrl,
-            error: 'Invalid YouTube URL format'
+            url: youtubeUrls[i],
+            error: 'Empty URL after cleaning'
           });
           continue;
         }
         
-        // Check if video already exists
-        const existingVideo = await VideoReel.findOne({ youtubeUrl });
+        // Convert to embed URL format for consistency
+        const embedUrl = convertToEmbedUrl(youtubeUrl);
+        if (!embedUrl) {
+          errors.push({
+            url: youtubeUrl,
+            error: 'Invalid YouTube URL format - unable to convert to embed URL'
+          });
+          continue;
+        }
+        
+        // Validate the converted embed URL
+        if (!validateYouTubeUrl(embedUrl)) {
+          errors.push({
+            url: youtubeUrl,
+            error: 'Invalid YouTube embed URL format after conversion'
+          });
+          continue;
+        }
+        
+        // Check if video already exists (using embed URL)
+        const existingVideo = await VideoReel.findOne({ youtubeUrl: embedUrl });
         if (existingVideo) {
           errors.push({
             url: youtubeUrl,
@@ -515,8 +537,8 @@ const bulkAddVideoReels = async (req, res) => {
           continue;
         }
         
-        // Extract video data
-        const youtubeData = await extractYouTubeVideoData(youtubeUrl);
+        // Extract video data using embed URL
+        const youtubeData = await extractYouTubeVideoData(embedUrl);
         if (!youtubeData) {
           errors.push({
             url: youtubeUrl,
@@ -529,7 +551,7 @@ const bulkAddVideoReels = async (req, res) => {
         const videoReel = new VideoReel({
           title: youtubeData.title || `Video Reel ${i + 1}`,
           description: youtubeData.description || '',
-          youtubeUrl,
+          youtubeUrl: embedUrl,
           youtubeVideoId: youtubeData.videoId,
           thumbnailUrl: youtubeData.thumbnailUrl,
           highResThumbnailUrl: youtubeData.highResThumbnailUrl,

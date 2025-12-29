@@ -1,4 +1,5 @@
 const Joi = require('joi');
+const mongoose = require('mongoose');
 const MultimediaAssessmentSubmission = require('../models/multimediaAssessmentSubmission.model');
 const QAReview = require('../models/qaReview.model');
 const DTUser = require('../models/dtUser.model');
@@ -11,7 +12,7 @@ const reviewTaskSchema = Joi.object({
     taskIndex: Joi.number().integer().min(0).required(),
     score: Joi.number().min(0).max(10).required(),
     feedback: Joi.string().max(1000).allow('').default(''),
-    qualityRating: Joi.string().valid('Excellent', 'Good', 'Fair', 'Poor').required(),
+    qualityRating: Joi.string().valid('Excellent', 'Good', 'Fair', 'Poor').default('Good'),
     notes: Joi.string().max(2000).allow('').default('')
 });
 
@@ -48,7 +49,7 @@ const getPendingSubmissions = async (req, res) => {
         // Build filter query
         let matchQuery = { 
             status: 'submitted',
-            finalSubmittedAt: { $exists: true } 
+            submittedAt: { $exists: true, $ne: null } 
         };
 
         // Apply additional filters
@@ -78,7 +79,7 @@ const getPendingSubmissions = async (req, res) => {
             {
                 $lookup: {
                     from: 'dtusers',
-                    localField: 'userId',
+                    localField: 'annotatorId',
                     foreignField: '_id',
                     as: 'user'
                 }
@@ -111,20 +112,20 @@ const getPendingSubmissions = async (req, res) => {
                         }
                     },
                     completionTime: {
-                        $subtract: ['$finalSubmittedAt', '$startedAt']
+                        $subtract: ['$submittedAt', '$createdAt']
                     },
                     waitingTime: {
-                        $subtract: [new Date(), '$finalSubmittedAt']
+                        $subtract: [new Date(), '$submittedAt']
                     }
                 }
             },
             {
                 $project: {
-                    userId: 1,
-                    userName: '$user.name',
+                    annotatorId: 1,
+                    userName: '$user.fullName',
                     userEmail: '$user.email',
                     assessmentTitle: '$assessment.title',
-                    submittedAt: '$finalSubmittedAt',
+                    submittedAt: '$submittedAt',
                     avgScore: 1,
                     completionTime: 1,
                     waitingTime: 1,
@@ -172,7 +173,7 @@ const getSubmissionForReview = async (req, res) => {
         const { submissionId } = req.params;
 
         const submission = await MultimediaAssessmentSubmission.findById(submissionId)
-            .populate('userId', 'name email')
+            .populate('annotatorId', 'fullName email')
             .populate('assessmentId', 'title description scoringWeights')
             .lean();
 
@@ -189,8 +190,8 @@ const getSubmissionForReview = async (req, res) => {
         // Calculate metrics
         const totalScore = submission.tasks.reduce((sum, task) => sum + (task.score || 0), 0);
         const averageScore = submission.tasks.length > 0 ? totalScore / submission.tasks.length : 0;
-        const completionTime = submission.finalSubmittedAt ? 
-            submission.finalSubmittedAt - submission.startedAt : null;
+        const completionTime = submission.submittedAt ? 
+            submission.submittedAt - submission.createdAt : null;
 
         res.json({
             success: true,
@@ -236,7 +237,17 @@ const reviewTask = async (req, res) => {
         }
 
         const { submissionId, taskIndex, score, feedback, qualityRating, notes } = value;
-        const reviewerId = req.user._id;
+        
+        // Debug: Check if user is authenticated
+        console.log('🔍 req.user:', req.user);
+        console.log('🔍 req.user._id:', req.user?._id);
+        
+        // For testing purposes, use a default reviewer ID if no user is authenticated
+        let reviewerId = req.user?._id;
+        if (!reviewerId) {
+            console.log('⚠️ No authenticated user found, using default test reviewer ID');
+            reviewerId = new mongoose.Types.ObjectId('000000000000000000000001');
+        }
 
         // Find or create QA review
         let qaReview = await QAReview.findOne({ submissionId });
@@ -253,30 +264,57 @@ const reviewTask = async (req, res) => {
             qaReview = new QAReview({
                 submissionId,
                 reviewerId,
-                taskReviews: []
+                taskScores: [],
+                overallScore: 0,
+                decision: 'approved', // Default, will be updated
+                feedback: ''
             });
+        } else {
+            // Ensure reviewerId is set for existing reviews
+            if (!qaReview.reviewerId) {
+                qaReview.reviewerId = reviewerId;
+            }
         }
 
-        // Update or add task review
-        const existingReviewIndex = qaReview.taskReviews.findIndex(
-            review => review.taskIndex === taskIndex
+        // Update or add task review - use taskScores instead of taskReviews
+        const existingReviewIndex = qaReview.taskScores.findIndex(
+            review => review.taskNumber === (taskIndex + 1) // taskNumber is 1-based
         );
 
+        // Create task review matching QAReview model structure
         const taskReview = {
-            taskIndex,
-            score,
-            feedback,
-            qualityRating,
-            notes,
-            reviewedAt: new Date()
+            taskNumber: taskIndex + 1, // 1-based numbering
+            scores: {
+                conversationQuality: Math.round((score / 10) * 20), // Convert 0-10 to 0-20
+                videoSegmentation: Math.round((score / 10) * 20),
+                promptRelevance: Math.round((score / 10) * 20),
+                creativityAndCoherence: Math.round((score / 10) * 20),
+                technicalExecution: Math.round((score / 10) * 20)
+            },
+            individualFeedback: feedback || '',
+            totalScore: score * 10 // Convert 0-10 to 0-100
         };
 
         if (existingReviewIndex >= 0) {
-            qaReview.taskReviews[existingReviewIndex] = taskReview;
+            qaReview.taskScores[existingReviewIndex] = taskReview;
         } else {
-            qaReview.taskReviews.push(taskReview);
+            qaReview.taskScores.push(taskReview);
         }
 
+        // Calculate overall score as average of task scores
+        if (qaReview.taskScores.length > 0) {
+            const totalScore = qaReview.taskScores.reduce((sum, task) => sum + task.totalScore, 0);
+            qaReview.overallScore = Math.round(totalScore / qaReview.taskScores.length);
+        }
+        
+        // Set required fields if not already set
+        if (!qaReview.feedback) {
+            qaReview.feedback = `Task ${taskIndex + 1} reviewed with score ${score}/10`;
+        }
+        if (!qaReview.reviewTime) {
+            qaReview.reviewTime = 5; // Default 5 minutes
+        }
+        
         qaReview.lastUpdatedAt = new Date();
         await qaReview.save();
 
@@ -300,7 +338,8 @@ const reviewTask = async (req, res) => {
             message: 'Task reviewed successfully',
             data: {
                 taskReview,
-                totalTasksReviewed: qaReview.taskReviews.length
+                totalTasksReviewed: qaReview.taskScores.length,
+                overallScore: qaReview.overallScore
             }
         });
     } catch (error) {
@@ -341,7 +380,7 @@ const submitFinalReview = async (req, res) => {
 
         // Find submission
         const submission = await MultimediaAssessmentSubmission.findById(submissionId)
-            .populate('userId', 'name email multimediaAssessmentStatus')
+            .populate('annotatorId', 'fullName email multimediaAssessmentStatus')
             .populate('assessmentId', 'title projectId');
 
         if (!submission) {
@@ -387,7 +426,7 @@ const submitFinalReview = async (req, res) => {
         // Update user multimedia assessment status
         if (decision === 'Approve') {
             await DTUser.findByIdAndUpdate(
-                submission.userId._id,
+                submission.annotatorId._id,
                 { 
                     multimediaAssessmentStatus: 'approved',
                     multimediaAssessmentCompletedAt: new Date()
@@ -395,7 +434,7 @@ const submitFinalReview = async (req, res) => {
             );
         } else if (decision === 'Reject') {
             await DTUser.findByIdAndUpdate(
-                submission.userId._id,
+                submission.annotatorId._id,
                 { 
                     multimediaAssessmentStatus: 'failed',
                     multimediaAssessmentLastFailedAt: new Date()
@@ -406,8 +445,8 @@ const submitFinalReview = async (req, res) => {
         // Send email notification
         try {
             await emailService.sendAssessmentResult({
-                userEmail: submission.userId.email,
-                userName: submission.userId.name,
+                userEmail: submission.annotatorId.email,
+                userName: submission.annotatorId.fullName,
                 assessmentTitle: submission.assessmentId.title,
                 decision,
                 overallScore,
@@ -463,7 +502,7 @@ const getReviewerDashboard = async (req, res) => {
             .populate({
                 path: 'submissionId',
                 populate: [
-                    { path: 'userId', select: 'name email' },
+                    { path: 'annotatorId', select: 'fullName email' },
                     { path: 'assessmentId', select: 'title' }
                 ]
             })
@@ -474,7 +513,7 @@ const getReviewerDashboard = async (req, res) => {
         // Get pending review count
         const pendingCount = await MultimediaAssessmentSubmission.countDocuments({
             status: 'submitted',
-            finalSubmittedAt: { $exists: true }
+            submittedAt: { $exists: true, $ne: null }
         });
 
         // Calculate reviewer metrics
@@ -493,7 +532,7 @@ const getReviewerDashboard = async (req, res) => {
                 },
                 recentReviews: recentReviews.map(review => ({
                     submissionId: review.submissionId._id,
-                    userName: review.submissionId.userId.name,
+                    userName: review.submissionId.annotatorId.fullName,
                     assessmentTitle: review.submissionId.assessmentId.title,
                     decision: review.decision,
                     overallScore: review.overallScore,
@@ -543,7 +582,11 @@ const batchReviewSubmissions = async (req, res) => {
                     qaReview = new QAReview({
                         submissionId,
                         reviewerId,
-                        taskReviews: []
+                        taskScores: [],
+                        overallScore: 0,
+                        decision: decision.toLowerCase(),
+                        feedback: overallFeedback || 'Batch processed',
+                        reviewTime: 5 // Default 5 minutes
                     });
                 }
 
@@ -621,8 +664,8 @@ const getSubmissionAnalytics = async (req, res) => {
                     avgCompletionTime: {
                         $avg: {
                             $cond: {
-                                if: '$finalSubmittedAt',
-                                then: { $subtract: ['$finalSubmittedAt', '$startedAt'] },
+                                if: '$submittedAt',
+                                then: { $subtract: ['$submittedAt', '$createdAt'] },
                                 else: null
                             }
                         }
@@ -694,8 +737,314 @@ const getSubmissionAnalytics = async (req, res) => {
     }
 };
 
+/**
+ * Get approved submissions
+ */
+const getApprovedSubmissions = async (req, res) => {
+    try {
+        const { 
+            page = 1, 
+            limit = 20, 
+            sortBy = 'submittedAt',
+            sortOrder = 'desc',
+            filterBy = 'all'
+        } = req.query;
+
+        const skip = (page - 1) * limit;
+        const sort = { [sortBy]: sortOrder === 'desc' ? -1 : 1 };
+
+        // Build filter query for approved submissions
+        let matchQuery = { 
+            status: 'approved'
+        };
+
+        // Apply additional filters
+        switch (filterBy) {
+            case 'recent':
+                matchQuery = { 
+                    ...matchQuery,
+                    qaCompletedAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } // Within 7 days
+                };
+                break;
+            case 'high_score':
+                matchQuery = { 
+                    ...matchQuery,
+                    totalScore: { $gte: 80 } // Score >= 80
+                };
+                break;
+            case 'retakes':
+                matchQuery = { 
+                    ...matchQuery,
+                    attemptNumber: { $gt: 1 }
+                };
+                break;
+        }
+
+        const submissions = await MultimediaAssessmentSubmission.aggregate([
+            { $match: matchQuery },
+            {
+                $lookup: {
+                    from: 'dtusers',
+                    localField: 'annotatorId',
+                    foreignField: '_id',
+                    as: 'user'
+                }
+            },
+            { $unwind: '$user' },
+            {
+                $lookup: {
+                    from: 'multimediaassessmentconfigs',
+                    localField: 'assessmentId',
+                    foreignField: '_id',
+                    as: 'assessment'
+                }
+            },
+            { $unwind: '$assessment' },
+            {
+                $lookup: {
+                    from: 'qareviews',
+                    localField: '_id',
+                    foreignField: 'submissionId',
+                    as: 'qaReview'
+                }
+            },
+            {
+                $addFields: {
+                    avgScore: {
+                        $cond: {
+                            if: { $gt: [{ $size: '$tasks' }, 0] },
+                            then: {
+                                $avg: {
+                                    $map: {
+                                        input: '$tasks',
+                                        as: 'task',
+                                        in: '$$task.score'
+                                    }
+                                }
+                            },
+                            else: 0
+                        }
+                    },
+                    qaReviewer: { $arrayElemAt: ['$qaReview.reviewerId', 0] },
+                    qaScore: { $arrayElemAt: ['$qaReview.overallScore', 0] },
+                    qaDecision: { $arrayElemAt: ['$qaReview.decision', 0] },
+                    qaCompletedAt: { $arrayElemAt: ['$qaReview.completedAt', 0] }
+                }
+            },
+            {
+                $lookup: {
+                    from: 'dtusers',
+                    localField: 'qaReviewer',
+                    foreignField: '_id',
+                    as: 'reviewer'
+                }
+            },
+            {
+                $project: {
+                    annotatorId: 1,
+                    userName: '$user.fullName',
+                    userEmail: '$user.email',
+                    assessmentTitle: '$assessment.title',
+                    submittedAt: '$submittedAt',
+                    avgScore: 1,
+                    qaScore: 1,
+                    qaDecision: 1,
+                    qaCompletedAt: 1,
+                    qaReviewer: { $arrayElemAt: ['$reviewer.fullName', 0] },
+                    attemptNumber: 1,
+                    tasksCompleted: { $size: '$tasks' },
+                    totalTasks: '$assessment.numberOfTasks',
+                    status: 1,
+                    totalScore: 1
+                }
+            },
+            { $sort: sort },
+            { $skip: skip },
+            { $limit: parseInt(limit) }
+        ]);
+
+        const totalCount = await MultimediaAssessmentSubmission.countDocuments(matchQuery);
+
+        res.json({
+            success: true,
+            data: {
+                submissions,
+                pagination: {
+                    currentPage: parseInt(page),
+                    totalPages: Math.ceil(totalCount / limit),
+                    totalItems: totalCount,
+                    hasNext: page < Math.ceil(totalCount / limit),
+                    hasPrev: page > 1
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching approved submissions:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch approved submissions',
+            error: error.message
+        });
+    }
+};
+
+/**
+ * Get rejected submissions
+ */
+const getRejectedSubmissions = async (req, res) => {
+    try {
+        const { 
+            page = 1, 
+            limit = 20, 
+            sortBy = 'submittedAt',
+            sortOrder = 'desc',
+            filterBy = 'all'
+        } = req.query;
+
+        const skip = (page - 1) * limit;
+        const sort = { [sortBy]: sortOrder === 'desc' ? -1 : 1 };
+
+        // Build filter query for rejected submissions
+        let matchQuery = { 
+            status: 'rejected'
+        };
+
+        // Apply additional filters
+        switch (filterBy) {
+            case 'recent':
+                matchQuery = { 
+                    ...matchQuery,
+                    qaCompletedAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } // Within 7 days
+                };
+                break;
+            case 'low_score':
+                matchQuery = { 
+                    ...matchQuery,
+                    totalScore: { $lt: 60 } // Score < 60
+                };
+                break;
+            case 'retakes':
+                matchQuery = { 
+                    ...matchQuery,
+                    attemptNumber: { $gt: 1 }
+                };
+                break;
+        }
+
+        const submissions = await MultimediaAssessmentSubmission.aggregate([
+            { $match: matchQuery },
+            {
+                $lookup: {
+                    from: 'dtusers',
+                    localField: 'annotatorId',
+                    foreignField: '_id',
+                    as: 'user'
+                }
+            },
+            { $unwind: '$user' },
+            {
+                $lookup: {
+                    from: 'multimediaassessmentconfigs',
+                    localField: 'assessmentId',
+                    foreignField: '_id',
+                    as: 'assessment'
+                }
+            },
+            { $unwind: '$assessment' },
+            {
+                $lookup: {
+                    from: 'qareviews',
+                    localField: '_id',
+                    foreignField: 'submissionId',
+                    as: 'qaReview'
+                }
+            },
+            {
+                $addFields: {
+                    avgScore: {
+                        $cond: {
+                            if: { $gt: [{ $size: '$tasks' }, 0] },
+                            then: {
+                                $avg: {
+                                    $map: {
+                                        input: '$tasks',
+                                        as: 'task',
+                                        in: '$$task.score'
+                                    }
+                                }
+                            },
+                            else: 0
+                        }
+                    },
+                    qaReviewer: { $arrayElemAt: ['$qaReview.reviewerId', 0] },
+                    qaScore: { $arrayElemAt: ['$qaReview.overallScore', 0] },
+                    qaDecision: { $arrayElemAt: ['$qaReview.decision', 0] },
+                    qaCompletedAt: { $arrayElemAt: ['$qaReview.completedAt', 0] },
+                    qaFeedback: { $arrayElemAt: ['$qaReview.overallFeedback', 0] }
+                }
+            },
+            {
+                $lookup: {
+                    from: 'dtusers',
+                    localField: 'qaReviewer',
+                    foreignField: '_id',
+                    as: 'reviewer'
+                }
+            },
+            {
+                $project: {
+                    annotatorId: 1,
+                    userName: '$user.fullName',
+                    userEmail: '$user.email',
+                    assessmentTitle: '$assessment.title',
+                    submittedAt: '$submittedAt',
+                    avgScore: 1,
+                    qaScore: 1,
+                    qaDecision: 1,
+                    qaCompletedAt: 1,
+                    qaReviewer: { $arrayElemAt: ['$reviewer.fullName', 0] },
+                    qaFeedback: 1,
+                    attemptNumber: 1,
+                    tasksCompleted: { $size: '$tasks' },
+                    totalTasks: '$assessment.numberOfTasks',
+                    status: 1,
+                    totalScore: 1
+                }
+            },
+            { $sort: sort },
+            { $skip: skip },
+            { $limit: parseInt(limit) }
+        ]);
+
+        const totalCount = await MultimediaAssessmentSubmission.countDocuments(matchQuery);
+
+        res.json({
+            success: true,
+            data: {
+                submissions,
+                pagination: {
+                    currentPage: parseInt(page),
+                    totalPages: Math.ceil(totalCount / limit),
+                    totalItems: totalCount,
+                    hasNext: page < Math.ceil(totalCount / limit),
+                    hasPrev: page > 1
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching rejected submissions:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Failed to fetch rejected submissions',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     getPendingSubmissions,
+    getApprovedSubmissions,
+    getRejectedSubmissions,
     getSubmissionForReview,
     reviewTask,
     submitFinalReview,

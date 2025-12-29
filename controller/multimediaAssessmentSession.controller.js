@@ -115,6 +115,13 @@ const startAssessmentSession = async (req, res) => {
         deviceType: sessionMetadata.deviceType || 'unknown',
         screenResolution: sessionMetadata.screenResolution || ''
       },
+      timerState: {
+        isRunning: true, // Start the timer immediately
+        startTime: new Date(),
+        pausedTime: 0,
+        totalPausedDuration: 0,
+        lastPauseStart: null
+      },
       tasks: selectedReels.map((reel, index) => ({
         taskNumber: index + 1,
         conversation: {
@@ -153,7 +160,11 @@ const startAssessmentSession = async (req, res) => {
           attemptNumber: submission.attemptNumber,
           status: submission.status,
           totalTimeSpent: submission.totalTimeSpent,
-          timerState: submission.timerState,
+          timerState: {
+            isRunning: submission.timerState?.isRunning || true,
+            startTime: submission.timerState?.startTime || new Date(),
+            totalPausedDuration: submission.timerState?.totalPausedDuration || 0
+          },
           completionPercentage: submission.completionPercentage
         },
         assessment: {
@@ -173,7 +184,7 @@ const startAssessmentSession = async (req, res) => {
           id: reel._id,
           title: reel.title,
           description: reel.description,
-          videoUrl: reel.videoUrl,
+          youtubeUrl: reel.youtubeUrl,
           thumbnailUrl: reel.thumbnailUrl,
           niche: reel.niche,
           duration: reel.duration,
@@ -257,7 +268,7 @@ const getAssessmentSession = async (req, res) => {
             originalVideo: {
               id: task.conversation.originalVideoId._id,
               title: task.conversation.originalVideoId.title,
-              videoUrl: task.conversation.originalVideoId.videoUrl,
+              youtubeUrl: task.conversation.originalVideoId.youtubeUrl,
               thumbnailUrl: task.conversation.originalVideoId.thumbnailUrl,
               duration: task.conversation.originalVideoId.duration,
               niche: task.conversation.originalVideoId.niche
@@ -336,7 +347,16 @@ const saveTaskProgress = async (req, res) => {
     task.conversation = {
       originalVideoId: conversation.originalVideoId,
       startingPoint: conversation.startingPoint,
-      turns: conversation.turns,
+      turns: conversation.turns.map(turn => ({
+        ...turn,
+        aiResponse: {
+          ...turn.aiResponse,
+          videoSegment: {
+            ...turn.aiResponse.videoSegment,
+            role: 'ai_response' // Auto-assign role for AI responses
+          }
+        }
+      })),
       totalDuration: conversation.turns.reduce((sum, turn) => {
         const segmentDuration = turn.aiResponse.videoSegment.endTime - turn.aiResponse.videoSegment.startTime;
         return sum + segmentDuration;
@@ -696,7 +716,7 @@ const getAvailableReels = async (req, res) => {
           id: reel._id,
           title: reel.title,
           description: reel.description,
-          videoUrl: reel.videoUrl,
+          youtubeUrl: reel.youtubeUrl,
           thumbnailUrl: reel.thumbnailUrl,
           niche: reel.niche,
           duration: reel.duration,

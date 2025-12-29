@@ -199,7 +199,16 @@ const multimediaAssessmentSubmissionSchema = new mongoose.Schema({
     type: Number, // in seconds
     default: 0
   },
-  timerState: timerStateSchema,
+  timerState: {
+    type: timerStateSchema,
+    default: () => ({
+      isRunning: false,
+      startTime: null,
+      pausedTime: 0,
+      totalPausedDuration: 0,
+      lastPauseStart: null
+    })
+  },
   
   // Submission status
   status: {
@@ -346,10 +355,10 @@ multimediaAssessmentSubmissionSchema.statics.canUserRetake = async function(anno
     return { canRetake: false, reason: 'Retakes not allowed' };
   }
   
-  // Check max attempts
-  if (latestAttempt.attemptNumber >= config.requirements.retakePolicy.maxAttempts) {
-    return { canRetake: false, reason: 'Maximum attempts reached' };
-  }
+  // Check max attempts - DISABLED to allow unlimited retakes
+  // if (latestAttempt.attemptNumber >= config.requirements.retakePolicy.maxAttempts) {
+  //   return { canRetake: false, reason: 'Maximum attempts reached' };
+  // }
   
   // Check if user passed
   if (latestAttempt.status === 'approved') {

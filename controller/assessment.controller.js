@@ -855,6 +855,121 @@ const getAllAssessments = async (req, res) => {
       // Continue without multimedia assessments - don't break the entire response
     }
 
+    // 3. Spidey High-Discipline Assessment (integrates with existing system)
+    try {
+      const SpideyAssessmentConfig = require('../models/spideyAssessmentConfig.model');
+      
+      const spideyConfigs = await SpideyAssessmentConfig.find({
+        isActive: true,
+        assessmentType: 'spidey_assessment'
+      }).populate('projectId', 'title description projectType');
+
+      for (const config of spideyConfigs) {
+        const spideyAssessment = {
+          id: config._id.toString(),
+          type: 'spidey_assessment',
+          title: config.title,
+          description: config.description,
+          category: 'quality_enforcement',
+          difficulty: 'expert',
+          estimatedDuration: 165, // Sum of all stage time limits
+          totalStages: 4,
+          stageLimits: {
+            stage1: config.stages.stage1.timeLimit,
+            stage2: config.stages.stage2.timeLimit,
+            stage3: config.stages.stage3.timeLimit,
+            stage4: config.stages.stage4.timeLimit
+          },
+          passingScore: config.scoring.passingScore,
+          maxAttempts: config.retakePolicy.maxAttempts,
+          cooldownDays: config.retakePolicy.cooldownDays,
+          isActive: true,
+          projectInfo: {
+            id: config.projectId?._id,
+            name: config.projectId?.title || 'Prompt Instantiation Project',
+            type: config.projectId?.projectType || 'assessment'
+          },
+          requirements: [
+            '⚠️ HIGH-DISCIPLINE ASSESSMENT',
+            'Passing score: 85% minimum',
+            'Zero tolerance for rule violations',
+            'Server authority - no frontend scoring',
+            'One attempt only - no retakes',
+            'Mandatory QA review for all submissions'
+          ],
+          instructions: 'This is a quality enforcement engine designed to protect partner accounts. Any rule violation results in immediate failure. The assessment uses a 4-stage state machine with hard rules and integrity testing.',
+          benefits: [
+            'Access to highest-tier projects',
+            'Premium compensation rates',
+            'Quality assurance reviewer privileges',
+            'Partner account protection certification'
+          ],
+          stages: [
+            { 
+              name: 'Guideline Comprehension', 
+              timeLimit: config.stages.stage1.timeLimit,
+              description: 'Quiz with auto-fail on critical mistakes'
+            },
+            { 
+              name: 'Mini Task Validation', 
+              timeLimit: config.stages.stage2.timeLimit,
+              description: 'Automated validation with forbidden keyword detection'
+            },
+            { 
+              name: 'Golden Solution & Rubric', 
+              timeLimit: config.stages.stage3.timeLimit,
+              description: 'File validation and rubric quality assessment'
+            },
+            { 
+              name: 'Integrity Trap', 
+              timeLimit: config.stages.stage4.timeLimit,
+              description: 'Blind compliance detection and violation flagging'
+            }
+          ],
+          warnings: [
+            '🚫 Forbidden keywords = immediate fail',
+            '🚫 Missing file references = immediate fail',
+            '🚫 Blind compliance = immediate fail',
+            '🚫 Rule violations = immediate fail',
+            '⚡ Server has final authority on all decisions'
+          ]
+        };
+
+        // Check user's Spidey assessment status
+        const DTUser = require('../models/dtUser.model');
+        const user = await DTUser.findById(userId).select('spideyAssessmentStatus');
+        
+        // Check for existing submissions
+        const SpideyAssessmentSubmission = require('../models/spideyAssessmentSubmission.model');
+        const latestSubmission = await SpideyAssessmentSubmission.findOne({
+          annotatorId: userId,
+          assessmentId: config._id
+        }).sort({ createdAt: -1 });
+
+        spideyAssessment.userStatus = {
+          hasAttempted: !!latestSubmission,
+          status: user?.spideyAssessmentStatus || 'not_started',
+          currentStage: latestSubmission?.currentStage || null,
+          lastAttemptDate: latestSubmission?.createdAt || null,
+          finalScore: latestSubmission?.finalScore || null,
+          canRetake: false, // Spidey allows no retakes by default
+          nextRetakeAvailable: null,
+          submissionStatus: latestSubmission?.status || null
+        };
+
+        // Override retake based on strict policy (Spidey typically allows no retakes)
+        if (latestSubmission && (latestSubmission.status === 'failed' || latestSubmission.status === 'rejected')) {
+          spideyAssessment.userStatus.canRetake = false;
+          spideyAssessment.userStatus.nextRetakeAvailable = 'No retakes allowed for Spidey assessment';
+        }
+
+        assessments.push(spideyAssessment);
+      }
+    } catch (spideyError) {
+      console.error('⚠️ Error fetching Spidey assessments:', spideyError);
+      // Continue without Spidey assessments - don't break the entire response
+    }
+
     // Sort assessments by type and difficulty
     assessments.sort((a, b) => {
       if (a.type !== b.type) {
@@ -874,11 +989,13 @@ const getAllAssessments = async (req, res) => {
           totalAssessments: assessments.length,
           englishProficiency: assessments.filter(a => a.type === 'english_proficiency').length,
           multimediaAssessments: assessments.filter(a => a.type === 'multimedia_assessment').length,
+          spideyAssessments: assessments.filter(a => a.type === 'spidey_assessment').length,
           userCanTake: assessments.filter(a => a.userStatus.canRetake).length
         },
         instructions: {
           english: 'Start with the English Proficiency Assessment to qualify as an annotator',
           multimedia: 'Complete multimedia assessments to access specialized video annotation projects',
+          spidey: '⚠️ Spidey is a high-discipline assessment with zero tolerance for violations - ONE ATTEMPT ONLY',
           general: 'Each assessment has specific requirements and cooldown periods between attempts'
         }
       }
@@ -976,14 +1093,14 @@ const startAssessmentById = async (req, res) => {
         }
       }
 
-      // Check attempt limits
-      const attemptCount = user.multimediaAssessmentAttempts || 0;
-      if (attemptCount >= assessmentConfig.requirements.retakePolicy.maxAttempts) {
-        return res.status(400).json({
-          success: false,
-          message: `Maximum attempts (${assessmentConfig.requirements.retakePolicy.maxAttempts}) reached for this assessment`
-        });
-      }
+      // Check attempt limits - DISABLED to allow unlimited retakes
+      // const attemptCount = user.multimediaAssessmentAttempts || 0;
+      // if (attemptCount >= assessmentConfig.requirements.retakePolicy.maxAttempts) {
+      //   return res.status(400).json({
+      //     success: false,
+      //     message: `Maximum attempts (${assessmentConfig.requirements.retakePolicy.maxAttempts}) reached for this assessment`
+      //   });
+      // }
 
       // Use existing multimedia assessment session controller
       const { startAssessmentSession } = require('./multimediaAssessmentSession.controller');
@@ -1647,7 +1764,7 @@ const getUserAssessmentsOverview = async (req, res) => {
               hasAttempted: userAttempts.length > 0,
               totalAttempts: userAttempts.length,
               isPassed: passedAttempts.length > 0,
-              canRetake: canRetake && userAttempts.length < (config.maxAttempts || 3),
+              canRetake: canRetake, // Unlimited retakes enabled
               nextRetakeAvailable: canRetake ? null : 
                 new Date(new Date(latestAttempt?.createdAt).getTime() + cooldownHours * 60 * 60 * 1000),
               

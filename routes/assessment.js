@@ -25,6 +25,16 @@ const {
   getAvailableReels
 } = require('../controller/multimediaAssessmentSession.controller');
 
+// Import Spidey Assessment Controller (integrates with existing system)
+const {
+  startSpideyAssessment,
+  submitStage1,
+  submitStage2,
+  submitStage3,
+  submitStage4,
+  getSpideyAssessmentStatus
+} = require('../controller/spideyAssessment.controller');
+
 // Import middleware
 const { authenticateToken } = require('../middleware/auth');
 const { authenticateAdmin } = require('../middleware/adminAuth');
@@ -124,11 +134,11 @@ router.get('/multimedia/session/:submissionId', authenticateToken, getAssessment
 router.post('/multimedia/:submissionId/save-progress', authenticateToken, saveTaskProgress);
 
 /**
- * @route POST /api/assessments/multimedia/:submissionId/submit-task
+ * @route POST /api/assessments/multimedia/:submissionId/submit-task/:taskNumber
  * @desc Submit individual task in multimedia assessment
  * @access Private (Annotator)
  */
-router.post('/multimedia/:submissionId/submit-task', authenticateToken, submitTask);
+router.post('/multimedia/:submissionId/submit-task/:taskNumber', authenticateToken, submitTask);
 
 /**
  * @route POST /api/assessments/multimedia/:submissionId/timer
@@ -150,6 +160,67 @@ router.post('/multimedia/:submissionId/submit', authenticateToken, submitMultime
  * @access Private (Annotator)
  */
 router.get('/multimedia/reels/:assessmentId', authenticateToken, getAvailableReels);
+
+// ==========================================
+// SPIDEY ASSESSMENT ROUTES (HIGH-DISCIPLINE)
+// ==========================================
+
+/**
+ * @route POST /api/assessments/spidey/start
+ * @desc Start Spidey High-Discipline Assessment
+ * @access Private (User)
+ * @returns New Spidey assessment session with Stage 1 configuration
+ * @note Integrates with existing assessment infrastructure
+ */
+router.post('/spidey/start', authenticateToken, startSpideyAssessment);
+
+/**
+ * @route GET /api/assessments/spidey/:submissionId/status
+ * @desc Get current Spidey assessment status and progress
+ * @access Private (User - own assessment)
+ * @returns Assessment status, current stage, and completion data
+ */
+router.get('/spidey/:submissionId/status', authenticateToken, getSpideyAssessmentStatus);
+
+/**
+ * @route POST /api/assessments/spidey/:submissionId/stage1/submit
+ * @desc Submit Stage 1 - Guideline Comprehension responses
+ * @access Private (User)
+ * @body { responses: Array, timeSpent: Number }
+ * @returns Stage completion result and next stage info
+ * @note Server authority - frontend never decides pass/fail
+ */
+router.post('/spidey/:submissionId/stage1/submit', authenticateToken, submitStage1);
+
+/**
+ * @route POST /api/assessments/spidey/:submissionId/stage2/submit
+ * @desc Submit Stage 2 - Mini Task Validation
+ * @access Private (User)
+ * @body { promptText, domain, failureExplanation, fileReferences, response, timeSpent }
+ * @returns Validation results and progression status
+ * @note Hard rules enforced - any violation = immediate fail
+ */
+router.post('/spidey/:submissionId/stage2/submit', authenticateToken, submitStage2);
+
+/**
+ * @route POST /api/assessments/spidey/:submissionId/stage3/submit
+ * @desc Submit Stage 3 - Golden Solution & Rubric
+ * @access Private (User)
+ * @body { positiveRubric, negativeRubric, timeSpent }
+ * @note Files uploaded separately, virus scan required
+ * @returns File validation and rubric assessment results
+ */
+router.post('/spidey/:submissionId/stage3/submit', authenticateToken, submitStage3);
+
+/**
+ * @route POST /api/assessments/spidey/:submissionId/stage4/submit
+ * @desc Submit Stage 4 - Integrity Trap Evaluation
+ * @access Private (User)
+ * @body { instructionGiven, userResponse, violationFlagged, responseTime, timeSpent }
+ * @returns Final assessment completion and scoring
+ * @note Blind compliance detection - critical for quality enforcement
+ */
+router.post('/spidey/:submissionId/stage4/submit', authenticateToken, submitStage4);
 
 // ==========================================
 // ADMIN ASSESSMENT ROUTES

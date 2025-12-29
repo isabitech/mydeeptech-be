@@ -13,7 +13,7 @@ const assessmentSchema = new mongoose.Schema(
     // Assessment metadata
     assessmentType: {
       type: String,
-      enum: ['annotator_qualification', 'skill_assessment', 'project_specific'],
+      enum: ['annotator_qualification', 'skill_assessment', 'project_specific', 'spidey_assessment'],
       default: 'annotator_qualification',
       required: true
     },
