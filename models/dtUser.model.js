@@ -131,6 +131,7 @@ const dtUserSchema = new mongoose.Schema(
       account_name: { type: String, default: "" },
       account_number: { type: String, default: "" },
       bank_name: { type: String, default: "" },
+      bank_code: { type: String, default: "" }, // For Paystack integration
       payment_method: { 
         type: String, 
         enum: ["bank_transfer", "paypal", "crypto", "mobile_money", ""],

@@ -2,6 +2,8 @@ const Invoice = require('../models/invoice.model');
 const DTUser = require('../models/dtUser.model');
 const AnnotationProject = require('../models/annotationProject.model');
 const { sendInvoiceNotification, sendPaymentConfirmation, sendPaymentReminder } = require('../utils/paymentMailer');
+const { convertUSDToNGN } = require('../utils/exchangeRateService');
+const { getBankCode, validatePaymentInfo } = require('../utils/bankCodeMapping');
 const Joi = require('joi');
 const mongoose = require('mongoose');
 
@@ -525,11 +527,260 @@ const deleteInvoice = async (req, res) => {
   }
 };
 
+// Admin function: Bulk authorize payment for all unpaid invoices
+const bulkAuthorizePayment = async (req, res) => {
+  try {
+    console.log(`💰 Admin ${req.admin.email} initiating bulk payment authorization`);
+
+    // Get all unpaid invoices
+    const unpaidInvoices = await Invoice.find({ 
+      paymentStatus: { $in: ['unpaid', 'overdue'] }
+    }).populate([
+      { path: 'dtUserId', select: 'fullName email' },
+      { path: 'projectId', select: 'projectName' }
+    ]);
+
+    if (unpaidInvoices.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No unpaid invoices found",
+        data: {
+          processedInvoices: 0,
+          totalAmount: 0,
+          emailsSent: 0,
+          errors: []
+        }
+      });
+    }
+
+    console.log(`📊 Found ${unpaidInvoices.length} unpaid invoices to process`);
+
+    const results = {
+      processedInvoices: 0,
+      totalAmount: 0,
+      emailsSent: 0,
+      errors: []
+    };
+
+    // Process each invoice
+    for (const invoice of unpaidInvoices) {
+      try {
+        // Mark as paid
+        await invoice.markAsPaid({
+          paymentMethod: 'bulk_transfer',
+          paymentReference: `BULK-${new Date().getTime()}`,
+          paymentNotes: `Bulk payment authorization by ${req.admin.email}`
+        });
+
+        results.processedInvoices++;
+        results.totalAmount += invoice.invoiceAmount;
+
+        // Send payment confirmation email
+        try {
+          await sendPaymentConfirmation(
+            invoice.dtUserId.email,
+            invoice.dtUserId.fullName,
+            {
+              invoiceNumber: invoice.invoiceNumber,
+              projectName: invoice.projectId.projectName,
+              amount: invoice.invoiceAmount,
+              currency: invoice.currency || 'USD',
+              paidAt: new Date()
+            }
+          );
+          results.emailsSent++;
+        } catch (emailError) {
+          console.error(`❌ Failed to send payment email for invoice ${invoice.invoiceNumber}:`, emailError);
+          results.errors.push({
+            invoiceNumber: invoice.invoiceNumber,
+            error: 'Email sending failed',
+            details: emailError.message
+          });
+        }
+
+      } catch (invoiceError) {
+        console.error(`❌ Failed to process invoice ${invoice.invoiceNumber}:`, invoiceError);
+        results.errors.push({
+          invoiceNumber: invoice.invoiceNumber,
+          error: 'Payment processing failed',
+          details: invoiceError.message
+        });
+      }
+    }
+
+    console.log(`✅ Bulk payment authorization completed. Processed: ${results.processedInvoices}, Emails sent: ${results.emailsSent}`);
+
+    res.status(200).json({
+      success: true,
+      message: "Bulk payment authorization completed",
+      data: results
+    });
+
+  } catch (error) {
+    console.error("❌ Error in bulk payment authorization:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error during bulk payment authorization",
+      error: error.message
+    });
+  }
+};
+
+// Admin function: Generate Paystack CSV for Nigerian freelancers
+const generatePaystackCSV = async (req, res) => {
+  try {
+    console.log(`📊 Admin ${req.admin.email} generating Paystack CSV`);
+
+    // Get unpaid invoices for Nigerian users
+    const unpaidInvoices = await Invoice.find({ 
+      paymentStatus: { $in: ['unpaid', 'overdue'] }
+    }).populate([
+      { path: 'dtUserId', select: 'fullName email personal_info payment_info' },
+      { path: 'projectId', select: 'projectName' }
+    ]);
+
+    if (unpaidInvoices.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No unpaid invoices found",
+        data: {
+          csvData: '',
+          totalInvoices: 0,
+          nigerianFreelancers: 0,
+          totalAmount: 0,
+          errors: []
+        }
+      });
+    }
+
+    const csvRows = [];
+    const results = {
+      totalInvoices: unpaidInvoices.length,
+      nigerianFreelancers: 0,
+      totalAmountUSD: 0,
+      totalAmountNGN: 0,
+      errors: []
+    };
+
+    // CSV Header
+    csvRows.push([
+      'Transfer Amount',
+      'Transfer Note (Optional)',
+      'Transfer Reference (Optional)',
+      'Recipient Code (This overrides all other details if available)',
+      'Bank Code or Slug',
+      'Account Number',
+      'Account Name (Optional)',
+      'Email Address (Optional)'
+    ]);
+
+    // Process each invoice
+    for (const invoice of unpaidInvoices) {
+      try {
+        const user = invoice.dtUserId;
+        
+        // Check if user is Nigerian (by country in personal_info)
+        const isNigerian = user.personal_info?.country?.toLowerCase() === 'nigeria' ||
+                          user.personal_info?.country?.toLowerCase() === 'ng';
+
+        if (!isNigerian) {
+          continue; // Skip non-Nigerian users
+        }
+
+        // Validate payment info
+        const validation = validatePaymentInfo(user.payment_info);
+        if (!validation.isValid) {
+          results.errors.push({
+            userId: user._id,
+            userEmail: user.email,
+            invoiceNumber: invoice.invoiceNumber,
+            error: 'Invalid payment info',
+            details: validation.errors.join(', ')
+          });
+          continue;
+        }
+
+        // Convert USD to NGN
+        const amountNGN = await convertUSDToNGN(invoice.invoiceAmount);
+        
+        // Get bank code (try from user's bank_code field first, then map from bank_name)
+        const bankCode = user.payment_info.bank_code || getBankCode(user.payment_info.bank_name);
+        
+        if (!bankCode) {
+          results.errors.push({
+            userId: user._id,
+            userEmail: user.email,
+            invoiceNumber: invoice.invoiceNumber,
+            error: 'Bank code not found',
+            details: `Unable to map bank: ${user.payment_info.bank_name}`
+          });
+          continue;
+        }
+
+        // Add CSV row
+        csvRows.push([
+          amountNGN.toFixed(2),
+          `${invoice.description || 'Project completion payment'} for ${user.fullName}`,
+          invoice.invoiceNumber,
+          '', // Leave recipient code empty
+          bankCode,
+          user.payment_info.account_number,
+          user.payment_info.account_name,
+          user.email
+        ]);
+
+        results.nigerianFreelancers++;
+        results.totalAmountUSD += invoice.invoiceAmount;
+        results.totalAmountNGN += amountNGN;
+
+      } catch (invoiceError) {
+        console.error(`❌ Failed to process invoice ${invoice.invoiceNumber}:`, invoiceError);
+        results.errors.push({
+          invoiceNumber: invoice.invoiceNumber,
+          error: 'Processing failed',
+          details: invoiceError.message
+        });
+      }
+    }
+
+    // Convert rows to CSV string
+    const csvContent = csvRows.map(row => 
+      row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(',')
+    ).join('\n');
+
+    console.log(`✅ Generated Paystack CSV for ${results.nigerianFreelancers} Nigerian freelancers`);
+    console.log(`💰 Total: $${results.totalAmountUSD.toFixed(2)} USD / ₦${results.totalAmountNGN.toFixed(2)} NGN`);
+
+    // Set CSV download headers
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="paystack-bulk-transfer-${new Date().toISOString().split('T')[0]}.csv"`);
+
+    res.status(200).json({
+      success: true,
+      message: "Paystack CSV generated successfully",
+      data: {
+        csvContent,
+        summary: results
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error generating Paystack CSV:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error generating CSV",
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   createInvoice,
   getAllInvoices,
   getInvoiceDetails,
   updatePaymentStatus,
   sendInvoiceReminder,
-  deleteInvoice
+  deleteInvoice,
+  bulkAuthorizePayment,
+  generatePaystackCSV
 };
