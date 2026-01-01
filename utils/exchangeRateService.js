@@ -23,16 +23,36 @@ const getUSDToNGNRate = async () => {
 
     console.log('📊 Fetching fresh USD/NGN exchange rate...');
     
-    // Fetch from exchangeratesapi.io
-    const response = await axios.get('https://api.exchangerate-api.com/v4/latest/USD', {
+    // Check if API key is available
+    const apiKey = process.env.EXCHANGE_RATES_API_KEY;
+    if (!apiKey) {
+      throw new Error('EXCHANGE_RATES_API_KEY environment variable is not set');
+    }
+
+    // Fetch from exchangeratesapi.io using latest endpoint (free plan uses EUR as base)
+    const response = await axios.get('https://api.exchangeratesapi.io/v1/latest', {
+      params: {
+        access_key: apiKey,
+        symbols: 'USD,NGN'
+      },
       timeout: 10000
     });
 
-    const ngnRate = response.data?.rates?.NGN;
-    
-    if (!ngnRate || typeof ngnRate !== 'number') {
-      throw new Error('Invalid NGN rate received from API');
+    // Check if API response indicates success
+    if (!response.data.success) {
+      const errorMessage = response.data.error?.info || response.data.error?.message || 'Unknown API error';
+      throw new Error(`Exchange rate API failed: ${errorMessage}`);
     }
+
+    const eurToUsd = response.data?.rates?.USD;
+    const eurToNgn = response.data?.rates?.NGN;
+    
+    if (!eurToUsd || !eurToNgn || typeof eurToUsd !== 'number' || typeof eurToNgn !== 'number') {
+      throw new Error('Invalid currency rates received from API');
+    }
+
+    // Calculate USD to NGN rate: NGN/USD = (EUR/NGN) / (EUR/USD)
+    const ngnRate = eurToNgn / eurToUsd;
 
     // Cache the rate
     rateCache = {
@@ -47,10 +67,14 @@ const getUSDToNGNRate = async () => {
   } catch (error) {
     console.error('❌ Failed to fetch exchange rate:', error.message);
     
-    // Return fallback rate if API fails
-    const fallbackRate = 1680; // Approximate USD/NGN rate as fallback
-    console.log(`⚠️ Using fallback USD/NGN rate: ${fallbackRate}`);
-    return fallbackRate;
+    // Log more details for debugging
+    if (error.response) {
+      console.error('API Response Status:', error.response.status);
+      console.error('API Response Data:', error.response.data);
+    }
+    
+    // Don't fallback - let the error propagate so dependent operations can fail gracefully
+    throw new Error(`Exchange rate service unavailable: ${error.message}`);
   }
 };
 

@@ -67,6 +67,20 @@ Authorization: Bearer <admin_token>
 }
 ```
 
+#### Error Response (Exchange Rate Service Failure):
+```json
+{
+  "success": false,
+  "message": "Cannot generate CSV due to exchange rate service failure",
+  "error": "Exchange rate service unavailable",
+  "details": {
+    "exchangeRateError": "Exchange rate service unavailable: EXCHANGE_RATES_API_KEY environment variable is not set",
+    "totalInvoices": 50,
+    "message": "Please try again later or contact support if the issue persists"
+  }
+}
+```
+
 ## CSV Format
 
 The generated CSV follows Paystack's bulk transfer format:
@@ -84,10 +98,21 @@ The generated CSV follows Paystack's bulk transfer format:
 
 ## Exchange Rate Integration
 
-- Uses `exchangeratesapi.io` for real-time USD/NGN conversion
+- Uses `exchangeratesapi.io` with API key authentication for real-time USD/NGN conversion
 - Implements caching (1-hour TTL) to reduce API calls
-- Falls back to approximate rate (₦1,680) if API fails
+- **No fallback rate** - API failures cause CSV generation to fail with detailed error response
 - Logs all conversion operations for audit trail
+- Requires `EXCHANGE_RATES_API_KEY` environment variable
+
+### API Configuration:
+```bash
+EXCHANGE_RATES_API_KEY=your_api_key_here
+```
+
+### API Endpoint Used:
+```
+GET https://api.exchangeratesapi.io/v1/convert?from=USD&to=NGN&amount=1&access_key=API_KEY
+```
 
 ## Bank Code Mapping
 
@@ -148,9 +173,10 @@ The DTUser profile update endpoint now accepts `bank_code`:
 
 ### Common Error Scenarios:
 1. **Invalid Payment Info**: Missing account details or unsupported bank
-2. **Exchange Rate API Failure**: Falls back to default rate
-3. **Email Delivery Failure**: Continues processing, logs errors
-4. **Non-Nigerian Users**: Skipped from CSV generation
+2. **Exchange Rate API Failure**: CSV generation fails with detailed error (no fallback)
+3. **Missing API Key**: Exchange rate service fails if `EXCHANGE_RATES_API_KEY` not set
+4. **Email Delivery Failure**: Continues processing, logs errors (bulk authorization only)
+5. **Non-Nigerian Users**: Skipped from CSV generation
 
 ### Error Response Format:
 ```json
@@ -175,6 +201,8 @@ The DTUser profile update endpoint now accepts `bank_code`:
 - Nigerian users must have `personal_info.country` set to "Nigeria" or "NG"
 - Users must have complete payment information including bank details
 - Bank names should match supported Nigerian banks list
+- **Required**: `EXCHANGE_RATES_API_KEY` environment variable must be set
+- Exchange rate API must be accessible and functional
 
 ### Performance:
 - Bulk operations use efficient aggregation queries

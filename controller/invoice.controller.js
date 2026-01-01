@@ -653,6 +653,27 @@ const generatePaystackCSV = async (req, res) => {
       });
     }
 
+    // Test exchange rate API first to fail fast
+    let exchangeRateError = null;
+    try {
+      await convertUSDToNGN(1); // Test conversion with $1
+      console.log('✅ Exchange rate API is working');
+    } catch (rateError) {
+      exchangeRateError = rateError.message;
+      console.error('❌ Exchange rate API failed:', exchangeRateError);
+      
+      return res.status(503).json({
+        success: false,
+        message: "Cannot generate CSV due to exchange rate service failure",
+        error: "Exchange rate service unavailable",
+        details: {
+          exchangeRateError,
+          totalInvoices: unpaidInvoices.length,
+          message: "Please try again later or contact support if the issue persists"
+        }
+      });
+    }
+
     const csvRows = [];
     const results = {
       totalInvoices: unpaidInvoices.length,
