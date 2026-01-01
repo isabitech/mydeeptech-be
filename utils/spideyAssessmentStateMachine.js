@@ -56,24 +56,38 @@ class SpideyAssessmentStateMachine {
   }
 
   /**
-   * Initialize or load candidate progress
+   * Initialize or load annotator progress
    * Persists state in database with timestamps
    */
-  async initializeCandidateProgress(assessmentId, candidateId) {
+  async initializeCandidateProgress(assessmentId, annotatorId) {
     try {
+      // Validate input parameters
+      if (!assessmentId) {
+        throw new Error('assessmentId is required');
+      }
+      if (!annotatorId) {
+        throw new Error('annotatorId is required');
+      }
+
       let submission = await this.SpideyAssessmentSubmission.findOne({
         assessmentId,
-        candidateId,
+        annotatorId,
         status: { $in: ['in_progress', 'submitted'] }
       });
 
       if (!submission) {
+        // Load assessment to get projectId
+        const assessment = await this.loadAssessment(assessmentId);
+
         // Create new submission with strict initial state
         submission = new this.SpideyAssessmentSubmission({
           assessmentId,
-          candidateId,
+          candidateId: annotatorId, // Set candidateId to annotatorId for compatibility
+          annotatorId: annotatorId, // Primary annotator reference
+          projectId: assessment.projectId, // Get from assessment config
           currentStage: null, // Must start from null - no shortcuts
           status: 'in_progress',
+          sessionStarted: new Date(), // Required field
           stageHistory: [],
           startedAt: new Date(),
           lastActivityAt: new Date(),
@@ -85,7 +99,7 @@ class SpideyAssessmentStateMachine {
         
         await this._logAudit('ASSESSMENT_STARTED', {
           assessmentId,
-          candidateId,
+          annotatorId,
           submissionId: submission._id,
           timestamp: new Date()
         });
@@ -93,7 +107,7 @@ class SpideyAssessmentStateMachine {
 
       return submission;
     } catch (error) {
-      await this._logError('CANDIDATE_INIT_FAILED', { assessmentId, candidateId, error: error.message });
+      await this._logError('CANDIDATE_INIT_FAILED', { assessmentId, annotatorId, error: error.message });
       throw error;
     }
   }
@@ -289,13 +303,23 @@ class SpideyAssessmentStateMachine {
    */
   async _logAudit(action, details) {
     try {
+      // Only log if we have minimum required data
+      if (!details.assessmentId || !details.annotatorId) {
+        console.log('Skipping audit log - insufficient data:', { action, details });
+        return;
+      }
+
       const auditEntry = new this.AuditLog({
-        entityType: 'SpideyAssessment',
-        action,
-        details,
+        assessmentId: details.assessmentId,
+        submissionId: details.submissionId || null, // May not exist yet
+        userId: details.annotatorId, // Use annotatorId as userId
+        action: action, // Must be one of the valid enum values
+        success: details.success !== false, // Default to true unless explicitly false
+        details: details,
         timestamp: new Date(),
-        source: 'StateMachine'
+        errorMessage: details.errorMessage || null
       });
+      
       await auditEntry.save();
     } catch (error) {
       console.error('Audit logging failed:', error);
@@ -308,9 +332,13 @@ class SpideyAssessmentStateMachine {
    */
   async _logError(errorType, details) {
     try {
-      await this._logAudit(`ERROR_${errorType}`, {
+      // Map error types to valid audit actions
+      const validAction = 'ASSESSMENT_FAILED'; // Use a valid enum value
+      
+      await this._logAudit(validAction, {
         ...details,
-        severity: 'ERROR'
+        success: false,
+        errorMessage: `${errorType}: ${details.error || 'Unknown error'}`
       });
     } catch (error) {
       console.error('Error logging failed:', error);

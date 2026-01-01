@@ -47,7 +47,7 @@ router.get('/verify-reset-token/:token', verifyResetToken);
 
 router.get('/getAllUsers', getAllUsers);
 router.get('/getUsers', getUsers)
-router.post('/createProject', createProject);
+router.post('/createProject', authenticateToken, createProject);
 router.get('/getProject', getProject)
 router.put('/updateProject/:id', updateProject)
 router.delete('/deleteProject/:id', deleteProject)

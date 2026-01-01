@@ -828,24 +828,56 @@ const getAllAssessments = async (req, res) => {
           }
         };
 
-        // Check user's multimedia assessment status
+        // Check user's multimedia assessment status from actual submissions
         const DTUser = require('../models/dtUser.model');
-        const user = await DTUser.findById(userId).select('multimediaAssessmentStatus multimediaAssessmentAttempts multimediaAssessmentLastAttempt multimediaAssessmentLastFailedAt');
+        const MultimediaAssessmentSubmission = require('../models/multimediaAssessmentSubmission.model');
+        
+        const user = await DTUser.findById(userId).select('multimediaAssessmentStatus multimediaAssessmentCompletedAt multimediaAssessmentLastFailedAt');
+        
+        // Get actual submission records for this user and assessment
+        const userSubmissions = await MultimediaAssessmentSubmission.find({
+          annotatorId: userId,
+          assessmentId: config._id
+        }).sort({ createdAt: -1 }).limit(10); // Get recent attempts
+        
+        const totalAttempts = userSubmissions.length;
+        const latestSubmission = userSubmissions[0];
+        
+        // Count attempts by status
+        const completedAttempts = userSubmissions.filter(sub => 
+          ['submitted', 'approved', 'rejected', 'revision_requested'].includes(sub.status)
+        ).length;
         
         multimediaAssessment.userStatus = {
-          hasAttempted: (user?.multimediaAssessmentAttempts || 0) > 0,
+          hasAttempted: totalAttempts > 0,
           status: user?.multimediaAssessmentStatus || 'not_started',
-          attempts: user?.multimediaAssessmentAttempts || 0,
-          lastAttemptDate: user?.multimediaAssessmentLastAttempt || null,
-          canRetake: true, // Will be validated on attempt
+          attempts: completedAttempts, // Count only completed attempts
+          lastAttemptDate: latestSubmission?.createdAt || user?.multimediaAssessmentCompletedAt || null,
+          canRetake: true, // Will be validated based on max attempts and cooldown
           nextRetakeAvailable: null
         };
+        
+        // Apply max attempts limit (now enforced)
+        const maxAttempts = multimediaAssessment.maxAttempts;
+        if (maxAttempts && completedAttempts >= maxAttempts) {
+          // Check if user has an approved submission - if so, they can't retake
+          const approvedSubmission = userSubmissions.find(sub => sub.status === 'approved');
+          if (approvedSubmission) {
+            multimediaAssessment.userStatus.canRetake = false;
+            multimediaAssessment.userStatus.status = 'approved';
+          } else {
+            // Reached max attempts without approval
+            multimediaAssessment.userStatus.canRetake = false;
+          }
+        }
 
-        // Check cooldown for multimedia assessment
-        if (user?.multimediaAssessmentLastFailedAt) {
+        // Check cooldown for multimedia assessment (only if failed recently)
+        if (user?.multimediaAssessmentLastFailedAt && multimediaAssessment.userStatus.canRetake) {
           const cooldownEnd = new Date(user.multimediaAssessmentLastFailedAt.getTime() + (multimediaAssessment.cooldownHours * 60 * 60 * 1000));
-          multimediaAssessment.userStatus.canRetake = new Date() >= cooldownEnd;
-          multimediaAssessment.userStatus.nextRetakeAvailable = cooldownEnd;
+          if (new Date() < cooldownEnd) {
+            multimediaAssessment.userStatus.canRetake = false;
+            multimediaAssessment.userStatus.nextRetakeAvailable = cooldownEnd;
+          }
         }
 
         assessments.push(multimediaAssessment);

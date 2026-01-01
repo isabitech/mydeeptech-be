@@ -6,6 +6,14 @@ const { ObjectId } = require('mongoose').Types;
 
 const createProject = async (req, res)  =>{
     try {
+        // Check if user is authenticated and is admin
+        if (!req.user || !req.user.userDoc || !req.user.userDoc.isAdmin) {
+            return res.status(403).json({ 
+                success: false,
+                message: 'Access denied. Admin privileges required to create projects.' 
+            });
+        }
+
         const { error } = projectSchema.validate(req.body);
         if (error) return res.status(400).json({ message: error.details[0].message });
         
@@ -15,7 +23,9 @@ const createProject = async (req, res)  =>{
         const project = {
             projectName: req.body.projectName,
             company: req.body.company,
-            dueDate: req.body.dueDate
+            dueDate: req.body.dueDate,
+            createdBy: req.user.userId,
+            createdAt: new Date()
         }
         const newProject = new projects(project)
         await newProject.save()

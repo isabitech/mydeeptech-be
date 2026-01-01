@@ -44,8 +44,17 @@ class SpideyAssessmentController {
    */
   async startAssessment(req, res) {
     try {
-      // Extract candidate ID from authenticated user
-      const candidateId = req.user._id;
+      // Extract annotator ID from authenticated user (from JWT token)
+      const annotatorId = req.user?.userId || req.userId;
+      
+      if (!annotatorId) {
+        console.log('❌ Missing annotator ID in Spidey assessment request');
+        return res.status(401).json({
+          success: false,
+          message: 'User authentication required',
+          code: 'USER_ID_MISSING'
+        });
+      }
       
       // Validate request
       const { error, value } = this.schemas.startAssessment.validate(req.body);
@@ -70,7 +79,7 @@ class SpideyAssessmentController {
       // Delegate to assessment engine
       const result = await this.assessmentEngine.startAssessment(
         assessmentId,
-        candidateId,
+        annotatorId,
         sessionData
       );
 

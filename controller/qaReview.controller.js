@@ -4,6 +4,7 @@ const MultimediaAssessmentSubmission = require('../models/multimediaAssessmentSu
 const QAReview = require('../models/qaReview.model');
 const DTUser = require('../models/dtUser.model');
 const MultimediaAssessmentConfig = require('../models/multimediaAssessmentConfig.model');
+const ProjectApplication = require('../models/projectApplication.model');
 const emailService = require('../utils/emailService');
 
 // Validation schemas
@@ -35,6 +36,22 @@ const batchReviewSchema = Joi.object({
  */
 const getPendingSubmissions = async (req, res) => {
     try {
+        // Check if user has QA reviewer permissions (qaStatus === 'approved')
+        const userQAStatus = req.user?.userDoc?.qaStatus;
+        const isAdmin = req.user?.userDoc?.isAdmin;
+        const isQAReviewer = isAdmin || userQAStatus === 'approved';
+        
+        if (!isQAReviewer) {
+            console.log('❌ QA Access denied for user:', req.user?.email, 'QA Status:', userQAStatus);
+            return res.status(403).json({
+                success: false,
+                message: 'Access denied. QA reviewer permissions required.',
+                code: 'INSUFFICIENT_PERMISSIONS'
+            });
+        }
+
+        console.log('🔍 QA: Fetching pending submissions for user:', req.user?.email);
+
         const { 
             page = 1, 
             limit = 20, 
@@ -51,6 +68,8 @@ const getPendingSubmissions = async (req, res) => {
             status: 'submitted',
             submittedAt: { $exists: true, $ne: null } 
         };
+
+        console.log('📋 Base query:', matchQuery);
 
         // Apply additional filters
         switch (filterBy) {
@@ -72,6 +91,42 @@ const getPendingSubmissions = async (req, res) => {
                     attemptNumber: { $gt: 1 }
                 };
                 break;
+        }
+
+        console.log('🔍 Final query with filters:', matchQuery);
+
+        // First, let's check if there are any matching documents
+        const matchCount = await MultimediaAssessmentSubmission.countDocuments(matchQuery);
+        console.log(`📊 Found ${matchCount} submissions matching query`);
+
+        if (matchCount === 0) {
+            console.log('⚠️  No submissions found with the specified criteria');
+            
+            // Let's check what data is available
+            const totalSubmissions = await MultimediaAssessmentSubmission.countDocuments();
+            const submittedCount = await MultimediaAssessmentSubmission.countDocuments({ status: 'submitted' });
+            
+            console.log(`📈 Debug info - Total: ${totalSubmissions}, Submitted: ${submittedCount}`);
+            
+            return res.json({
+                success: true,
+                data: {
+                    submissions: [],
+                    pagination: {
+                        currentPage: parseInt(page),
+                        totalPages: 0,
+                        totalItems: 0,
+                        hasNext: false,
+                        hasPrev: false
+                    },
+                    debug: {
+                        queryUsed: matchQuery,
+                        totalSubmissionsInDB: totalSubmissions,
+                        submittedSubmissionsInDB: submittedCount,
+                        message: 'No submissions match the current criteria'
+                    }
+                }
+            });
         }
 
         const submissions = await MultimediaAssessmentSubmission.aggregate([
@@ -140,6 +195,8 @@ const getPendingSubmissions = async (req, res) => {
             { $limit: parseInt(limit) }
         ]);
 
+        console.log(`✅ Aggregation completed, returned ${submissions.length} submissions`);
+
         const totalCount = await MultimediaAssessmentSubmission.countDocuments(matchQuery);
 
         res.json({
@@ -170,6 +227,20 @@ const getPendingSubmissions = async (req, res) => {
  */
 const getSubmissionForReview = async (req, res) => {
     try {
+        // Check if user has QA reviewer permissions (qaStatus === 'approved')
+        const userQAStatus = req.user?.userDoc?.qaStatus;
+        const isAdmin = req.user?.userDoc?.isAdmin;
+        const isQAReviewer = isAdmin || userQAStatus === 'approved';
+        
+        if (!isQAReviewer) {
+            console.log('❌ QA Access denied for user:', req.user?.email, 'QA Status:', userQAStatus);
+            return res.status(403).json({
+                success: false,
+                message: 'Access denied. QA reviewer permissions required.',
+                code: 'INSUFFICIENT_PERMISSIONS'
+            });
+        }
+
         const { submissionId } = req.params;
 
         const submission = await MultimediaAssessmentSubmission.findById(submissionId)
@@ -266,8 +337,8 @@ const reviewTask = async (req, res) => {
                 reviewerId,
                 taskScores: [],
                 overallScore: 0,
-                decision: 'approved', // Default, will be updated
-                feedback: ''
+                decision: 'Request Revision', // Temporary placeholder - will be updated in final review
+                feedback: 'Individual task reviews in progress'
             });
         } else {
             // Ensure reviewerId is set for existing reviews
@@ -357,6 +428,20 @@ const reviewTask = async (req, res) => {
  */
 const submitFinalReview = async (req, res) => {
     try {
+        // Check if user has QA reviewer permissions (qaStatus === 'approved')
+        const userQAStatus = req.user?.userDoc?.qaStatus;
+        const isAdmin = req.user?.userDoc?.isAdmin;
+        const isQAReviewer = isAdmin || userQAStatus === 'approved';
+        
+        if (!isQAReviewer) {
+            console.log('❌ QA Access denied for user:', req.user?.email, 'QA Status:', userQAStatus);
+            return res.status(403).json({
+                success: false,
+                message: 'Access denied. QA reviewer permissions required.',
+                code: 'INSUFFICIENT_PERMISSIONS'
+            });
+        }
+
         const { error, value } = finalReviewSchema.validate(req.body);
         if (error) {
             return res.status(400).json({
@@ -381,7 +466,14 @@ const submitFinalReview = async (req, res) => {
         // Find submission
         const submission = await MultimediaAssessmentSubmission.findById(submissionId)
             .populate('annotatorId', 'fullName email multimediaAssessmentStatus')
-            .populate('assessmentId', 'title projectId');
+            .populate({
+                path: 'assessmentId',
+                select: 'title projectId',
+                populate: {
+                    path: 'projectId',
+                    select: 'projectName projectCategory'
+                }
+            });
 
         if (!submission) {
             return res.status(404).json({
@@ -424,6 +516,7 @@ const submitFinalReview = async (req, res) => {
         await submission.save();
 
         // Update user multimedia assessment status
+        let projectAutoApproved = false;
         if (decision === 'Approve') {
             await DTUser.findByIdAndUpdate(
                 submission.annotatorId._id,
@@ -432,6 +525,53 @@ const submitFinalReview = async (req, res) => {
                     multimediaAssessmentCompletedAt: new Date()
                 }
             );
+            
+            // Auto-approve project application if exists
+            try {
+                const projectId = submission.assessmentId.projectId;
+                if (projectId) {
+                    const projectApplication = await ProjectApplication.findOneAndUpdate(
+                        {
+                            userId: submission.annotatorId._id,
+                            projectId: projectId,
+                            status: { $in: ['pending', 'under_review'] }
+                        },
+                        {
+                            status: 'approved',
+                            approvedAt: new Date(),
+                            approvedBy: req.user._id,
+                            approvalReason: 'Multimedia assessment passed - auto-approved'
+                        },
+                        { new: true }
+                    );
+                    
+                    if (projectApplication) {
+                        projectAutoApproved = true;
+                        console.log(`✅ Auto-approved project application ${projectApplication._id} for user ${submission.annotatorId._id}`);
+                    } else {
+                        // Create new project application if none exists
+                        const newApplication = new ProjectApplication({
+                            userId: submission.annotatorId._id,
+                            projectId: projectId,
+                            status: 'approved',
+                            appliedAt: new Date(),
+                            approvedAt: new Date(),
+                            approvedBy: req.user._id,
+                            approvalReason: 'Multimedia assessment passed - auto-approved',
+                            applicationData: {
+                                reason: 'Automatically approved based on multimedia assessment performance',
+                                experience: 'Demonstrated competency through multimedia assessment'
+                            }
+                        });
+                        await newApplication.save();
+                        projectAutoApproved = true;
+                        console.log(`✅ Created and approved new project application ${newApplication._id} for user ${submission.annotatorId._id}`);
+                    }
+                }
+            } catch (projectError) {
+                console.error('Error auto-approving project application:', projectError);
+                // Don't fail the QA approval if project approval fails
+            }
         } else if (decision === 'Reject') {
             await DTUser.findByIdAndUpdate(
                 submission.annotatorId._id,
@@ -443,29 +583,107 @@ const submitFinalReview = async (req, res) => {
         }
 
         // Send email notification
+        let emailSent = false;
         try {
-            await emailService.sendAssessmentResult({
-                userEmail: submission.annotatorId.email,
-                userName: submission.annotatorId.fullName,
-                assessmentTitle: submission.assessmentId.title,
-                decision,
-                overallScore,
-                feedback: overallFeedback,
-                canRetake: decision === 'Reject'
-            });
+            // Use direct Brevo API for better reliability
+            const brevo = require('@getbrevo/brevo');
+            const apiInstance = new brevo.TransactionalEmailsApi();
+            apiInstance.setApiKey(brevo.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY);
+            
+            const emailContent = `
+              <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background-color: #f8f9fa; padding: 20px;">
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+                  <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 300;">MyDeepTech</h1>
+                  <p style="color: #f1f3f4; margin: 10px 0 0 0; font-size: 16px;">Assessment Results</p>
+                </div>
+                
+                <div style="background-color: white; padding: 40px; border-radius: 0 0 10px 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                  <h2 style="color: #333; margin-bottom: 20px;">Dear ${submission.annotatorId.fullName},</h2>
+                  
+                  ${decision === 'Approve' ? `
+                    <div style="background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 5px; padding: 20px; margin: 20px 0; text-align: center;">
+                      <h3 style="color: #155724; margin: 0 0 10px 0;">🎉 Congratulations!</h3>
+                      <p style="color: #155724; margin: 0; font-size: 16px;"><strong>Your ${submission.assessmentId.title} has been approved!</strong></p>
+                    </div>
+                    
+                    <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">
+                      We're pleased to inform you that you have successfully passed your multimedia assessment with a score of <strong>${overallScore}%</strong>.
+                    </p>
+                    
+                    ${projectAutoApproved ? `
+                      <div style="background-color: #e2f3ff; border: 1px solid #b3d7ff; border-radius: 5px; padding: 15px; margin: 20px 0;">
+                        <h3 style="color: #0c5aa6; margin: 0 0 10px 0;">🚀 Project Access Granted</h3>
+                        <p style="color: #0c5aa6; margin: 0; font-size: 14px;">
+                          You have been automatically approved for the <strong>${submission.assessmentId.projectId?.projectName}</strong> project. 
+                          You can now access project tasks and start earning.
+                        </p>
+                      </div>
+                    ` : ''}
+                  ` : `
+                    <div style="background-color: #f8d7da; border: 1px solid #f5c6cb; border-radius: 5px; padding: 20px; margin: 20px 0; text-align: center;">
+                      <h3 style="color: #721c24; margin: 0 0 10px 0;">Assessment Results</h3>
+                      <p style="color: #721c24; margin: 0; font-size: 16px;">Your ${submission.assessmentId.title} requires revision.</p>
+                    </div>
+                    
+                    <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">
+                      Your assessment score was <strong>${overallScore}%</strong>. While this doesn't meet our current requirements, we encourage you to review the feedback and try again.
+                    </p>
+                  `}
+                  
+                  ${overallFeedback ? `
+                    <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 5px; padding: 15px; margin: 20px 0;">
+                      <h3 style="color: #856404; margin: 0 0 10px 0;">📝 Feedback</h3>
+                      <p style="color: #856404; margin: 0; font-size: 14px;">${overallFeedback}</p>
+                    </div>
+                  ` : ''}
+                  
+                  <div style="text-align: center; margin: 30px 0;">
+                    <a href="https://mydeeptech.ng/dashboard" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: 500;">View Dashboard</a>
+                  </div>
+                  
+                  <p style="color: #555; line-height: 1.6; margin-bottom: 20px;">
+                    Thank you for participating in our assessment process. If you have any questions, please don't hesitate to contact our support team.
+                  </p>
+                  
+                  <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+                  
+                  <div style="text-align: center; color: #888; font-size: 12px;">
+                    <p>Best regards,<br><strong>MyDeepTech QA Team</strong></p>
+                  </div>
+                </div>
+              </div>
+            `;
+            
+            const sendSmtpEmail = new brevo.SendSmtpEmail();
+            sendSmtpEmail.subject = decision === 'Approve' ? 
+              `🎉 Assessment Approved - Welcome to ${submission.assessmentId.projectId?.projectName}` : 
+              `Assessment Results - ${submission.assessmentId.title}`;
+            sendSmtpEmail.htmlContent = emailContent;
+            sendSmtpEmail.sender = { 
+              name: "MyDeepTech QA Team", 
+              email: process.env.BREVO_SENDER_EMAIL || "no-reply@mydeeptech.ng" 
+            };
+            sendSmtpEmail.to = [{ email: submission.annotatorId.email, name: submission.annotatorId.fullName }];
+            sendSmtpEmail.replyTo = { email: "support@mydeeptech.ng", name: "MyDeepTech Support" };
+            
+            await apiInstance.sendTransacEmail(sendSmtpEmail);
+            emailSent = true;
+            console.log(`✅ Assessment result email sent to ${submission.annotatorId.email}`);
         } catch (emailError) {
             console.error('Failed to send assessment result email:', emailError);
+            emailSent = false;
         }
 
         res.json({
             success: true,
-            message: `Assessment ${decision.toLowerCase()}d successfully`,
+            message: `Assessment ${decision.toLowerCase()}d successfully${projectAutoApproved ? ' and project application auto-approved' : ''}`,
             data: {
                 decision,
                 overallScore,
                 submissionStatus: newSubmissionStatus,
                 userStatus: newUserStatus,
-                emailSent: true
+                emailSent,
+                projectAutoApproved
             }
         });
     } catch (error) {
@@ -483,6 +701,20 @@ const submitFinalReview = async (req, res) => {
  */
 const getReviewerDashboard = async (req, res) => {
     try {
+        // Check if user has QA reviewer permissions (qaStatus === 'approved')
+        const userQAStatus = req.user?.userDoc?.qaStatus;
+        const isAdmin = req.user?.userDoc?.isAdmin;
+        const isQAReviewer = isAdmin || userQAStatus === 'approved';
+        
+        if (!isQAReviewer) {
+            console.log('❌ QA Access denied for user:', req.user?.email, 'QA Status:', userQAStatus);
+            return res.status(403).json({
+                success: false,
+                message: 'Access denied. QA reviewer permissions required.',
+                code: 'INSUFFICIENT_PERMISSIONS'
+            });
+        }
+
         const reviewerId = req.user._id;
 
         // Get reviewer statistics
@@ -555,6 +787,20 @@ const getReviewerDashboard = async (req, res) => {
  */
 const batchReviewSubmissions = async (req, res) => {
     try {
+        // Check if user has QA reviewer permissions (qaStatus === 'approved')
+        const userQAStatus = req.user?.userDoc?.qaStatus;
+        const isAdmin = req.user?.userDoc?.isAdmin;
+        const isQAReviewer = isAdmin || userQAStatus === 'approved';
+        
+        if (!isQAReviewer) {
+            console.log('❌ QA Access denied for user:', req.user?.email, 'QA Status:', userQAStatus);
+            return res.status(403).json({
+                success: false,
+                message: 'Access denied. QA reviewer permissions required.',
+                code: 'INSUFFICIENT_PERMISSIONS'
+            });
+        }
+
         const { error, value } = batchReviewSchema.validate(req.body);
         if (error) {
             return res.status(400).json({
@@ -645,6 +891,20 @@ const batchReviewSubmissions = async (req, res) => {
  */
 const getSubmissionAnalytics = async (req, res) => {
     try {
+        // Check if user has QA reviewer permissions (qaStatus === 'approved')
+        const userQAStatus = req.user?.userDoc?.qaStatus;
+        const isAdmin = req.user?.userDoc?.isAdmin;
+        const isQAReviewer = isAdmin || userQAStatus === 'approved';
+        
+        if (!isQAReviewer) {
+            console.log('❌ QA Access denied for user:', req.user?.email, 'QA Status:', userQAStatus);
+            return res.status(403).json({
+                success: false,
+                message: 'Access denied. QA reviewer permissions required.',
+                code: 'INSUFFICIENT_PERMISSIONS'
+            });
+        }
+
         const { 
             startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Last 30 days
             endDate = new Date()
@@ -742,6 +1002,20 @@ const getSubmissionAnalytics = async (req, res) => {
  */
 const getApprovedSubmissions = async (req, res) => {
     try {
+        // Check if user has QA reviewer permissions (qaStatus === 'approved')
+        const userQAStatus = req.user?.userDoc?.qaStatus;
+        const isAdmin = req.user?.userDoc?.isAdmin;
+        const isQAReviewer = isAdmin || userQAStatus === 'approved';
+        
+        if (!isQAReviewer) {
+            console.log('❌ QA Access denied for user:', req.user?.email, 'QA Status:', userQAStatus);
+            return res.status(403).json({
+                success: false,
+                message: 'Access denied. QA reviewer permissions required.',
+                code: 'INSUFFICIENT_PERMISSIONS'
+            });
+        }
+
         const { 
             page = 1, 
             limit = 20, 
@@ -893,6 +1167,20 @@ const getApprovedSubmissions = async (req, res) => {
  */
 const getRejectedSubmissions = async (req, res) => {
     try {
+        // Check if user has QA reviewer permissions (qaStatus === 'approved')
+        const userQAStatus = req.user?.userDoc?.qaStatus;
+        const isAdmin = req.user?.userDoc?.isAdmin;
+        const isQAReviewer = isAdmin || userQAStatus === 'approved';
+        
+        if (!isQAReviewer) {
+            console.log('❌ QA Access denied for user:', req.user?.email, 'QA Status:', userQAStatus);
+            return res.status(403).json({
+                success: false,
+                message: 'Access denied. QA reviewer permissions required.',
+                code: 'INSUFFICIENT_PERMISSIONS'
+            });
+        }
+
         const { 
             page = 1, 
             limit = 20, 

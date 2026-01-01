@@ -29,6 +29,36 @@ const { authenticateToken } = require('../middleware/auth');
 router.get('/submissions/pending', authenticateToken, getPendingSubmissions);
 
 /**
+ * @route GET /api/qa/debug/check
+ * @desc Debug endpoint to check QA system status
+ * @access Private
+ */
+router.get('/debug/check', authenticateToken, async (req, res) => {
+    try {
+        const MultimediaAssessmentSubmission = require('../models/multimediaAssessmentSubmission.model');
+        
+        const totalCount = await MultimediaAssessmentSubmission.countDocuments();
+        const submittedCount = await MultimediaAssessmentSubmission.countDocuments({ status: 'submitted' });
+        const statusBreakdown = await MultimediaAssessmentSubmission.aggregate([
+            { $group: { _id: '$status', count: { $sum: 1 } } },
+            { $sort: { count: -1 } }
+        ]);
+        
+        res.json({
+            success: true,
+            debug: {
+                totalSubmissions: totalCount,
+                submittedSubmissions: submittedCount,
+                statusBreakdown: statusBreakdown,
+                user: req.user ? { email: req.user.email, roles: req.user.userDoc?.roles } : null
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+/**
  * @route GET /api/qa/submissions/approved
  * @desc Get approved submissions
  * @access Private (QA Reviewer)

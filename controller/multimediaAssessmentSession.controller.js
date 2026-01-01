@@ -443,18 +443,89 @@ const submitTask = async (req, res) => {
     // Mark task as completed
     await submission.completeTask(parseInt(taskNumber));
     
-    console.log(`✅ Task ${taskNumber} submitted in session ${submissionId}`);
+    // Refresh submission to get updated task data
+    await submission.populate([
+      { path: 'assessmentId' },
+      { path: 'annotatorId', select: 'fullName email' },
+      { path: 'projectId', select: 'projectName' }
+    ]);
+    
+    // Check if all tasks are now completed
+    const incompleteTasks = submission.tasks.filter(task => !task.isCompleted);
+    let isAssessmentAutoSubmitted = false;
+    
+    if (incompleteTasks.length === 0) {
+      console.log(`🎯 All tasks completed! Auto-submitting assessment ${submissionId}`);
+      
+      try {
+        // Stop timer if running
+        if (submission.timerState.isRunning) {
+          await submission.pauseTimer();
+        }
+        
+        // Update submission status to submitted
+        submission.status = 'submitted';
+        submission.submittedAt = new Date();
+        
+        // Update user's multimedia assessment status
+        const user = await DTUser.findById(userId);
+        if (user) {
+          user.multimediaAssessmentStatus = 'under_review';
+          await user.save();
+        }
+        
+        await submission.save();
+        
+        // Update assessment statistics
+        if (submission.assessmentId && submission.assessmentId.statistics) {
+          submission.assessmentId.statistics.totalCompletions += 1;
+          await submission.assessmentId.save();
+        }
+        
+        // Send completion email to user
+        try {
+          await sendAssessmentCompletionEmail(
+            submission.annotatorId.email,
+            submission.annotatorId.fullName,
+            {
+              assessmentTitle: submission.assessmentId.title,
+              projectName: submission.projectId.projectName,
+              submissionId: submission._id,
+              completedTasks: submission.tasks.length,
+              totalTimeSpent: submission.formattedTimeSpent,
+              completedAt: submission.submittedAt
+            }
+          );
+          console.log(`📧 Assessment completion email sent to ${submission.annotatorId.email}`);
+        } catch (emailError) {
+          console.error('❌ Error sending completion email:', emailError.message);
+          // Don't fail the submission if email fails
+        }
+        
+        isAssessmentAutoSubmitted = true;
+        console.log(`✅ Assessment ${submissionId} automatically submitted after final task completion`);
+        
+      } catch (autoSubmitError) {
+        console.error(`❌ Error auto-submitting assessment ${submissionId}:`, autoSubmitError.message);
+        // Don't fail the task submission if auto-submit fails
+      }
+    }
+    
+    console.log(`✅ Task ${taskNumber} submitted in session ${submissionId}${isAssessmentAutoSubmitted ? ' - Assessment auto-submitted!' : ''}`);
     
     res.status(200).json({
       success: true,
-      message: `Task ${taskNumber} submitted successfully`,
+      message: `Task ${taskNumber} submitted successfully${isAssessmentAutoSubmitted ? '. Assessment automatically submitted for QA review!' : ''}`,
       data: {
         taskNumber: parseInt(taskNumber),
         submittedAt: task.submittedAt,
         conversationTurns: task.conversation.turns.length,
         totalDuration: task.conversation.totalDuration,
         completionPercentage: submission.completionPercentage,
-        isAssessmentComplete: submission.completionPercentage === 100
+        isAssessmentComplete: submission.completionPercentage === 100,
+        assessmentAutoSubmitted: isAssessmentAutoSubmitted,
+        assessmentStatus: submission.status,
+        assessmentSubmittedAt: submission.submittedAt
       }
     });
     

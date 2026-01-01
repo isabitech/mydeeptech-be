@@ -28,18 +28,18 @@ class SpideyAssessmentEngine {
   }
 
   /**
-   * Start assessment for candidate
+   * Start assessment for annotator
    * Initialize state machine and create submission
    */
-  async startAssessment(assessmentId, candidateId, sessionData = {}) {
+  async startAssessment(assessmentId, annotatorId, sessionData = {}) {
     try {
       // Load assessment configuration
       const assessment = await this.stateMachine.loadAssessment(assessmentId);
       
-      // Initialize candidate progress
+      // Initialize annotator progress
       const submission = await this.stateMachine.initializeCandidateProgress(
         assessmentId, 
-        candidateId
+        annotatorId
       );
 
       // Record session metadata
@@ -54,24 +54,37 @@ class SpideyAssessmentEngine {
 
       await this._logAction('ASSESSMENT_STARTED', {
         assessmentId,
-        candidateId,
+        annotatorId,
         submissionId: submission._id,
         assessment: assessment.title
       });
 
+      // Get stage1 configuration and content for frontend
+      const stage1Config = this._formatStageConfigForFrontend(assessment.stages.stage1, 'stage1');
+      
       return {
         success: true,
         submissionId: submission._id,
         currentStage: 'stage1',
         assessmentTitle: assessment.title,
         timeLimit: this.STAGE_TIMEOUTS.stage1,
-        message: 'Assessment started successfully'
+        message: 'Assessment started successfully',
+        
+        // Stage1 specific data
+        stageConfig: stage1Config,
+        
+        // Assessment metadata
+        assessmentInfo: {
+          totalStages: 4,
+          description: assessment.description || 'Spidey High-Discipline Assessment System',
+          projectId: assessment.projectId
+        }
       };
 
     } catch (error) {
       await this._logError('ASSESSMENT_START_FAILED', {
         assessmentId,
-        candidateId,
+        annotatorId,
         error: error.message
       });
       throw error;
@@ -308,6 +321,12 @@ class SpideyAssessmentEngine {
       const state = await this.stateMachine.getAssessmentState(submissionId);
       const submission = await this.SpideyAssessmentSubmission.findById(submissionId);
       
+      // Get assessment configuration to include current stage details
+      const assessment = await this.stateMachine.loadAssessment(state.assessmentId);
+      const currentStageConfig = state.currentStage && assessment.stages[state.currentStage] 
+        ? this._formatStageConfigForFrontend(assessment.stages[state.currentStage], state.currentStage)
+        : null;
+      
       return {
         success: true,
         submissionId,
@@ -324,7 +343,17 @@ class SpideyAssessmentEngine {
         stageHistory: state.stageHistory,
         ruleViolations: state.ruleViolations,
         finalScore: submission?.finalScore,
-        availableActions: this._getAvailableActions(state)
+        availableActions: this._getAvailableActions(state),
+        
+        // Include current stage configuration and details
+        stageConfig: currentStageConfig,
+        
+        // Assessment metadata
+        assessmentInfo: {
+          totalStages: 4,
+          description: assessment.description || 'Spidey High-Discipline Assessment System',
+          projectId: assessment.projectId
+        }
       };
 
     } catch (error) {
@@ -568,12 +597,34 @@ class SpideyAssessmentEngine {
    */
   async _logAction(action, details) {
     try {
+      // Only log if we have minimum required data
+      if (!details.assessmentId || !details.annotatorId) {
+        console.log('Skipping action log - insufficient data:', { action, details });
+        return;
+      }
+
+      // Map action names to valid audit enum values
+      const actionMap = {
+        'ASSESSMENT_STARTED': 'ASSESSMENT_STARTED',
+        'ASSESSMENT_COMPLETED': 'ASSESSMENT_COMPLETED', 
+        'STAGE_COMPLETED': 'STAGE_SUBMITTED',
+        'STAGE_FAILED': 'ASSESSMENT_FAILED',
+        'ASSESSMENT_TERMINATED': 'ASSESSMENT_FAILED',
+        'ASSESSMENT_EXPIRED': 'ASSESSMENT_FAILED'
+      };
+
+      const validAction = actionMap[action] || 'AUDIT_GENERATED';
+
       const auditEntry = new this.AuditLog({
-        entityType: 'SpideyAssessmentEngine',
-        action,
-        details,
-        source: 'AssessmentEngine'
+        assessmentId: details.assessmentId,
+        submissionId: details.submissionId || null,
+        userId: details.annotatorId,
+        action: validAction,
+        success: !action.includes('FAILED') && !action.includes('TERMINATED'),
+        details: details,
+        timestamp: new Date()
       });
+      
       await auditEntry.save();
     } catch (error) {
       console.error('Action logging failed:', error);
@@ -582,15 +633,86 @@ class SpideyAssessmentEngine {
 
   async _logError(errorType, details) {
     try {
+      // Only log if we have minimum required data
+      if (!details.assessmentId || !details.annotatorId) {
+        console.log('Skipping engine error log - insufficient data:', { errorType, details });
+        return;
+      }
+
       const auditEntry = new this.AuditLog({
-        entityType: 'SpideyAssessmentEngine',
-        action: `ERROR_${errorType}`,
+        assessmentId: details.assessmentId,
+        submissionId: details.submissionId || null,
+        userId: details.annotatorId,
+        action: 'ASSESSMENT_FAILED', // Use valid enum value
+        success: false,
         details: { ...details, severity: 'ERROR' },
-        source: 'AssessmentEngine'
+        errorMessage: `${errorType}: ${details.error || 'Unknown error'}`,
+        timestamp: new Date()
       });
+      
       await auditEntry.save();
     } catch (error) {
       console.error('Error logging failed:', error);
+    }
+  }
+
+  /**
+   * Format stage configuration for frontend (excludes sensitive data like correct answers)
+   */
+  _formatStageConfigForFrontend(stageConfig, stageName) {
+    if (!stageConfig) return null;
+
+    const baseConfig = {
+      name: stageConfig.name,
+      timeLimit: stageConfig.timeLimit
+    };
+
+    // Add stage-specific configuration
+    switch (stageName) {
+      case 'stage1':
+        return {
+          ...baseConfig,
+          passingScore: stageConfig.passingScore,
+          questions: stageConfig.questions ? stageConfig.questions.map(q => ({
+            questionId: q.questionId,
+            questionText: q.questionText,
+            questionType: q.questionType,
+            options: q.options ? q.options.map(opt => ({
+              optionId: opt.optionId,
+              optionText: opt.optionText
+              // Note: isCorrect is excluded for security
+            })) : undefined,
+            isCritical: q.isCritical,
+            points: q.points
+          })) : []
+        };
+        
+      case 'stage2':
+        return {
+          ...baseConfig,
+          validation: stageConfig.validation
+        };
+        
+      case 'stage3':
+        return {
+          ...baseConfig,
+          fileValidation: {
+            allowedTypes: stageConfig.fileValidation?.allowedTypes,
+            maxFileSize: stageConfig.fileValidation?.maxFileSize,
+            minContentLength: stageConfig.fileValidation?.minContentLength
+          },
+          rubricRequirements: stageConfig.rubricRequirements
+        };
+        
+      case 'stage4':
+        return {
+          ...baseConfig,
+          instructions: 'Complete the final integrity assessment'
+          // Note: trapValidation details are excluded for security
+        };
+        
+      default:
+        return baseConfig;
     }
   }
 }

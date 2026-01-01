@@ -16,7 +16,7 @@ const auditLogSchema = new mongoose.Schema({
   
   submissionId: {
     type: mongoose.Schema.Types.ObjectId,
-    required: true,
+    required: false, // Optional - may not exist for early stage errors
     ref: 'SpideyAssessmentSubmission'
   },
   
