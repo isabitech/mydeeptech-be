@@ -43,10 +43,46 @@ Content-Type: application/json
 **Description:** Generates Paystack-compatible CSV for bulk transfers to Nigerian freelancers  
 **Authentication:** Admin JWT token required
 
-#### Request:
+#### Query Parameters:
+- `invoiceIds[]` (optional): Array of specific invoice IDs to process
+  - If not provided: Processes all unpaid invoices
+  - If provided: Only processes specified invoices
+
+#### Request Examples:
+
+**Process All Unpaid Invoices:**
 ```http
 GET /api/admin/invoices/generate-paystack-csv
 Authorization: Bearer <admin_token>
+```
+
+**Process Specific Invoices:**
+```http
+GET /api/admin/invoices/generate-paystack-csv?invoiceIds[]=6954196ee8b6e6a840c52acc&invoiceIds[]=694bce86d3d84f0a1647cccb&invoiceIds[]=694aa1b0710807ff387b3858&invoiceIds[]=6941c56e6a11ae564fe1a640
+Authorization: Bearer <admin_token>
+```
+
+#### Request Payload Structure:
+```javascript
+// Query Parameters (URL encoded)
+const params = new URLSearchParams();
+
+// Option 1: Process all unpaid invoices (no parameters)
+// No parameters needed
+
+// Option 2: Process specific invoices
+const selectedInvoiceIds = [
+  '6954196ee8b6e6a840c52acc',
+  '694bce86d3d84f0a1647cccb', 
+  '694aa1b0710807ff387b3858',
+  '6941c56e6a11ae564fe1a640'
+];
+
+selectedInvoiceIds.forEach(id => {
+  params.append('invoiceIds[]', id);
+});
+
+const url = `/api/admin/invoices/generate-paystack-csv?${params.toString()}`;
 ```
 
 #### Response:
@@ -58,6 +94,7 @@ Authorization: Bearer <admin_token>
     "csvContent": "Transfer Amount,Transfer Note (Optional),...",
     "summary": {
       "totalInvoices": 50,
+      "selectedInvoices": 4,
       "nigerianFreelancers": 25,
       "totalAmountUSD": 12750.50,
       "totalAmountNGN": 21421840.00,
@@ -76,6 +113,7 @@ Authorization: Bearer <admin_token>
   "details": {
     "exchangeRateError": "Exchange rate service unavailable: EXCHANGE_RATES_API_KEY environment variable is not set",
     "totalInvoices": 50,
+    "selectedInvoices": 4,
     "message": "Please try again later or contact support if the issue persists"
   }
 }
@@ -209,6 +247,78 @@ The DTUser profile update endpoint now accepts `bank_code`:
 - Exchange rate caching reduces API calls
 - Error handling allows partial success scenarios
 - CSV generation streams large datasets
+
+### 3. Generate MPESA CSV
+**Endpoint:** `GET /api/admin/invoices/generate-mpesa-csv`  
+**Description:** Generates MPESA-compatible CSV for bulk transfers (USD amounts - no conversion)  
+**Authentication:** Admin JWT token required
+
+#### Query Parameters:
+- `invoiceIds[]` (optional): Array of specific invoice IDs to process
+  - If not provided: Processes all unpaid invoices
+  - If provided: Only processes specified invoices
+
+#### Request Examples:
+```http
+# Process specific invoices
+GET /api/admin/invoices/generate-mpesa-csv?invoiceIds[]=6954196ee8b6e6a840c52acc&invoiceIds[]=694bce86d3d84f0a1647cccb
+
+# Process all unpaid invoices  
+GET /api/admin/invoices/generate-mpesa-csv
+Authorization: Bearer <admin_token>
+```
+
+#### Success Response:
+```json
+{
+  "success": true,
+  "message": "MPESA CSV generated successfully",
+  "data": {
+    "csvContent": "\"Transfer Amount(USD)\",\"Transfer Note (Optional)\",\"Transfer Reference (Optional)\",\"MPESA Account Number\",\"Account Name\",\"Email Address\"\n\"12.50\",\"Payment for John Doe\",\"2025120006\",\"254712345678\",\"John Doe\",\"john@example.com\"",
+    "summary": {
+      "totalInvoices": 4,
+      "selectedInvoices": 4,
+      "processedInvoices": 3,
+      "totalAmountUSD": 89.50,
+      "errors": [
+        {
+          "userId": "691308172315ec87cb58f4be",
+          "userEmail": "user@example.com",
+          "invoiceNumber": "2025120007",
+          "error": "Missing MPESA account number",
+          "details": "payment_info.account_number is required"
+        }
+      ]
+    }
+  }
+}
+```
+
+## MPESA CSV Format
+
+The generated CSV follows MPESA bulk transfer format:
+
+| Field | Description | Example |
+|-------|-------------|---------|
+| Transfer Amount(USD) | Amount in USD (no conversion) | 12.50 |
+| Transfer Note (Optional) | Description for the transfer | "Payment for John Doe" |
+| Transfer Reference (Optional) | Invoice number | "2025120006" |
+| MPESA Account Number | Recipient's MPESA account number | "254712345678" |
+| Account Name | Recipient's account name | "John Doe" |
+| Email Address | Recipient's email address | "john@example.com" |
+
+### MPESA CSV Example:
+```csv
+"Transfer Amount(USD)","Transfer Note (Optional)","Transfer Reference (Optional)","MPESA Account Number","Account Name","Email Address"
+"12.50","Payment for John Doe","2025120006","254712345678","John Doe","john@example.com"
+"45.00","Invoice payment for Jane Smith","2025120007","254798765432","Jane Smith","jane@example.com"
+```
+
+### MPESA Validation Requirements:
+- `payment_info.account_number` must be present (MPESA phone number)
+- `payment_info.account_name` must be present
+- `invoice.invoiceAmount` must be greater than 0
+- No currency conversion - amounts kept in USD
 
 ## Testing
 

@@ -1,7 +1,7 @@
 const express = require('express');
 const { getAllDTUsers, getAllAdminUsers, getAdminDashboard, approveAnnotator, approveUserForQA, rejectUserForQA, getAllQAUsers, rejectAnnotator, getDTUserAdmin, createAdmin, requestAdminVerification, confirmAdminVerification, verifyAdminOTP, adminLogin } = require('../controller/dtUser.controller.js');
 const { createAnnotationProject, getAllAnnotationProjects, getAnnotationProjectDetails, updateAnnotationProject, deleteAnnotationProject, requestProjectDeletionOTP, verifyOTPAndDeleteProject, getAnnotationProjectApplications, approveAnnotationProjectApplication, rejectAnnotationProjectApplication, removeApprovedApplicant, getRemovableApplicants, exportApprovedAnnotatorsCSV, attachAssessmentToProject, removeAssessmentFromProject, getAvailableAssessments } = require('../controller/annotationProject.controller.js');
-const { createInvoice, getAllInvoices, getInvoiceDetails, updatePaymentStatus, sendInvoiceReminder, deleteInvoice, bulkAuthorizePayment, generatePaystackCSV } = require('../controller/invoice.controller.js');
+const { createInvoice, getAllInvoices, getInvoiceDetails, updatePaymentStatus, sendInvoiceReminder, deleteInvoice, bulkAuthorizePayment, generatePaystackCSV, generateMPESACSV } = require('../controller/invoice.controller.js');
 const { getAdminNotifications, createAnnouncement, getNotificationStats, cleanupNotifications, broadcastNotification } = require('../controller/notification.controller.js');
 const { getAdminAssessments, getAdminAssessmentsOverview } = require('../controller/assessment.controller.js');
 const { addVideoReel, getAllVideoReels, getVideoReelById, updateVideoReel, deleteVideoReel, bulkAddVideoReels, getVideoReelAnalytics } = require('../controller/videoReel.controller.js');
@@ -63,14 +63,15 @@ router.get('/projects/:projectId/export-approved-csv', authenticateAdmin, export
 // Invoice Management Routes
 router.post('/invoices', authenticateAdmin, createInvoice);
 router.get('/invoices', authenticateAdmin, getAllInvoices);
+// Bulk Payment Routes for Nigerian Freelancers (must come before :invoiceId routes)
+router.post('/invoices/bulk-authorize-payment', authenticateAdmin, bulkAuthorizePayment);
+router.get('/invoices/generate-paystack-csv', authenticateAdmin, generatePaystackCSV);
+router.get('/invoices/generate-mpesa-csv', authenticateAdmin, generateMPESACSV);
+// Specific invoice routes (with parameters)
 router.get('/invoices/:invoiceId', authenticateAdmin, getInvoiceDetails);
 router.patch('/invoices/:invoiceId/payment-status', authenticateAdmin, updatePaymentStatus);
 router.post('/invoices/:invoiceId/send-reminder', authenticateAdmin, sendInvoiceReminder);
 router.delete('/invoices/:invoiceId', authenticateAdmin, deleteInvoice);
-
-// Bulk Payment Routes for Nigerian Freelancers
-router.post('/invoices/bulk-authorize-payment', authenticateAdmin, bulkAuthorizePayment);
-router.get('/invoices/generate-paystack-csv', authenticateAdmin, generatePaystackCSV);
 
 // Notification Management Routes
 router.get('/notifications', authenticateAdmin, getAdminNotifications);
