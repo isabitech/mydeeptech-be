@@ -465,6 +465,7 @@ const getDTUserProfile = async (req, res) => {
         accountName: user.payment_info?.account_name || "",
         accountNumber: user.payment_info?.account_number || "",
         bankName: user.payment_info?.bank_name || "",
+        bankCode: user.payment_info?.bank_code || "",
         paymentMethod: user.payment_info?.payment_method || "",
         paymentCurrency: user.payment_info?.payment_currency || ""
       },
@@ -597,6 +598,7 @@ const updateDTUserProfile = async (req, res) => {
         account_name: req.body.paymentInfo.accountName !== undefined ? req.body.paymentInfo.accountName : user.payment_info?.account_name,
         account_number: req.body.paymentInfo.accountNumber !== undefined ? req.body.paymentInfo.accountNumber : user.payment_info?.account_number,
         bank_name: req.body.paymentInfo.bankName !== undefined ? req.body.paymentInfo.bankName : user.payment_info?.bank_name,
+        bank_code: req.body.paymentInfo.bankCode !== undefined ? req.body.paymentInfo.bankCode : user.payment_info?.bank_code,
         payment_method: req.body.paymentInfo.paymentMethod !== undefined ? req.body.paymentInfo.paymentMethod : user.payment_info?.payment_method,
         payment_currency: req.body.paymentInfo.paymentCurrency !== undefined ? req.body.paymentInfo.paymentCurrency : user.payment_info?.payment_currency
       };
@@ -706,6 +708,7 @@ const updateDTUserProfile = async (req, res) => {
         accountName: updatedUser.payment_info?.account_name || "",
         accountNumber: updatedUser.payment_info?.account_number || "",
         bankName: updatedUser.payment_info?.bank_name || "",
+        bankCode: updatedUser.payment_info?.bank_code || "",
         paymentMethod: updatedUser.payment_info?.payment_method || "",
         paymentCurrency: updatedUser.payment_info?.payment_currency || ""
       },

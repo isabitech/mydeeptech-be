@@ -2,6 +2,8 @@ const Invoice = require('../models/invoice.model');
 const DTUser = require('../models/dtUser.model');
 const AnnotationProject = require('../models/annotationProject.model');
 const { sendInvoiceNotification, sendPaymentConfirmation, sendPaymentReminder } = require('../utils/paymentMailer');
+const { convertUSDToNGN } = require('../utils/exchangeRateService');
+const { getBankCode, validatePaymentInfo } = require('../utils/bankCodeMapping');
 const Joi = require('joi');
 const mongoose = require('mongoose');
 
@@ -525,11 +527,588 @@ const deleteInvoice = async (req, res) => {
   }
 };
 
+// Admin function: Bulk authorize payment for all unpaid invoices
+const bulkAuthorizePayment = async (req, res) => {
+  try {
+    console.log(`💰 Admin ${req.admin.email} initiating bulk payment authorization`);
+
+    // Get all unpaid invoices
+    const unpaidInvoices = await Invoice.find({ 
+      paymentStatus: { $in: ['unpaid', 'overdue'] }
+    }).populate([
+      { path: 'dtUserId', select: 'fullName email' },
+      { path: 'projectId', select: 'projectName' }
+    ]);
+
+    if (unpaidInvoices.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No unpaid invoices found",
+        data: {
+          processedInvoices: 0,
+          totalAmount: 0,
+          emailsSent: 0,
+          errors: []
+        }
+      });
+    }
+
+    console.log(`📊 Found ${unpaidInvoices.length} unpaid invoices to process`);
+
+    const results = {
+      processedInvoices: 0,
+      totalAmount: 0,
+      emailsSent: 0,
+      errors: []
+    };
+
+    // Process each invoice
+    for (const invoice of unpaidInvoices) {
+      try {
+        // Mark as paid
+        await invoice.markAsPaid({
+          paymentMethod: 'bulk_transfer',
+          paymentReference: `BULK-${new Date().getTime()}`,
+          paymentNotes: `Bulk payment authorization by ${req.admin.email}`
+        });
+
+        results.processedInvoices++;
+        results.totalAmount += invoice.invoiceAmount;
+
+        // Send payment confirmation email
+        try {
+          await sendPaymentConfirmation(
+            invoice.dtUserId.email,
+            invoice.dtUserId.fullName,
+            {
+              invoiceNumber: invoice.invoiceNumber,
+              projectName: invoice.projectId.projectName,
+              amount: invoice.invoiceAmount,
+              currency: invoice.currency || 'USD',
+              paidAt: new Date()
+            }
+          );
+          results.emailsSent++;
+        } catch (emailError) {
+          console.error(`❌ Failed to send payment email for invoice ${invoice.invoiceNumber}:`, emailError);
+          results.errors.push({
+            invoiceNumber: invoice.invoiceNumber,
+            error: 'Email sending failed',
+            details: emailError.message
+          });
+        }
+
+      } catch (invoiceError) {
+        console.error(`❌ Failed to process invoice ${invoice.invoiceNumber}:`, invoiceError);
+        results.errors.push({
+          invoiceNumber: invoice.invoiceNumber,
+          error: 'Payment processing failed',
+          details: invoiceError.message
+        });
+      }
+    }
+
+    console.log(`✅ Bulk payment authorization completed. Processed: ${results.processedInvoices}, Emails sent: ${results.emailsSent}`);
+
+    res.status(200).json({
+      success: true,
+      message: "Bulk payment authorization completed",
+      data: results
+    });
+
+  } catch (error) {
+    console.error("❌ Error in bulk payment authorization:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error during bulk payment authorization",
+      error: error.message
+    });
+  }
+};
+
+// Admin function: Generate Paystack CSV for selected invoices
+const generatePaystackCSV = async (req, res) => {
+  try {
+    console.log(`📊 Admin ${req.admin.email} generating Paystack CSV`);
+
+    // Get invoice IDs from query parameters (optional - if not provided, process all unpaid)
+    const { invoiceIds } = req.query;
+    let invoiceFilter = { paymentStatus: { $in: ['unpaid', 'overdue'] } };
+    
+    // If specific invoice IDs are provided, filter by those IDs
+    if (invoiceIds && Array.isArray(invoiceIds) && invoiceIds.length > 0) {
+      console.log(`🎯 Processing specific invoices: ${invoiceIds.length} selected`);
+      
+      // Validate all invoice IDs before proceeding
+      const invalidIds = [];
+      const validObjectIds = [];
+      
+      for (const id of invoiceIds) {
+        if (!id || typeof id !== 'string') {
+          invalidIds.push(id);
+          continue;
+        }
+        
+        try {
+          // Check if it's a valid ObjectId format
+          if (!mongoose.Types.ObjectId.isValid(id)) {
+            invalidIds.push(id);
+            continue;
+          }
+          
+          validObjectIds.push(new mongoose.Types.ObjectId(id));
+        } catch (error) {
+          invalidIds.push(id);
+        }
+      }
+      
+      // If there are invalid IDs, return error
+      if (invalidIds.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid invoice ID(s) provided",
+          error: "Invalid ObjectId format",
+          details: {
+            invalidIds,
+            totalProvided: invoiceIds.length,
+            validIds: validObjectIds.length
+          }
+        });
+      }
+      
+      // If no valid IDs found
+      if (validObjectIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "No valid invoice IDs provided",
+          error: "All provided IDs are invalid"
+        });
+      }
+      
+      invoiceFilter = {
+        _id: { $in: validObjectIds },
+        paymentStatus: { $in: ['unpaid', 'overdue'] }
+      };
+    } else if (invoiceIds && !Array.isArray(invoiceIds)) {
+      // Handle single invoice ID case
+      if (!mongoose.Types.ObjectId.isValid(invoiceIds)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid invoice ID format",
+          error: "Provided invoice ID is not a valid ObjectId"
+        });
+      }
+      
+      console.log(`🎯 Processing single invoice: ${invoiceIds}`);
+      invoiceFilter = {
+        _id: new mongoose.Types.ObjectId(invoiceIds),
+        paymentStatus: { $in: ['unpaid', 'overdue'] }
+      };
+    } else {
+      console.log('📋 Processing all unpaid invoices');
+    }
+
+    // Get invoices based on filter
+    const unpaidInvoices = await Invoice.find(invoiceFilter).populate([
+      { path: 'dtUserId', select: 'fullName email personal_info payment_info' },
+      { path: 'projectId', select: 'projectName' }
+    ]);
+
+    if (unpaidInvoices.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No unpaid invoices found matching criteria",
+        data: {
+          csvContent: '',
+          summary: {
+            totalInvoices: 0,
+            processedInvoices: 0,
+            totalAmountUSD: 0,
+            totalAmountNGN: 0,
+            errors: [],
+            selectedInvoices: invoiceIds ? invoiceIds.length : 0
+          }
+        }
+      });
+    }
+
+    // Test exchange rate API first to fail fast
+    let exchangeRateError = null;
+    try {
+      await convertUSDToNGN(1); // Test conversion with $1
+      console.log('✅ Exchange rate API is working');
+    } catch (rateError) {
+      exchangeRateError = rateError.message;
+      console.error('❌ Exchange rate API failed:', exchangeRateError);
+      
+      return res.status(503).json({
+        success: false,
+        message: "Cannot generate CSV due to exchange rate service failure",
+        error: "Exchange rate service unavailable",
+        details: {
+          exchangeRateError,
+          totalInvoices: unpaidInvoices.length,
+          selectedInvoices: invoiceIds ? invoiceIds.length : 0,
+          message: "Please try again later or contact support if the issue persists"
+        }
+      });
+    }
+
+    const csvRows = [];
+    const results = {
+      totalInvoices: unpaidInvoices.length,
+      selectedInvoices: invoiceIds ? invoiceIds.length : 0,
+      processedInvoices: 0,
+      totalAmountUSD: 0,
+      totalAmountNGN: 0,
+      errors: []
+    };
+
+    // CSV Header
+    csvRows.push([
+      'Transfer Amount',
+      'Transfer Note (Optional)',
+      'Transfer Reference (Optional)',
+      'Recipient Code (This overrides all other details if available)',
+      'Bank Code or Slug',
+      'Account Number',
+      'Account Name (Optional)',
+      'Email Address (Optional)'
+    ]);
+
+    // Process each invoice
+    for (const invoice of unpaidInvoices) {
+      try {
+        const user = invoice.dtUserId;
+        
+        console.log(`✅ Processing invoice ${invoice.invoiceNumber} for ${user.email}`);
+
+        // Validate payment info
+        const validation = validatePaymentInfo(user.payment_info);
+        if (!validation.isValid) {
+          console.log(`❌ Invalid payment info for ${user.email}:`, validation.errors);
+          results.errors.push({
+            userId: user._id,
+            userEmail: user.email,
+            invoiceNumber: invoice.invoiceNumber,
+            error: 'Invalid payment info',
+            details: validation.errors.join(', ')
+          });
+          continue;
+        }
+
+        console.log(`✅ Payment info valid for ${user.email}`);
+
+        // Convert USD to NGN
+        const amountNGN = await convertUSDToNGN(invoice.invoiceAmount);
+        
+        // Get bank code (try from user's bank_code field first, then map from bank_name)
+        const bankCode = user.payment_info.bank_code || getBankCode(user.payment_info.bank_name);
+        
+        if (!bankCode) {
+          results.errors.push({
+            userId: user._id,
+            userEmail: user.email,
+            invoiceNumber: invoice.invoiceNumber,
+            error: 'Bank code not found',
+            details: `Unable to map bank: ${user.payment_info.bank_name}`
+          });
+          continue;
+        }
+
+        // Add CSV row
+        csvRows.push([
+          amountNGN.toFixed(2),
+          `${invoice.description || 'Project completion payment'} for ${user.fullName}`,
+          invoice.invoiceNumber,
+          '', // Leave recipient code empty
+          bankCode,
+          user.payment_info.account_number,
+          user.payment_info.account_name,
+          user.email
+        ]);
+
+        results.processedInvoices++;
+        results.totalAmountUSD += invoice.invoiceAmount;
+        results.totalAmountNGN += amountNGN;
+
+      } catch (invoiceError) {
+        console.error(`❌ Failed to process invoice ${invoice.invoiceNumber}:`, invoiceError);
+        results.errors.push({
+          invoiceNumber: invoice.invoiceNumber,
+          error: 'Processing failed',
+          details: invoiceError.message
+        });
+      }
+    }
+
+    // Convert rows to CSV string
+    const csvContent = csvRows.map(row => 
+      row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(',')
+    ).join('\n');
+
+    console.log(`✅ Generated Paystack CSV for ${results.processedInvoices} invoices`);
+    console.log(`💰 Total: $${results.totalAmountUSD.toFixed(2)} USD / ₦${results.totalAmountNGN.toFixed(2)} NGN`);
+
+    // Set CSV download headers
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="paystack-bulk-transfer-${new Date().toISOString().split('T')[0]}.csv"`);
+
+    res.status(200).json({
+      success: true,
+      message: "Paystack CSV generated successfully",
+      data: {
+        csvContent,
+        summary: results
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error generating Paystack CSV:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error generating CSV",
+      error: error.message
+    });
+  }
+};
+
+// Admin function: Generate MPESA CSV for selected invoices
+const generateMPESACSV = async (req, res) => {
+  try {
+    console.log(`📊 Admin ${req.admin.email} generating MPESA CSV`);
+
+    // Get invoice IDs from query parameters (optional - if not provided, process all unpaid)
+    const { invoiceIds } = req.query;
+    let invoiceFilter = { paymentStatus: { $in: ['unpaid', 'overdue'] } };
+    
+    // If specific invoice IDs are provided, filter by those IDs
+    if (invoiceIds && Array.isArray(invoiceIds) && invoiceIds.length > 0) {
+      console.log(`🎯 Processing specific invoices: ${invoiceIds.length} selected`);
+      
+      // Validate all invoice IDs before proceeding
+      const invalidIds = [];
+      const validObjectIds = [];
+      
+      for (const id of invoiceIds) {
+        if (!id || typeof id !== 'string') {
+          invalidIds.push(id);
+          continue;
+        }
+        
+        try {
+          // Check if it's a valid ObjectId format
+          if (!mongoose.Types.ObjectId.isValid(id)) {
+            invalidIds.push(id);
+            continue;
+          }
+          
+          validObjectIds.push(new mongoose.Types.ObjectId(id));
+        } catch (error) {
+          invalidIds.push(id);
+        }
+      }
+      
+      // If there are invalid IDs, return error
+      if (invalidIds.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid invoice ID(s) provided",
+          error: "Invalid ObjectId format",
+          details: {
+            invalidIds,
+            totalProvided: invoiceIds.length,
+            validIds: validObjectIds.length
+          }
+        });
+      }
+      
+      // If no valid IDs found
+      if (validObjectIds.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: "No valid invoice IDs provided",
+          error: "All provided IDs are invalid"
+        });
+      }
+      
+      invoiceFilter = {
+        _id: { $in: validObjectIds },
+        paymentStatus: { $in: ['unpaid', 'overdue'] }
+      };
+    } else if (invoiceIds && !Array.isArray(invoiceIds)) {
+      // Handle single invoice ID case
+      if (!mongoose.Types.ObjectId.isValid(invoiceIds)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid invoice ID format",
+          error: "Provided invoice ID is not a valid ObjectId"
+        });
+      }
+      
+      console.log(`🎯 Processing single invoice: ${invoiceIds}`);
+      invoiceFilter = {
+        _id: new mongoose.Types.ObjectId(invoiceIds),
+        paymentStatus: { $in: ['unpaid', 'overdue'] }
+      };
+    } else {
+      console.log('📋 Processing all unpaid invoices');
+    }
+
+    // Get invoices based on filter
+    const unpaidInvoices = await Invoice.find(invoiceFilter).populate([
+      { path: 'dtUserId', select: 'fullName email personal_info payment_info' },
+      { path: 'projectId', select: 'projectName' }
+    ]);
+
+    if (unpaidInvoices.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No unpaid invoices found matching criteria",
+        data: {
+          csvContent: '',
+          summary: {
+            totalInvoices: 0,
+            processedInvoices: 0,
+            totalAmountUSD: 0,
+            errors: [],
+            selectedInvoices: invoiceIds ? invoiceIds.length : 0
+          }
+        }
+      });
+    }
+
+    const csvRows = [];
+    const results = {
+      totalInvoices: unpaidInvoices.length,
+      selectedInvoices: invoiceIds ? invoiceIds.length : 0,
+      processedInvoices: 0,
+      totalAmountUSD: 0,
+      errors: []
+    };
+
+    // CSV Header
+    csvRows.push([
+      'Transfer Amount(USD)',
+      'Transfer Note (Optional)',
+      'Transfer Reference (Optional)',
+      'MPESA Account Number',
+      'Account Name',
+      'Email Address'
+    ]);
+
+    // Process each invoice
+    for (const invoice of unpaidInvoices) {
+      try {
+        const user = invoice.dtUserId;
+        
+        console.log(`✅ Processing invoice ${invoice.invoiceNumber} for ${user.email}`);
+
+        // Check if invoice has an amount
+        if (!invoice.invoiceAmount || invoice.invoiceAmount <= 0) {
+          console.log(`⚠️ Skipping invoice ${invoice.invoiceNumber} - no valid amount (${invoice.invoiceAmount})`);
+          results.errors.push({
+            userId: user._id,
+            userEmail: user.email,
+            invoiceNumber: invoice.invoiceNumber,
+            error: 'Invalid invoice amount',
+            details: `Amount is ${invoice.invoiceAmount || 'undefined'}`
+          });
+          continue;
+        }
+
+        // Validate payment info (basic validation for MPESA)
+        if (!user.payment_info?.account_number) {
+          console.log(`❌ Missing MPESA account number for ${user.email}`);
+          results.errors.push({
+            userId: user._id,
+            userEmail: user.email,
+            invoiceNumber: invoice.invoiceNumber,
+            error: 'Missing MPESA account number',
+            details: 'payment_info.account_number is required'
+          });
+          continue;
+        }
+
+        if (!user.payment_info?.account_name) {
+          console.log(`❌ Missing account name for ${user.email}`);
+          results.errors.push({
+            userId: user._id,
+            userEmail: user.email,
+            invoiceNumber: invoice.invoiceNumber,
+            error: 'Missing account name',
+            details: 'payment_info.account_name is required'
+          });
+          continue;
+        }
+
+        console.log(`✅ Payment info valid for ${user.email}`);
+
+        // Create transfer note
+        const transferNote = `${invoice.description || 'Payment'} for ${user.fullName}`;
+
+        // Add row to CSV
+        csvRows.push([
+          invoice.invoiceAmount.toFixed(2), // Transfer Amount(USD)
+          transferNote, // Transfer Note (Optional)
+          invoice.invoiceNumber, // Transfer Reference (Optional)
+          user.payment_info.account_number, // MPESA Account Number
+          user.payment_info.account_name, // Account Name
+          user.email // Email Address
+        ]);
+
+        results.processedInvoices++;
+        results.totalAmountUSD += invoice.invoiceAmount;
+
+      } catch (invoiceError) {
+        console.error(`❌ Failed to process invoice ${invoice.invoiceNumber}:`, invoiceError);
+        results.errors.push({
+          userId: invoice.dtUserId?._id,
+          userEmail: invoice.dtUserId?.email,
+          invoiceNumber: invoice.invoiceNumber,
+          error: 'Processing failed',
+          details: invoiceError.message
+        });
+      }
+    }
+
+    // Generate CSV content
+    const csvContent = csvRows.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+
+    console.log(`✅ Generated MPESA CSV for ${results.processedInvoices} invoices`);
+    console.log(`💰 Total: $${results.totalAmountUSD.toFixed(2)} USD`);
+
+    // Set CSV download headers
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="mpesa-bulk-transfer-${new Date().toISOString().split('T')[0]}.csv"`);
+
+    res.status(200).json({
+      success: true,
+      message: "MPESA CSV generated successfully",
+      data: {
+        csvContent,
+        summary: results
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error generating MPESA CSV:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error generating MPESA CSV",
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   createInvoice,
   getAllInvoices,
   getInvoiceDetails,
   updatePaymentStatus,
   sendInvoiceReminder,
-  deleteInvoice
+  deleteInvoice,
+  bulkAuthorizePayment,
+  generatePaystackCSV,
+  generateMPESACSV
 };
