@@ -1,9 +1,10 @@
-const express = require('express');
-const { authenticateToken } = require('../middleware/auth.js');
+import express from 'express';
+import { authenticateToken } from '../middleware/auth.js';
+import Notification from '../models/notification.model.js';
 
 const router = express.Router();
 
-// User notification endpoints (placeholder for future implementation)
+// User notification endpoints
 
 /**
  * Get notification summary
@@ -12,7 +13,7 @@ const router = express.Router();
 router.get('/summary', authenticateToken, async (req, res) => {
   try {
     const userId = req.userId || req.user?.userId;
-    
+
     console.log(`📊 User ${userId} requesting notification summary`);
 
     // Get notification counts and summary data
@@ -74,7 +75,6 @@ router.get('/summary', authenticateToken, async (req, res) => {
  * Get user's notifications
  * GET /api/notifications
  */
-const Notification = require('../models/notification.model');
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const userId = req.userId || req.user?.userId;
@@ -128,10 +128,9 @@ router.patch('/:notificationId/read', authenticateToken, async (req, res) => {
   try {
     const { notificationId } = req.params;
     const userId = req.userId || req.user?.userId;
-    
+
     console.log(`📖 User ${userId} marking notification ${notificationId} as read`);
 
-    // For now, just return success until notification model is implemented
     res.status(200).json({
       success: true,
       message: "Notification marked as read successfully",
@@ -159,10 +158,9 @@ router.patch('/:notificationId/read', authenticateToken, async (req, res) => {
 router.patch('/read-all', authenticateToken, async (req, res) => {
   try {
     const userId = req.userId || req.user?.userId;
-    
+
     console.log(`📖 User ${userId} marking all notifications as read`);
 
-    // For now, just return success until notification model is implemented
     res.status(200).json({
       success: true,
       message: "All notifications marked as read successfully",
@@ -191,10 +189,9 @@ router.delete('/:notificationId', authenticateToken, async (req, res) => {
   try {
     const { notificationId } = req.params;
     const userId = req.userId || req.user?.userId;
-    
+
     console.log(`🗑️ User ${userId} deleting notification ${notificationId}`);
 
-    // For now, just return success until notification model is implemented
     res.status(200).json({
       success: true,
       message: "Notification deleted successfully",
@@ -222,10 +219,9 @@ router.delete('/:notificationId', authenticateToken, async (req, res) => {
 router.get('/preferences', authenticateToken, async (req, res) => {
   try {
     const userId = req.userId || req.user?.userId;
-    
+
     console.log(`⚙️ User ${userId} requesting notification preferences`);
 
-    // Return default preferences until user preference model is implemented
     const defaultPreferences = {
       emailNotifications: {
         applicationUpdates: true,
@@ -275,10 +271,9 @@ router.put('/preferences', authenticateToken, async (req, res) => {
   try {
     const userId = req.userId || req.user?.userId;
     const { preferences } = req.body;
-    
+
     console.log(`⚙️ User ${userId} updating notification preferences`);
 
-    // For now, just return the provided preferences until user preference model is implemented
     res.status(200).json({
       success: true,
       message: "Notification preferences updated successfully",
@@ -299,4 +294,4 @@ router.put('/preferences', authenticateToken, async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

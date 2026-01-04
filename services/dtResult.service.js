@@ -1,6 +1,6 @@
-const dtUserRepository = require('../repositories/dtUser.repository');
-const { ValidationError, NotFoundError } = require('../utils/responseHandler');
-const { generateOptimizedUrl, generateThumbnail } = require('../config/cloudinary');
+import dtUserRepository from '../repositories/dtUser.repository.js';
+import { ValidationError, NotFoundError } from '../utils/responseHandler.js';
+import { generateOptimizedUrl, generateThumbnail } from '../config/cloudinary.js';
 
 class DTResultService {
     async submitResult(userId, projectId, notes, file) {
@@ -102,4 +102,4 @@ class DTResultService {
     }
 }
 
-module.exports = new DTResultService();
+export default new DTResultService();

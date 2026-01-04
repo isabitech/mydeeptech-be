@@ -1,5 +1,5 @@
 import taskService from '../services/task.service.js';
-import { ResponseHandler } from '../utils/responseHandler.js';
+import { ResponseHandler, ValidationError, NotFoundError } from '../utils/responseHandler.js';
 import Joi from 'joi';
 
 class TaskController {
@@ -17,50 +17,34 @@ class TaskController {
     });
 
     async createTask(req, res) {
-        try {
-            const { error, value } = TaskController.taskSchema.validate(req.body);
-            if (error) {
-                return ResponseHandler.error(res, { statusCode: 400, message: error.details[0].message });
-            }
-
-            const newTask = await taskService.createTask(value);
-            return ResponseHandler.success(res, newTask, 'Task created successfully', 201);
-        } catch (error) {
-            return ResponseHandler.error(res, error);
+        const { error, value } = TaskController.taskSchema.validate(req.body);
+        if (error) {
+            throw new ValidationError(error.details[0].message);
         }
+
+        const newTask = await taskService.createTask(value);
+        ResponseHandler.success(res, newTask, 'Task created successfully', 201);
     }
 
     async getTask(req, res) {
-        try {
-            const task = await taskService.getTaskById(req.params.id);
-            return ResponseHandler.success(res, task, 'Task found successfully');
-        } catch (error) {
-            return ResponseHandler.error(res, error);
-        }
+        const task = await taskService.getTaskById(req.params.id);
+        ResponseHandler.success(res, task, 'Task found successfully');
     }
 
     async getAllTasks(req, res) {
-        try {
-            const tasks = await taskService.getAllTasks();
-            return ResponseHandler.success(res, tasks, 'All Tasks fetched successfully');
-        } catch (error) {
-            return ResponseHandler.error(res, error);
-        }
+        const tasks = await taskService.getAllTasks();
+        ResponseHandler.success(res, tasks, 'All Tasks fetched successfully');
     }
 
     async assignTask(req, res) {
-        try {
-            const { error, value } = TaskController.taskAssignmentSchema.validate(req.body);
-            if (error) {
-                return ResponseHandler.error(res, { statusCode: 400, message: error.details[0].message });
-            }
-
-            const { taskId, userId } = value;
-            const newAssignment = await taskService.assignTask(taskId, userId);
-            return ResponseHandler.success(res, newAssignment, 'Task assigned successfully');
-        } catch (error) {
-            return ResponseHandler.error(res, error);
+        const { error, value } = TaskController.taskAssignmentSchema.validate(req.body);
+        if (error) {
+            throw new ValidationError(error.details[0].message);
         }
+
+        const { taskId, userId } = value;
+        const newAssignment = await taskService.assignTask(taskId, userId);
+        ResponseHandler.success(res, newAssignment, 'Task assigned successfully');
     }
 }
 

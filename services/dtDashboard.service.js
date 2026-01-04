@@ -1,9 +1,9 @@
-const DTUser = require('../models/dtUser.model');
-const ProjectApplication = require('../models/projectApplication.model');
-const Invoice = require('../models/invoice.model');
-const AnnotationProject = require('../models/annotationProject.model');
-const mongoose = require('mongoose');
-const { NotFoundError } = require('../utils/responseHandler');
+import DTUser from '../models/dtUser.model.js';
+import ProjectApplication from '../models/projectApplication.model.js';
+import Invoice from '../models/invoice.model.js';
+import AnnotationProject from '../models/annotationProject.model.js';
+import mongoose from 'mongoose';
+import { NotFoundError } from '../utils/responseHandler.js';
 
 class DTDashboardService {
     async getUserDashboard(userId) {
@@ -101,4 +101,4 @@ class DTDashboardService {
     }
 }
 
-module.exports = new DTDashboardService();
+export default new DTDashboardService();

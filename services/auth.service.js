@@ -1,7 +1,7 @@
-const bcrypt = require('bcrypt');
-const userRepository = require('../repositories/user.repository');
-const { AuthenticationError, ConflictError, NotFoundError } = require('../utils/responseHandler');
-const { RoleType } = require('../utils/role');
+import bcrypt from 'bcrypt';
+import userRepository from '../repositories/user.repository.js';
+import { AuthenticationError, ConflictError, NotFoundError } from '../utils/responseHandler.js';
+import { RoleType } from '../utils/role.js';
 
 class AuthService {
     /**
@@ -51,4 +51,4 @@ class AuthService {
     }
 }
 
-module.exports = new AuthService();
+export default new AuthService();

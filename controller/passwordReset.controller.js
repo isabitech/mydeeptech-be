@@ -1,5 +1,5 @@
 import passwordResetService from '../services/passwordReset.service.js';
-import ResponseHandler from '../utils/responseHandler.js';
+import { ResponseHandler, ValidationError } from '../utils/responseHandler.js';
 import Joi from 'joi';
 
 class PasswordResetController {
@@ -21,15 +21,10 @@ class PasswordResetController {
    * POST /api/auth/forgot-password
    */
   async forgotPassword(req, res) {
-    try {
-      const { error, value } = PasswordResetController.forgotPasswordSchema.validate(req.body);
-      if (error) return ResponseHandler.error(res, error.details[0].message, 400);
-
-      await passwordResetService.forgotPassword(value.email, 'user');
-      return ResponseHandler.success(res, null, 'If an account with that email exists, we have sent a password reset link.');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+    const { error, value } = PasswordResetController.forgotPasswordSchema.validate(req.body);
+    if (error) throw new ValidationError(error.details[0].message);
+    await passwordResetService.forgotPassword(value.email, 'user');
+    ResponseHandler.success(res, null, 'If an account with that email exists, we have sent a password reset link.');
   }
 
   /**
@@ -37,16 +32,11 @@ class PasswordResetController {
    * POST /api/auth/reset-password
    */
   async resetPassword(req, res) {
-    try {
-      const { error, value } = PasswordResetController.resetPasswordSchema.validate(req.body);
-      if (error) return ResponseHandler.error(res, error.details[0].message, 400);
-
-      const { token, password, confirmPassword } = value;
-      await passwordResetService.resetPassword(token, password, confirmPassword, 'user');
-      return ResponseHandler.success(res, null, 'Password has been reset successfully. You can now log in.');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+    const { error, value } = PasswordResetController.resetPasswordSchema.validate(req.body);
+    if (error) throw new ValidationError(error.details[0].message);
+    const { token, password, confirmPassword } = value;
+    await passwordResetService.resetPassword(token, password, confirmPassword, 'user');
+    ResponseHandler.success(res, null, 'Password has been reset successfully. You can now log in.');
   }
 
   /**
@@ -54,15 +44,10 @@ class PasswordResetController {
    * POST /api/dtuser/forgot-password
    */
   async dtUserForgotPassword(req, res) {
-    try {
-      const { error, value } = PasswordResetController.forgotPasswordSchema.validate(req.body);
-      if (error) return ResponseHandler.error(res, error.details[0].message, 400);
-
-      await passwordResetService.forgotPassword(value.email, 'dtuser');
-      return ResponseHandler.success(res, null, 'If an account with that email exists, we have sent a password reset link.');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+    const { error, value } = PasswordResetController.forgotPasswordSchema.validate(req.body);
+    if (error) throw new ValidationError(error.details[0].message);
+    await passwordResetService.forgotPassword(value.email, 'dtuser');
+    ResponseHandler.success(res, null, 'If an account with that email exists, we have sent a password reset link.');
   }
 
   /**
@@ -70,16 +55,11 @@ class PasswordResetController {
    * POST /api/dtuser/reset-password
    */
   async dtUserResetPassword(req, res) {
-    try {
-      const { error, value } = PasswordResetController.resetPasswordSchema.validate(req.body);
-      if (error) return ResponseHandler.error(res, error.details[0].message, 400);
-
-      const { token, password, confirmPassword } = value;
-      await passwordResetService.resetPassword(token, password, confirmPassword, 'dtuser');
-      return ResponseHandler.success(res, null, 'Password has been reset successfully. You can now log in.');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+    const { error, value } = PasswordResetController.resetPasswordSchema.validate(req.body);
+    if (error) throw new ValidationError(error.details[0].message);
+    const { token, password, confirmPassword } = value;
+    await passwordResetService.resetPassword(token, password, confirmPassword, 'dtuser');
+    ResponseHandler.success(res, null, 'Password has been reset successfully. You can now log in.');
   }
 
   /**
@@ -87,14 +67,10 @@ class PasswordResetController {
    * GET /api/auth/verify-reset-token/:token
    */
   async verifyResetToken(req, res) {
-    try {
-      const { token } = req.params;
-      const { type = 'user' } = req.query; // 'user' or 'dtuser'
-      const data = await passwordResetService.verifyResetToken(token, type);
-      return ResponseHandler.success(res, data, 'Token is valid');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+    const { token } = req.params;
+    const { type = 'user' } = req.query; // 'user' or 'dtuser'
+    const data = await passwordResetService.verifyResetToken(token, type);
+    ResponseHandler.success(res, data, 'Token is valid');
   }
 }
 

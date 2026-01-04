@@ -1,5 +1,5 @@
 import multimediaAssessmentConfigService from '../services/multimediaAssessmentConfig.service.js';
-import ResponseHandler from '../utils/responseHandler.js';
+import { ResponseHandler, ValidationError, NotFoundError } from '../utils/responseHandler.js';
 import Joi from 'joi';
 
 /**
@@ -85,17 +85,13 @@ class MultimediaAssessmentConfigController {
    * POST /api/admin/multimedia-assessments/config
    */
   async createAssessmentConfig(req, res) {
-    try {
-      const { error, value } = MultimediaAssessmentConfigController.assessmentConfigSchema.validate(req.body);
-      if (error) {
-        return ResponseHandler.error(res, error.details[0].message, 400);
-      }
-
-      const assessmentConfig = await multimediaAssessmentConfigService.createAssessmentConfig(value, req.admin.userId);
-      return ResponseHandler.success(res, { assessmentConfig }, 'Assessment configuration created successfully', 201);
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
+    const { error, value } = MultimediaAssessmentConfigController.assessmentConfigSchema.validate(req.body);
+    if (error) {
+      throw new ValidationError(error.details[0].message);
     }
+
+    const assessmentConfig = await multimediaAssessmentConfigService.createAssessmentConfig(value, req.admin.userId);
+    ResponseHandler.success(res, { assessmentConfig }, 'Assessment configuration created successfully', 201);
   }
 
   /**
@@ -103,41 +99,37 @@ class MultimediaAssessmentConfigController {
    * GET /api/admin/multimedia-assessments/config
    */
   async getAllAssessmentConfigs(req, res) {
-    try {
-      const { assessmentConfigs, totalCount, totalPages } = await multimediaAssessmentConfigService.getAllAssessmentConfigs(req.query);
+    const { assessmentConfigs, totalCount, totalPages } = await multimediaAssessmentConfigService.getAllAssessmentConfigs(req.query);
 
-      return ResponseHandler.success(res, {
-        assessmentConfigs: assessmentConfigs.map(config => ({
-          id: config._id,
-          title: config.title,
-          description: config.description,
-          project: {
-            id: config.projectId._id,
-            name: config.projectId.projectName,
-            status: config.projectId.status
-          },
-          requirements: config.requirements,
-          totalConfiguredReels: config.totalConfiguredReels,
-          completionRate: config.completionRate,
-          statistics: config.statistics,
-          isActive: config.isActive,
-          createdBy: config.createdBy,
-          lastModifiedBy: config.lastModifiedBy,
-          createdAt: config.createdAt,
-          updatedAt: config.updatedAt
-        })),
-        pagination: {
-          currentPage: parseInt(req.query.page || 1),
-          totalPages,
-          totalCount,
-          limit: parseInt(req.query.limit || 20),
-          hasNextPage: parseInt(req.query.page || 1) < totalPages,
-          hasPrevPage: parseInt(req.query.page || 1) > 1
-        }
-      });
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+    ResponseHandler.success(res, {
+      assessmentConfigs: assessmentConfigs.map(config => ({
+        id: config._id,
+        title: config.title,
+        description: config.description,
+        project: {
+          id: config.projectId._id,
+          name: config.projectId.projectName,
+          status: config.projectId.status
+        },
+        requirements: config.requirements,
+        totalConfiguredReels: config.totalConfiguredReels,
+        completionRate: config.completionRate,
+        statistics: config.statistics,
+        isActive: config.isActive,
+        createdBy: config.createdBy,
+        lastModifiedBy: config.lastModifiedBy,
+        createdAt: config.createdAt,
+        updatedAt: config.updatedAt
+      })),
+      pagination: {
+        currentPage: parseInt(req.query.page || 1),
+        totalPages,
+        totalCount,
+        limit: parseInt(req.query.limit || 20),
+        hasNextPage: parseInt(req.query.page || 1) < totalPages,
+        hasPrevPage: parseInt(req.query.page || 1) > 1
+      }
+    });
   }
 
   /**
@@ -145,43 +137,39 @@ class MultimediaAssessmentConfigController {
    * GET /api/admin/multimedia-assessments/config/:id
    */
   async getAssessmentConfigById(req, res) {
-    try {
-      const { id } = req.params;
-      const { assessmentConfig, nicheAvailability } = await multimediaAssessmentConfigService.getAssessmentConfigById(id);
+    const { id } = req.params;
+    const { assessmentConfig, nicheAvailability } = await multimediaAssessmentConfigService.getAssessmentConfigById(id);
 
-      return ResponseHandler.success(res, {
-        assessmentConfig: {
-          id: assessmentConfig._id,
-          title: assessmentConfig.title,
-          description: assessmentConfig.description,
-          instructions: assessmentConfig.instructions,
-          project: {
-            id: assessmentConfig.projectId._id,
-            name: assessmentConfig.projectId.projectName,
-            description: assessmentConfig.projectId.projectDescription,
-            status: assessmentConfig.projectId.status,
-            budget: assessmentConfig.projectId.budget
-          },
-          requirements: assessmentConfig.requirements,
-          videoReels: {
-            ...assessmentConfig.videoReels,
-            nicheAvailability
-          },
-          scoring: assessmentConfig.scoring,
-          taskSettings: assessmentConfig.taskSettings,
-          totalConfiguredReels: assessmentConfig.totalConfiguredReels,
-          completionRate: assessmentConfig.completionRate,
-          statistics: assessmentConfig.statistics,
-          isActive: assessmentConfig.isActive,
-          createdBy: assessmentConfig.createdBy,
-          lastModifiedBy: assessmentConfig.lastModifiedBy,
-          createdAt: assessmentConfig.createdAt,
-          updatedAt: assessmentConfig.updatedAt
-        }
-      });
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+    ResponseHandler.success(res, {
+      assessmentConfig: {
+        id: assessmentConfig._id,
+        title: assessmentConfig.title,
+        description: assessmentConfig.description,
+        instructions: assessmentConfig.instructions,
+        project: {
+          id: assessmentConfig.projectId._id,
+          name: assessmentConfig.projectId.projectName,
+          description: assessmentConfig.projectId.projectDescription,
+          status: assessmentConfig.projectId.status,
+          budget: assessmentConfig.projectId.budget
+        },
+        requirements: assessmentConfig.requirements,
+        videoReels: {
+          ...assessmentConfig.videoReels,
+          nicheAvailability
+        },
+        scoring: assessmentConfig.scoring,
+        taskSettings: assessmentConfig.taskSettings,
+        totalConfiguredReels: assessmentConfig.totalConfiguredReels,
+        completionRate: assessmentConfig.completionRate,
+        statistics: assessmentConfig.statistics,
+        isActive: assessmentConfig.isActive,
+        createdBy: assessmentConfig.createdBy,
+        lastModifiedBy: assessmentConfig.lastModifiedBy,
+        createdAt: assessmentConfig.createdAt,
+        updatedAt: assessmentConfig.updatedAt
+      }
+    });
   }
 
   /**
@@ -189,20 +177,16 @@ class MultimediaAssessmentConfigController {
    * PUT /api/admin/multimedia-assessments/config/:id
    */
   async updateAssessmentConfig(req, res) {
-    try {
-      const { id } = req.params;
-      const updateSchema = MultimediaAssessmentConfigController.assessmentConfigSchema.fork(['projectId'], schema => schema.optional());
-      const { error, value } = updateSchema.validate(req.body);
+    const { id } = req.params;
+    const updateSchema = MultimediaAssessmentConfigController.assessmentConfigSchema.fork(['projectId'], schema => schema.optional());
+    const { error, value } = updateSchema.validate(req.body);
 
-      if (error) {
-        return ResponseHandler.error(res, error.details[0].message, 400);
-      }
-
-      const assessmentConfig = await multimediaAssessmentConfigService.updateAssessmentConfig(id, value, req.admin.userId);
-      return ResponseHandler.success(res, { assessmentConfig }, 'Assessment configuration updated successfully');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
+    if (error) {
+      throw new ValidationError(error.details[0].message);
     }
+
+    const assessmentConfig = await multimediaAssessmentConfigService.updateAssessmentConfig(id, value, req.admin.userId);
+    ResponseHandler.success(res, { assessmentConfig }, 'Assessment configuration updated successfully');
   }
 
   /**
@@ -210,18 +194,14 @@ class MultimediaAssessmentConfigController {
    * DELETE /api/admin/multimedia-assessments/config/:id
    */
   async deleteAssessmentConfig(req, res) {
-    try {
-      const { id } = req.params;
-      const assessmentConfig = await multimediaAssessmentConfigService.deleteAssessmentConfig(id);
+    const { id } = req.params;
+    const assessmentConfig = await multimediaAssessmentConfigService.deleteAssessmentConfig(id);
 
-      return ResponseHandler.success(res, {
-        deletedId: assessmentConfig._id,
-        title: assessmentConfig.title,
-        deletedAt: new Date()
-      }, 'Assessment configuration deleted successfully');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+    ResponseHandler.success(res, {
+      deletedId: assessmentConfig._id,
+      title: assessmentConfig.title,
+      deletedAt: new Date()
+    }, 'Assessment configuration deleted successfully');
   }
 
   /**
@@ -229,26 +209,22 @@ class MultimediaAssessmentConfigController {
    * GET /api/admin/multimedia-assessments/config/project/:projectId
    */
   async getAssessmentConfigByProject(req, res) {
-    try {
-      const { projectId } = req.params;
-      const assessmentConfig = await multimediaAssessmentConfigService.getAssessmentConfigByProject(projectId);
+    const { projectId } = req.params;
+    const assessmentConfig = await multimediaAssessmentConfigService.getAssessmentConfigByProject(projectId);
 
-      return ResponseHandler.success(res, {
-        assessmentConfig: {
-          id: assessmentConfig._id,
-          title: assessmentConfig.title,
-          description: assessmentConfig.description,
-          requirements: assessmentConfig.requirements,
-          videoReels: assessmentConfig.videoReels,
-          scoring: assessmentConfig.scoring,
-          isActive: assessmentConfig.isActive,
-          project: assessmentConfig.projectId,
-          createdBy: assessmentConfig.createdBy
-        }
-      });
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+    ResponseHandler.success(res, {
+      assessmentConfig: {
+        id: assessmentConfig._id,
+        title: assessmentConfig.title,
+        description: assessmentConfig.description,
+        requirements: assessmentConfig.requirements,
+        videoReels: assessmentConfig.videoReels,
+        scoring: assessmentConfig.scoring,
+        isActive: assessmentConfig.isActive,
+        project: assessmentConfig.projectId,
+        createdBy: assessmentConfig.createdBy
+      }
+    });
   }
 }
 

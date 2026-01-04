@@ -1,127 +1,120 @@
-const express = require('express');
-const { signup, login, getAllUsers, getUsers } = require('../controller/user.js'); // Ensure this path is correct
-const { createProject, getProject, updateProject, deleteProject } = require('../controller/project.js')
-const { createTask, getTask, getAllTasks, assignTask } = require('../controller/task.js')
-const { validateVisitor } = require('../controller/validateuser.js')
-const dtUserController = require("../controller/dtUser.controller.js");
-const { createDTUser, verifyEmail, submitResult, updateUserStatus, setupPassword, dtUserLogin, getDTUserProfile, updateDTUserProfile, resetDTUserPassword, resendVerificationEmail, getAvailableProjects, applyToProject, getUserActiveProjects, getUserInvoices, getUnpaidInvoices, getPaidInvoices, getInvoiceDetails, getInvoiceDashboard, getDTUserDashboard, submitResultWithCloudinary, getUserResultSubmissions, uploadIdDocument, uploadResume, getProjectGuidelines } = require("../controller/dtUser.controller.js");
-const { authenticateToken, authorizeProfileAccess } = require('../middleware/auth.js');
+import express from 'express';
+import userController from '../controller/user.js';
+import projectController from '../controller/project.js';
+import taskController from '../controller/task.js';
+import validateUserController from '../controller/validateuser.js';
+import dtUserController from "../controller/dtUser.controller.js";
+import { authenticateToken, authorizeProfileAccess } from '../middleware/auth.js';
+import passwordResetController from '../controller/passwordReset.controller.js';
+import { resultFileUpload, idDocumentUpload, resumeUpload } from '../config/cloudinary.js';
+import tryCatch from '../utils/tryCatch.js';
 
-// Import password reset controllers
+const router = express.Router();
+
+const { signup, login, getAllUsers, getUsers } = userController;
+const { createProject, getProject, updateProject, deleteProject } = projectController;
+const { createTask, getTask, getAllTasks, assignTask } = taskController;
+const { validateVisitor } = validateUserController;
 const {
-  forgotPassword,
-  resetPassword,
-  dtUserForgotPassword,
-  dtUserResetPassword,
-  verifyResetToken
-} = require('../controller/passwordReset.controller.js');
+  createDTUser, verifyEmail, setupPassword, dtUserLogin,
+  getDTUserProfile, updateDTUserProfile, resetDTUserPassword,
+  resendVerificationEmail, getAvailableProjects, applyToProject,
+  getUserActiveProjects, getUserInvoices, getUnpaidInvoices,
+  getPaidInvoices, getInvoiceDetails, getInvoiceDashboard,
+  getDTUserDashboard, submitResultWithCloudinary, getUserResultSubmissions,
+  uploadIdDocument, uploadResume, getProjectGuidelines
+} = dtUserController;
 
-// Import Cloudinary upload middleware for result submissions
-const { resultFileUpload, idDocumentUpload, resumeUpload } = require('../config/cloudinary');
+const {
+  forgotPassword, resetPassword, dtUserForgotPassword,
+  dtUserResetPassword, verifyResetToken
+} = passwordResetController;
 
-
-
-const router = express.Router()
-
-router.post('/signup', signup);
-router.post('/login', login);
+router.post('/signup', tryCatch(signup));
+router.post('/login', tryCatch(login));
 
 // ======================
 // PASSWORD RESET ROUTES  
 // ======================
 
 // Regular User Password Reset
-router.post('/forgot-password', forgotPassword);
-router.post('/reset-password', resetPassword);
+router.post('/forgot-password', tryCatch(forgotPassword));
+router.post('/reset-password', tryCatch(resetPassword));
 
 // DTUser Password Reset
-router.post('/dtuser-forgot-password', dtUserForgotPassword);
-router.post('/dtuser-reset-password', dtUserResetPassword);
+router.post('/dtuser-forgot-password', tryCatch(dtUserForgotPassword));
+router.post('/dtuser-reset-password', tryCatch(dtUserResetPassword));
 
 // Token verification (optional - for frontend validation)
-router.get('/verify-reset-token/:token', verifyResetToken);
+router.get('/verify-reset-token/:token', tryCatch(verifyResetToken));
 
 // ======================
 // OTHER AUTH ROUTES
 // ======================
 
 // Regular User Auth Routes (Admin only for listing)
-router.get('/getAllUsers', authenticateToken, getAllUsers);
-router.get('/getUsers', authenticateToken, getUsers)
-router.post('/createProject', authenticateToken, createProject);
-router.get('/getProject', authenticateToken, getProject)
-router.put('/updateProject/:id', authenticateToken, updateProject)
-router.delete('/deleteProject/:id', authenticateToken, deleteProject)
-router.post('/createTasks', authenticateToken, createTask);
-router.get('/getTask/:id', authenticateToken, getTask);
-router.get('/getAllTasks', authenticateToken, getAllTasks);
-router.post('/assignTask', authenticateToken, assignTask);
-router.post('/emailValidation', validateVisitor);
-router.post("/createDTuser", createDTUser);
-router.get("/verifyDTusermail/:id", verifyEmail);
-router.post("/setupPassword", setupPassword);
-router.post("/dtUserLogin", dtUserLogin);
-router.post("/resendVerificationEmail", resendVerificationEmail);
-router.get("/dtUserProfile/:userId", authenticateToken, authorizeProfileAccess, getDTUserProfile);
-router.patch("/dtUserProfile/:userId", authenticateToken, authorizeProfileAccess, updateDTUserProfile);
-router.patch("/dtUserResetPassword", authenticateToken, resetDTUserPassword);
+router.get('/getAllUsers', authenticateToken, tryCatch(getAllUsers));
+router.get('/getUsers', authenticateToken, tryCatch(getUsers));
+router.post('/createProject', authenticateToken, tryCatch(createProject));
+router.get('/getProject', authenticateToken, tryCatch(getProject));
+router.put('/updateProject/:id', authenticateToken, tryCatch(updateProject));
+router.delete('/deleteProject/:id', authenticateToken, tryCatch(deleteProject));
+router.post('/createTasks', authenticateToken, tryCatch(createTask));
+router.get('/getTask/:id', authenticateToken, tryCatch(getTask));
+router.get('/getAllTasks', authenticateToken, tryCatch(getAllTasks));
+router.post('/assignTask', authenticateToken, tryCatch(assignTask));
+router.post('/emailValidation', tryCatch(validateVisitor));
+router.post("/createDTuser", tryCatch(createDTUser));
+router.get("/verifyDTusermail/:id", tryCatch(verifyEmail));
+router.post("/setupPassword", tryCatch(setupPassword));
+router.post("/dtUserLogin", tryCatch(dtUserLogin));
+router.post("/resendVerificationEmail", tryCatch(resendVerificationEmail));
+router.get("/dtUserProfile/:userId", authenticateToken, authorizeProfileAccess, tryCatch(getDTUserProfile));
+router.patch("/dtUserProfile/:userId", authenticateToken, authorizeProfileAccess, tryCatch(updateDTUserProfile));
+router.patch("/dtUserResetPassword", authenticateToken, tryCatch(resetDTUserPassword));
 
 // Project routes for DTUsers (approved annotators only)
-router.get("/projects", authenticateToken, getAvailableProjects);
-router.post("/projects/:projectId/apply", authenticateToken, applyToProject);
-router.get("/projects/:projectId/guidelines", authenticateToken, getProjectGuidelines);
-router.get("/activeProjects/:userId", authenticateToken, getUserActiveProjects);
+router.get("/projects", authenticateToken, tryCatch(getAvailableProjects));
+router.post("/projects/:projectId/apply", authenticateToken, tryCatch(applyToProject));
+router.get("/projects/:projectId/guidelines", authenticateToken, tryCatch(getProjectGuidelines));
+router.get("/activeProjects/:userId", authenticateToken, tryCatch(getUserActiveProjects));
 
 // DTUser Invoice Routes
-router.get('/invoices', authenticateToken, getUserInvoices);
-router.get('/invoices/unpaid', authenticateToken, getUnpaidInvoices);
-router.get('/invoices/paid', authenticateToken, getPaidInvoices);
-router.get('/invoices/dashboard', authenticateToken, getInvoiceDashboard);
-router.get('/invoices/:invoiceId', authenticateToken, getInvoiceDetails);
+router.get('/invoices', authenticateToken, tryCatch(getUserInvoices));
+router.get('/invoices/unpaid', authenticateToken, tryCatch(getUnpaidInvoices));
+router.get('/invoices/paid', authenticateToken, tryCatch(getPaidInvoices));
+router.get('/invoices/dashboard', authenticateToken, tryCatch(getInvoiceDashboard));
+router.get('/invoices/:invoiceId', authenticateToken, tryCatch(getInvoiceDetails));
 
 // DTUser Dashboard Route - Personal overview for authenticated DTUsers
-router.get('/dashboard', authenticateToken, getDTUserDashboard);
+router.get('/dashboard', authenticateToken, tryCatch(getDTUserDashboard));
 
-// DTUser Result Submission Routes (NEW) - flexible field names
 router.post('/submit-result', authenticateToken, (req, res, next) => {
-  // Create a flexible upload handler that accepts different field names
   const upload = resultFileUpload.fields([
     { name: 'resultFile', maxCount: 1 },
     { name: 'file', maxCount: 1 },
     { name: 'result', maxCount: 1 },
     { name: 'upload', maxCount: 1 },
-    { name: 'screenshots', maxCount: 1 }  // Added support for 'screenshots' field
+    { name: 'screenshots', maxCount: 1 }
   ]);
 
   upload(req, res, (err) => {
-    if (err) {
-      console.error('❌ Upload error:', err);
-      return res.status(400).json({
-        success: false,
-        message: `Upload error: ${err.message}`,
-        error: err.code || 'UPLOAD_ERROR'
-      });
-    }
+    if (err) return next(err);
 
-    // Find which field was used and normalize to req.file
     if (req.files) {
       const fileField = req.files.resultFile || req.files.file || req.files.result || req.files.upload || req.files.screenshots;
       if (fileField && fileField[0]) {
         req.file = fileField[0];
-        console.log(`📁 File received via field: ${req.file.fieldname}`);
       }
     }
-
-    // Proceed to the controller
     next();
   });
-}, submitResultWithCloudinary);
+}, tryCatch(submitResultWithCloudinary));
 
-router.get('/result-submissions', authenticateToken, getUserResultSubmissions);
+router.get('/result-submissions', authenticateToken, tryCatch(getUserResultSubmissions));
 
 // Upload ID Document Route - adds to profile information
 router.post('/upload-id-document', authenticateToken, (req, res, next) => {
-  // Create a flexible upload handler for ID documents
   const upload = idDocumentUpload.fields([
     { name: 'idDocument', maxCount: 1 },
     { name: 'id_document', maxCount: 1 },
@@ -130,32 +123,20 @@ router.post('/upload-id-document', authenticateToken, (req, res, next) => {
   ]);
 
   upload(req, res, (err) => {
-    if (err) {
-      console.error('❌ ID document upload error:', err);
-      return res.status(400).json({
-        success: false,
-        message: `Upload error: ${err.message}`,
-        error: err.code || 'UPLOAD_ERROR'
-      });
-    }
+    if (err) return next(err);
 
-    // Find which field was used and normalize to req.file
     if (req.files) {
       const fileField = req.files.idDocument || req.files.id_document || req.files.document || req.files.file;
       if (fileField && fileField[0]) {
         req.file = fileField[0];
-        console.log(`🆔 ID document received via field: ${req.file.fieldname}`);
       }
     }
-
-    // Proceed to the controller
     next();
   });
-}, uploadIdDocument);
+}, tryCatch(uploadIdDocument));
 
 // Upload Resume Route - adds to profile information  
 router.post('/upload-resume', authenticateToken, (req, res, next) => {
-  // Create a flexible upload handler for resumes
   const upload = resumeUpload.fields([
     { name: 'resume', maxCount: 1 },
     { name: 'cv', maxCount: 1 },
@@ -164,28 +145,17 @@ router.post('/upload-resume', authenticateToken, (req, res, next) => {
   ]);
 
   upload(req, res, (err) => {
-    if (err) {
-      console.error('❌ Resume upload error:', err);
-      return res.status(400).json({
-        success: false,
-        message: `Upload error: ${err.message}`,
-        error: err.code || 'UPLOAD_ERROR'
-      });
-    }
+    if (err) return next(err);
 
-    // Find which field was used and normalize to req.file
     if (req.files) {
       const fileField = req.files.resume || req.files.cv || req.files.document || req.files.file;
       if (fileField && fileField[0]) {
         req.file = fileField[0];
-        console.log(`📄 Resume received via field: ${req.file.fieldname}`);
       }
     }
-
-    // Proceed to the controller
     next();
   });
-}, uploadResume);
+}, tryCatch(uploadResume));
 
 // Debug endpoint to test file upload (temporary)
 router.post('/debug-upload', authenticateToken, (req, res) => {
@@ -208,7 +178,4 @@ router.post('/debug-upload', authenticateToken, (req, res) => {
   });
 });
 
-/*router.post("/:id/DTusertosubmitresult", submitResult;
-router.put("/Dtuserstatusupdate/:id/status", updateUserStatus); */
-
-module.exports = router;
+export default router;

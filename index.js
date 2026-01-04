@@ -1,38 +1,27 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-const dotenv = require('dotenv');
-const { createServer } = require('http');
-const { initializeSocketIO } = require('./utils/chatSocketService');
-const { initRedis, closeRedis, redisHealthCheck } = require('./config/redis');
-const errorHandler = require('./middleware/errorHandler');
+import express from 'express';
+import mongoose from 'mongoose';
+import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import dotenv from 'dotenv';
+import { createServer } from 'http';
+import { initializeSocketIO } from './utils/chatSocketService.js';
+import { initRedis, closeRedis, redisHealthCheck } from './config/redis.js';
+import errorHandler from './middleware/errorHandler.js';
 
-// Conditionally load Swagger (optional dependency)
-let swaggerUi, specs;
-try {
-    const swagger = require('./config/swagger');
-    swaggerUi = swagger.swaggerUi;
-    specs = swagger.specs;
-} catch (error) {
-    console.log('⚠️ Swagger dependencies not found. API documentation will not be available.');
-    swaggerUi = null;
-    specs = null;
-}
+// Conditionally load Swagger (now using ESM import)
+import { swaggerUi, specs } from './config/swagger.js';
 
 dotenv.config({ path: './.env' });
 
-//console.log("Loaded BREVO_API_KEY:", process.env.BREVO_API_KEY ? "✅ Yes" : "❌ No");
-
-const route = require('./routes/auth');
-const adminRoute = require('./routes/admin');
-const mediaRoute = require('./routes/media');
-const notificationRoute = require('./routes/notifications');
-const assessmentRoute = require('./routes/assessment');
-const supportRoute = require('./routes/support');
-const chatRoute = require('./routes/chat');
-const qaRoute = require('./routes/qa');
+import authRoutes from './routes/auth.js';
+import adminRoutes from './routes/admin.js';
+import mediaRoutes from './routes/media.js';
+import notificationRoutes from './routes/notifications.js';
+import assessmentRoutes from './routes/assessment.js';
+import supportRoutes from './routes/support.js';
+import chatRoutes from './routes/chat.js';
+import qaRoutes from './routes/qa.js';
 
 const app = express();
 const server = createServer(app);
@@ -131,7 +120,6 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// API Documentation (only if Swagger is available)
 if (swaggerUi && specs) {
     app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
         explorer: true,
@@ -140,19 +128,17 @@ if (swaggerUi && specs) {
         customCss: '.swagger-ui .topbar { display: none }'
     }));
     console.log('📚 API Documentation available at: http://localhost:5000/api-docs');
-} else {
-    console.log('📚 API Documentation not available (Swagger dependencies missing)');
 }
 
 // Routes
-app.use('/api/auth', route);
-app.use('/api/admin', adminRoute);
-app.use('/api/media', mediaRoute);
-app.use('/api/notifications', notificationRoute);
-app.use('/api/assessments', assessmentRoute);
-app.use('/api/support', supportRoute);
-app.use('/api/chat', chatRoute);
-app.use('/api/qa', qaRoute);
+app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/media', mediaRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/assessments', assessmentRoutes);
+app.use('/api/support', supportRoutes);
+app.use('/api/chat', chatRoutes);
+app.use('/api/qa', qaRoutes);
 
 // Global Error Handler (Must be registered after all routes)
 app.use(errorHandler);

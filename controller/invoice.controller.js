@@ -1,5 +1,5 @@
 import invoiceService from '../services/invoice.service.js';
-import { ResponseHandler } from '../utils/responseHandler.js';
+import { ResponseHandler, ValidationError, NotFoundError } from '../utils/responseHandler.js';
 import Joi from 'joi';
 
 class InvoiceController {
@@ -27,16 +27,12 @@ class InvoiceController {
    * POST /api/admin/invoices
    */
   async createInvoice(req, res) {
-    try {
-      const { error, value } = InvoiceController.createInvoiceSchema.validate(req.body);
-      if (error) return ResponseHandler.error(res, { statusCode: 400, message: error.details[0].message });
+    const { error, value } = InvoiceController.createInvoiceSchema.validate(req.body);
+    if (error) throw new ValidationError(error.details[0].message);
 
-      const adminId = req.admin?.userId || req.user?.userId;
-      const invoice = await invoiceService.createInvoice(value, adminId);
-      return ResponseHandler.success(res, { invoice, emailNotificationSent: invoice.emailSent }, "Invoice created successfully", 201);
-    } catch (error) {
-      return ResponseHandler.error(res, error);
-    }
+    const adminId = req.admin?.userId || req.user?.userId;
+    const invoice = await invoiceService.createInvoice(value, adminId);
+    ResponseHandler.success(res, { invoice, emailNotificationSent: invoice.emailSent }, "Invoice created successfully", 201);
   }
 
   /**
@@ -44,12 +40,8 @@ class InvoiceController {
    * GET /api/admin/invoices
    */
   async getAllInvoices(req, res) {
-    try {
-      const data = await invoiceService.getAllInvoices(req.query);
-      return ResponseHandler.success(res, data, "Invoices retrieved successfully");
-    } catch (error) {
-      return ResponseHandler.error(res, error);
-    }
+    const data = await invoiceService.getAllInvoices(req.query);
+    ResponseHandler.success(res, data, "Invoices retrieved successfully");
   }
 
   /**
@@ -57,19 +49,15 @@ class InvoiceController {
    * GET /api/admin/invoices/:invoiceId
    */
   async getInvoiceDetails(req, res) {
-    try {
-      const invoice = await invoiceService.getInvoiceDetails(req.params.invoiceId, null, true);
-      return ResponseHandler.success(res, {
-        invoice,
-        computedFields: {
-          daysOverdue: invoice.daysOverdue,
-          amountDue: invoice.amountDue,
-          formattedInvoiceNumber: invoice.formattedInvoiceNumber
-        }
-      }, "Invoice details retrieved successfully");
-    } catch (error) {
-      return ResponseHandler.error(res, error);
-    }
+    const invoice = await invoiceService.getInvoiceDetails(req.params.invoiceId, null, true);
+    ResponseHandler.success(res, {
+      invoice,
+      computedFields: {
+        daysOverdue: invoice.daysOverdue,
+        amountDue: invoice.amountDue,
+        formattedInvoiceNumber: invoice.formattedInvoiceNumber
+      }
+    }, "Invoice details retrieved successfully");
   }
 
   /**
@@ -77,12 +65,8 @@ class InvoiceController {
    * PATCH /api/admin/invoices/:invoiceId/status
    */
   async updatePaymentStatus(req, res) {
-    try {
-      const data = await invoiceService.updatePaymentStatus(req.params.invoiceId, req.body);
-      return ResponseHandler.success(res, data, `Invoice payment status updated to ${req.body.paymentStatus}`);
-    } catch (error) {
-      return ResponseHandler.error(res, error);
-    }
+    const data = await invoiceService.updatePaymentStatus(req.params.invoiceId, req.body);
+    ResponseHandler.success(res, data, `Invoice payment status updated to ${req.body.paymentStatus}`);
   }
 
   /**
@@ -90,12 +74,8 @@ class InvoiceController {
    * POST /api/admin/invoices/:invoiceId/reminder
    */
   async sendInvoiceReminder(req, res) {
-    try {
-      const data = await invoiceService.sendInvoiceReminder(req.params.invoiceId);
-      return ResponseHandler.success(res, data, "Payment reminder sent successfully");
-    } catch (error) {
-      return ResponseHandler.error(res, error);
-    }
+    const data = await invoiceService.sendInvoiceReminder(req.params.invoiceId);
+    ResponseHandler.success(res, data, "Payment reminder sent successfully");
   }
 
   /**
@@ -103,12 +83,8 @@ class InvoiceController {
    * DELETE /api/admin/invoices/:invoiceId
    */
   async deleteInvoice(req, res) {
-    try {
-      await invoiceService.deleteInvoice(req.params.invoiceId);
-      return ResponseHandler.success(res, null, "Invoice deleted successfully");
-    } catch (error) {
-      return ResponseHandler.error(res, error);
-    }
+    await invoiceService.deleteInvoice(req.params.invoiceId);
+    ResponseHandler.success(res, null, "Invoice deleted successfully");
   }
 
   /**
@@ -116,13 +92,9 @@ class InvoiceController {
    * POST /api/admin/invoices/bulk-authorize
    */
   async bulkAuthorizePayment(req, res) {
-    try {
-      const adminEmail = req.admin?.email || req.user?.email;
-      const data = await invoiceService.bulkAuthorizePayment(adminEmail);
-      return ResponseHandler.success(res, data, "Bulk payment authorization completed");
-    } catch (error) {
-      return ResponseHandler.error(res, error);
-    }
+    const adminEmail = req.admin?.email || req.user?.email;
+    const data = await invoiceService.bulkAuthorizePayment(adminEmail);
+    ResponseHandler.success(res, data, "Bulk payment authorization completed");
   }
 
   /**
@@ -130,19 +102,15 @@ class InvoiceController {
    * GET /api/admin/invoices/export/paystack
    */
   async generatePaystackCSV(req, res) {
-    try {
-      const { invoiceIds } = req.query;
-      const ids = Array.isArray(invoiceIds) ? invoiceIds : (invoiceIds ? [invoiceIds] : []);
+    const { invoiceIds } = req.query;
+    const ids = Array.isArray(invoiceIds) ? invoiceIds : (invoiceIds ? [invoiceIds] : []);
 
-      const data = await invoiceService.generatePaystackCSV(ids);
+    const data = await invoiceService.generatePaystackCSV(ids);
 
-      res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename="paystack-bulk-transfer-${new Date().toISOString().split('T')[0]}.csv"`);
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="paystack-bulk-transfer-${new Date().toISOString().split('T')[0]}.csv"`);
 
-      return res.status(200).send(data.csvContent);
-    } catch (error) {
-      return ResponseHandler.error(res, error);
-    }
+    res.status(200).send(data.csvContent);
   }
 
   /**
@@ -150,19 +118,15 @@ class InvoiceController {
    * GET /api/admin/invoices/export/mpesa
    */
   async generateMPESACSV(req, res) {
-    try {
-      const { invoiceIds } = req.query;
-      const ids = Array.isArray(invoiceIds) ? invoiceIds : (invoiceIds ? [invoiceIds] : []);
+    const { invoiceIds } = req.query;
+    const ids = Array.isArray(invoiceIds) ? invoiceIds : (invoiceIds ? [invoiceIds] : []);
 
-      const data = await invoiceService.generateMPESACSV(ids);
+    const data = await invoiceService.generateMPESACSV(ids);
 
-      res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename="mpesa-bulk-transfer-${new Date().toISOString().split('T')[0]}.csv"`);
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="mpesa-bulk-transfer-${new Date().toISOString().split('T')[0]}.csv"`);
 
-      return res.status(200).send(data.csvContent);
-    } catch (error) {
-      return ResponseHandler.error(res, error);
-    }
+    res.status(200).send(data.csvContent);
   }
 }
 

@@ -1,6 +1,10 @@
-const express = require('express');
-const { authenticateToken } = require('../middleware/auth.js');
-const { authenticateAdmin } = require('../middleware/adminAuth.js');
+import express from 'express';
+import { authenticateToken } from '../middleware/auth.js';
+import { authenticateAdmin } from '../middleware/adminAuth.js';
+import chatSupportController from '../controller/chatSupport.controller.js';
+
+const router = express.Router();
+
 const {
   startChatSession,
   getActiveChats,
@@ -10,9 +14,7 @@ const {
   joinChatAsAdmin,
   closeChatSession,
   getChatTicketById
-} = require('../controller/chatSupport.controller.js');
-
-const router = express.Router();
+} = chatSupportController;
 
 // ======================
 // USER CHAT ROUTES
@@ -70,4 +72,4 @@ router.post('/admin/join/:ticketId', authenticateAdmin, joinChatAsAdmin);
  */
 router.post('/admin/close/:ticketId', authenticateAdmin, closeChatSession);
 
-module.exports = router;
+export default router;

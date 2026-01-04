@@ -1,5 +1,5 @@
 import surveyUserService from '../services/surveyUser.service.js';
-import ResponseHandler from '../utils/responseHandler.js';
+import { ResponseHandler, ValidationError } from '../utils/responseHandler.js';
 import Joi from 'joi';
 
 class ValidateUserController {
@@ -13,15 +13,11 @@ class ValidateUserController {
    * POST /api/validate/visitor
    */
   async validateVisitor(req, res) {
-    try {
-      const { error, value } = ValidateUserController.validateVisitorSchema.validate(req.body);
-      if (error) return ResponseHandler.error(res, error.details[0].message, 400);
+    const { error, value } = ValidateUserController.validateVisitorSchema.validate(req.body);
+    if (error) throw new ValidationError(error.details[0].message);
 
-      const data = await surveyUserService.validateVisitor(value.email);
-      return ResponseHandler.success(res, data, 'Visitor validated');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+    const data = await surveyUserService.validateVisitor(value.email);
+    ResponseHandler.success(res, data, 'Visitor validated');
   }
 }
 

@@ -1,5 +1,5 @@
 import videoReelService from '../services/videoReel.service.js';
-import ResponseHandler from '../utils/responseHandler.js';
+import { ResponseHandler, ValidationError, NotFoundError } from '../utils/responseHandler.js';
 import Joi from 'joi';
 import { validateYouTubeUrl } from '../utils/youTubeService.js';
 
@@ -50,17 +50,13 @@ class VideoReelController {
    * POST /api/admin/video-reels
    */
   async addVideoReel(req, res) {
-    try {
-      const { error, value } = VideoReelController.videoReelCreateSchema.validate(req.body);
-      if (error) {
-        return ResponseHandler.error(res, error.details[0].message, 400);
-      }
-
-      const videoReel = await videoReelService.addVideoReel(value, req.admin.userId);
-      return ResponseHandler.success(res, videoReel, 'Video reel uploaded successfully', 201);
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
+    const { error, value } = VideoReelController.videoReelCreateSchema.validate(req.body);
+    if (error) {
+      throw new ValidationError(error.details[0].message);
     }
+
+    const videoReel = await videoReelService.addVideoReel(value, req.admin.userId);
+    ResponseHandler.success(res, videoReel, 'Video reel uploaded successfully', 201);
   }
 
   /**
@@ -68,12 +64,8 @@ class VideoReelController {
    * GET /api/admin/video-reels
    */
   async getAllVideoReels(req, res) {
-    try {
-      const data = await videoReelService.getAllVideoReels(req.query);
-      return ResponseHandler.success(res, data, 'Video reels retrieved successfully');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+    const data = await videoReelService.getAllVideoReels(req.query);
+    ResponseHandler.success(res, data, 'Video reels retrieved successfully');
   }
 
   /**
@@ -81,12 +73,8 @@ class VideoReelController {
    * GET /api/admin/video-reels/:id
    */
   async getVideoReelById(req, res) {
-    try {
-      const videoReel = await videoReelService.getVideoReelById(req.params.id);
-      return ResponseHandler.success(res, { videoReel }, 'Video reel retrieved successfully');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+    const videoReel = await videoReelService.getVideoReelById(req.params.id);
+    ResponseHandler.success(res, { videoReel }, 'Video reel retrieved successfully');
   }
 
   /**
@@ -94,17 +82,12 @@ class VideoReelController {
    * PUT /api/admin/video-reels/:id
    */
   async updateVideoReel(req, res) {
-    try {
-      const { error, value } = VideoReelController.videoReelUpdateSchema.validate(req.body);
-      if (error) {
-        return ResponseHandler.error(res, error.details[0].message, 400);
-      }
-
-      const videoReel = await videoReelService.updateVideoReel(req.params.id, value, req.admin.userId);
-      return ResponseHandler.success(res, { videoReel }, 'Video reel updated successfully');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
+    const { error, value } = VideoReelController.videoReelUpdateSchema.validate(req.body);
+    if (error) {
+      throw new ValidationError(error.details[0].message);
     }
+    const videoReel = await videoReelService.updateVideoReel(req.params.id, value, req.admin.userId);
+    ResponseHandler.success(res, { videoReel }, 'Video reel updated successfully');
   }
 
   /**
@@ -112,16 +95,12 @@ class VideoReelController {
    * DELETE /api/admin/video-reels/:id
    */
   async deleteVideoReel(req, res) {
-    try {
-      const videoReel = await videoReelService.deleteVideoReel(req.params.id);
-      return ResponseHandler.success(res, {
-        deletedId: videoReel._id,
-        title: videoReel.title,
-        deletedAt: new Date()
-      }, 'Video reel deleted successfully');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+    const videoReel = await videoReelService.deleteVideoReel(req.params.id);
+    ResponseHandler.success(res, {
+      deletedId: videoReel._id,
+      title: videoReel.title,
+      deletedAt: new Date()
+    }, 'Video reel deleted successfully');
   }
 
   /**
@@ -129,12 +108,8 @@ class VideoReelController {
    * POST /api/admin/video-reels/bulk
    */
   async bulkAddVideoReels(req, res) {
-    try {
-      const data = await videoReelService.bulkAddVideoReels(req.body, req.admin.userId);
-      return ResponseHandler.success(res, data, `Bulk add completed: ${data.summary.successful} added, ${data.summary.failed} failed`);
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+    const data = await videoReelService.bulkAddVideoReels(req.body, req.admin.userId);
+    ResponseHandler.success(res, data, `Bulk add completed: ${data.summary.successful} added, ${data.summary.failed} failed`);
   }
 
   /**
@@ -142,12 +117,8 @@ class VideoReelController {
    * GET /api/admin/video-reels/analytics
    */
   async getVideoReelAnalytics(req, res) {
-    try {
-      const data = await videoReelService.getVideoReelAnalytics(req.query);
-      return ResponseHandler.success(res, data, 'Video reel analytics retrieved successfully');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+    const data = await videoReelService.getVideoReelAnalytics(req.query);
+    ResponseHandler.success(res, data, 'Video reel analytics retrieved successfully');
   }
 }
 
