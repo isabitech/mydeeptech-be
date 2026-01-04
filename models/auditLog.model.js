@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 /**
  * AUDIT LOG MODEL
@@ -13,13 +13,13 @@ const auditLogSchema = new mongoose.Schema({
     required: true,
     ref: 'SpideyAssessmentConfig'
   },
-  
+
   submissionId: {
     type: mongoose.Schema.Types.ObjectId,
     required: true,
     ref: 'SpideyAssessmentSubmission'
   },
-  
+
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     required: true,
@@ -46,7 +46,7 @@ const auditLogSchema = new mongoose.Schema({
   stage: {
     type: String,
     enum: ['stage1', 'stage2', 'stage3', 'stage4', 'final'],
-    required: function() {
+    required: function () {
       return this.action.includes('STAGE') || this.action.includes('TRANSITION');
     }
   },
@@ -101,21 +101,21 @@ auditLogSchema.index({ assessmentId: 1, action: 1 });
 auditLogSchema.index({ timestamp: -1 }); // For chronological queries
 
 // Static methods for common operations
-auditLogSchema.statics.logAction = async function(data) {
+auditLogSchema.statics.logAction = async function (data) {
   const log = new this(data);
   return await log.save();
 };
 
-auditLogSchema.statics.getSubmissionAuditTrail = async function(submissionId) {
+auditLogSchema.statics.getSubmissionAuditTrail = async function (submissionId) {
   return await this.find({ submissionId })
     .sort({ timestamp: 1 })
     .populate('userId', 'email fullName')
     .lean();
 };
 
-auditLogSchema.statics.getAssessmentAnalytics = async function(assessmentId) {
+auditLogSchema.statics.getAssessmentAnalytics = async function (assessmentId) {
   const pipeline = [
-    { $match: { assessmentId: mongoose.Types.ObjectId(assessmentId) } },
+    { $match: { assessmentId: new mongoose.Types.ObjectId(assessmentId) } },
     {
       $group: {
         _id: '$action',
@@ -124,12 +124,12 @@ auditLogSchema.statics.getAssessmentAnalytics = async function(assessmentId) {
       }
     }
   ];
-  
+
   return await this.aggregate(pipeline);
 };
 
 // Instance methods
-auditLogSchema.methods.toSafeObject = function() {
+auditLogSchema.methods.toSafeObject = function () {
   const obj = this.toObject();
   return {
     id: obj._id,
@@ -141,4 +141,5 @@ auditLogSchema.methods.toSafeObject = function() {
   };
 };
 
-module.exports = mongoose.model('AuditLog', auditLogSchema);
+const AuditLog = mongoose.model('AuditLog', auditLogSchema);
+export default AuditLog;

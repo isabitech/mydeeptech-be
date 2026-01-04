@@ -1,5 +1,4 @@
-const mongoose = require('mongoose');
-
+import mongoose from 'mongoose';
 
 const taskAssignmentSchema = new mongoose.Schema({
     taskId: {
@@ -12,9 +11,7 @@ const taskAssignmentSchema = new mongoose.Schema({
         minlength: 5,
         required: true
     }
-
 });
 
-const TaskAssignment = mongoose.model( 'TaskAssignment', taskAssignmentSchema)
-
-module.exports = TaskAssignment;
+const TaskAssignment = mongoose.model('TaskAssignment', taskAssignmentSchema);
+export default TaskAssignment;

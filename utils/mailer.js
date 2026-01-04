@@ -1,6 +1,6 @@
-const nodemailer = require("nodemailer");
-const { sendVerificationEmailBrevo } = require('./brevoMailer');
-const { sendVerificationEmailBrevoSMTP } = require('./brevoSMTP');
+import nodemailer from "nodemailer";
+import { sendVerificationEmailBrevo } from './brevoMailer.js';
+import { sendVerificationEmailBrevoSMTP } from './brevoSMTP.js';
 
 // Validate email configuration
 if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
@@ -45,11 +45,11 @@ const sendVerificationEmailGmail = async (email, name, userId) => {
 // Main email function with priorities: Brevo SMTP > Brevo API > Gmail
 const sendVerificationEmail = async (email, name, userId) => {
   console.log(`📧 Sending verification email to ${email}...`);
-  
+
   // 1st Priority: Try Brevo SMTP (fastest and most reliable)
   if (process.env.SMTP_LOGIN && process.env.SMTP_KEY) {
     try {
-      console.log("� Attempting to send email via Brevo SMTP...");
+      console.log(" Attempting to send email via Brevo SMTP...");
       const result = await sendVerificationEmailBrevoSMTP(email, name, userId);
       console.log(`✅ Email sent successfully via ${result.provider}`);
       return result;
@@ -57,7 +57,7 @@ const sendVerificationEmail = async (email, name, userId) => {
       console.warn("⚠️ Brevo SMTP failed, trying other methods...", brevoSMTPError.message);
     }
   }
-  
+
   // 2nd Priority: Try Brevo API
   if (process.env.BREVO_API_KEY && process.env.BREVO_API_KEY !== 'your-brevo-api-key-here') {
     try {
@@ -69,11 +69,11 @@ const sendVerificationEmail = async (email, name, userId) => {
       console.warn("⚠️ Brevo API failed, trying Gmail fallback...", brevoAPIError.message);
     }
   }
-  
+
   // 3rd Priority: Gmail fallback
   if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
     try {
-      console.log("� Attempting to send email via Gmail...");
+      console.log(" Attempting to send email via Gmail...");
       const result = await sendVerificationEmailGmail(email, name, userId);
       console.log(`✅ Email sent successfully via ${result.provider}`);
       return result;
@@ -82,9 +82,9 @@ const sendVerificationEmail = async (email, name, userId) => {
       throw new Error(`All email providers failed. Gmail: ${gmailError.message}`);
     }
   }
-  
+
   // No email provider configured
   throw new Error("No email provider configured. Please set up Brevo SMTP, Brevo API, or Gmail SMTP credentials.");
 };
 
-module.exports = { sendVerificationEmail };
+export { sendVerificationEmail };

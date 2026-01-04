@@ -1,4 +1,4 @@
-const { sendEmail } = require('./brevoSMTP');
+import { sendEmail } from './brevoSMTP.js';
 
 const sendAdminVerificationEmail = async (email, verificationCode, adminName) => {
     try {
@@ -113,6 +113,6 @@ This is an automated security email. Please do not reply.
     }
 };
 
-module.exports = {
+export {
     sendAdminVerificationEmail
 };

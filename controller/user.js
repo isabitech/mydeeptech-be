@@ -1,123 +1,69 @@
-const { response } = require('express');
-const User = require('../models/user');
-const { signupSchema, loginSchema } = require('../utils/authValidator');
-const { RoleType } = require('../utils/role')
-const bcrypt = require('bcrypt');
+import { signupSchema, loginSchema } from '../utils/authValidator.js';
+import authService from '../services/auth.service.js';
+import userRepository from '../repositories/user.repository.js';
+import { ResponseHandler, ValidationError, NotFoundError } from '../utils/responseHandler.js';
 
-// Signup controller
-const signup = async (req, res) => {
-  try {
-    const { error } = signupSchema.validate(req.body);
-    if (error) return res.status(400).json({ message: error.details[0].message });
+class UserController {
+  // Signup controller
+  async signup(req, res, next) {
+    try {
+      const { error } = signupSchema.validate(req.body);
+      if (error) throw new ValidationError(error.details[0].message);
 
-    const { firstname, lastname, username, email, password, phone } = req.body;
-
-    const existingUser = await User.findOne({ email: req.body.email })
-    const admin = await User.findOne({ role: RoleType.ADMIN })
-    if (existingUser) return res.status(400).json({ message: 'Email already in use' });
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const newUser = new User({ firstname, lastname, username, email, password: hashedPassword, phone, role: RoleType.USER });
-    await newUser.save();
-
-    res.status(200).send({
-      responseCode: "90",
-      responseMessage: 'User registered successfully',
-      data: newUser
-    });
-  } catch (error) {
-    console.error('Error during signup:', error); // Log the error
-    res.status(500).json({ message: 'Server error', error: error.message });
-  }
-};
-
-// Login controller
-const login = async (req, res) => {
-  try {
-    const { error } = loginSchema.validate(req.body);
-    if (error) return res.status(400).json({ message: error.details[0].message });
-
-    const { email, password } = req.body;
-
-    const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: 'User not found' });
-
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) return res.status(400).json({ message: 'Invalid credentials' });
-
-    res.status(200).json({ message: 'Login successful', user });
-  } catch (error) {
-    res.status(500).json({ message: 'Server error', error });
-  }
-};
-const getAllUsers = async (req, res) => {
-  const user = await User.find({ role: req.params.role });
-  try {
-    if (!user) {
-      return res.status(400).send({
-        responseCode: "90",
-        responseMessage: "No user found",
-        data: null,
-      });
+      const user = await authService.signup(req.body);
+      ResponseHandler.success(res, user, 'User registered successfully', 201);
+    } catch (error) {
+      next(error);
     }
-
-    res.status(200).send({
-      responseCode: "90",
-      responseMessage: "User retrieved successfully",
-      data: user
-    });
-  } catch (error) {
-    res.status(500).send({
-      responseCode: "90",
-      responseMessage: "Internal server error",
-      data: error.message,
-    });
-
-    console.log(error);
   }
-};
-const getUsers = async (req, res) => {
- 
-  try {
-    const query = {};
 
-    if (req.query.role) {
-      query.role = req.query.role.toUpperCase();
+  // Login controller
+  async login(req, res, next) {
+    try {
+      const { error } = loginSchema.validate(req.body);
+      if (error) throw new ValidationError(error.details[0].message);
+
+      const { email, password } = req.body;
+      const user = await authService.login(email, password);
+
+      ResponseHandler.success(res, { user }, 'Login successful');
+    } catch (error) {
+      next(error);
     }
-   
-    // const user = await User.find(query);
-    const user = await User.find(query).select('-password');
-
-    if (!user || user.length === 0) {
-      return res.status(400).send({
-        responseCode: "99",
-        responseMessage: "No user found",
-        data: null,
-      });
-    }
-    // const sanitizedUsers = user.map(user => {
-    //   const userObj = user.toObject(); 
-    //   delete userObj.password;
-    //   return userObj;
-    // });
-  
-
-    
-    res.status(200).send({
-      responseCode: "90",
-      responseMessage: "User retrieved successfully",
-      data: user
-    });
-  } catch (error) {
-    res.status(500).send({
-      responseCode: "99",
-      responseMessage: "Internal server error",
-      data: error.message,
-    });
-
-    console.log(error);
   }
-};
 
-module.exports = { signup, login, getAllUsers, getUsers };
+  async getAllUsers(req, res, next) {
+    try {
+      const users = await userRepository.find({ role: req.params.role });
+      if (!users || users.length === 0) {
+        throw new NotFoundError("No users found for this role");
+      }
+
+      ResponseHandler.success(res, users, "Users retrieved successfully");
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getUsers(req, res, next) {
+    try {
+      const query = {};
+      if (req.query.role) {
+        query.role = req.query.role.toUpperCase();
+      }
+
+      const users = await userRepository.find(query);
+
+      if (!users || users.length === 0) {
+        throw new NotFoundError("No users found");
+      }
+
+      ResponseHandler.success(res, users, "Users retrieved successfully");
+    } catch (error) {
+      next(error);
+    }
+  }
+}
+
+export const userController = new UserController();
+export default userController;

@@ -1,19 +1,19 @@
 const express = require('express');
 const { signup, login, getAllUsers, getUsers } = require('../controller/user.js'); // Ensure this path is correct
 const { createProject, getProject, updateProject, deleteProject } = require('../controller/project.js')
-const { createTask, getTask, getAllTasks, assignTask} = require('../controller/task.js')
-const {validateVisitor} = require('../controller/validateuser.js')
+const { createTask, getTask, getAllTasks, assignTask } = require('../controller/task.js')
+const { validateVisitor } = require('../controller/validateuser.js')
 const dtUserController = require("../controller/dtUser.controller.js");
 const { createDTUser, verifyEmail, submitResult, updateUserStatus, setupPassword, dtUserLogin, getDTUserProfile, updateDTUserProfile, resetDTUserPassword, resendVerificationEmail, getAvailableProjects, applyToProject, getUserActiveProjects, getUserInvoices, getUnpaidInvoices, getPaidInvoices, getInvoiceDetails, getInvoiceDashboard, getDTUserDashboard, submitResultWithCloudinary, getUserResultSubmissions, uploadIdDocument, uploadResume, getProjectGuidelines } = require("../controller/dtUser.controller.js");
 const { authenticateToken, authorizeProfileAccess } = require('../middleware/auth.js');
 
 // Import password reset controllers
-const { 
-  forgotPassword, 
-  resetPassword, 
-  dtUserForgotPassword, 
-  dtUserResetPassword, 
-  verifyResetToken 
+const {
+  forgotPassword,
+  resetPassword,
+  dtUserForgotPassword,
+  dtUserResetPassword,
+  verifyResetToken
 } = require('../controller/passwordReset.controller.js');
 
 // Import Cloudinary upload middleware for result submissions
@@ -45,16 +45,17 @@ router.get('/verify-reset-token/:token', verifyResetToken);
 // OTHER AUTH ROUTES
 // ======================
 
-router.get('/getAllUsers', getAllUsers);
-router.get('/getUsers', getUsers)
-router.post('/createProject', createProject);
-router.get('/getProject', getProject)
-router.put('/updateProject/:id', updateProject)
-router.delete('/deleteProject/:id', deleteProject)
-router.post('/createTasks', createTask);
-router.get('/getTask/:id', getTask);
-router.get('/getAllTasks', getAllTasks);
-router.post('/assignTask', assignTask);
+// Regular User Auth Routes (Admin only for listing)
+router.get('/getAllUsers', authenticateToken, getAllUsers);
+router.get('/getUsers', authenticateToken, getUsers)
+router.post('/createProject', authenticateToken, createProject);
+router.get('/getProject', authenticateToken, getProject)
+router.put('/updateProject/:id', authenticateToken, updateProject)
+router.delete('/deleteProject/:id', authenticateToken, deleteProject)
+router.post('/createTasks', authenticateToken, createTask);
+router.get('/getTask/:id', authenticateToken, getTask);
+router.get('/getAllTasks', authenticateToken, getAllTasks);
+router.post('/assignTask', authenticateToken, assignTask);
 router.post('/emailValidation', validateVisitor);
 router.post("/createDTuser", createDTUser);
 router.get("/verifyDTusermail/:id", verifyEmail);
@@ -193,7 +194,7 @@ router.post('/debug-upload', authenticateToken, (req, res) => {
   console.log('Body keys:', Object.keys(req.body));
   console.log('Files:', req.files);
   console.log('File:', req.file);
-  
+
   res.json({
     success: true,
     message: 'Debug endpoint - check server logs for details',

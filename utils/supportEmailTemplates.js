@@ -1,15 +1,15 @@
-const { sendEmail } = require('./brevoSMTP');
+import { sendEmail } from './brevoSMTP.js';
 
 /**
  * Send ticket creation confirmation email to user
- * @param {Object} userEmail - User's email address
+ * @param {string} userEmail - User's email address
  * @param {Object} ticket - Support ticket details
  */
-const sendTicketCreationEmail = async (userEmail, ticket) => {
-  try {
-    const subject = `Support Ticket Created - ${ticket.ticketNumber}`;
-    
-    const htmlContent = `
+export const sendTicketCreationEmail = async (userEmail, ticket) => {
+    try {
+        const subject = `Support Ticket Created - ${ticket.ticketNumber}`;
+
+        const htmlContent = `
     <!DOCTYPE html>
     <html>
     <head>
@@ -96,7 +96,7 @@ const sendTicketCreationEmail = async (userEmail, ticket) => {
     </html>
     `;
 
-    const textContent = `
+        const textContent = `
 Support Ticket Created - ${ticket.ticketNumber}
 
 Hello! Your support ticket has been successfully created.
@@ -121,53 +121,53 @@ Need immediate help? Contact us at support@mydeeptech.ng
 MyDeepTech Support Team
     `;
 
-    await sendEmail(userEmail, subject, textContent, htmlContent);
-    console.log(`✅ Ticket creation email sent to ${userEmail} for ticket ${ticket.ticketNumber}`);
-  } catch (error) {
-    console.error('❌ Error sending ticket creation email:', error);
-    throw error;
-  }
+        await sendEmail({ to: userEmail, subject, text: textContent, html: htmlContent });
+        console.log(`✅ Ticket creation email sent to ${userEmail} for ticket ${ticket.ticketNumber}`);
+    } catch (error) {
+        console.error('❌ Error sending ticket creation email:', error);
+        throw error;
+    }
 };
 
 /**
  * Send ticket status update email to user
- * @param {String} userEmail - User's email address
+ * @param {string} userEmail - User's email address
  * @param {Object} ticket - Support ticket details
- * @param {String} oldStatus - Previous status
- * @param {String} newStatus - New status
+ * @param {string} oldStatus - Previous status
+ * @param {string} newStatus - New status
  */
-const sendTicketStatusUpdateEmail = async (userEmail, ticket, oldStatus, newStatus) => {
-  try {
-    const subject = `Ticket Status Update - ${ticket.ticketNumber}`;
-    
-    let statusMessage = '';
-    let statusColor = '#007bff';
-    let nextSteps = '';
+export const sendTicketStatusUpdateEmail = async (userEmail, ticket, oldStatus, newStatus) => {
+    try {
+        const subject = `Ticket Status Update - ${ticket.ticketNumber}`;
 
-    switch (newStatus) {
-      case 'in_progress':
-        statusMessage = 'Your ticket is now being actively worked on by our support team.';
-        statusColor = '#ffc107';
-        nextSteps = 'Our team is investigating your issue. You\'ll be notified of any updates or if we need additional information.';
-        break;
-      case 'waiting_for_user':
-        statusMessage = 'We need additional information from you to proceed.';
-        statusColor = '#fd7e14';
-        nextSteps = 'Please check your ticket for our latest message and provide the requested information.';
-        break;
-      case 'resolved':
-        statusMessage = 'Great news! Your support ticket has been resolved.';
-        statusColor = '#28a745';
-        nextSteps = 'Please review the resolution and let us know if you need any clarification or if the issue persists.';
-        break;
-      case 'closed':
-        statusMessage = 'Your support ticket has been closed.';
-        statusColor = '#6c757d';
-        nextSteps = 'If you need further assistance with this issue, feel free to create a new support ticket.';
-        break;
-    }
+        let statusMessage = '';
+        let statusColor = '#007bff';
+        let nextSteps = '';
 
-    const htmlContent = `
+        switch (newStatus) {
+            case 'in_progress':
+                statusMessage = 'Your ticket is now being actively worked on by our support team.';
+                statusColor = '#ffc107';
+                nextSteps = 'Our team is investigating your issue. You\'ll be notified of any updates or if we need additional information.';
+                break;
+            case 'waiting_for_user':
+                statusMessage = 'We need additional information from you to proceed.';
+                statusColor = '#fd7e14';
+                nextSteps = 'Please check your ticket for our latest message and provide the requested information.';
+                break;
+            case 'resolved':
+                statusMessage = 'Great news! Your support ticket has been resolved.';
+                statusColor = '#28a745';
+                nextSteps = 'Please review the resolution and let us know if you need any clarification or if the issue persists.';
+                break;
+            case 'closed':
+                statusMessage = 'Your support ticket has been closed.';
+                statusColor = '#6c757d';
+                nextSteps = 'If you need further assistance with this issue, feel free to create a new support ticket.';
+                break;
+        }
+
+        const htmlContent = `
     <!DOCTYPE html>
     <html>
     <head>
@@ -248,7 +248,7 @@ const sendTicketStatusUpdateEmail = async (userEmail, ticket, oldStatus, newStat
     </html>
     `;
 
-    const textContent = `
+        const textContent = `
 Ticket Status Update - ${ticket.ticketNumber}
 
 ${ticket.subject}
@@ -267,25 +267,25 @@ Need help? Reply to this email or contact support@mydeeptech.ng
 MyDeepTech Support Team
     `;
 
-    await sendEmail(userEmail, subject, textContent, htmlContent);
-    console.log(`✅ Status update email sent to ${userEmail} for ticket ${ticket.ticketNumber}`);
-  } catch (error) {
-    console.error('❌ Error sending status update email:', error);
-    throw error;
-  }
+        await sendEmail({ to: userEmail, subject, text: textContent, html: htmlContent });
+        console.log(`✅ Status update email sent to ${userEmail} for ticket ${ticket.ticketNumber}`);
+    } catch (error) {
+        console.error('❌ Error sending status update email:', error);
+        throw error;
+    }
 };
 
 /**
  * Send new ticket notification email to admin
- * @param {String} adminEmail - Admin's email address
+ * @param {string} adminEmail - Admin's email address
  * @param {Object} ticket - Support ticket details
  * @param {Object} user - User who created the ticket
  */
-const sendNewTicketNotificationToAdmin = async (adminEmail, ticket, user) => {
-  try {
-    const subject = `New Support Ticket - ${ticket.ticketNumber} (${ticket.priority.toUpperCase()})`;
-    
-    const htmlContent = `
+export const sendNewTicketNotificationToAdmin = async (adminEmail, ticket, user) => {
+    try {
+        const subject = `New Support Ticket - ${ticket.ticketNumber} (${ticket.priority.toUpperCase()})`;
+
+        const htmlContent = `
     <!DOCTYPE html>
     <html>
     <head>
@@ -360,7 +360,7 @@ const sendNewTicketNotificationToAdmin = async (adminEmail, ticket, user) => {
     </html>
     `;
 
-    const textContent = `
+        const textContent = `
 New Support Ticket - ${ticket.ticketNumber} (${ticket.priority.toUpperCase()})
 
 A new support ticket requires attention from the support team.
@@ -386,24 +386,24 @@ Please respond within 24 hours to maintain service quality standards.
 MyDeepTech Support Admin
     `;
 
-    await sendEmail(adminEmail, subject, textContent, htmlContent);
-    console.log(`✅ New ticket notification email sent to admin ${adminEmail} for ticket ${ticket.ticketNumber}`);
-  } catch (error) {
-    console.error('❌ Error sending admin notification email:', error);
-    throw error;
-  }
+        await sendEmail({ to: adminEmail, subject, text: textContent, html: htmlContent });
+        console.log(`✅ New ticket notification email sent to admin ${adminEmail} for ticket ${ticket.ticketNumber}`);
+    } catch (error) {
+        console.error('❌ Error sending admin notification email:', error);
+        throw error;
+    }
 };
 
 /**
  * Send ticket assignment notification email to admin
- * @param {String} adminEmail - Admin's email address
+ * @param {string} adminEmail - Admin's email address
  * @param {Object} ticket - Support ticket details
  */
-const sendTicketAssignmentEmail = async (adminEmail, ticket) => {
-  try {
-    const subject = `Ticket Assigned to You - ${ticket.ticketNumber}`;
-    
-    const htmlContent = `
+export const sendTicketAssignmentEmail = async (adminEmail, ticket) => {
+    try {
+        const subject = `Ticket Assigned to You - ${ticket.ticketNumber}`;
+
+        const htmlContent = `
     <!DOCTYPE html>
     <html>
     <head>
@@ -458,22 +458,42 @@ const sendTicketAssignmentEmail = async (adminEmail, ticket) => {
     </html>
     `;
 
-    await sendEmail(adminEmail, subject, '', htmlContent);
-    console.log(`✅ Assignment email sent to admin ${adminEmail} for ticket ${ticket.ticketNumber}`);
-  } catch (error) {
-    console.error('❌ Error sending assignment email:', error);
-    throw error;
-  }
+        await sendEmail({ to: adminEmail, subject, text: '', html: htmlContent });
+        console.log(`✅ Assignment email sent to admin ${adminEmail} for ticket ${ticket.ticketNumber}`);
+    } catch (error) {
+        console.error('❌ Error sending assignment email:', error);
+        throw error;
+    }
+};
+
+/**
+ * Calculate waiting time for customer
+ */
+const getWaitingTime = (startTime) => {
+    const now = new Date();
+    const start = new Date(startTime);
+    const diffMs = now - start;
+
+    const minutes = Math.floor(diffMs / 60000);
+    const seconds = Math.floor((diffMs % 60000) / 1000);
+
+    if (minutes > 0) {
+        return `${minutes} minute${minutes > 1 ? 's' : ''} ${seconds} second${seconds !== 1 ? 's' : ''}`;
+    }
+    return `${seconds} second${seconds !== 1 ? 's' : ''}`;
 };
 
 /**
  * Send email notification to support team when no agents are online
+ * @param {string} supportEmail - Support email address
+ * @param {Object} ticket - Support ticket details
+ * @param {Object} user - User details
  */
-const sendOfflineAgentNotification = async (supportEmail, ticket, user) => {
-  try {
-    const subject = `🚨 URGENT: New Chat Request - No Agents Online - ${ticket.ticketNumber}`;
-    
-    const htmlContent = `
+export const sendOfflineAgentNotification = async (supportEmail, ticket, user) => {
+    try {
+        const subject = `🚨 URGENT: New Chat Request - No Agents Online - ${ticket.ticketNumber}`;
+
+        const htmlContent = `
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -515,28 +535,28 @@ const sendOfflineAgentNotification = async (supportEmail, ticket, user) => {
                     <p><strong>Status:</strong> Waiting for Agent</p>
                     <p class="timestamp"><strong>Started At:</strong> ${new Date(ticket.createdAt).toLocaleString()}</p>
                 </div>
-
+ 
                 <div class="user-info">
                     <h2>👤 Customer Information</h2>
                     <p><strong>Name:</strong> ${user.fullName || user.username || 'N/A'}</p>
                     <p><strong>Email:</strong> ${user.email}</p>
                     <p><strong>User ID:</strong> ${user._id}</p>
                 </div>
-
+ 
                 ${ticket.description ? `
                 <div class="message-preview">
                     <h3>💬 Initial Message</h3>
                     <p><em>"${ticket.description}"</em></p>
                 </div>
                 ` : ''}
-
+ 
                 <div style="text-align: center; margin: 30px 0;">
                     <a href="${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/admin/support/chat/${ticket._id}" 
                        class="action-button">
                         🚀 JOIN CHAT NOW
                     </a>
                 </div>
-
+ 
                 <div style="background: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 5px; margin: 20px 0;">
                     <p><strong>⚠️ Action Required:</strong></p>
                     <ul>
@@ -547,7 +567,7 @@ const sendOfflineAgentNotification = async (supportEmail, ticket, user) => {
                     </ul>
                 </div>
             </div>
-
+ 
             <div class="footer">
                 <p><strong>MyDeepTech Support System</strong></p>
                 <p>This is an automated notification. Customer waiting time: <strong>${getWaitingTime(ticket.createdAt)}</strong></p>
@@ -561,7 +581,7 @@ const sendOfflineAgentNotification = async (supportEmail, ticket, user) => {
     </html>
     `;
 
-    const textContent = `
+        const textContent = `
 🚨 URGENT: New Chat Request - No Agents Online
 
 Ticket: ${ticket.ticketNumber}
@@ -582,37 +602,12 @@ Direct Chat: ${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/admin/suppor
 MyDeepTech Support System
     `;
 
-    await sendEmail(supportEmail, subject, textContent, htmlContent);
-    console.log(`📧 Offline agent notification sent to ${supportEmail} for ticket ${ticket.ticketNumber}`);
-    return { success: true };
+        await sendEmail({ to: supportEmail, subject, text: textContent, html: htmlContent });
+        console.log(`📧 Offline agent notification sent to ${supportEmail} for ticket ${ticket.ticketNumber}`);
+        return { success: true };
 
-  } catch (error) {
-    console.error('❌ Error sending offline agent notification:', error);
-    return { success: false, error: error.message };
-  }
-};
-
-/**
- * Calculate waiting time for customer
- */
-const getWaitingTime = (startTime) => {
-  const now = new Date();
-  const start = new Date(startTime);
-  const diffMs = now - start;
-  
-  const minutes = Math.floor(diffMs / 60000);
-  const seconds = Math.floor((diffMs % 60000) / 1000);
-  
-  if (minutes > 0) {
-    return `${minutes} minute${minutes > 1 ? 's' : ''} ${seconds} second${seconds !== 1 ? 's' : ''}`;
-  }
-  return `${seconds} second${seconds !== 1 ? 's' : ''}`;
-};
-
-module.exports = {
-  sendTicketCreationEmail,
-  sendTicketStatusUpdateEmail,
-  sendNewTicketNotificationToAdmin,
-  sendTicketAssignmentEmail,
-  sendOfflineAgentNotification
+    } catch (error) {
+        console.error('❌ Error sending offline agent notification:', error);
+        return { success: false, error: error.message };
+    }
 };

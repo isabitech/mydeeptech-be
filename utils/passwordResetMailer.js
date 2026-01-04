@@ -1,4 +1,4 @@
-const { sendEmail } = require('./brevoSMTP');
+import { sendEmail } from './brevoSMTP.js';
 
 /**
  * Send password reset email using Brevo SMTP
@@ -7,13 +7,13 @@ const { sendEmail } = require('./brevoSMTP');
  * @param {string} resetToken - Password reset token
  * @param {string} userType - 'user' or 'dtuser'
  */
-const sendPasswordResetEmail = async (email, name, resetToken, userType = 'user') => {
-  try {
-    const resetUrl = userType === 'dtuser' 
-      ? `${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/reset-password?token=${resetToken}&type=dtuser`
-      : `${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/reset-password?token=${resetToken}&type=user`;
+export const sendPasswordResetEmail = async (email, name, resetToken, userType = 'user') => {
+    try {
+        const resetUrl = userType === 'dtuser'
+            ? `${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/reset-password?token=${resetToken}&type=dtuser`
+            : `${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/reset-password?token=${resetToken}&type=user`;
 
-    const htmlContent = `
+        const htmlContent = `
         <!DOCTYPE html>
         <html lang="en">
         <head>
@@ -186,7 +186,7 @@ const sendPasswordResetEmail = async (email, name, resetToken, userType = 'user'
         </html>
       `;
 
-      const textContent = `
+        const textContent = `
 Password Reset Request - MyDeepTech
 
 Hello ${name},
@@ -213,26 +213,26 @@ MyDeepTech Security Team
 https://mydeeptech.ng
       `;
 
-    // Send email using Brevo API with SMTP fallback
-    const response = await sendEmail({
-      to: email,
-      subject: '🔒 Reset Your MyDeepTech Password',
-      html: htmlContent,
-      text: textContent
-    });
-    
-    console.log(`✅ Password reset email sent to ${email} via ${response.provider}`);
-    return { 
-      success: true, 
-      messageId: response.messageId,
-      provider: response.provider,
-      resetUrl 
-    };
+        // Send email using Brevo API
+        const response = await sendEmail({
+            to: email,
+            subject: '🔒 Reset Your MyDeepTech Password',
+            html: htmlContent,
+            text: textContent
+        });
 
-  } catch (error) {
-    console.error('❌ Error sending password reset email:', error);
-    throw new Error(`Failed to send password reset email: ${error.message}`);
-  }
+        console.log(`✅ Password reset email sent to ${email} via ${response.provider}`);
+        return {
+            success: true,
+            messageId: response.messageId,
+            provider: response.provider,
+            resetUrl
+        };
+
+    } catch (error) {
+        console.error('❌ Error sending password reset email:', error);
+        throw new Error(`Failed to send password reset email: ${error.message}`);
+    }
 };
 
 /**
@@ -241,13 +241,13 @@ https://mydeeptech.ng
  * @param {string} name - User's name
  * @param {string} userType - 'user' or 'dtuser'
  */
-const sendPasswordResetConfirmationEmail = async (email, name, userType = 'user') => {
-  try {
-    const loginUrl = userType === 'dtuser' 
-      ? `${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/dtuser/login`
-      : `${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/login`;
+export const sendPasswordResetConfirmationEmail = async (email, name, userType = 'user') => {
+    try {
+        const loginUrl = userType === 'dtuser'
+            ? `${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/dtuser/login`
+            : `${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/login`;
 
-    const htmlContent = `
+        const htmlContent = `
         <!DOCTYPE html>
         <html lang="en">
         <head>
@@ -304,7 +304,7 @@ const sendPasswordResetConfirmationEmail = async (email, name, userType = 'user'
         </html>
       `;
 
-      const textContent = `
+        const textContent = `
 Password Changed Successfully - MyDeepTech
 
 Hello ${name},
@@ -323,23 +323,18 @@ MyDeepTech Security Team
 support@mydeeptech.ng
       `;
 
-    const response = await sendEmail({
-      to: email,
-      subject: '✅ MyDeepTech Password Successfully Changed',
-      html: htmlContent,
-      text: textContent
-    });
-    
-    console.log(`✅ Password reset confirmation email sent to ${email} via ${response.provider}`);
-    return { success: true, messageId: response.messageId };
+        const response = await sendEmail({
+            to: email,
+            subject: '✅ MyDeepTech Password Successfully Changed',
+            html: htmlContent,
+            text: textContent
+        });
 
-  } catch (error) {
-    console.error('❌ Error sending confirmation email:', error);
-    throw new Error(`Failed to send confirmation email: ${error.message}`);
-  }
-};
+        console.log(`✅ Password reset confirmation email sent to ${email} via ${response.provider}`);
+        return { success: true, messageId: response.messageId };
 
-module.exports = {
-  sendPasswordResetEmail,
-  sendPasswordResetConfirmationEmail
+    } catch (error) {
+        console.error('❌ Error sending confirmation email:', error);
+        throw new Error(`Failed to send confirmation email: ${error.message}`);
+    }
 };

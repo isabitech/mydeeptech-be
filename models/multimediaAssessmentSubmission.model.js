@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 // Sub-schemas for nested structures
 const videoSegmentSchema = new mongoose.Schema({
@@ -99,7 +99,7 @@ const assessmentTaskSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
-  
+
   // QA scoring for individual task
   qaScore: {
     conversationQuality: {
@@ -176,24 +176,24 @@ const multimediaAssessmentSubmissionSchema = new mongoose.Schema({
     ref: 'MultimediaAssessmentConfig',
     required: true
   },
-  
+
   // User information
   annotatorId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'DTUser',
     required: true
   },
-  
+
   // Project reference
   projectId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'AnnotationProject',
     required: true
   },
-  
+
   // Assessment tasks
   tasks: [assessmentTaskSchema],
-  
+
   // Time tracking
   totalTimeSpent: {
     type: Number, // in seconds
@@ -209,27 +209,27 @@ const multimediaAssessmentSubmissionSchema = new mongoose.Schema({
       lastPauseStart: null
     })
   },
-  
+
   // Submission status
   status: {
     type: String,
     enum: ['in_progress', 'submitted', 'under_review', 'approved', 'rejected'],
     default: 'in_progress'
   },
-  
+
   // Submission info
   submittedAt: {
     type: Date,
     default: null
   },
-  
+
   // QA Review reference
   qaReview: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'QAReview',
     default: null
   },
-  
+
   // Overall scoring
   totalScore: {
     type: Number,
@@ -237,21 +237,21 @@ const multimediaAssessmentSubmissionSchema = new mongoose.Schema({
     max: 100,
     default: null
   },
-  
+
   // Attempt tracking
   attemptNumber: {
     type: Number,
     default: 1,
     min: 1
   },
-  
+
   // Previous attempt reference for retakes
   previousAttempt: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'MultimediaAssessmentSubmission',
     default: null
   },
-  
+
   // Session metadata
   sessionMetadata: {
     browserInfo: {
@@ -272,7 +272,7 @@ const multimediaAssessmentSubmissionSchema = new mongoose.Schema({
       default: ''
     }
   },
-  
+
   // Auto-save progress tracking
   lastAutoSave: {
     type: Date,
@@ -296,25 +296,25 @@ multimediaAssessmentSubmissionSchema.index({ qaReview: 1 });
 multimediaAssessmentSubmissionSchema.index({ createdAt: -1 });
 
 // Compound index for finding user's latest attempt
-multimediaAssessmentSubmissionSchema.index({ 
-  annotatorId: 1, 
-  assessmentId: 1, 
-  attemptNumber: -1 
+multimediaAssessmentSubmissionSchema.index({
+  annotatorId: 1,
+  assessmentId: 1,
+  attemptNumber: -1
 });
 
 // Virtual for completion percentage
-multimediaAssessmentSubmissionSchema.virtual('completionPercentage').get(function() {
+multimediaAssessmentSubmissionSchema.virtual('completionPercentage').get(function () {
   if (!this.tasks || this.tasks.length === 0) return 0;
   const completedTasks = this.tasks.filter(task => task.isCompleted).length;
   return Math.round((completedTasks / this.tasks.length) * 100);
 });
 
 // Virtual for formatted time spent
-multimediaAssessmentSubmissionSchema.virtual('formattedTimeSpent').get(function() {
+multimediaAssessmentSubmissionSchema.virtual('formattedTimeSpent').get(function () {
   const hours = Math.floor(this.totalTimeSpent / 3600);
   const minutes = Math.floor((this.totalTimeSpent % 3600) / 60);
   const seconds = this.totalTimeSpent % 60;
-  
+
   if (hours > 0) {
     return `${hours}h ${minutes}m ${seconds}s`;
   } else if (minutes > 0) {
@@ -325,16 +325,16 @@ multimediaAssessmentSubmissionSchema.virtual('formattedTimeSpent').get(function(
 });
 
 // Virtual for time remaining
-multimediaAssessmentSubmissionSchema.virtual('timeRemaining').get(function() {
+multimediaAssessmentSubmissionSchema.virtual('timeRemaining').get(function () {
   if (!this.populated('assessmentId') || !this.assessmentId.requirements) return null;
-  
+
   const timeLimitSeconds = this.assessmentId.requirements.timeLimit * 60;
   const remaining = timeLimitSeconds - this.totalTimeSpent;
   return Math.max(0, remaining);
 });
 
 // Static method to find user's latest attempt for assessment
-multimediaAssessmentSubmissionSchema.statics.findLatestUserAttempt = function(annotatorId, assessmentId) {
+multimediaAssessmentSubmissionSchema.statics.findLatestUserAttempt = function (annotatorId, assessmentId) {
   return this.findOne({ annotatorId, assessmentId })
     .sort({ attemptNumber: -1 })
     .populate('assessmentId')
@@ -343,139 +343,135 @@ multimediaAssessmentSubmissionSchema.statics.findLatestUserAttempt = function(an
 };
 
 // Static method to check if user can retake assessment
-multimediaAssessmentSubmissionSchema.statics.canUserRetake = async function(annotatorId, assessmentId) {
+multimediaAssessmentSubmissionSchema.statics.canUserRetake = async function (annotatorId, assessmentId) {
   const latestAttempt = await this.findLatestUserAttempt(annotatorId, assessmentId);
-  
+
   if (!latestAttempt) return { canRetake: true, reason: 'First attempt' };
-  
+
   const config = latestAttempt.assessmentId;
-  
+
   // Check if retakes are allowed
   if (!config.requirements.retakePolicy.allowed) {
     return { canRetake: false, reason: 'Retakes not allowed' };
   }
-  
-  // Check max attempts - DISABLED to allow unlimited retakes
-  // if (latestAttempt.attemptNumber >= config.requirements.retakePolicy.maxAttempts) {
-  //   return { canRetake: false, reason: 'Maximum attempts reached' };
-  // }
-  
+
   // Check if user passed
   if (latestAttempt.status === 'approved') {
     return { canRetake: false, reason: 'Already passed' };
   }
-  
+
   // Check cooldown period for failed attempts
   if (latestAttempt.status === 'rejected' && latestAttempt.updatedAt) {
     const cooldownMs = config.requirements.retakePolicy.cooldownHours * 60 * 60 * 1000;
     const timeElapsed = Date.now() - latestAttempt.updatedAt.getTime();
-    
+
     if (timeElapsed < cooldownMs) {
       const remainingMs = cooldownMs - timeElapsed;
       const remainingHours = Math.ceil(remainingMs / (60 * 60 * 1000));
-      return { 
-        canRetake: false, 
+      return {
+        canRetake: false,
         reason: `Cooldown period active`,
-        remainingHours 
+        remainingHours
       };
     }
   }
-  
+
   return { canRetake: true, reason: 'Eligible for retake' };
 };
 
 // Instance method to start timer
-multimediaAssessmentSubmissionSchema.methods.startTimer = function() {
+multimediaAssessmentSubmissionSchema.methods.startTimer = function () {
   if (this.timerState.isRunning) {
     throw new Error('Timer is already running');
   }
-  
+
   this.timerState.isRunning = true;
   this.timerState.startTime = new Date();
   this.timerState.lastPauseStart = null;
-  
+
   return this.save();
 };
 
 // Instance method to pause timer
-multimediaAssessmentSubmissionSchema.methods.pauseTimer = function() {
+multimediaAssessmentSubmissionSchema.methods.pauseTimer = function () {
   if (!this.timerState.isRunning) {
     throw new Error('Timer is not running');
   }
-  
+
   this.timerState.isRunning = false;
   this.timerState.lastPauseStart = new Date();
-  
+
   // Calculate time elapsed since start and add to total
   if (this.timerState.startTime) {
     const elapsed = Date.now() - this.timerState.startTime.getTime();
     this.totalTimeSpent += Math.floor(elapsed / 1000);
   }
-  
+
   return this.save();
 };
 
 // Instance method to resume timer
-multimediaAssessmentSubmissionSchema.methods.resumeTimer = function() {
+multimediaAssessmentSubmissionSchema.methods.resumeTimer = function () {
   if (this.timerState.isRunning) {
     throw new Error('Timer is already running');
   }
-  
+
   // Calculate paused duration and add to total
   if (this.timerState.lastPauseStart) {
     const pauseDuration = Date.now() - this.timerState.lastPauseStart.getTime();
     this.timerState.totalPausedDuration += Math.floor(pauseDuration / 1000);
   }
-  
+
   this.timerState.isRunning = true;
   this.timerState.startTime = new Date();
   this.timerState.lastPauseStart = null;
-  
+
   return this.save();
 };
 
 // Instance method to complete task
-multimediaAssessmentSubmissionSchema.methods.completeTask = function(taskNumber) {
+multimediaAssessmentSubmissionSchema.methods.completeTask = function (taskNumber) {
   const task = this.tasks.find(t => t.taskNumber === taskNumber);
   if (!task) {
     throw new Error(`Task ${taskNumber} not found`);
   }
-  
+
   task.isCompleted = true;
   task.submittedAt = new Date();
-  
+
   return this.save();
 };
 
 // Instance method to calculate total score from QA scores
-multimediaAssessmentSubmissionSchema.methods.calculateTotalScore = function() {
-  const completedTasks = this.tasks.filter(task => 
+multimediaAssessmentSubmissionSchema.methods.calculateTotalScore = function () {
+  const completedTasks = this.tasks.filter(task =>
     task.isCompleted && task.qaScore && task.qaScore.taskTotal !== null
   );
-  
+
   if (completedTasks.length === 0) {
     this.totalScore = null;
     return this.totalScore;
   }
-  
+
   const totalScore = completedTasks.reduce((sum, task) => sum + task.qaScore.taskTotal, 0);
   this.totalScore = Math.round(totalScore / completedTasks.length);
-  
+
   return this.totalScore;
 };
 
 // Pre-save middleware to validate submission
-multimediaAssessmentSubmissionSchema.pre('save', function(next) {
+multimediaAssessmentSubmissionSchema.pre('save', function (next) {
   // Validate timer state
   if (this.timerState.isRunning && !this.timerState.startTime) {
     return next(new Error('Timer cannot be running without start time'));
   }
-  
+
   // Auto-update last save time
   this.lastAutoSave = new Date();
   this.autoSaveCount += 1;
-  
+
   next();
 });
 
-module.exports = mongoose.model('MultimediaAssessmentSubmission', multimediaAssessmentSubmissionSchema);
+const MultimediaAssessmentSubmission = mongoose.model('MultimediaAssessmentSubmission', multimediaAssessmentSubmissionSchema);
+export default MultimediaAssessmentSubmission;

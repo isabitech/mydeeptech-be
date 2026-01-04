@@ -1,10 +1,6 @@
-/**
- * Notification Service
- * Handles creation and management of user notifications
- */
+import Notification from '../models/notification.model.js';
+import mongoose from 'mongoose';
 
-const Notification = require('../models/notification.model');
-const mongoose = require('mongoose');
 /**
  * Create a general notification
  * @param {Object} notificationData - Notification details
@@ -47,19 +43,19 @@ const createNotification = async (notificationData) => {
 const createApplicationStatusNotification = async (userId, status, project, application) => {
   try {
     console.log(`📬 Creating application status notification for user ${userId}: ${status}`);
-    
+
     const titles = {
       approved: `Application Approved: ${project.projectName}`,
       rejected: `Application Update: ${project.projectName}`,
       pending: `Application Received: ${project.projectName}`
     };
-    
+
     const messages = {
       approved: `Congratulations! Your application for "${project.projectName}" has been approved. You can now start working on this project.`,
       rejected: `Your application for "${project.projectName}" has been reviewed. Please check your email for details.`,
       pending: `Your application for "${project.projectName}" has been received and is under review.`
     };
-    
+
     const notification = await createNotification({
       userId: userId,
       type: 'application_status',
@@ -73,9 +69,9 @@ const createApplicationStatusNotification = async (userId, status, project, appl
         status: status
       }
     });
-    
+
     return notification;
-    
+
   } catch (error) {
     console.error('❌ Error creating application status notification:', error);
     throw error;
@@ -90,9 +86,9 @@ const createApplicationStatusNotification = async (userId, status, project, appl
 const createAssessmentCompletionNotification = async (userId, assessmentData) => {
   try {
     console.log(`🎯 Creating assessment completion notification for user ${userId}`);
-    
+
     const { totalScore, percentage, sections } = assessmentData;
-    
+
     const notification = await createNotification({
       userId: userId,
       type: 'assessment_completed',
@@ -105,9 +101,9 @@ const createAssessmentCompletionNotification = async (userId, assessmentData) =>
         completedAt: new Date()
       }
     });
-    
+
     return notification;
-    
+
   } catch (error) {
     console.error('❌ Error creating assessment completion notification:', error);
     throw error;
@@ -124,7 +120,7 @@ const createAssessmentCompletionNotification = async (userId, assessmentData) =>
 const createSystemAnnouncement = async (title, message, priority = 'normal', targetUsers = 'all') => {
   try {
     console.log(`📢 Creating system announcement: ${title}`);
-    
+
     // For now, just log the announcement until notification model is implemented
     const announcement = {
       id: new Date().getTime(),
@@ -136,18 +132,18 @@ const createSystemAnnouncement = async (title, message, priority = 'normal', tar
       createdAt: new Date(),
       status: 'active'
     };
-    
+
     console.log(`✅ System announcement created:`, announcement);
-    
+
     return announcement;
-    
+
   } catch (error) {
     console.error('❌ Error creating system announcement:', error);
     throw error;
   }
 };
 
-module.exports = {
+export {
   createNotification,
   createApplicationStatusNotification,
   createAssessmentCompletionNotification,

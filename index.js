@@ -1,22 +1,24 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const dotenv = require('dotenv');
-const bodyParser = require('body-parser');
 const { createServer } = require('http');
 const { initializeSocketIO } = require('./utils/chatSocketService');
 const { initRedis, closeRedis, redisHealthCheck } = require('./config/redis');
+const errorHandler = require('./middleware/errorHandler');
 
 // Conditionally load Swagger (optional dependency)
 let swaggerUi, specs;
 try {
-  const swagger = require('./config/swagger');
-  swaggerUi = swagger.swaggerUi;
-  specs = swagger.specs;
+    const swagger = require('./config/swagger');
+    swaggerUi = swagger.swaggerUi;
+    specs = swagger.specs;
 } catch (error) {
-  console.log('⚠️ Swagger dependencies not found. API documentation will not be available.');
-  swaggerUi = null;
-  specs = null;
+    console.log('⚠️ Swagger dependencies not found. API documentation will not be available.');
+    swaggerUi = null;
+    specs = null;
 }
 
 dotenv.config({ path: './.env' });
@@ -41,9 +43,9 @@ initializeSocketIO(server);
 // CORS Configuration - Development and Production
 const corsOptions = {
     origin: [
-        'http://localhost:5173', 
-        'http://127.0.0.1:5173', 
-        'https://mydeeptech.ng', 
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+        'https://mydeeptech.ng',
         'https://www.mydeeptech.ng',
         'https://mydeeptech-be.onrender.com',
         'https://mydeeptech-frontend.onrender.com'
@@ -61,17 +63,17 @@ app.get("/", (req, res) => {
 app.get("/health", async (req, res) => {
     try {
         const redisStatus = await redisHealthCheck();
-        
+
         // Test MongoDB connectivity with actual database operation
         let mongoStatus = 'disconnected';
         let mongoDetails = { status: 'disconnected' };
-        
+
         if (mongoose.connection.readyState === 1) {
             try {
                 // Perform actual database ping
                 await mongoose.connection.db.admin().ping();
                 const collections = await mongoose.connection.db.listCollections().toArray();
-                
+
                 mongoStatus = 'connected';
                 mongoDetails = {
                     status: 'connected',
@@ -89,9 +91,9 @@ app.get("/health", async (req, res) => {
                 };
             }
         }
-        
+
         const isHealthy = mongoStatus === 'connected' && redisStatus.status === 'connected';
-        
+
         res.status(isHealthy ? 200 : 503).json({
             status: isHealthy ? 'ok' : 'degraded',
             timestamp: new Date().toISOString(),
@@ -110,22 +112,36 @@ app.get("/health", async (req, res) => {
 });
 
 // Middleware
+app.use(helmet()); // Basic security headers
 app.use(cors(corsOptions));
-app.use(express.json());
-app.use(express.urlencoded({extended: true}));
-app.use(bodyParser.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Rate limiting
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Limit each IP to 100 requests per windowMs
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: {
+        success: false,
+        message: "Too many requests from this IP, please try again after 15 minutes",
+        code: "RATE_LIMIT_EXCEEDED"
+    }
+});
+app.use('/api/', limiter);
 
 // API Documentation (only if Swagger is available)
 if (swaggerUi && specs) {
-  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
-    explorer: true,
-    customSiteTitle: "MyDeepTech API Documentation",
-    customfavIcon: "/favicon.ico",
-    customCss: '.swagger-ui .topbar { display: none }'
-  }));
-  console.log('📚 API Documentation available at: http://localhost:5000/api-docs');
+    app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
+        explorer: true,
+        customSiteTitle: "MyDeepTech API Documentation",
+        customfavIcon: "/favicon.ico",
+        customCss: '.swagger-ui .topbar { display: none }'
+    }));
+    console.log('📚 API Documentation available at: http://localhost:5000/api-docs');
 } else {
-  console.log('📚 API Documentation not available (Swagger dependencies missing)');
+    console.log('📚 API Documentation not available (Swagger dependencies missing)');
 }
 
 // Routes
@@ -137,6 +153,9 @@ app.use('/api/assessments', assessmentRoute);
 app.use('/api/support', supportRoute);
 app.use('/api/chat', chatRoute);
 app.use('/api/qa', qaRoute);
+
+// Global Error Handler (Must be registered after all routes)
+app.use(errorHandler);
 
 // Initialize Redis connection
 const initializeRedis = async () => {
@@ -156,11 +175,11 @@ mongoose.set('bufferCommands', false); // Disable mongoose buffering for product
 const connectDB = async () => {
     const maxRetries = 5;
     let retries = 0;
-    
+
     while (retries < maxRetries) {
         try {
             console.log(`🔄 Attempting MongoDB connection (attempt ${retries + 1}/${maxRetries})...`);
-            
+
             const conn = await mongoose.connect(process.env.MONGO_URI, {
                 // Production-optimized timeouts
                 serverSelectionTimeoutMS: 60000, // 60 seconds
@@ -171,23 +190,23 @@ const connectDB = async () => {
                 maxIdleTimeMS: 30000,           // Close connections after 30s idle
                 heartbeatFrequencyMS: 10000,    // Heartbeat every 10s
             });
-            
+
             console.log(`✅ MongoDB connected successfully to: ${conn.connection.host}`);
-            
+
             // Test database connectivity
             const collections = await mongoose.connection.db.listCollections().toArray();
             console.log(`📊 Database verification: Found ${collections.length} collections`);
-            
+
             return conn;
         } catch (error) {
             retries++;
             console.error(`❌ MongoDB connection attempt ${retries} failed:`, error.message);
-            
+
             if (retries === maxRetries) {
                 console.error('💀 All MongoDB connection attempts failed');
                 throw new Error(`Failed to connect to MongoDB after ${maxRetries} attempts: ${error.message}`);
             }
-            
+
             // Exponential backoff: wait 2^retries seconds before retry
             const waitTime = Math.pow(2, retries) * 1000;
             console.log(`⏳ Waiting ${waitTime}ms before retry...`);
@@ -208,15 +227,15 @@ initializeRedis();
 // Graceful shutdown handler
 const gracefulShutdown = async (signal) => {
     console.log(`\n🛑 Received ${signal}, starting graceful shutdown...`);
-    
+
     try {
         // Close Redis connection
         await closeRedis();
-        
+
         // Close MongoDB connection
         await mongoose.connection.close();
         console.log('✅ MongoDB connection closed');
-        
+
         // Close HTTP server
         process.exit(0);
     } catch (error) {

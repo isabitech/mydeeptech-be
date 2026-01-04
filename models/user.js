@@ -1,42 +1,43 @@
-const mongoose = require('mongoose');
-const {RoleType} = require('../utils/role');
+import mongoose from 'mongoose';
+import { RoleType } from '../utils/role.js';
 
 const userSchema = new mongoose.Schema({
     firstname: {
         type: String,
-        minlenght: 3,
-        required: 'Fristname is required'
+        minlength: 3,
+        required: 'Firstname is required'
     },
     lastname: {
         type: String,
-        minlenght: 3,
+        minlength: 3,
         required: 'Lastname is required'
     },
     username: {
         type: String,
-        minlenght: 3,
-        required: 'Username is required' 
+        minlength: 3,
+        required: 'Username is required'
     },
-    email: { 
-        type: String, 
+    email: {
+        type: String,
         minlength: 3,
         unique: true,
         lowercase: true,
-        required: "Email is required" 
-        },
+        required: "Email is required"
+    },
     password: {
-         type: String, 
-         minlength: 8, 
-         required: "Password is required" 
-        },
+        type: String,
+        minlength: 8,
+        required: "Password is required",
+        select: false
+    },
     phone: {
-       type: String, 
-       required: true 
+        type: String,
+        required: true
     },
     role: {
         type: String,
         required: "Role name is required",
-        enum: [RoleType.USER, RoleType.ADMIN],
+        enum: Object.values(RoleType),
         default: RoleType.USER
     },
     // Password reset fields
@@ -52,8 +53,9 @@ const userSchema = new mongoose.Schema({
         type: Number,
         default: 0
     }
-  });
+}, {
+    timestamps: true
+});
 
-  const User = mongoose.model('User', userSchema); // Defining the model here
-
-  module.exports = User; 
+const User = mongoose.model('User', userSchema);
+export default User;

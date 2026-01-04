@@ -1,4 +1,7 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
+import SpideyAssessmentConfig from '../models/spideyAssessmentConfig.model.js';
+import SpideyAssessmentSubmission from '../models/spideyAssessmentSubmission.model.js';
+import AuditLog from '../models/auditLog.model.js';
 
 /**
  * SPIDEY FINAL DECISION & AUDIT ENGINE
@@ -7,10 +10,6 @@ const mongoose = require('mongoose');
  */
 class SpideyFinalDecisionEngine {
   constructor() {
-    this.SpideyAssessmentConfig = require('../models/spideyAssessmentConfig.model');
-    this.SpideyAssessmentSubmission = require('../models/spideyAssessmentSubmission.model');
-    this.AuditLog = require('../models/auditLog.model');
-    
     // Final decision rules - IMMUTABLE
     this.DECISION_RULES = {
       REQUIRE_ALL_STAGES_PASSED: true,      // ALL stages must pass
@@ -24,7 +23,7 @@ class SpideyFinalDecisionEngine {
     this.AUDIT_CATEGORIES = {
       STAGE_ENTRY: 'stage_entry',
       STAGE_EXIT: 'stage_exit',
-      VALIDATION_FAILURE: 'validation_failure', 
+      VALIDATION_FAILURE: 'validation_failure',
       RULE_VIOLATION: 'rule_violation',
       FINAL_OUTCOME: 'final_outcome',
       TIME_TRACKING: 'time_tracking',
@@ -39,7 +38,7 @@ class SpideyFinalDecisionEngine {
    */
   async makeFinalDecision(submissionId) {
     try {
-      const submission = await this.SpideyAssessmentSubmission.findById(submissionId)
+      const submission = await SpideyAssessmentSubmission.findById(submissionId)
         .populate('assessmentId candidateId');
 
       if (!submission) {
@@ -65,7 +64,7 @@ class SpideyFinalDecisionEngine {
       if (submission.status !== 'completed' && submission.status !== 'failed') {
         decisionResult.finalDecision = 'INCOMPLETE';
         decisionResult.decisionReason.push('Assessment not yet completed');
-        
+
         await this._logFinalDecision(decisionResult, 'INCOMPLETE_ASSESSMENT');
         return decisionResult;
       }
@@ -78,7 +77,7 @@ class SpideyFinalDecisionEngine {
         decisionResult.score = 0;
         decisionResult.violations = hardFailCheck.violations;
         decisionResult.decisionReason.push('Hard fail rule violation detected');
-        
+
         await this._logFinalDecision(decisionResult, 'HARD_FAIL_TERMINATION');
         return decisionResult;
       }
@@ -91,7 +90,7 @@ class SpideyFinalDecisionEngine {
         decisionResult.score = stageCheck.averageScore;
         decisionResult.stageResults = stageCheck.stageResults;
         decisionResult.decisionReason.push('One or more stages failed');
-        
+
         await this._logFinalDecision(decisionResult, 'STAGE_FAILURE');
         return decisionResult;
       }
@@ -104,7 +103,7 @@ class SpideyFinalDecisionEngine {
         decisionResult.score = scoreCheck.finalScore;
         decisionResult.stageResults = scoreCheck.stageBreakdown;
         decisionResult.decisionReason.push(`Score ${scoreCheck.finalScore} below minimum ${this.DECISION_RULES.MINIMUM_PASS_SCORE}`);
-        
+
         await this._logFinalDecision(decisionResult, 'INSUFFICIENT_SCORE');
         return decisionResult;
       }
@@ -117,7 +116,7 @@ class SpideyFinalDecisionEngine {
         decisionResult.score = scoreCheck.finalScore;
         decisionResult.violations = criticalCheck.violations;
         decisionResult.decisionReason.push('Critical rule violations detected');
-        
+
         await this._logFinalDecision(decisionResult, 'CRITICAL_VIOLATIONS');
         return decisionResult;
       }
@@ -131,7 +130,7 @@ class SpideyFinalDecisionEngine {
 
       // Update submission with final results
       await this._updateSubmissionWithFinalDecision(submission, decisionResult);
-      
+
       await this._logFinalDecision(decisionResult, 'ASSESSMENT_PASSED');
       return decisionResult;
 
@@ -197,7 +196,7 @@ class SpideyFinalDecisionEngine {
 
     for (const requiredStage of requiredStages) {
       const stageRecord = submission.stageHistory.find(h => h.stage === requiredStage);
-      
+
       if (!stageRecord) {
         result.stageResults.push({
           stage: requiredStage,
@@ -224,7 +223,7 @@ class SpideyFinalDecisionEngine {
     }
 
     result.averageScore = completedStages > 0 ? Math.round(totalScore / completedStages) : 0;
-    result.allPassed = result.stageResults.every(s => s.passed);
+    result.allPassed = result.stageResults.length === requiredStages.length && result.stageResults.every(s => s.passed);
 
     return result;
   }
@@ -234,11 +233,11 @@ class SpideyFinalDecisionEngine {
    */
   async _calculateFinalScore(submission) {
     const assessment = submission.assessmentId;
-    const scoringWeights = assessment.scoringWeights || {
-      stage1Weight: 0.15,  // 15% - Guideline comprehension
-      stage2Weight: 0.30,  // 30% - Task design quality
-      stage3Weight: 0.35,  // 35% - Golden solution quality
-      stage4Weight: 0.20   // 20% - Integrity check
+    const scoringWeights = assessment.scoring?.weights || {
+      stage1: 0.15,  // 15% - Guideline comprehension
+      stage2: 0.30,  // 30% - Task design quality
+      stage3: 0.35,  // 35% - Golden solution quality
+      stage4: 0.20   // 20% - Integrity check
     };
 
     const result = {
@@ -251,9 +250,9 @@ class SpideyFinalDecisionEngine {
     let totalWeight = 0;
 
     for (const stageRecord of submission.stageHistory) {
-      const stageWeight = scoringWeights[`${stageRecord.stage}Weight`] || 0;
+      const stageWeight = scoringWeights[stageRecord.stage] || 0;
       const stageScore = stageRecord.score || 0;
-      
+
       weightedSum += stageScore * stageWeight;
       totalWeight += stageWeight;
 
@@ -283,7 +282,7 @@ class SpideyFinalDecisionEngine {
     // Check stage-level critical violations
     for (const stageRecord of submission.stageHistory) {
       if (stageRecord.violations) {
-        const criticalViolations = stageRecord.violations.filter(v => 
+        const criticalViolations = stageRecord.violations.filter(v =>
           v.severity === 'critical'
         );
 
@@ -299,7 +298,7 @@ class SpideyFinalDecisionEngine {
     }
 
     // Check global critical violations
-    const globalCritical = submission.ruleViolations.filter(v => 
+    const globalCritical = submission.ruleViolations.filter(v =>
       v.severity === 'critical'
     );
 
@@ -315,7 +314,13 @@ class SpideyFinalDecisionEngine {
    * Update submission with final decision
    */
   async _updateSubmissionWithFinalDecision(submission, decisionResult) {
-    submission.finalScore = decisionResult.score;
+    if (typeof submission.finalScore === 'object') {
+      submission.finalScore.percentage = decisionResult.score;
+      submission.finalScore.passed = decisionResult.passed;
+    } else {
+      submission.finalScore = decisionResult.score;
+    }
+
     submission.status = decisionResult.passed ? 'completed' : 'failed';
     submission.completedAt = decisionResult.decisionTimestamp;
 
@@ -336,12 +341,12 @@ class SpideyFinalDecisionEngine {
    */
   async generateAuditReport(submissionId) {
     try {
-      const submission = await this.SpideyAssessmentSubmission.findById(submissionId)
+      const submission = await SpideyAssessmentSubmission.findById(submissionId)
         .populate('assessmentId candidateId');
 
-      const auditLogs = await this.AuditLog.find({
+      const auditLogs = await AuditLog.find({
         $or: [
-          { entityId: submissionId },
+          { submissionId: submissionId },
           { 'details.submissionId': submissionId }
         ]
       }).sort({ timestamp: 1 });
@@ -352,7 +357,7 @@ class SpideyFinalDecisionEngine {
         candidateEmail: submission.candidateId.email,
         assessmentTitle: submission.assessmentId.title,
         reportGeneratedAt: new Date(),
-        
+
         // Timeline
         timeline: {
           started: submission.startedAt,
@@ -377,7 +382,7 @@ class SpideyFinalDecisionEngine {
         finalOutcome: {
           decision: submission.status,
           passed: submission.status === 'completed',
-          finalScore: submission.finalScore,
+          finalScore: typeof submission.finalScore === 'object' ? submission.finalScore.percentage : submission.finalScore,
           stageScores: [],
           decisionFactors: []
         },
@@ -464,10 +469,10 @@ class SpideyFinalDecisionEngine {
    */
   async validateDecisionReproducibility(submissionId) {
     try {
-      const submission = await this.SpideyAssessmentSubmission.findById(submissionId);
-      const auditLogs = await this.AuditLog.find({
+      const submission = await SpideyAssessmentSubmission.findById(submissionId);
+      const auditLogs = await AuditLog.find({
         $or: [
-          { entityId: submissionId },
+          { submissionId: submissionId },
           { 'details.submissionId': submissionId }
         ]
       }).sort({ timestamp: 1 });
@@ -483,8 +488,8 @@ class SpideyFinalDecisionEngine {
       // Check audit trail completeness
       const requiredEvents = [
         'ASSESSMENT_STARTED',
-        'STAGE_STARTED',
-        'STAGE_COMPLETED', 
+        'STAGE_ADVANCED',
+        'STAGE_COMPLETED',
         'FINAL_DECISION_MADE'
       ];
 
@@ -503,7 +508,7 @@ class SpideyFinalDecisionEngine {
           validation.issues.push(`Stage progression error: expected ${expectedStage}, found ${stageRecord.stage}`);
           validation.reproducible = false;
         }
-        
+
         if (stageRecord.passed) {
           expectedStage = this._getNextStage(expectedStage);
         } else {
@@ -514,8 +519,9 @@ class SpideyFinalDecisionEngine {
 
       // Verify scoring calculations
       const recalculatedScore = await this._recalculateFinalScore(submission);
-      if (Math.abs(recalculatedScore - (submission.finalScore || 0)) > 1) {
-        validation.issues.push(`Score calculation mismatch: stored ${submission.finalScore}, recalculated ${recalculatedScore}`);
+      const currentScore = typeof submission.finalScore === 'object' ? submission.finalScore.percentage : submission.finalScore;
+      if (Math.abs(recalculatedScore - (currentScore || 0)) > 1) {
+        validation.issues.push(`Score calculation mismatch: stored ${currentScore}, recalculated ${recalculatedScore}`);
         validation.decisionFactorsVerified = false;
       }
 
@@ -541,7 +547,7 @@ class SpideyFinalDecisionEngine {
   _getNextStage(currentStage) {
     const progression = {
       'stage1': 'stage2',
-      'stage2': 'stage3', 
+      'stage2': 'stage3',
       'stage3': 'stage4',
       'stage4': 'completed'
     };
@@ -557,10 +563,12 @@ class SpideyFinalDecisionEngine {
    * Audit and logging methods
    */
   async _logFinalDecision(decisionResult, category) {
-    const auditEntry = new this.AuditLog({
-      entityType: 'SpideyFinalDecision',
-      entityId: decisionResult.submissionId,
-      action: 'FINAL_DECISION_RENDERED',
+    const auditEntry = new AuditLog({
+      assessmentId: decisionResult.assessmentId,
+      submissionId: decisionResult.submissionId,
+      userId: decisionResult.candidateId,
+      action: 'FINAL_DECISION_MADE',
+      success: true,
       details: {
         category,
         decision: decisionResult.finalDecision,
@@ -576,21 +584,31 @@ class SpideyFinalDecisionEngine {
   }
 
   async _logValidation(submissionId, validation) {
-    const auditEntry = new this.AuditLog({
-      entityType: 'SpideyValidation',
-      entityId: submissionId,
-      action: 'REPRODUCIBILITY_VALIDATED',
+    const auditEntry = new AuditLog({
+      submissionId: submissionId,
+      action: 'AUDIT_GENERATED',
+      success: true,
       details: validation,
       source: 'FinalDecisionEngine'
     });
-    await auditEntry.save();
+    // Note: AuditLog requires assessmentId and userId
+    // We'd need to fetch them if needed, but for now I'll skip if schema is strict
+    // Assuming required fields must be present
+    const submission = await SpideyAssessmentSubmission.findById(submissionId);
+    if (submission) {
+      auditEntry.assessmentId = submission.assessmentId;
+      auditEntry.userId = submission.candidateId;
+      await auditEntry.save();
+    }
   }
 
   async _storeAuditReport(report) {
-    const auditEntry = new this.AuditLog({
-      entityType: 'SpideyAuditReport',
-      entityId: report.submissionId,
-      action: 'AUDIT_REPORT_GENERATED',
+    const auditEntry = new AuditLog({
+      assessmentId: report.assessmentId || (await SpideyAssessmentSubmission.findById(report.submissionId))?.assessmentId,
+      submissionId: report.submissionId,
+      userId: report.candidateId,
+      action: 'AUDIT_GENERATED',
+      success: true,
       details: {
         reportId: new mongoose.Types.ObjectId(),
         summary: {
@@ -608,12 +626,22 @@ class SpideyFinalDecisionEngine {
 
   async _logError(errorType, details) {
     try {
-      const auditEntry = new this.AuditLog({
-        entityType: 'SpideyFinalDecision',
+      const auditEntry = new AuditLog({
         action: `ERROR_${errorType}`,
+        success: false,
+        errorMessage: details.error,
         details: { ...details, severity: 'ERROR' },
         source: 'FinalDecisionEngine'
       });
+      // Try to fill in IDs if available in details
+      if (details.submissionId) {
+        auditEntry.submissionId = details.submissionId;
+        const sub = await SpideyAssessmentSubmission.findById(details.submissionId);
+        if (sub) {
+          auditEntry.assessmentId = sub.assessmentId;
+          auditEntry.userId = sub.candidateId;
+        }
+      }
       await auditEntry.save();
     } catch (error) {
       console.error('Error logging failed:', error);
@@ -621,4 +649,4 @@ class SpideyFinalDecisionEngine {
   }
 }
 
-module.exports = SpideyFinalDecisionEngine;
+export default SpideyFinalDecisionEngine;

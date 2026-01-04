@@ -1,12 +1,16 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const SuserSchema = new mongoose.Schema({
   email: {
     type: String,
     required: true,
-    unique: true
+    unique: true,
+    lowercase: true,
+    trim: true
   }
-  // You can add more fields like name, access level, etc.
+}, {
+  timestamps: true
 });
 
-module.exports = mongoose.model('Suser', SuserSchema);
+const SurveyUser = mongoose.model('Suser', SuserSchema);
+export default SurveyUser;

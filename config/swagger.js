@@ -1,8 +1,8 @@
-// swagger.js - API Documentation Configuration
-const swaggerJsdoc = require('swagger-jsdoc');
-const swaggerUi = require('swagger-ui-express');
+import swaggerJsdoc from 'swagger-jsdoc';
+import swaggerUi from 'swagger-ui-express';
 
 const options = {
+  // ... existing options content ...
   definition: {
     openapi: '3.0.0',
     info: {
@@ -201,7 +201,7 @@ const options = {
 
 const specs = swaggerJsdoc(options);
 
-module.exports = {
+export {
   swaggerUi,
   specs,
 };

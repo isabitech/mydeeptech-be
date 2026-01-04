@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const supportTicketSchema = new mongoose.Schema({
   // Ticket identification
@@ -7,13 +7,13 @@ const supportTicketSchema = new mongoose.Schema({
     unique: true,
     required: true
   },
-  
+
   // Chat ticket flag
   isChat: {
     type: Boolean,
     default: false
   },
-  
+
   // User information
   userId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -25,7 +25,7 @@ const supportTicketSchema = new mongoose.Schema({
     required: true,
     enum: ['User', 'DTUser']
   },
-  
+
   // Ticket details
   subject: {
     type: String,
@@ -42,7 +42,7 @@ const supportTicketSchema = new mongoose.Schema({
     required: true,
     enum: [
       'technical_issue',
-      'account_problem', 
+      'account_problem',
       'payment_inquiry',
       'project_question',
       'assessment_issue',
@@ -63,7 +63,7 @@ const supportTicketSchema = new mongoose.Schema({
     enum: ['open', 'in_progress', 'waiting_for_user', 'resolved', 'closed'],
     default: 'open'
   },
-  
+
   // Admin assignment and handling
   assignedTo: {
     type: mongoose.Schema.Types.ObjectId,
@@ -74,7 +74,7 @@ const supportTicketSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
-  
+
   // File attachments
   attachments: [{
     fileName: String,
@@ -85,7 +85,7 @@ const supportTicketSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
-  
+
   // Conversation/Messages
   messages: [{
     sender: {
@@ -117,7 +117,7 @@ const supportTicketSchema = new mongoose.Schema({
       fileType: String
     }]
   }],
-  
+
   // Resolution information
   resolution: {
     summary: String,
@@ -131,7 +131,7 @@ const supportTicketSchema = new mongoose.Schema({
       enum: ['solved', 'duplicate', 'cannot_reproduce', 'not_applicable', 'escalated']
     }
   },
-  
+
   // Metadata
   lastUpdated: {
     type: Date,
@@ -155,13 +155,13 @@ const supportTicketSchema = new mongoose.Schema({
     }
   }],
   tags: [String],
-  
+
   // Auto-close functionality
   autoCloseAt: {
     type: Date,
     default: null
   },
-  
+
   // Response time tracking
   firstResponseAt: {
     type: Date,
@@ -176,7 +176,7 @@ const supportTicketSchema = new mongoose.Schema({
 });
 
 // Auto-generate ticket number as fallback (timestamp + random)
-supportTicketSchema.pre('save', function(next) {
+supportTicketSchema.pre('save', function (next) {
   if (this.isNew && !this.ticketNumber) {
     console.log('⚠️ Generating fallback ticket number in model...');
     const timestamp = Date.now();
@@ -184,14 +184,14 @@ supportTicketSchema.pre('save', function(next) {
     this.ticketNumber = `TKT-${timestamp}-${random}`;
     console.log(`🎫 Fallback ticket number: ${this.ticketNumber}`);
   }
-  
+
   // Always update lastUpdated
   this.lastUpdated = Date.now();
   next();
 });
 
 // Update last updated when messages are added
-supportTicketSchema.pre('save', function(next) {
+supportTicketSchema.pre('save', function (next) {
   if (this.isModified('messages') && this.messages.length > 0) {
     const latestMessage = this.messages[this.messages.length - 1];
     if (latestMessage.isAdminReply && !this.firstResponseAt) {
@@ -211,4 +211,5 @@ supportTicketSchema.index({ priority: 1 });
 supportTicketSchema.index({ assignedTo: 1 });
 supportTicketSchema.index({ createdAt: -1 });
 
-module.exports = mongoose.model('SupportTicket', supportTicketSchema);
+const SupportTicket = mongoose.model('SupportTicket', supportTicketSchema);
+export default SupportTicket;

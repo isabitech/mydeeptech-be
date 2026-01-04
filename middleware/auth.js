@@ -6,8 +6,8 @@ const authenticateToken = async (req, res, next) => {
   try {
     // Get token from Authorization header (Bearer token) or from _usrinfo format
     const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.startsWith('Bearer ') 
-      ? authHeader.split(' ')[1] 
+    const token = authHeader && authHeader.startsWith('Bearer ')
+      ? authHeader.split(' ')[1]
       : req.headers.token || req.body.token || req.query.token;
 
     if (!token) {
@@ -19,9 +19,19 @@ const authenticateToken = async (req, res, next) => {
     }
 
     // Verify the token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      console.error('FATAL: JWT_SECRET environment variable is not defined.');
+      return res.status(500).json({
+        success: false,
+        message: 'Authentication service misconfigured',
+        code: 'INTERNAL_ERROR'
+      });
+    }
+
+    const decoded = jwt.verify(token, jwtSecret);
     console.log('🔓 JWT decoded:', { userId: decoded.userId, email: decoded.email });
-    
+
     // Optional: Check if user still exists and is active
     const user = await DTUser.findById(decoded.userId);
     console.log('👤 User found in DB:', {
@@ -30,7 +40,7 @@ const authenticateToken = async (req, res, next) => {
       annotatorStatus: user?.annotatorStatus,
       isEmailVerified: user?.isEmailVerified
     });
-    
+
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -61,7 +71,7 @@ const authenticateToken = async (req, res, next) => {
 
   } catch (error) {
     console.error('❌ JWT Authentication failed:', error.message);
-    
+
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({
         success: false,
@@ -69,7 +79,7 @@ const authenticateToken = async (req, res, next) => {
         code: 'INVALID_TOKEN'
       });
     }
-    
+
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({
         success: false,
