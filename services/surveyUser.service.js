@@ -1,6 +1,6 @@
 import surveyUserRepository from '../repositories/surveyUser.repository.js';
 import { isValidEmailFormat } from '../utils/emailvalidator.js';
-import { ValidationError, ForbiddenError } from '../utils/errors.js';
+import { ValidationError, ForbiddenError } from '../utils/responseHandler.js';
 
 class SurveyUserService {
     async validateVisitor(email) {

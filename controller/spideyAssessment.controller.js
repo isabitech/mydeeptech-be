@@ -1,5 +1,5 @@
 import spideyAssessmentService from '../services/spideyAssessment.service.js';
-import ResponseHandler from '../utils/responseHandler.js';
+import { ResponseHandler } from '../utils/responseHandler.js';
 import Joi from 'joi';
 
 /**
@@ -29,7 +29,7 @@ class SpideyAssessmentController {
    * Start new Spidey Assessment
    * POST /api/assessments/spidey/start
    */
-  async startAssessment(req, res) {
+  async startSpideyAssessment(req, res) {
     try {
       const candidateId = req.user._id;
       const { error, value } = SpideyAssessmentController.startAssessmentSchema.validate(req.body);
@@ -62,29 +62,26 @@ class SpideyAssessmentController {
    * POST /api/assessments/spidey/submit-stage
    */
   async submitStage(req, res) {
-    try {
-      const { error, value } = SpideyAssessmentController.submitStageSchema.validate(req.body);
+    const { error, value } = SpideyAssessmentController.submitStageSchema.validate(req.body);
 
-      if (error) {
-        return ResponseHandler.error(res, error.details[0].message, 400);
-      }
-
-      const { submissionId, stage, submissionData } = value;
-      const files = req.files || [];
-
-      const result = await spideyAssessmentService.submitStage(
-        submissionId,
-        stage,
-        submissionData,
-        files
-      );
-
-      // result contains its own success/message/etc.
-      // We pass the whole result as data
-      return ResponseHandler.success(res, result, result.message || 'Stage submitted successfully');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
+    if (error) {
+      return ResponseHandler.error(res, error.details[0].message, 400);
     }
+
+    const { submissionId, stage, submissionData } = value;
+    const files = req.files || [];
+
+    const result = await spideyAssessmentService.submitStage(
+      submissionId,
+      stage,
+      submissionData,
+      files
+    );
+
+    // result contains its own success/message/etc.
+    // We pass the whole result as data
+    return ResponseHandler.success(res, result, result.message || 'Stage submitted successfully');
+
   }
 
   /**
@@ -92,18 +89,15 @@ class SpideyAssessmentController {
    * GET /api/assessments/spidey/:submissionId/status
    */
   async getAssessmentStatus(req, res) {
-    try {
-      const { submissionId } = req.params;
 
-      if (!submissionId) {
-        return ResponseHandler.error(res, 'Submission ID is required', 400);
-      }
+    const { submissionId } = req.params;
 
-      const result = await spideyAssessmentService.getAssessmentStatus(submissionId);
-      return ResponseHandler.success(res, result);
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
+    if (!submissionId) {
+      return ResponseHandler.error(res, 'Submission ID is required', 400);
     }
+
+    const result = await spideyAssessmentService.getAssessmentStatus(submissionId);
+    return ResponseHandler.success(res, result);
   }
 
   /**
@@ -111,18 +105,16 @@ class SpideyAssessmentController {
    * POST /api/assessments/spidey/:submissionId/finalize
    */
   async getFinalDecision(req, res) {
-    try {
-      const { submissionId } = req.params;
 
-      if (!submissionId) {
-        return ResponseHandler.error(res, 'Submission ID is required', 400);
-      }
+    const { submissionId } = req.params;
 
-      const result = await spideyAssessmentService.getFinalDecision(submissionId);
-      return ResponseHandler.success(res, { finalDecision: result });
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
+    if (!submissionId) {
+      return ResponseHandler.error(res, 'Submission ID is required', 400);
     }
+
+    const result = await spideyAssessmentService.getFinalDecision(submissionId);
+    return ResponseHandler.success(res, { finalDecision: result });
+
   }
 
   /**
@@ -130,18 +122,12 @@ class SpideyAssessmentController {
    * GET /api/assessments/spidey/:submissionId/audit
    */
   async getAuditReport(req, res) {
-    try {
-      const { submissionId } = req.params;
-
-      if (!req.user.isAdmin && !req.user.roles?.includes('qa_reviewer')) {
-        return ResponseHandler.error(res, 'Admin access required', 403);
-      }
-
-      const report = await spideyAssessmentService.getAuditReport(submissionId);
-      return ResponseHandler.success(res, { auditReport: report });
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
+    const { submissionId } = req.params;
+    if (!req.user.isAdmin && !req.user.roles?.includes('qa_reviewer')) {
+      return ResponseHandler.error(res, 'Admin access required', 403);
     }
+    const report = await spideyAssessmentService.getAuditReport(submissionId);
+    return ResponseHandler.success(res, { auditReport: report });
   }
 
   /**
@@ -149,18 +135,16 @@ class SpideyAssessmentController {
    * GET /api/assessments/spidey/:assessmentId/analytics
    */
   async getAssessmentAnalytics(req, res) {
-    try {
-      const { assessmentId } = req.params;
 
-      if (!req.user.isAdmin && !req.user.roles?.includes('analytics_viewer')) {
-        return ResponseHandler.error(res, 'Admin access required', 403);
-      }
+    const { assessmentId } = req.params;
 
-      const analytics = await spideyAssessmentService.getAssessmentAnalytics(assessmentId);
-      return ResponseHandler.success(res, { analytics });
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
+    if (!req.user.isAdmin && !req.user.roles?.includes('analytics_viewer')) {
+      return ResponseHandler.error(res, 'Admin access required', 403);
     }
+
+    const analytics = await spideyAssessmentService.getAssessmentAnalytics(assessmentId);
+    return ResponseHandler.success(res, { analytics });
+
   }
 
   /**
@@ -168,14 +152,35 @@ class SpideyAssessmentController {
    * GET /api/assessments/spidey/:assessmentId/config
    */
   async getAssessmentConfig(req, res) {
-    try {
-      const { assessmentId } = req.params;
-      const config = await spideyAssessmentService.getAssessmentConfig(assessmentId);
-      return ResponseHandler.success(res, { config });
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+    const { assessmentId } = req.params;
+    const config = await spideyAssessmentService.getAssessmentConfig(assessmentId);
+    return ResponseHandler.success(res, { config });
+
   }
+  // Wrapper methods for stage submissions
+  async submitStage1(req, res) {
+    req.body.stage = 'stage1';
+    req.body.submissionId = req.params.submissionId;
+    return this.submitStage(req, res);
+  };
+  async submitStage2(req, res) {
+    req.body.stage = 'stage2';
+    req.body.submissionId = req.params.submissionId;
+    return this.submitStage(req, res);
+  };
+  async submitStage3(req, res) {
+    req.body.stage = 'stage3';
+    req.body.submissionId = req.params.submissionId;
+    return this.submitStage(req, res);
+  };
+  async submitStage4(req, res) {
+    req.body.stage = 'stage4';
+    req.body.submissionId = req.params.submissionId;
+    return this.submitStage(req, res);
+  };
 }
 
+// Create controller instance
 export default new SpideyAssessmentController();
+
+

@@ -1,6 +1,6 @@
 import videoReelRepository from '../repositories/videoReel.repository.js';
 import { extractYouTubeVideoData, convertToEmbedUrl, validateYouTubeUrl } from '../utils/youTubeService.js';
-import { ValidationError, ConflictError, NotFoundError } from '../utils/errors.js';
+import { ValidationError, ConflictError, NotFoundError } from '../utils/responseHandler.js';
 import MultimediaAssessmentConfig from '../models/multimediaAssessmentConfig.model.js';
 
 class VideoReelService {

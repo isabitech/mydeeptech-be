@@ -1,14 +1,11 @@
-import Notification from '../models/notification.model.js';
-import mongoose from 'mongoose';
-
+import  Notification from '../models/notification.model.js'
 class NotificationService {
     /**
      * Create a general notification
      * @param {Object} notificationData - Notification details
      */
     async createNotification(notificationData) {
-        try {
-            const { userId, type, title, message, data = {}, priority = 'medium' } = notificationData;
+                    const { userId, type, title, message, data = {}, priority = 'medium' } = notificationData;
 
             // Determine user model type
             let userModel = notificationData.userModel || 'DTUser';
@@ -25,10 +22,6 @@ class NotificationService {
 
             console.log(`✅ Notification created in DB:`, notification._id);
             return notification;
-        } catch (error) {
-            console.error('❌ Error creating notification:', error);
-            throw error;
-        }
     }
 
     /**
@@ -129,15 +122,135 @@ class NotificationService {
         };
     }
 
-    async broadcastNotification(data) {
-        const { title, message, priority = 'medium', type = 'system_announcement' } = data;
+    // async broadcastNotification(data) {
+    //     const { title, message, priority = 'medium', type = 'system_announcement' } = data;
 
-        // In a real scenario, this might use a message queue or batch insert
-        // For now, we'll demonstrate the concept
-        // But broadcast to ALL users can be expensive.
-        return { success: true, message: 'Broadcast initiated' };
+    //     // In a real scenario, this might use a message queue or batch insert
+    //     // For now, we'll demonstrate the concept
+    //     // But broadcast to ALL users can be expensive.
+    //     return { success: true, message: 'Broadcast initiated' };
+    // }
+
+    // --- Additional Methods ---
+
+    async getNotificationSummary(userId) {
+        const [totalNotifications, unreadCount, readCount, highPriorityCount, mediumPriorityCount, lowPriorityCount, recentCount] = await Promise.all([
+            Notification.countDocuments({ userId }),
+            Notification.countDocuments({ userId, isRead: false }),
+            Notification.countDocuments({ userId, isRead: true }),
+            Notification.countDocuments({ userId, priority: 'high' }),
+            Notification.countDocuments({ userId, priority: 'medium' }),
+            Notification.countDocuments({ userId, priority: 'low' }),
+            Notification.countDocuments({ userId, createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } })
+        ]);
+
+        const typeBreakdown = await Notification.aggregate([
+            { $match: { userId } },
+            { $group: { _id: '$type', count: { $sum: 1 } } },
+            { $sort: { count: -1 } }
+        ]);
+
+        const latestNotifications = await Notification.find({ userId })
+            .sort({ createdAt: -1 })
+            .limit(3)
+            .select('title message type priority createdAt isRead');
+
+        return {
+            totalNotifications,
+            unreadCount,
+            readCount,
+            recentCount,
+            priorityBreakdown: {
+                high: highPriorityCount,
+                medium: mediumPriorityCount,
+                low: lowPriorityCount
+            },
+            typeBreakdown: typeBreakdown.reduce((acc, item) => {
+                acc[item._id] = item.count;
+                return acc;
+            }, {}),
+            latestNotifications,
+            lastUpdated: new Date()
+        };
+    }
+
+    async getUserNotificationsV2(userId, page = 1, limit = 10) {
+        const skip = (page - 1) * limit;
+        const [notifications, totalNotifications, unreadCount, readCount] = await Promise.all([
+            Notification.find({ userId }).sort({ createdAt: -1 }).skip(skip).limit(limit),
+            Notification.countDocuments({ userId }),
+            Notification.countDocuments({ userId, isRead: false }),
+            Notification.countDocuments({ userId, isRead: true })
+        ]);
+        return {
+            notifications,
+            pagination: {
+                currentPage: page,
+                totalPages: Math.ceil(totalNotifications / limit),
+                totalNotifications,
+                hasNextPage: page * limit < totalNotifications,
+                hasPrevPage: page > 1,
+                limit
+            },
+            summary: {
+                totalNotifications,
+                unreadNotifications: unreadCount,
+                readNotifications: readCount
+            }
+        };
+    }
+
+    async markNotificationRead(notificationId, userId) {
+        await Notification.updateOne({ _id: notificationId, userId }, { $set: { isRead: true } });
+        return { notificationId, userId, markedReadAt: new Date() };
+    }
+
+    async markAllNotificationsRead(userId) {
+        const result = await Notification.updateMany({ userId, isRead: false }, { $set: { isRead: true } });
+        return { userId, markedReadCount: result.modifiedCount, markedReadAt: new Date() };
+    }
+
+    async deleteNotificationV2(notificationId, userId) {
+        await Notification.deleteOne({ _id: notificationId, userId });
+        return { notificationId, userId, deletedAt: new Date() };
+    }
+
+    async getNotificationPreferences(userId) {
+        // In a real app, fetch from DB. Here, return defaults.
+        return {
+            userId,
+            preferences: {
+                emailNotifications: {
+                    applicationUpdates: true,
+                    projectAssignments: true,
+                    paymentUpdates: true,
+                    systemAnnouncements: true
+                },
+                inAppNotifications: {
+                    applicationUpdates: true,
+                    projectAssignments: true,
+                    paymentUpdates: true,
+                    systemAnnouncements: true
+                },
+                pushNotifications: {
+                    applicationUpdates: false,
+                    projectAssignments: true,
+                    paymentUpdates: true,
+                    systemAnnouncements: false
+                }
+            },
+            lastUpdated: new Date()
+        };
+    }
+
+    async updateNotificationPreferences(userId, preferences) {
+        // In a real app, save to DB. Here, just echo back.
+        return {
+            userId,
+            preferences: preferences || {},
+            updatedAt: new Date()
+        };
     }
 }
 
 export default new NotificationService();
-export const notificationService = new NotificationService(); // Named export for compatibility

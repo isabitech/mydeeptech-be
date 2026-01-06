@@ -1,5 +1,5 @@
 import chatSupportService from '../services/chatSupport.service.js';
-import ResponseHandler from '../utils/responseHandler.js';
+import { ResponseHandler } from '../utils/responseHandler.js';
 import Joi from 'joi';
 
 class ChatSupportController {

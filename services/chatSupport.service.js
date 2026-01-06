@@ -4,7 +4,7 @@ import User from '../models/user.js';
 import { createNotification } from '../utils/notificationService.js';
 import { sendNewTicketNotificationToAdmin, sendOfflineAgentNotification } from '../utils/supportEmailTemplates.js';
 import { getOnlineAdminsCount, broadcastToAdmins } from '../utils/chatSocketService.js';
-import { NotFoundError, ValidationError, ForbiddenError } from '../utils/errors.js';
+import { NotFoundError, ValidationError, ForbiddenError } from '../utils/responseHandler.js';
 
 class ChatSupportService {
     async startChatSession(data, userId, userType) {

@@ -2,7 +2,7 @@ import MultimediaAssessmentConfig from '../models/multimediaAssessmentConfig.mod
 import AnnotationProject from '../models/annotationProject.model.js';
 import VideoReel from '../models/videoReel.model.js';
 import MultimediaAssessmentSubmission from '../models/multimediaAssessmentSubmission.model.js';
-import { NotFoundError, ValidationError } from '../utils/errors.js';
+import { NotFoundError, ValidationError } from '../utils/responseHandler.js';
 
 class MultimediaAssessmentConfigService {
     /**

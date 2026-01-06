@@ -17,88 +17,89 @@ class NotificationController {
     relatedData: Joi.object().optional()
   });
 
-  /**
-   * Get user notifications
-   * GET /api/notifications
-   */
+
+  async getNotificationSummary(req, res) {
+      const userId = req.userId || req.user?.userId || req.dtuser?.userId;
+      const result = await notificationService.getNotificationSummary(userId);
+     return ResponseHandler.success(res, result, 'Notification summary retrieved successfully');
+  }
+
   async getUserNotifications(req, res) {
-    const userId = req.user?.userId || req.dtuser?.userId;
-    const data = await notificationService.getUserNotifications(userId, req.query);
-    ResponseHandler.success(res, data, 'Notifications retrieved successfully');
+      const userId = req.userId || req.user?.userId || req.dtuser?.userId;
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 10;
+      const result = await notificationService.getUserNotifications(userId, page, limit);
+      return ResponseHandler.success(res, result, 'User notifications retrieved successfully');
   }
 
-  /**
-   * Mark notification as read
-   * PATCH /api/notifications/:notificationId/read
-   */
-  async markAsRead(req, res) {
-    const userId = req.user?.userId || req.dtuser?.userId;
-    const notification = await notificationService.markAsRead(req.params.notificationId, userId);
-    ResponseHandler.success(res, notification, 'Notification marked as read');
+
+  async markNotificationRead(req, res) {
+      const { notificationId } = req.params;
+      const userId = req.userId || req.user?.userId || req.dtuser?.userId;
+      const result = await notificationService.markNotificationRead(notificationId, userId);
+      return ResponseHandler.success(res, result, 'Notification marked as read successfully');
+  
   }
 
-  /**
-   * Mark all as read
-   * PATCH /api/notifications/read-all
-   */
-  async markAllAsRead(req, res) {
-    const userId = req.user?.userId || req.dtuser?.userId;
-    await notificationService.markAllAsRead(userId);
-    ResponseHandler.success(res, null, 'All notifications marked as read');
+
+  async markAllNotificationsRead(req, res) {
+      const userId = req.userId || req.user?.userId || req.dtuser?.userId;
+      const result = await notificationService.markAllNotificationsRead(userId);
+      return ResponseHandler.success(res, result, 'All notifications marked as read successfully');
   }
 
-  /**
-   * Delete notification
-   * DELETE /api/notifications/:notificationId
-   */
+
   async deleteNotification(req, res) {
-    const userId = req.user?.userId || req.dtuser?.userId;
-    await notificationService.deleteNotification(req.params.notificationId, userId);
-    ResponseHandler.success(res, null, 'Notification deleted successfully');
+      const { notificationId } = req.params;
+      const userId = req.userId || req.user?.userId || req.dtuser?.userId;
+      const result = await notificationService.deleteNotification(notificationId, userId);
+      return ResponseHandler.success(res, result, 'Notification deleted successfully');
+  }
+  async getNotificationPreferences(req, res) {
+      const userId = req.userId || req.user?.userId || req.dtuser?.userId;
+      const result = await notificationService.getNotificationPreferences(userId);
+      return ResponseHandler.success(res, result, 'Notification preferences retrieved successfully');
   }
 
-  // ADMIN METHODS
+  async updateNotificationPreferences(req, res) {
+      const userId = req.userId || req.user?.userId || req.dtuser?.userId;
+      const { preferences } = req.body;
+      const result = await notificationService.updateNotificationPreferences(userId, preferences);
+      return ResponseHandler.success(res, result, 'Notification preferences updated successfully');
+  }
 
-  /**
-   * Create a new notification for users (Admin)
-   * POST /api/admin/notifications
-   */
   async createAdminNotification(req, res) {
-    const { error, value } = NotificationController.createNotificationSchema.validate(req.body);
-    if (error) throw new ValidationError(error.details[0].message);
+      const { error, value } = NotificationController.createNotificationSchema.validate(req.body);
+      if (error) throw new ValidationError(error.details[0].message);
 
-    const { recipientId, recipientType, ...notificationData } = value;
+      const { recipientId, recipientType, ...notificationData } = value;
 
-    if (recipientType === 'all') {
-      const dtusers = await DTUser.find({}, '_id');
-      const recipients = dtusers.map(u => u._id);
+      if (recipientType === 'all') {
+        const dtusers = await DTUser.find({}, '_id');
+        const recipients = dtusers.map(u => u._id);
 
-      await Promise.all(recipients.slice(0, 100).map(userId =>
-        notificationService.createNotification({
-          userId,
+        await Promise.all(recipients.slice(0, 100).map(userId =>
+          notificationService.createNotification({
+            userId,
+            ...notificationData
+          })
+        ));
+
+        return ResponseHandler.success(res, { recipientCount: recipients.length }, 'Broadcast initiated successfully', 201);
+      } else if (recipientId) {
+        const notification = await notificationService.createNotification({
+          userId: recipientId,
           ...notificationData
-        })
-      ));
-
-      ResponseHandler.success(res, { recipientCount: recipients.length }, 'Broadcast initiated successfully', 201);
-    } else if (recipientId) {
-      const notification = await notificationService.createNotification({
-        userId: recipientId,
-        ...notificationData
-      });
-      ResponseHandler.success(res, notification, 'Notification created successfully', 201);
-    } else {
-      throw new ValidationError('recipientId is required for single notification');
-    }
+        });
+        return ResponseHandler.success(res, notification, 'Notification created successfully', 201);
+      } else {
+        throw new ValidationError('recipientId is required for single notification');
+      }
   }
 
-  /**
-   * Get all notifications for admin dashboard
-   * GET /api/admin/notifications
-   */
   async getAdminNotifications(req, res) {
-    const data = await notificationService.getAdminNotifications(req.query);
-    ResponseHandler.success(res, data, 'Admin notifications retrieved successfully');
+      const data = await notificationService.getAdminNotifications(req.query);
+      return ResponseHandler.success(res, data, 'Admin notifications retrieved successfully');
   }
 }
 

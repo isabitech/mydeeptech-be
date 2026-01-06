@@ -1,6 +1,5 @@
 import annotationProjectRepository from '../repositories/annotationProject.repository.js';
-import projectApplicationRepository from '../repositories/projectApplication.repository.js';
-import { NotFoundError, ValidationError, ForbiddenError } from '../utils/responseHandler.js';
+import { NotFoundError, ValidationError,} from '../utils/responseHandler.js';
 import {
     sendProjectDeletionOTP,
     sendProjectDeletionConfirmation,
@@ -10,12 +9,51 @@ import {
     sendProjectAnnotatorRemovedNotification
 } from '../utils/projectMailer.js';
 import * as notificationService from '../utils/notificationService.js';
-import DTUser from '../models/dtUser.model.js';
 import ProjectApplication from '../models/projectApplication.model.js';
 import AnnotationProject from '../models/annotationProject.model.js';
 import MultimediaAssessmentConfig from '../models/multimediaAssessmentConfig.model.js';
 
 class AnnotationProjectService {
+        async exportApprovedAnnotatorsCSV(projectId) {
+            const project = await AnnotationProject.findById(projectId);
+            if (!project) throw new NotFoundError("Project not found");
+
+            const approvedApplications = await ProjectApplication.find({
+                projectId,
+                status: 'approved'
+            }).populate({
+                path: 'applicantId',
+                select: 'fullName email phone personal_info'
+            }).sort({ reviewedAt: -1 });
+
+            if (approvedApplications.length === 0) {
+                throw new NotFoundError("No approved annotators found for this project");
+            }
+
+            const csvHeaders = ['Full Name', 'Country', 'Email'];
+            const csvRows = [csvHeaders.join(',')];
+
+            approvedApplications.forEach(app => {
+                const applicant = app.applicantId;
+                const personalInfo = applicant.personal_info || {};
+                const row = [
+                    `"${applicant.fullName || 'N/A'}"`,
+                    `"${personalInfo.country || 'N/A'}"`,
+                    `"${applicant.email || 'N/A'}"`
+                ];
+                csvRows.push(row.join(','));
+            });
+
+            const csvContent = csvRows.join('\n');
+            const timestamp = new Date().toISOString().split('T')[0];
+            const sanitizedProjectName = project.projectName
+                .replace(/[^a-zA-Z0-9\s]/g, '')
+                .replace(/\s+/g, '_')
+                .toLowerCase();
+            const filename = `${sanitizedProjectName}_approved_annotators_${timestamp}.csv`;
+
+            return { filename, csvContent };
+        }
     async createProject(data, admin) {
         const adminId = admin?.userId || admin?.userDoc?._id;
         if (!adminId) {

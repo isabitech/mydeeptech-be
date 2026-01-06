@@ -3,7 +3,7 @@ import dtUserRepository from '../repositories/dtUser.repository.js';
 import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import { sendPasswordResetEmail, sendPasswordResetConfirmationEmail } from '../utils/passwordResetMailer.js';
-import { ValidationError, NotFoundError, UnauthorizedError } from '../utils/errors.js';
+import { ValidationError, NotFoundError, UnauthorizedError } from '../utils/responseHandler.js';
 
 class PasswordResetService {
     /**

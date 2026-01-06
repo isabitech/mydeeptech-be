@@ -104,6 +104,56 @@ class AssessmentController {
     const result = await assessmentService.getAvailableAssessments(userId);
     ResponseHandler.success(res, result, "Available assessments retrieved successfully");
   }
+  async getAssessmentSubmissions(req, res) {
+    const { assessmentId } = req.params;
+    const { page = 1, limit = 10, status, userId, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+    const requestingUserId = req.user?.userId || req.userId;
+    const isAdmin = req.admin;
+    if (!isAdmin && userId && userId !== requestingUserId) throw new AuthenticationError("Access denied. You can only view your own submissions unless you are an admin.");
+    const params = { assessmentId, page, limit, status, userId, sortBy, sortOrder, isAdmin, requestingUserId };
+    const result = await assessmentService.getAssessmentSubmissions(params);
+    ResponseHandler.success(res, result, "Assessment submissions retrieved successfully");
+  }
+
+  async getAdminAssessmentsOverview(req, res) {
+    if (!req.admin) throw new AuthenticationError("Admin authentication required");
+    const result = await assessmentService.getAdminAssessmentsOverview(req.admin);
+    ResponseHandler.success(res, result, "Assessment overview retrieved successfully");
+  }
+
+  async getUserAssessmentsOverview(req, res) {
+    const userId = req.user?.userId || req.userId;
+    if (!userId) throw new AuthenticationError("User authentication required");
+    const result = await assessmentService.getUserAssessmentsOverview(userId);
+    ResponseHandler.success(res, result, "User assessment overview retrieved successfully");
+  }
+
+  async startAssessmentById(req, res) {
+    const userId = req.user?.userId || req.userId;
+    const { assessmentId } = req.params;
+    if (!userId) throw new AuthenticationError("User authentication required");
+    const result = await assessmentService.startAssessmentById(userId, assessmentId);
+    if (result.cooldownActive) {
+      ResponseHandler.error(res, "Assessment cooldown active. Please wait before retaking.", 400, { nextRetakeAvailable: result.nextRetakeAvailable, hoursRemaining: result.hoursRemaining });
+    } else if (result.questions) {
+      ResponseHandler.success(res, {
+        questions: result.questions,
+        assessmentInfo: {
+          totalQuestions: result.questions.length,
+          questionsPerSection: 5,
+          sections: ['Comprehension', 'Vocabulary', 'Grammar', 'Writing'],
+          passingScore: 60,
+          timeLimit: 30,
+          assessmentType: 'annotator_qualification',
+          instructions: "This assessment contains questions from 4 sections: Comprehension, Vocabulary, Grammar, and Writing. You have 30 minutes to complete all 20 questions. A passing score is 60%."
+        }
+      }, "Assessment questions retrieved successfully");
+    } else if (result.startSession) {
+      ResponseHandler.success(res, result, "Multimedia assessment session started");
+    } else {
+      ResponseHandler.success(res, result);
+    }
+  }
 }
 
 export default new AssessmentController();

@@ -101,3 +101,6 @@ export {
     NotFoundError,
     ConflictError
 };
+
+export const ForbiddenError = AuthorizationError;
+export const UnauthorizedError = AuthenticationError;

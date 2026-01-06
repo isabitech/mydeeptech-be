@@ -1,9 +1,8 @@
 import MultimediaAssessmentSubmission from '../models/multimediaAssessmentSubmission.model.js';
-import MultimediaAssessmentConfig from '../models/multimediaAssessmentConfig.model.js';
 import QAReview from '../models/qaReview.model.js';
 import VideoReel from '../models/videoReel.model.js';
 import DTUser from '../models/dtUser.model.js';
-import mongoose from 'mongoose';
+
 
 class AssessmentAnalyticsService {
     async getDashboard(filter) {

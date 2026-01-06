@@ -25,7 +25,10 @@ class QAReviewController {
         decision: Joi.string().valid('Approve', 'Reject').required(),
         overallFeedback: Joi.string().max(1000).allow('').default('Batch processed')
     });
-
+    async getRejectedSubmissions(req, res) {
+        const result = await qaReviewService.getRejectedSubmissions(req.query);
+        return ResponseHandler.success(res, result, 'Rejected submissions retrieved successfully');
+    }
     async getPendingSubmissions(req, res) {
         try {
             const result = await qaReviewService.getPendingSubmissions(req.query);
@@ -113,4 +116,16 @@ class QAReviewController {
     }
 }
 
-export default new QAReviewController();
+const qaReviewController = new QAReviewController();
+export default qaReviewController;
+export const {
+    getPendingSubmissions,
+    getApprovedSubmissions,
+    getRejectedSubmissions,
+    getSubmissionForReview,
+    reviewTask,
+    submitFinalReview,
+    getReviewerDashboard,
+    batchReviewSubmissions,
+    getSubmissionAnalytics
+} = qaReviewController;

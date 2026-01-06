@@ -5,6 +5,81 @@ import { NotFoundError, ValidationError } from '../utils/responseHandler.js';
 import mongoose from 'mongoose';
 
 class QAReviewService {
+        async getRejectedSubmissions(query) {
+            const { page = 1, limit = 20, sortBy = 'submittedAt', sortOrder = 'desc', filterBy = 'all' } = query;
+            const skip = (page - 1) * limit;
+            const sort = { [sortBy]: sortOrder === 'desc' ? -1 : 1 };
+
+            let matchQuery = { status: 'rejected' };
+            switch (filterBy) {
+                case 'recent':
+                    matchQuery.qaCompletedAt = { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) };
+                    break;
+                case 'low_score':
+                    matchQuery.totalScore = { $lt: 60 };
+                    break;
+                case 'retakes':
+                    matchQuery.attemptNumber = { $gt: 1 };
+                    break;
+            }
+
+            const submissions = await MultimediaAssessmentSubmission.aggregate([
+                { $match: matchQuery },
+                { $lookup: { from: 'dtusers', localField: 'annotatorId', foreignField: '_id', as: 'user' } },
+                { $unwind: '$user' },
+                { $lookup: { from: 'multimediaassessmentconfigs', localField: 'assessmentId', foreignField: '_id', as: 'assessment' } },
+                { $unwind: '$assessment' },
+                { $lookup: { from: 'qareviews', localField: '_id', foreignField: 'submissionId', as: 'qaReview' } },
+                { $addFields: {
+                    avgScore: {
+                        $cond: {
+                            if: { $gt: [{ $size: '$tasks' }, 0] },
+                            then: { $avg: { $map: { input: '$tasks', as: 'task', in: '$$task.score' } } },
+                            else: 0
+                        }
+                    },
+                    qaReviewer: { $arrayElemAt: ['$qaReview.reviewerId', 0] },
+                    qaScore: { $arrayElemAt: ['$qaReview.overallScore', 0] },
+                    qaDecision: { $arrayElemAt: ['$qaReview.decision', 0] },
+                    qaCompletedAt: { $arrayElemAt: ['$qaReview.completedAt', 0] },
+                    qaFeedback: { $arrayElemAt: ['$qaReview.overallFeedback', 0] }
+                } },
+                { $lookup: { from: 'dtusers', localField: 'qaReviewer', foreignField: '_id', as: 'reviewer' } },
+                { $project: {
+                    annotatorId: 1,
+                    userName: '$user.fullName',
+                    userEmail: '$user.email',
+                    assessmentTitle: '$assessment.title',
+                    submittedAt: '$submittedAt',
+                    avgScore: 1,
+                    qaScore: 1,
+                    qaDecision: 1,
+                    qaCompletedAt: 1,
+                    qaReviewer: { $arrayElemAt: ['$reviewer.fullName', 0] },
+                    qaFeedback: 1,
+                    attemptNumber: 1,
+                    tasksCompleted: { $size: '$tasks' },
+                    totalTasks: '$assessment.numberOfTasks',
+                    status: 1,
+                    totalScore: 1
+                } },
+                { $sort: sort },
+                { $skip: skip },
+                { $limit: parseInt(limit) }
+            ]);
+
+            const totalCount = await MultimediaAssessmentSubmission.countDocuments(matchQuery);
+            return {
+                submissions,
+                pagination: {
+                    currentPage: parseInt(page),
+                    totalPages: Math.ceil(totalCount / limit),
+                    totalItems: totalCount,
+                    hasNext: page < Math.ceil(totalCount / limit),
+                    hasPrev: page > 1
+                }
+            };
+        }
     async getPendingSubmissions(query) {
         const { page = 1, limit = 20, sortBy = 'submittedAt', sortOrder = 'desc', filterBy = 'all' } = query;
         const skip = (page - 1) * limit;

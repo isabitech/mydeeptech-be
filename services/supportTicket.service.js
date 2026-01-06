@@ -8,9 +8,7 @@ import {
     sendNewTicketNotificationToAdmin,
     sendTicketAssignmentEmail
 } from '../utils/supportEmailTemplates.js';
-import { NotFoundError, ValidationError, ForbiddenError } from '../utils/errors.js';
-import mongoose from 'mongoose';
-
+import { NotFoundError, ValidationError, ForbiddenError } from '../utils/responseHandler.js';
 class SupportTicketService {
     async createTicket(data, userId, userType) {
         const { subject, description, category, priority, attachments } = data;
@@ -194,39 +192,96 @@ class SupportTicketService {
 
     // ADMIN METHODS
     async getAllTickets(queryParams) {
-        const { status, priority, category, assignedTo, search, page = 1, limit = 20 } = queryParams;
-        const filter = {};
+        const page = parseInt(queryParams.page) || 1;
+        const limit = parseInt(queryParams.limit) || 20;
+        const status = queryParams.status;
+        const category = queryParams.category;
+        const priority = queryParams.priority;
+        const assignedTo = queryParams.assignedTo;
+        const skip = (page - 1) * limit;
 
-        if (status) filter.status = status;
-        if (priority) filter.priority = priority;
-        if (category) filter.category = category;
-        if (assignedTo) filter.assignedTo = assignedTo;
+        // Build query
+        const query = {};
+        if (status) query.status = status;
+        if (category) query.category = category;
+        if (priority) query.priority = priority;
+        if (assignedTo) query.assignedTo = assignedTo;
 
-        if (search) {
-            filter.$or = [
-                { ticketNumber: { $regex: search, $options: 'i' } },
-                { subject: { $regex: search, $options: 'i' } }
-            ];
-        }
-
-        const skip = (parseInt(page) - 1) * parseInt(limit);
-
-        const [tickets, totalCount] = await Promise.all([
-            SupportTicket.find(filter)
-                .populate('userId', 'fullName email username')
+        const [tickets, totalTickets] = await Promise.all([
+            SupportTicket.find(query)
+                .populate('userId', 'fullName email')
                 .populate('assignedTo', 'fullName email')
-                .sort({ createdAt: -1 })
+                .sort({ priority: 1, createdAt: -1 })
                 .skip(skip)
-                .limit(parseInt(limit)),
-            SupportTicket.countDocuments(filter)
+                .limit(limit),
+            SupportTicket.countDocuments(query)
         ]);
 
         return {
             tickets,
             pagination: {
-                total: totalCount,
-                page: parseInt(page),
-                pages: Math.ceil(totalCount / parseInt(limit))
+                currentPage: page,
+                totalPages: Math.ceil(totalTickets / limit),
+                totalTickets,
+                hasNextPage: page * limit < totalTickets,
+                hasPrevPage: page > 1,
+                limit
+            }
+        };
+    }
+
+    /**
+     * Get tickets by category (admin only)
+     */
+    async getTicketsByCategory(category, page = 1, limit = 20) {
+        const skip = (page - 1) * limit;
+        const [tickets, totalTickets] = await Promise.all([
+            SupportTicket.find({ category })
+                .populate('userId', 'fullName email')
+                .populate('assignedTo', 'fullName email')
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit),
+            SupportTicket.countDocuments({ category })
+        ]);
+        return {
+            category,
+            tickets,
+            pagination: {
+                currentPage: page,
+                totalPages: Math.ceil(totalTickets / limit),
+                totalTickets,
+                hasNextPage: page * limit < totalTickets,
+                hasPrevPage: page > 1,
+                limit
+            }
+        };
+    }
+
+    /**
+     * Get tickets by priority (admin only)
+     */
+    async getTicketsByPriority(priority, page = 1, limit = 20) {
+        const skip = (page - 1) * limit;
+        const [tickets, totalTickets] = await Promise.all([
+            SupportTicket.find({ priority })
+                .populate('userId', 'fullName email')
+                .populate('assignedTo', 'fullName email')
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit),
+            SupportTicket.countDocuments({ priority })
+        ]);
+        return {
+            priority,
+            tickets,
+            pagination: {
+                currentPage: page,
+                totalPages: Math.ceil(totalTickets / limit),
+                totalTickets,
+                hasNextPage: page * limit < totalTickets,
+                hasPrevPage: page > 1,
+                limit
             }
         };
     }

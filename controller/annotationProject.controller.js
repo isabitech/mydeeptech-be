@@ -1,6 +1,6 @@
 import Joi from 'joi';
 import annotationProjectService from '../services/annotationProject.service.js';
-import { ResponseHandler, ValidationError, NotFoundError } from '../utils/responseHandler.js';
+import { ResponseHandler, ValidationError} from '../utils/responseHandler.js';
 
 class AnnotationProjectController {
   /**
@@ -207,32 +207,11 @@ class AnnotationProjectController {
    */
   async exportApprovedAnnotatorsCSV(req, res) {
     const { projectId } = req.params;
-    const result = await annotationProjectService.getProjectDetails(projectId);
-    const approvedAnnotators = result.annotators.approved;
-
-    if (approvedAnnotators.length === 0) {
-      throw new NotFoundError("No approved annotators found for this project");
-    }
-
-    const csvHeaders = ['Full Name', 'Country', 'Email'];
-    const csvRows = [csvHeaders.join(',')];
-
-    approvedAnnotators.forEach(item => {
-      const annotator = item.annotator;
-      csvRows.push([
-        `"${annotator.fullName || 'N/A'}"`,
-        `"${annotator.personalInfo.country || 'N/A'}"`,
-        `"${annotator.email || 'N/A'}"`
-      ].join(','));
-    });
-
-    const csvContent = csvRows.join('\n');
-    const filename = `${result.project.projectName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_annotators.csv`;
+    const { filename, csvContent } = await annotationProjectService.exportApprovedAnnotatorsCSV(projectId);
 
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
-
     res.status(200).send(csvContent);
   }
 }

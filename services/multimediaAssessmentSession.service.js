@@ -6,7 +6,7 @@ import AnnotationProject from '../models/annotationProject.model.js';
 import ProjectApplication from '../models/projectApplication.model.js';
 import { sendAssessmentCompletionEmail } from '../utils/multimediaAssessmentEmails.js';
 import { sendProjectApplicationNotification } from '../utils/projectMailer.js';
-import { NotFoundError, ValidationError } from '../utils/errors.js';
+import { NotFoundError, ValidationError } from '../utils/responseHandler.js';
 
 class MultimediaAssessmentSessionService {
     /**

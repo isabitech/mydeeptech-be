@@ -1,8 +1,8 @@
-const projectApplicationRepository = require('../repositories/projectApplication.repository');
-const dtUserRepository = require('../repositories/dtUser.repository');
-const { NotFoundError, ValidationError, AuthenticationError } = require('../utils/responseHandler');
-const AnnotationProject = require('../models/annotationProject.model'); // Still using model directly for complex queries if repository is thin
-const ProjectApplication = require('../models/projectApplication.model');
+import projectApplicationRepository from '../repositories/projectApplication.repository.js';
+import dtUserRepository from '../repositories/dtUser.repository.js';
+import AnnotationProject from '../models/annotationProject.model.js';
+import { NotFoundError, ValidationError, AuthenticationError } from '../utils/responseHandler.js';
+import ProjectApplication from '../models/projectApplication.model.js';
 
 class DTProjectService {
     async getAvailableProjects(userId, query) {
@@ -122,4 +122,4 @@ class DTProjectService {
     }
 }
 
-module.exports = new DTProjectService();
+export default new DTProjectService();

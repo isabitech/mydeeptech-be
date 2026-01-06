@@ -1,5 +1,5 @@
 import supportTicketService from '../services/supportTicket.service.js';
-import ResponseHandler from '../utils/responseHandler.js';
+import { ResponseHandler } from '../utils/responseHandler.js';
 import Joi from 'joi';
 
 class SupportTicketController {
@@ -51,6 +51,31 @@ class SupportTicketController {
     priority: Joi.string().valid('low', 'medium', 'high', 'urgent').optional(),
     tags: Joi.array().items(Joi.string()).optional()
   });
+  /**
+   * Get tickets by category (admin only)
+   * GET /api/support/admin/tickets/category/:category
+   */
+  async getTicketsByCategory(req, res) {
+    const { category } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const result = await supportTicketService.getTicketsByCategory(category, page, limit);
+    return ResponseHandler.success(res, result, `Tickets in category "${category}" retrieved successfully`);
+
+  }
+
+  /**
+   * Get tickets by priority (admin only)
+   * GET /api/support/admin/tickets/priority/:priority
+   */
+  async getTicketsByPriority(req, res) {
+    const { priority } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const result = await supportTicketService.getTicketsByPriority(priority, page, limit);
+    return ResponseHandler.success(res, result, `Tickets with priority "${priority}" retrieved successfully`);
+  }
+
 
   // USER METHODS
 
@@ -59,18 +84,12 @@ class SupportTicketController {
    * POST /api/support/tickets
    */
   async createTicket(req, res) {
-    try {
-      const { error, value } = SupportTicketController.createTicketSchema.validate(req.body);
-      if (error) return ResponseHandler.error(res, error.details[0].message, 400);
-
-      const userId = req.user?.userId || req.dtuser?.userId;
-      const userType = req.dtuser ? 'dtuser' : 'user';
-
-      const ticket = await supportTicketService.createTicket(value, userId, userType);
-      return ResponseHandler.success(res, ticket, 'Support ticket created successfully', 201);
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+    const { error, value } = SupportTicketController.createTicketSchema.validate(req.body);
+    if (error) return ResponseHandler.error(res, error.details[0].message, 400);
+    const userId = req.user?.userId || req.dtuser?.userId;
+    const userType = req.dtuser ? 'dtuser' : 'user';
+    const ticket = await supportTicketService.createTicket(value, userId, userType);
+    return ResponseHandler.success(res, ticket, 'Support ticket created successfully', 201);
   }
 
   /**
@@ -78,13 +97,11 @@ class SupportTicketController {
    * GET /api/support/tickets
    */
   async getUserTickets(req, res) {
-    try {
-      const userId = req.user?.userId || req.dtuser?.userId;
-      const data = await supportTicketService.getUserTickets(userId, req.query);
-      return ResponseHandler.success(res, data, 'Tickets retrieved successfully');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+
+    const userId = req.user?.userId || req.dtuser?.userId;
+    const data = await supportTicketService.getUserTickets(userId, req.query);
+    return ResponseHandler.success(res, data, 'Tickets retrieved successfully');
+
   }
 
   /**
@@ -92,16 +109,13 @@ class SupportTicketController {
    * GET /api/support/tickets/:ticketId
    */
   async getTicketById(req, res) {
-    try {
-      const userId = req.user?.userId || req.dtuser?.userId;
-      const userType = req.dtuser ? 'dtuser' : 'user';
-      const isAdmin = !!(req.admin || req.dtuser?.role === 'ADMIN');
 
-      const ticket = await supportTicketService.getTicketById(req.params.ticketId, userId, userType, isAdmin);
-      return ResponseHandler.success(res, ticket, 'Ticket details retrieved successfully');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+    const userId = req.user?.userId || req.dtuser?.userId;
+    const userType = req.dtuser ? 'dtuser' : 'user';
+    const isAdmin = !!(req.admin || req.dtuser?.role === 'ADMIN');
+
+    const ticket = await supportTicketService.getTicketById(req.params.ticketId, userId, userType, isAdmin);
+    return ResponseHandler.success(res, ticket, 'Ticket details retrieved successfully');
   }
 
   /**
@@ -109,19 +123,16 @@ class SupportTicketController {
    * POST /api/support/tickets/:ticketId/messages
    */
   async addMessageToTicket(req, res) {
-    try {
-      const { error, value } = SupportTicketController.addMessageSchema.validate(req.body);
-      if (error) return ResponseHandler.error(res, error.details[0].message, 400);
 
-      const userId = req.user?.userId || req.dtuser?.userId || req.admin?.userId;
-      const userType = req.dtuser ? 'dtuser' : 'user';
-      const isAdmin = !!(req.admin || req.dtuser?.role === 'ADMIN');
+    const { error, value } = SupportTicketController.addMessageSchema.validate(req.body);
+    if (error) return ResponseHandler.error(res, error.details[0].message, 400);
 
-      const ticket = await supportTicketService.addMessageToTicket(req.params.ticketId, userId, userType, value, isAdmin);
-      return ResponseHandler.success(res, ticket, 'Message added to ticket successfully');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+    const userId = req.user?.userId || req.dtuser?.userId || req.admin?.userId;
+    const userType = req.dtuser ? 'dtuser' : 'user';
+    const isAdmin = !!(req.admin || req.dtuser?.role === 'ADMIN');
+
+    const ticket = await supportTicketService.addMessageToTicket(req.params.ticketId, userId, userType, value, isAdmin);
+    return ResponseHandler.success(res, ticket, 'Message added to ticket successfully');
   }
 
   /**
@@ -129,16 +140,14 @@ class SupportTicketController {
    * POST /api/support/tickets/:ticketId/rate
    */
   async rateTicket(req, res) {
-    try {
-      const { error, value } = SupportTicketController.rateTicketSchema.validate(req.body);
-      if (error) return ResponseHandler.error(res, error.details[0].message, 400);
 
-      const userId = req.user?.userId || req.dtuser?.userId;
-      const ticket = await supportTicketService.rateTicket(req.params.ticketId, userId, value.rating);
-      return ResponseHandler.success(res, ticket, 'Ticket rated successfully');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+    const { error, value } = SupportTicketController.rateTicketSchema.validate(req.body);
+    if (error) return ResponseHandler.error(res, error.details[0].message, 400);
+
+    const userId = req.user?.userId || req.dtuser?.userId;
+    const ticket = await supportTicketService.rateTicket(req.params.ticketId, userId, value.rating);
+    return ResponseHandler.success(res, ticket, 'Ticket rated successfully');
+
   }
 
   // ADMIN METHODS
@@ -148,12 +157,10 @@ class SupportTicketController {
    * GET /api/support/admin/tickets
    */
   async getAllTickets(req, res) {
-    try {
-      const data = await supportTicketService.getAllTickets(req.query);
-      return ResponseHandler.success(res, data, 'All tickets retrieved successfully');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+
+    const data = await supportTicketService.getAllTickets(req.query);
+    return ResponseHandler.success(res, data, 'All tickets retrieved successfully');
+
   }
 
   /**
@@ -161,15 +168,11 @@ class SupportTicketController {
    * POST /api/support/admin/tickets/:ticketId/assign
    */
   async assignTicket(req, res) {
-    try {
+
       const adminId = req.admin?.userId || req.dtuser?.userId;
       const targetAdminId = req.body.adminId || adminId;
-
       const ticket = await supportTicketService.assignTicket(req.params.ticketId, targetAdminId);
       return ResponseHandler.success(res, ticket, 'Ticket assigned successfully');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
   }
 
   /**
@@ -177,7 +180,6 @@ class SupportTicketController {
    * PATCH /api/support/admin/tickets/:ticketId/status
    */
   async updateTicketStatus(req, res) {
-    try {
       const { error, value } = SupportTicketController.updateStatusSchema.validate(req.body);
       if (error) return ResponseHandler.error(res, error.details[0].message, 400);
 
@@ -186,9 +188,6 @@ class SupportTicketController {
 
       const ticket = await supportTicketService.updateTicketStatus(req.params.ticketId, status, adminId, resolutionData);
       return ResponseHandler.success(res, ticket, 'Ticket status updated successfully');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
   }
 
   /**
@@ -196,12 +195,8 @@ class SupportTicketController {
    * GET /api/support/admin/stats
    */
   async getTicketStats(req, res) {
-    try {
       const stats = await supportTicketService.getTicketStats();
       return ResponseHandler.success(res, stats, 'Ticket statistics retrieved successfully');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
   }
 
   /**
@@ -209,13 +204,9 @@ class SupportTicketController {
    * POST /api/support/admin/tickets/:ticketId/notes
    */
   async addInternalNote(req, res) {
-    try {
-      const adminId = req.admin?.userId || req.dtuser?.userId;
-      const ticket = await supportTicketService.addInternalNote(req.params.ticketId, adminId, req.body.note);
-      return ResponseHandler.success(res, ticket, 'Internal note added successfully');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+    const adminId = req.admin?.userId || req.dtuser?.userId;
+    const ticket = await supportTicketService.addInternalNote(req.params.ticketId, adminId, req.body.note);
+    return ResponseHandler.success(res, ticket, 'Internal note added successfully');
   }
 
   /**
@@ -223,16 +214,12 @@ class SupportTicketController {
    * PUT /api/support/admin/tickets/:ticketId
    */
   async updateTicket(req, res) {
-    try {
-      const { error, value } = SupportTicketController.updateTicketSchema.validate(req.body);
-      if (error) return ResponseHandler.error(res, error.details[0].message, 400);
-
-      const ticket = await supportTicketService.updateTicket(req.params.ticketId, value);
-      return ResponseHandler.success(res, ticket, 'Ticket updated successfully');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+    const { error, value } = SupportTicketController.updateTicketSchema.validate(req.body);
+    if (error) return ResponseHandler.error(res, error.details[0].message, 400);
+    const ticket = await supportTicketService.updateTicket(req.params.ticketId, value);
+    return ResponseHandler.success(res, ticket, 'Ticket updated successfully');
   }
 }
 
-export default new SupportTicketController();
+const supportTicketController = new SupportTicketController();
+export default supportTicketController;

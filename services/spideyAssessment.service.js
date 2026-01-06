@@ -1,7 +1,7 @@
 import SpideyAssessmentEngine from '../utils/spideyAssessmentEngine.js';
 import SpideyFinalDecisionEngine from '../utils/spideyFinalDecisionEngine.js';
 import SpideyAssessmentConfig from '../models/spideyAssessmentConfig.model.js';
-import { NotFoundError, ValidationError } from '../utils/errors.js';
+import { NotFoundError, ValidationError } from '../utils/responseHandler.js';
 
 class SpideyAssessmentService {
     constructor() {

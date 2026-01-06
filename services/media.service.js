@@ -4,7 +4,7 @@ import {
     generateOptimizedUrl,
     generateThumbnail
 } from '../config/cloudinary.js';
-import { ValidationError, NotFoundError } from '../utils/errors.js';
+import { ValidationError, NotFoundError } from '../utils/responseHandler.js';
 import dtUserRepository from '../repositories/dtUser.repository.js';
 
 class MediaService {
