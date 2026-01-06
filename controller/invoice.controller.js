@@ -1,5 +1,5 @@
 import invoiceService from '../services/invoice.service.js';
-import { ResponseHandler, ValidationError, NotFoundError } from '../utils/responseHandler.js';
+import { ResponseHandler, ValidationError } from '../utils/responseHandler.js';
 import Joi from 'joi';
 
 class InvoiceController {
@@ -29,7 +29,6 @@ class InvoiceController {
   async createInvoice(req, res) {
     const { error, value } = InvoiceController.createInvoiceSchema.validate(req.body);
     if (error) throw new ValidationError(error.details[0].message);
-
     const adminId = req.admin?.userId || req.user?.userId;
     const invoice = await invoiceService.createInvoice(value, adminId);
     ResponseHandler.success(res, { invoice, emailNotificationSent: invoice.emailSent }, "Invoice created successfully", 201);

@@ -1,5 +1,5 @@
 import taskService from '../services/task.service.js';
-import { ResponseHandler, ValidationError, NotFoundError } from '../utils/responseHandler.js';
+import { ResponseHandler, ValidationError } from '../utils/responseHandler.js';
 import Joi from 'joi';
 
 class TaskController {

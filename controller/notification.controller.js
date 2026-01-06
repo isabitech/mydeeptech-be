@@ -1,5 +1,5 @@
 import notificationService from '../services/notification.service.js';
-import { ResponseHandler, ValidationError, NotFoundError } from '../utils/responseHandler.js';
+import { ResponseHandler, ValidationError } from '../utils/responseHandler.js';
 import Joi from 'joi';
 import DTUser from '../models/dtUser.model.js';
 

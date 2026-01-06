@@ -1,5 +1,5 @@
 import mediaService from '../services/media.service.js';
-import { ResponseHandler, ValidationError, NotFoundError } from '../utils/responseHandler.js';
+import { ResponseHandler } from '../utils/responseHandler.js';
 
 class MediaController {
   /**

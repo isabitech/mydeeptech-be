@@ -1,5 +1,5 @@
 import videoReelService from '../services/videoReel.service.js';
-import { ResponseHandler, ValidationError, NotFoundError } from '../utils/responseHandler.js';
+import { ResponseHandler, ValidationError } from '../utils/responseHandler.js';
 import Joi from 'joi';
 import { validateYouTubeUrl } from '../utils/youTubeService.js';
 
