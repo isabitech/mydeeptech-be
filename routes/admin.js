@@ -24,6 +24,7 @@ const {
     updateAnnotationProject, deleteAnnotationProject, requestProjectDeletionOTP,
     verifyOTPAndDeleteProject, getAnnotationProjectApplications,
     approveAnnotationProjectApplication, rejectAnnotationProjectApplication,
+    rejectAnnotationProjectApplicationsBulk, getApprovedApplicants,
     removeApprovedApplicant, getRemovableApplicants, exportApprovedAnnotatorsCSV,
     attachAssessmentToProject, removeAssessmentFromProject, getAvailableAssessments
 } = annotationProjectController;
@@ -97,10 +98,12 @@ router.delete('/projects/:projectId/assessment', authenticateAdmin, tryCatch(rem
 // Application Management Routes
 router.get('/applications', authenticateAdmin, tryCatch(getAnnotationProjectApplications));
 router.patch('/applications/:applicationId/approve', authenticateAdmin, tryCatch(approveAnnotationProjectApplication));
+router.post('/applications/bulk-reject', authenticateAdmin, tryCatch(rejectAnnotationProjectApplicationsBulk));
 router.patch('/applications/:applicationId/reject', authenticateAdmin, tryCatch(rejectAnnotationProjectApplication));
 router.delete('/applications/:applicationId/remove', authenticateAdmin, tryCatch(removeApprovedApplicant));
 
 // Project Applicant Management Routes
+router.get('/projects/:projectId/approved-applicants', authenticateAdmin, tryCatch(getApprovedApplicants));
 router.get('/projects/:projectId/removable-applicants', authenticateAdmin, tryCatch(getRemovableApplicants));
 router.get('/projects/:projectId/export-approved-csv', authenticateAdmin, tryCatch(exportApprovedAnnotatorsCSV));
 

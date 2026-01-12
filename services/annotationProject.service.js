@@ -1,5 +1,5 @@
 import annotationProjectRepository from '../repositories/annotationProject.repository.js';
-import { NotFoundError, ValidationError,} from '../utils/responseHandler.js';
+import { NotFoundError, ValidationError, } from '../utils/responseHandler.js';
 import {
     sendProjectDeletionOTP,
     sendProjectDeletionConfirmation,
@@ -14,46 +14,46 @@ import AnnotationProject from '../models/annotationProject.model.js';
 import MultimediaAssessmentConfig from '../models/multimediaAssessmentConfig.model.js';
 
 class AnnotationProjectService {
-        async exportApprovedAnnotatorsCSV(projectId) {
-            const project = await AnnotationProject.findById(projectId);
-            if (!project) throw new NotFoundError("Project not found");
+    async exportApprovedAnnotatorsCSV(projectId) {
+        const project = await AnnotationProject.findById(projectId);
+        if (!project) throw new NotFoundError("Project not found");
 
-            const approvedApplications = await ProjectApplication.find({
-                projectId,
-                status: 'approved'
-            }).populate({
-                path: 'applicantId',
-                select: 'fullName email phone personal_info'
-            }).sort({ reviewedAt: -1 });
+        const approvedApplications = await ProjectApplication.find({
+            projectId,
+            status: 'approved'
+        }).populate({
+            path: 'applicantId',
+            select: 'fullName email phone personal_info'
+        }).sort({ reviewedAt: -1 });
 
-            if (approvedApplications.length === 0) {
-                throw new NotFoundError("No approved annotators found for this project");
-            }
-
-            const csvHeaders = ['Full Name', 'Country', 'Email'];
-            const csvRows = [csvHeaders.join(',')];
-
-            approvedApplications.forEach(app => {
-                const applicant = app.applicantId;
-                const personalInfo = applicant.personal_info || {};
-                const row = [
-                    `"${applicant.fullName || 'N/A'}"`,
-                    `"${personalInfo.country || 'N/A'}"`,
-                    `"${applicant.email || 'N/A'}"`
-                ];
-                csvRows.push(row.join(','));
-            });
-
-            const csvContent = csvRows.join('\n');
-            const timestamp = new Date().toISOString().split('T')[0];
-            const sanitizedProjectName = project.projectName
-                .replace(/[^a-zA-Z0-9\s]/g, '')
-                .replace(/\s+/g, '_')
-                .toLowerCase();
-            const filename = `${sanitizedProjectName}_approved_annotators_${timestamp}.csv`;
-
-            return { filename, csvContent };
+        if (approvedApplications.length === 0) {
+            throw new NotFoundError("No approved annotators found for this project");
         }
+
+        const csvHeaders = ['Full Name', 'Country', 'Email'];
+        const csvRows = [csvHeaders.join(',')];
+
+        approvedApplications.forEach(app => {
+            const applicant = app.applicantId;
+            const personalInfo = applicant.personal_info || {};
+            const row = [
+                `"${applicant.fullName || 'N/A'}"`,
+                `"${personalInfo.country || 'N/A'}"`,
+                `"${applicant.email || 'N/A'}"`
+            ];
+            csvRows.push(row.join(','));
+        });
+
+        const csvContent = csvRows.join('\n');
+        const timestamp = new Date().toISOString().split('T')[0];
+        const sanitizedProjectName = project.projectName
+            .replace(/[^a-zA-Z0-9\s]/g, '')
+            .replace(/\s+/g, '_')
+            .toLowerCase();
+        const filename = `${sanitizedProjectName}_approved_annotators_${timestamp}.csv`;
+
+        return { filename, csvContent };
+    }
     async createProject(data, admin) {
         const adminId = admin?.userId || admin?.userDoc?._id;
         if (!adminId) {
@@ -569,6 +569,91 @@ class AnnotationProjectService {
         return application;
     }
 
+    async rejectApplicationsBulk(applicationIds, admin, body) {
+        const { rejectionReason = 'other', reviewNotes = '' } = body;
+
+        if (!Array.isArray(applicationIds) || applicationIds.length === 0) {
+            throw new ValidationError('No application IDs provided');
+        }
+
+        // 1️⃣ Fetch pending applications (needed for notifications)
+        const applications = await ProjectApplication.find({
+            _id: { $in: applicationIds },
+            status: 'pending'
+        })
+            .populate('projectId', 'projectName projectCategory')
+            .populate('applicantId', 'fullName email');
+
+        if (!applications.length) {
+            throw new NotFoundError('No pending applications found with the provided IDs');
+        }
+
+        // 2️⃣ BULK UPDATE (single DB operation)
+        await ProjectApplication.updateMany(
+            { _id: { $in: applications.map(app => app._id) } },
+            {
+                $set: {
+                    status: 'rejected',
+                    reviewedBy: admin.userId,
+                    reviewedAt: new Date(),
+                    rejectionReason,
+                    reviewNotes
+                }
+            }
+        );
+
+        // 3️⃣ Send notifications & emails (non-blocking, fault-tolerant)
+        const notificationResults = await Promise.allSettled(
+            applications.map(async (application) => {
+                try {
+                    await sendProjectRejectionNotification(
+                        application.applicantId.email,
+                        application.applicantId.fullName,
+                        {
+                            projectName: application.projectId.projectName,
+                            projectCategory: application.projectId.projectCategory,
+                            adminName: admin.fullName,
+                            rejectionReason,
+                            reviewNotes
+                        }
+                    );
+
+                    await notificationService.createApplicationStatusNotification(
+                        application.applicantId._id,
+                        'rejected',
+                        application.projectId,
+                        application
+                    );
+
+                    return { id: application._id, status: 'success' };
+                } catch (error) {
+                    console.error(
+                        `⚠️ Notification failed for application ${application._id}:`,
+                        error.message
+                    );
+                    return {
+                        id: application._id,
+                        status: 'notification_failed',
+                        message: error.message
+                    };
+                }
+            })
+        );
+
+        // 4️⃣ Build response
+        const successCount = notificationResults.filter(
+            r => r.status === 'fulfilled' && r.value.status === 'success'
+        ).length;
+
+        return {
+            total: applicationIds.length,
+            processed: applications.length,
+            rejected: applications.length,
+            notificationSuccess: successCount,
+            notificationFailed: applications.length - successCount
+        };
+    }
+
     async removeApprovedApplicant(applicationId, admin, body) {
         const { removalReason, removalNotes } = body;
 
@@ -637,7 +722,15 @@ class AnnotationProjectService {
             }))
         };
     }
+    async getApprovedApplicants(projectId) {
+        const project = await AnnotationProject.findById(projectId);
+        if (!project) throw new NotFoundError("Project not found");
+        const approvedApplications = await ProjectApplication.find({ projectId, status: 'approved' })
+            .populate('applicantId', 'fullName email phone')
+            .sort({ reviewedAt: -1 });
 
+        return approvedApplications;
+    }
     async attachAssessment(projectId, admin, body) {
         const { assessmentId, isRequired = true, assessmentInstructions = '' } = body;
 

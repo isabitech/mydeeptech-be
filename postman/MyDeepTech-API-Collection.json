@@ -700,6 +700,97 @@
               "response": []
             }
           ]
+        },
+        {
+          "name": "Application Management",
+          "item": [
+            {
+              "name": "Get All Applications",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin/applications?status=pending",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "applications"
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "pending"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Bulk Reject Applications",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"applicationIds\": [\"app_id_1\", \"app_id_2\"],\n  \"rejectionReason\": \"Does not meet quality standards\",\n  \"reviewNotes\": \"Multiple errors found in the entry tasks.\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/admin/applications/bulk-reject",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "applications",
+                    "bulk-reject"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Approved Applicants",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin/projects/{{project_id}}/approved-applicants",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "projects",
+                    "{{project_id}}",
+                    "approved-applicants"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
         }
       ]
     },

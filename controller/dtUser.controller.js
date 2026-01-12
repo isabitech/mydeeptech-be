@@ -49,13 +49,9 @@ class DTUserController {
   async setupPassword(req, res) {
     const { error } = dtUserPasswordSchema.validate(req.body);
     if (error) throw new ValidationError(error.details[0].message);
-
     const { userId, email, password } = req.body;
-
     const user = await dtUserAuthService.setupPassword(userId, password);
-
     if (user.email !== email) throw new ValidationError("Invalid request");
-
     ResponseHandler.success(res, {
       id: user._id,
       fullName: user.fullName,
@@ -211,7 +207,6 @@ class DTUserController {
   async approveUserForQA(req, res) {
     const { userId } = req.params;
     const user = await dtUserAdminService.approveQAStatus(userId);
-
     ResponseHandler.success(res, {
       userId: user._id,
       fullName: user.fullName,

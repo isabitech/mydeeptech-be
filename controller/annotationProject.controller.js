@@ -1,6 +1,6 @@
 import Joi from 'joi';
 import annotationProjectService from '../services/annotationProject.service.js';
-import { ResponseHandler, ValidationError} from '../utils/responseHandler.js';
+import { ResponseHandler, ValidationError } from '../utils/responseHandler.js';
 
 class AnnotationProjectController {
   /**
@@ -154,6 +154,19 @@ class AnnotationProjectController {
   }
 
   /**
+   * Reject multiple applications in bulk
+   */
+  async rejectAnnotationProjectApplicationsBulk(req, res) {
+    const { applicationIds, rejectionReason, reviewNotes } = req.body;
+    const result = await annotationProjectService.rejectApplicationsBulk(
+      applicationIds,
+      req.admin,
+      { rejectionReason, reviewNotes }
+    );
+    ResponseHandler.success(res, result, "Applications processed for rejection");
+  }
+
+  /**
    * Remove an approved applicant from a project
    */
   async removeApprovedApplicant(req, res) {
@@ -174,6 +187,15 @@ class AnnotationProjectController {
     const { projectId } = req.params;
     const result = await annotationProjectService.getRemovableApplicants(projectId);
     ResponseHandler.success(res, result, "Removable applicants retrieved successfully");
+  }
+
+  /**
+   * Get all approved applicants for a project
+   */
+  async getApprovedApplicants(req, res) {
+    const { projectId } = req.params;
+    const result = await annotationProjectService.getApprovedApplicants(projectId);
+    ResponseHandler.success(res, result, "Approved applicants retrieved successfully");
   }
 
   /**
