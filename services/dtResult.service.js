@@ -2,7 +2,15 @@ import dtUserRepository from '../repositories/dtUser.repository.js';
 import { ValidationError, NotFoundError } from '../utils/responseHandler.js';
 import { generateOptimizedUrl, generateThumbnail } from '../config/cloudinary.js';
 
+/**
+ * Service for handling result submissions and document uploads for DTUsers.
+ * Manages file processing through Cloudinary and updates user profile statuses.
+ */
 class DTResultService {
+    /**
+     * Submits a result file for a project. 
+     * Optimizes images via Cloudinary and updates the user's annotator status if applicable.
+     */
     async submitResult(userId, projectId, notes, file) {
         if (!file) throw new ValidationError('Result file is required');
 

@@ -72,7 +72,7 @@ export const authenticateAdmin = async (req, res, next) => {
       return ResponseHandler.error(res, new AuthenticationError('Admin token has expired. Please login again.'));
     }
 
-    return ResponseHandler.handleError(res, error);
+    return ResponseHandler.error(res, error);
   }
 };
 

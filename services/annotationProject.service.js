@@ -13,11 +13,20 @@ import ProjectApplication from '../models/projectApplication.model.js';
 import AnnotationProject from '../models/annotationProject.model.js';
 import MultimediaAssessmentConfig from '../models/multimediaAssessmentConfig.model.js';
 
+/**
+ * Service managing complex annotation projects, their lifecycles, and participant applications.
+ * Handles specialized logic for project approval flows, bulk operations, and data exports.
+ */
 class AnnotationProjectService {
+    /**
+     * Generates a CSV export of all approved annotators for a specific project.
+     */
     async exportApprovedAnnotatorsCSV(projectId) {
+        // Validate project existence
         const project = await AnnotationProject.findById(projectId);
         if (!project) throw new NotFoundError("Project not found");
 
+        // Fetch all approved applications with detailed applicant profiles
         const approvedApplications = await ProjectApplication.find({
             projectId,
             status: 'approved'
@@ -30,9 +39,11 @@ class AnnotationProjectService {
             throw new NotFoundError("No approved annotators found for this project");
         }
 
+        // Initialize CSV structure with standard headers
         const csvHeaders = ['Full Name', 'Country', 'Email'];
         const csvRows = [csvHeaders.join(',')];
 
+        // Transform application data into sanitized CSV rows
         approvedApplications.forEach(app => {
             const applicant = app.applicantId;
             const personalInfo = applicant.personal_info || {};
@@ -45,6 +56,8 @@ class AnnotationProjectService {
         });
 
         const csvContent = csvRows.join('\n');
+
+        // Generate a URL-safe filename with project identifier and date
         const timestamp = new Date().toISOString().split('T')[0];
         const sanitizedProjectName = project.projectName
             .replace(/[^a-zA-Z0-9\s]/g, '')
@@ -83,6 +96,7 @@ class AnnotationProjectService {
         const skip = (page - 1) * limit;
         const { status, category, search } = query;
 
+        // Build composite filter based on provided search criteria
         const filter = {};
         if (status) filter.status = status;
         if (category) filter.projectCategory = category;
@@ -95,6 +109,7 @@ class AnnotationProjectService {
             ];
         }
 
+        // Fetch projects with creator and admin associations
         const projects = await AnnotationProject.find(filter)
             .populate('createdBy', 'fullName email')
             .populate('assignedAdmins', 'fullName email')
@@ -103,8 +118,10 @@ class AnnotationProjectService {
             .limit(limit)
             .lean();
 
+        // Calculate totals for pagination metadata
         const totalProjects = await annotationProjectRepository.countDocuments(filter);
 
+        // Fetch categorization summaries for dashboard visibility
         const [statusSummary, categorySummary] = await Promise.all([
             AnnotationProject.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
             AnnotationProject.aggregate([{ $group: { _id: '$projectCategory', count: { $sum: 1 } } }])
@@ -284,6 +301,10 @@ class AnnotationProjectService {
         return true;
     }
 
+    /**
+     * Initiates a project deletion request by generating and emailing an OTP.
+     * Deletion is restricted if active applications exist, requiring manual intervention.
+     */
     async requestDeletionOTP(projectId, admin, reason) {
         const project = await annotationProjectRepository.findById(projectId);
         if (!project) {
@@ -569,6 +590,10 @@ class AnnotationProjectService {
         return application;
     }
 
+    /**
+     * Rejects multiple project applications in a single operation.
+     * Optimizes performance by using bulk database updates and Promise.allSettled for notifications.
+     */
     async rejectApplicationsBulk(applicationIds, admin, body) {
         const { rejectionReason = 'other', reviewNotes = '' } = body;
 
@@ -576,7 +601,7 @@ class AnnotationProjectService {
             throw new ValidationError('No application IDs provided');
         }
 
-        // 1️⃣ Fetch pending applications (needed for notifications)
+        // 1️⃣ Fetch pending applications (needed for personalized notifications)
         const applications = await ProjectApplication.find({
             _id: { $in: applicationIds },
             status: 'pending'
@@ -588,7 +613,7 @@ class AnnotationProjectService {
             throw new NotFoundError('No pending applications found with the provided IDs');
         }
 
-        // 2️⃣ BULK UPDATE (single DB operation)
+        // 2️⃣ Execute atomic bulk update for database consistency
         await ProjectApplication.updateMany(
             { _id: { $in: applications.map(app => app._id) } },
             {
@@ -602,7 +627,7 @@ class AnnotationProjectService {
             }
         );
 
-        // 3️⃣ Send notifications & emails (non-blocking, fault-tolerant)
+        // 3️⃣ Dispatch notification emails (asynchronous and fault-tolerant)
         const notificationResults = await Promise.allSettled(
             applications.map(async (application) => {
                 try {
@@ -640,7 +665,7 @@ class AnnotationProjectService {
             })
         );
 
-        // 4️⃣ Build response
+        // 4️⃣ Aggregrate operation results for the response summary
         const successCount = notificationResults.filter(
             r => r.status === 'fulfilled' && r.value.status === 'success'
         ).length;

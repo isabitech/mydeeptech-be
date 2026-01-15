@@ -5,7 +5,14 @@ import AnnotationProject from '../models/annotationProject.model.js';
 import mongoose from 'mongoose';
 import { NotFoundError } from '../utils/responseHandler.js';
 
+/**
+ * Service for aggregating dashboard metrics for DTUsers.
+ * Provides a comprehensive view of recent activity, financial status, and profile completion.
+ */
 class DTDashboardService {
+    /**
+     * Compiles all necessary data for the user dashboard in parallel for performance.
+     */
     async getUserDashboard(userId) {
         const objectId = new mongoose.Types.ObjectId(userId);
         const thirtyDaysAgo = new Date();

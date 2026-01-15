@@ -7,9 +7,18 @@ import { NotFoundError } from '../utils/responseHandler.js';
 import { sendAnnotatorApprovalEmail, sendAnnotatorRejectionEmail } from '../utils/annotatorMailer.js';
 import mongoose from 'mongoose';
 
+/**
+ * Service handling administrative operations for DTUsers.
+ * Includes user listing with filters, dashboard statistics, and manual status overrides.
+ */
 class DTUserAdminService {
+    /**
+     * Retrieves all non-admin users with advanced filtering and pagination.
+     */
     async getAllUsers(query) {
         const { page = 1, limit = 20, status, verified, hasPassword, search } = query;
+
+        // Build exclusion filter to hide internal admins from user management lists
         const filter = {
             $nor: [
                 { email: { $regex: /@mydeeptech\.ng$/, $options: 'i' } },
@@ -17,9 +26,12 @@ class DTUserAdminService {
             ]
         };
 
+        // Apply dynamic conditional filters based on query parameters
         if (status) filter.annotatorStatus = status;
         if (verified !== undefined) filter.isEmailVerified = verified === 'true';
         if (hasPassword !== undefined) filter.hasSetPassword = hasPassword === 'true';
+
+        // Implement full-text search across primary user identifier fields
         if (search) {
             filter.$or = [
                 { fullName: { $regex: search, $options: 'i' } },
@@ -28,6 +40,7 @@ class DTUserAdminService {
             ];
         }
 
+        // Execute paginated find with sensitivity-aware selection (no passwords)
         const skip = (parseInt(page) - 1) * parseInt(limit);
         const users = await DTUser.find(filter)
             .select('-password')
@@ -35,7 +48,10 @@ class DTUserAdminService {
             .skip(skip)
             .limit(parseInt(limit));
 
+        // Get total count for pagination metadata
         const total = await DTUser.countDocuments(filter);
+
+        // Generate a real-time summary of user status distributions
         const statusSummary = await DTUser.aggregate([
             { $match: { $nor: [{ email: /@mydeeptech\.ng$/i }, { domains: { $in: ['Administration', 'Management'] } }] } },
             { $group: { _id: '$annotatorStatus', count: { $sum: 1 } } }
@@ -74,11 +90,18 @@ class DTUserAdminService {
         return { users, pagination: { currentPage: page, totalPages: Math.ceil(total / limit), totalAdminUsers: total } };
     }
 
+    /**
+     * Aggregates system-wide statistics for the administrative dashboard.
+     * Combines data from Users, Projects, Applications, and Invoices.
+     */
     async getAdminDashboard() {
+        // Reference point for "recent" activity metrics
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
+        // Execute disparate metric aggregations in parallel for optimized dashboard loading
         const [dtUserStats, projectStats, applicationStats, invoiceStats] = await Promise.all([
+            // User distribution metrics
             DTUser.aggregate([
                 { $match: { $nor: [{ email: /@mydeeptech\.ng$/i }, { domains: { $in: ['Administration', 'Management'] } }] } },
                 {
@@ -91,8 +114,11 @@ class DTUserAdminService {
                     }
                 }
             ]),
+            // Project pipeline status
             AnnotationProject.aggregate([{ $group: { _id: null, totalProjects: { $sum: 1 }, activeProjects: { $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] } } } }]),
+            // Application throughput metrics
             ProjectApplication.aggregate([{ $group: { _id: null, totalApplications: { $sum: 1 }, pendingApplications: { $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] } } } }]),
+            // Financial health overview
             Invoice.aggregate([{ $group: { _id: null, totalInvoices: { $sum: 1 }, paidAmount: { $sum: { $cond: [{ $eq: ['$paymentStatus', 'paid'] }, '$invoiceAmount', 0] } } } }])
         ]);
 
@@ -108,9 +134,11 @@ class DTUserAdminService {
         const user = await dtUserRepository.findById(userId);
         if (!user) throw new NotFoundError("User not found");
 
+        // Apply new status and persist
         user.annotatorStatus = newStatus;
         await user.save();
 
+        // Send confirmation email asynchronously if approved
         if (newStatus === 'approved') {
             try {
                 await sendAnnotatorApprovalEmail(user.email, user.fullName);
@@ -121,6 +149,9 @@ class DTUserAdminService {
         return user;
     }
 
+    /**
+     * Rejects an annotator and sends a notification email with the reason.
+     */
     async rejectAnnotator(userId, reason) {
         const user = await dtUserRepository.findById(userId);
         if (!user) throw new NotFoundError("User not found");

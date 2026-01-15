@@ -3,6 +3,10 @@ import userRepository from '../repositories/user.repository.js';
 import { AuthenticationError, ConflictError, NotFoundError } from '../utils/responseHandler.js';
 import { RoleType } from '../utils/role.js';
 
+/**
+ * Generic authentication service for system users.
+ * Handles account creation and credential verification.
+ */
 class AuthService {
     /**
      * Sign up a new user

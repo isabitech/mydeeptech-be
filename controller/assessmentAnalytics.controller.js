@@ -2,6 +2,10 @@ import assessmentAnalyticsService from '../services/assessmentAnalytics.service.
 import { ResponseHandler } from '../utils/responseHandler.js';
 import Joi from 'joi';
 
+/**
+ * Controller for retrieving business intelligence and performance data for assessments.
+ * Provides insights into user performance, QA accuracy, and video reel engagement.
+ */
 class AssessmentAnalyticsController {
     static analyticsQuerySchema = Joi.object({
         startDate: Joi.date().optional(),
@@ -13,48 +17,34 @@ class AssessmentAnalyticsController {
     });
 
     async getAssessmentDashboard(req, res) {
-        try {
-            const { error, value } = AssessmentAnalyticsController.analyticsQuerySchema.validate(req.query);
-            if (error) return ResponseHandler.error(res, { statusCode: 400, message: 'Validation error', details: error.details.map(d => d.message) });
+        const { error, value } = AssessmentAnalyticsController.analyticsQuerySchema.validate(req.query);
+        if (error) return ResponseHandler.error(res, { statusCode: 400, message: 'Validation error', details: error.details.map(d => d.message) });
 
-            const data = await assessmentAnalyticsService.getDashboard(value);
-            return ResponseHandler.success(res, data, 'Assessment dashboard analytics retrieved successfully');
-        } catch (error) {
-            return ResponseHandler.error(res, error);
-        }
+        const data = await assessmentAnalyticsService.getDashboard(value);
+        return ResponseHandler.success(res, data, 'Assessment dashboard analytics retrieved successfully');
     }
 
     async getReelAnalytics(req, res) {
-        try {
-            const data = await assessmentAnalyticsService.getReelAnalytics();
-            return ResponseHandler.success(res, data, 'Video reel analytics retrieved successfully');
-        } catch (error) {
-            return ResponseHandler.error(res, error);
-        }
+        const data = await assessmentAnalyticsService.getReelAnalytics();
+        return ResponseHandler.success(res, data, 'Video reel analytics retrieved successfully');
     }
 
     async getUserPerformanceAnalytics(req, res) {
-        try {
-            const { error, value } = AssessmentAnalyticsController.analyticsQuerySchema.validate(req.query);
-            if (error) return ResponseHandler.error(res, { statusCode: 400, message: 'Validation error', details: error.details.map(d => d.message) });
+        const { error, value } = AssessmentAnalyticsController.analyticsQuerySchema.validate(req.query);
+        if (error) return ResponseHandler.error(res, { statusCode: 400, message: 'Validation error', details: error.details.map(d => d.message) });
+        const data = await assessmentAnalyticsService.getUserPerformance(value);
+        return ResponseHandler.success(res, data, 'User performance analytics retrieved successfully');
 
-            const data = await assessmentAnalyticsService.getUserPerformance(value);
-            return ResponseHandler.success(res, data, 'User performance analytics retrieved successfully');
-        } catch (error) {
-            return ResponseHandler.error(res, error);
-        }
     }
 
     async getQAAnalytics(req, res) {
-        try {
-            const { error, value } = AssessmentAnalyticsController.analyticsQuerySchema.validate(req.query);
-            if (error) return ResponseHandler.error(res, { statusCode: 400, message: 'Validation error', details: error.details.map(d => d.message) });
 
-            const data = await assessmentAnalyticsService.getQAAnalytics(value);
-            return ResponseHandler.success(res, data, 'QA analytics retrieved successfully');
-        } catch (error) {
-            return ResponseHandler.error(res, error);
-        }
+        const { error, value } = AssessmentAnalyticsController.analyticsQuerySchema.validate(req.query);
+        if (error) return ResponseHandler.error(res, { statusCode: 400, message: 'Validation error', details: error.details.map(d => d.message) });
+
+        const data = await assessmentAnalyticsService.getQAAnalytics(value);
+        return ResponseHandler.success(res, data, 'QA analytics retrieved successfully');
+
     }
 }
 

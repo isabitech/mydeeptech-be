@@ -9,23 +9,30 @@ import { getBankCode, validatePaymentInfo } from '../utils/bankCodeMapping.js';
 import { ValidationError, NotFoundError } from '../utils/responseHandler.js';
 import mongoose from 'mongoose';
 
+/**
+ * Service managing the invoicing lifecycle.
+ * Handles invoice generation, payment tracking, automated reminders, and bulk exports for payroll processing.
+ */
 class InvoiceService {
     /** Admin: Create invoice */
+    /**
+     * Generates a new invoice for an approved annotator after verifying project participation.
+     */
     async createInvoice(data, adminId) {
         const { projectId, dtUserId, invoiceAmount } = data;
 
-        // Verify project
+        // Verify that the project exists
         const project = await AnnotationProject.findById(projectId);
         if (!project) throw new NotFoundError("Project not found");
 
-        // Verify user
+        // Validate that the user is an approved annotator
         const dtUser = await dtUserRepository.findById(dtUserId);
         if (!dtUser) throw new NotFoundError("DTUser not found");
         if (dtUser.annotatorStatus !== 'approved') {
             throw new ValidationError("Can only create invoices for approved annotators");
         }
 
-        // Verify user worked on project
+        // Ensure the user actually participated in the project via an approved application
         const userWorkedOnProject = await ProjectApplication.findOne({
             projectId,
             applicantId: dtUserId,
@@ -35,6 +42,7 @@ class InvoiceService {
             throw new ValidationError("User has not worked on this project or application not approved");
         }
 
+        // Initialize invoice record with administrative metadata
         const invoiceData = {
             ...data,
             createdBy: adminId,
@@ -42,13 +50,15 @@ class InvoiceService {
         };
 
         const invoice = await invoiceRepository.create(invoiceData);
+
+        // Populate associations for full response detail
         await invoice.populate([
             { path: 'projectId', select: 'projectName projectDescription' },
             { path: 'dtUserId', select: 'fullName email' },
             { path: 'createdBy', select: 'fullName email' }
         ]);
 
-        // Send notification
+        // Attempt to dispatch invoice notification email asynchronously
         try {
             await sendInvoiceNotification(dtUser.email, dtUser.fullName, {
                 invoiceNumber: invoice.invoiceNumber,
@@ -58,6 +68,7 @@ class InvoiceService {
                 dueDate: invoice.dueDate,
                 description: invoice.description
             });
+            // Mark as sent upon successful dispatch
             invoice.emailSent = true;
             invoice.emailSentAt = new Date();
             await invoice.save();
@@ -156,6 +167,8 @@ class InvoiceService {
     /** Admin: Update payment status */
     async updatePaymentStatus(invoiceId, updateData) {
         const { paymentStatus, paymentMethod, paymentReference, paymentNotes, paidAmount } = updateData;
+
+        // Retrieve target invoice with user contact info for notifications
         const invoice = await invoiceRepository.findByIdWithPopulate(invoiceId, [
             { path: 'dtUserId', select: 'fullName email payment_info' },
             { path: 'projectId', select: 'projectName' }
@@ -163,6 +176,7 @@ class InvoiceService {
 
         if (!invoice) throw new NotFoundError("Invoice not found");
 
+        // Prepare update payload based on current payment status
         const patch = { paymentStatus };
         if (paymentStatus === 'paid') {
             patch.paidAt = new Date();
@@ -173,8 +187,10 @@ class InvoiceService {
             if (paymentNotes) patch.paymentNotes = paymentNotes;
         }
 
+        // Persist update in the repository
         const updated = await invoiceRepository.update(invoiceId, patch);
 
+        // Dispatch payment confirmation email if the invoice is now marked as paid
         let emailSent = false;
         if (paymentStatus === 'paid') {
             try {
@@ -243,6 +259,10 @@ class InvoiceService {
     }
 
     /** Admin: Bulk authorize payment */
+    /**
+     * Authorizes payments in bulk for all unpaid invoices.
+     * Useful for batch processing at the end of a payment cycle.
+     */
     async bulkAuthorizePayment(adminEmail) {
         const unpaidInvoices = await invoiceRepository.find(
             { paymentStatus: { $in: ['unpaid', 'overdue'] } },
@@ -291,6 +311,10 @@ class InvoiceService {
     }
 
     /** Admin: Generate Paystack CSV */
+    /**
+     * Generates a CSV file formatted for Paystack bulk transfers.
+     * Includes currency conversion from USD to NGN and bank code mapping.
+     */
     async generatePaystackCSV(invoiceIdsArray) {
         let filter = { paymentStatus: { $in: ['unpaid', 'overdue'] } };
         if (invoiceIdsArray && invoiceIdsArray.length > 0) {

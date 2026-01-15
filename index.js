@@ -1,147 +1,10 @@
-import express from 'express';
-import mongoose from 'mongoose';
-import cors from 'cors';
-import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
-import { createServer } from 'http';
-import { initializeSocketIO } from './utils/chatSocketService.js';
-import { initRedis, closeRedis, redisHealthCheck } from './config/redis.js';
-import errorHandler from './middleware/errorHandler.js';
-
-// Conditionally load Swagger (now using ESM import)
-import { swaggerUi, specs } from './config/swagger.js';
+import mongoose from 'mongoose';
+import url from 'url';
+import { app, server } from './app.js';
+import { initRedis, closeRedis } from './config/redis.js';
 
 dotenv.config({ path: './.env' });
-
-import authRoutes from './routes/auth.js';
-import adminRoutes from './routes/admin.js';
-import mediaRoutes from './routes/media.js';
-import notificationRoutes from './routes/notifications.js';
-import assessmentRoutes from './routes/assessment.js';
-import supportRoutes from './routes/support.js';
-import chatRoutes from './routes/chat.js';
-import qaRoutes from './routes/qa.js';
-
-const app = express();
-const server = createServer(app);
-
-// Initialize Socket.IO for chat functionality
-initializeSocketIO(server);
-
-// CORS Configuration - Development and Production
-const corsOptions = {
-    origin: [
-        'http://localhost:5173',
-        'http://127.0.0.1:5173',
-        'https://mydeeptech.ng',
-        'https://www.mydeeptech.ng',
-        'https://mydeeptech-be.onrender.com',
-        'https://mydeeptech-frontend.onrender.com'
-    ],
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With', 'token']
-};
-
-app.get("/", (req, res) => {
-    res.send('Welcome to My Deep Tech')
-});
-
-// Enhanced health check endpoint with database ping
-app.get("/health", async (req, res) => {
-    try {
-        const redisStatus = await redisHealthCheck();
-
-        // Test MongoDB connectivity with actual database operation
-        let mongoStatus = 'disconnected';
-        let mongoDetails = { status: 'disconnected' };
-
-        if (mongoose.connection.readyState === 1) {
-            try {
-                // Perform actual database ping
-                await mongoose.connection.db.admin().ping();
-                const collections = await mongoose.connection.db.listCollections().toArray();
-
-                mongoStatus = 'connected';
-                mongoDetails = {
-                    status: 'connected',
-                    host: mongoose.connection.host,
-                    database: mongoose.connection.name,
-                    collections: collections.length,
-                    readyState: mongoose.connection.readyState
-                };
-            } catch (dbError) {
-                mongoStatus = 'error';
-                mongoDetails = {
-                    status: 'error',
-                    error: dbError.message,
-                    readyState: mongoose.connection.readyState
-                };
-            }
-        }
-
-        const isHealthy = mongoStatus === 'connected' && redisStatus.status === 'connected';
-
-        res.status(isHealthy ? 200 : 503).json({
-            status: isHealthy ? 'ok' : 'degraded',
-            timestamp: new Date().toISOString(),
-            services: {
-                mongodb: mongoDetails,
-                redis: redisStatus
-            }
-        });
-    } catch (error) {
-        res.status(500).json({
-            status: 'error',
-            error: error.message,
-            timestamp: new Date().toISOString()
-        });
-    }
-});
-
-// Middleware
-app.use(helmet()); // Basic security headers
-app.use(cors(corsOptions));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// Rate limiting
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Limit each IP to 100 requests per windowMs
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: {
-        success: false,
-        message: "Too many requests from this IP, please try again after 15 minutes",
-        code: "RATE_LIMIT_EXCEEDED"
-    }
-});
-app.use('/api/', limiter);
-
-if (swaggerUi && specs) {
-    app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
-        explorer: true,
-        customSiteTitle: "MyDeepTech API Documentation",
-        customfavIcon: "/favicon.ico",
-        customCss: '.swagger-ui .topbar { display: none }'
-    }));
-    console.log('📚 API Documentation available at: http://localhost:5000/api-docs');
-}
-
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/media', mediaRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/assessments', assessmentRoutes);
-app.use('/api/support', supportRoutes);
-app.use('/api/chat', chatRoutes);
-app.use('/api/qa', qaRoutes);
-
-// Global Error Handler (Must be registered after all routes)
-app.use(errorHandler);
 
 // Initialize Redis connection
 const initializeRedis = async () => {
@@ -155,9 +18,9 @@ const initializeRedis = async () => {
 };
 
 // Configure mongoose for production
-mongoose.set('bufferCommands', false); // Disable mongoose buffering for production
+mongoose.set('bufferCommands', false);
 
-// Enhanced MongoDB connection with retry logic and production timeouts
+// Enhanced MongoDB connection with retry logic
 const connectDB = async () => {
     const maxRetries = 5;
     let retries = 0;
@@ -167,33 +30,24 @@ const connectDB = async () => {
             console.log(`🔄 Attempting MongoDB connection (attempt ${retries + 1}/${maxRetries})...`);
 
             const conn = await mongoose.connect(process.env.MONGO_URI, {
-                // Production-optimized timeouts
-                serverSelectionTimeoutMS: 60000, // 60 seconds
-                socketTimeoutMS: 60000,          // 60 seconds  
-                connectTimeoutMS: 60000,         // 60 seconds
-                maxPoolSize: 10,                // Connection pool size
-                minPoolSize: 2,                 // Minimum connections
-                maxIdleTimeMS: 30000,           // Close connections after 30s idle
-                heartbeatFrequencyMS: 10000,    // Heartbeat every 10s
+                serverSelectionTimeoutMS: 60000,
+                socketTimeoutMS: 60000,
+                connectTimeoutMS: 60000,
+                maxPoolSize: 10,
+                minPoolSize: 2,
+                maxIdleTimeMS: 30000,
+                heartbeatFrequencyMS: 10000,
             });
 
             console.log(`✅ MongoDB connected successfully to: ${conn.connection.host}`);
-
-            // Test database connectivity
-            const collections = await mongoose.connection.db.listCollections().toArray();
-            console.log(`📊 Database verification: Found ${collections.length} collections`);
-
             return conn;
         } catch (error) {
             retries++;
             console.error(`❌ MongoDB connection attempt ${retries} failed:`, error.message);
-
             if (retries === maxRetries) {
                 console.error('💀 All MongoDB connection attempts failed');
                 throw new Error(`Failed to connect to MongoDB after ${maxRetries} attempts: ${error.message}`);
             }
-
-            // Exponential backoff: wait 2^retries seconds before retry
             const waitTime = Math.pow(2, retries) * 1000;
             console.log(`⏳ Waiting ${waitTime}ms before retry...`);
             await new Promise(resolve => setTimeout(resolve, waitTime));
@@ -201,28 +55,13 @@ const connectDB = async () => {
     }
 };
 
-// Database Connection
-connectDB().catch(err => {
-    console.error('💀 Fatal: Could not establish MongoDB connection:', err.message);
-    process.exit(1);
-});
-
-// Initialize Redis (non-blocking)
-initializeRedis();
-
 // Graceful shutdown handler
 const gracefulShutdown = async (signal) => {
     console.log(`\n🛑 Received ${signal}, starting graceful shutdown...`);
-
     try {
-        // Close Redis connection
         await closeRedis();
-
-        // Close MongoDB connection
         await mongoose.connection.close();
         console.log('✅ MongoDB connection closed');
-
-        // Close HTTP server
         process.exit(0);
     } catch (error) {
         console.error('❌ Error during graceful shutdown:', error);
@@ -230,14 +69,25 @@ const gracefulShutdown = async (signal) => {
     }
 };
 
-// Handle graceful shutdown
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+// Start Server only if run directly
+if (process.argv[1] && import.meta.url === url.pathToFileURL(process.argv[1]).href) {
+    connectDB().catch(err => {
+        console.error('💀 Fatal: Could not establish MongoDB connection:', err.message);
+        process.exit(1);
+    });
 
-// Start Server
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`💬 Socket.IO chat server active`);
-    console.log(`🔗 Health check available at: http://localhost:${PORT}/health`);
-});
+    initializeRedis();
+
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+    const PORT = process.env.PORT || 5000;
+    server.listen(PORT, () => {
+        console.log(`🚀 Server running on port ${PORT}`);
+        console.log(`💬 Socket.IO chat server active`);
+        console.log(`🔗 Health check available at: http://localhost:${PORT}/health`);
+    });
+}
+
+
+

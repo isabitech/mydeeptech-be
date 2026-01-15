@@ -3,6 +3,10 @@ import SpideyFinalDecisionEngine from '../utils/spideyFinalDecisionEngine.js';
 import SpideyAssessmentConfig from '../models/spideyAssessmentConfig.model.js';
 import { NotFoundError, ValidationError } from '../utils/responseHandler.js';
 
+/**
+ * Specialized service for managing the Spidey Assessment engine.
+ * Orchestrates multi-stage assessments for high-difficulty technical roles.
+ */
 class SpideyAssessmentService {
     constructor() {
         this.assessmentEngine = new SpideyAssessmentEngine();

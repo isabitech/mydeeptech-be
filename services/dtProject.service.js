@@ -4,7 +4,15 @@ import AnnotationProject from '../models/annotationProject.model.js';
 import { NotFoundError, ValidationError, AuthenticationError } from '../utils/responseHandler.js';
 import ProjectApplication from '../models/projectApplication.model.js';
 
+/**
+ * Service managing annotator interactions with projects.
+ * Handles project discovery (filtering based on status and eligibility) and the application process.
+ */
 class DTProjectService {
+    /**
+     * Retrieves projects available for the user to join or that they've already applied to.
+     * Enforces annotator approval status before allowing project visibility.
+     */
     async getAvailableProjects(userId, query) {
         const user = await dtUserRepository.findById(userId);
         if (!user) throw new NotFoundError("User not found");
@@ -87,6 +95,10 @@ class DTProjectService {
         return { projects: enrichedProjects, total };
     }
 
+    /**
+     * Processes a user's application to a specific project.
+     * Validates project status, user eligibility, and required documents (resume).
+     */
     async applyToProject(userId, projectId, applicationData) {
         const user = await dtUserRepository.findById(userId);
         if (!user || user.annotatorStatus !== 'approved') {

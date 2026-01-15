@@ -2,6 +2,10 @@ import Joi from 'joi';
 import annotationProjectService from '../services/annotationProject.service.js';
 import { ResponseHandler, ValidationError } from '../utils/responseHandler.js';
 
+/**
+ * Controller for managing all aspects of annotation projects.
+ * Provides endpoints for project lifecycle, applicant management, and administrative security (OTP flow).
+ */
 class AnnotationProjectController {
   /**
    * Joi validation schemas
@@ -106,6 +110,10 @@ class AnnotationProjectController {
 
   /**
    * Request OTP for sensitive deletion of project with active applications
+   */
+  /**
+   * Request an OTP for destructive operations (deleting projects with active applicants).
+   * Ensures high-risk deletions are intentional and authorized.
    */
   async requestProjectDeletionOTP(req, res) {
     const { projectId } = req.params;

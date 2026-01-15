@@ -7,26 +7,26 @@ class VideoReelService {
     async addVideoReel(data, adminId) {
         let { youtubeUrl, niche, tags = [], contentWarnings = [], title, description } = data;
 
-        // Convert and validate URL
+        // Normalize and validate the YouTube URL for embed compatibility
         const embedUrl = convertToEmbedUrl(youtubeUrl);
         if (!embedUrl || !validateYouTubeUrl(embedUrl)) {
             throw new ValidationError('Invalid YouTube URL format');
         }
         youtubeUrl = embedUrl;
 
-        // Check existence
+        // Ensure the video hasn't already been added to the system
         const existing = await videoReelRepository.findOne({ youtubeUrl });
         if (existing) {
             throw new ConflictError('Video with this YouTube URL already exists');
         }
 
-        // Extract YouTube data
+        // Fetch rich metadata directly from YouTube API (title, duration, etc.)
         const youtubeData = await extractYouTubeVideoData(youtubeUrl);
         if (!youtubeData) {
             throw new ValidationError('Failed to extract video data from YouTube');
         }
 
-        // Create record
+        // Persist the new video reel with combined user and YouTube metadata
         return await videoReelRepository.create({
             title: title || youtubeData.title || 'Untitled Video',
             description: description || youtubeData.description || '',

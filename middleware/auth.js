@@ -65,7 +65,7 @@ export const authenticateToken = async (req, res, next) => {
       return ResponseHandler.error(res, new AuthenticationError('Token has expired. Please login again.'));
     }
 
-    return ResponseHandler.handleError(res, error);
+    return ResponseHandler.error(res, error);
   }
 };
 
@@ -84,7 +84,7 @@ export const authorizeProfileAccess = (req, res, next) => {
 
     next();
   } catch (error) {
-    return ResponseHandler.handleError(res, error);
+    return ResponseHandler.error(res, error);
   }
 };
 

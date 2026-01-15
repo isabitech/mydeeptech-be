@@ -23,12 +23,16 @@ const errorHandler = (err, req, res, next) => {
         err.code = 'DUPLICATE_KEY_ERROR';
     }
 
-    // Handle Mongoose validation errors
-    if (err.name === 'ValidationError') {
-        const messages = Object.values(err.errors).map(val => val.message);
-        err.message = `Validation failed: ${messages.join(', ')}`;
+    // Handle Mongoose/Joi validation errors
+    if (err.name === 'ValidationError' || err.isJoi) {
+        let message = err.message;
+        if (err.errors) {
+            const messages = Object.values(err.errors).map(val => val.message);
+            message = `Validation failed: ${messages.join(', ')}`;
+        }
+        err.message = message;
         err.statusCode = 400;
-        err.code = 'DB_VALIDATION_ERROR';
+        err.code = 'VALIDATION_ERROR';
     }
 
     // Handle JWT errors

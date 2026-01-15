@@ -6,6 +6,10 @@ import Joi from 'joi';
  * MULTIMEDIA ASSESSMENT CONFIGURATION CONTROLLER
  * REST API for managing assessment configurations
  */
+/**
+ * Controller for administrative management of multimedia assessment configurations.
+ * Handles CRUD operations for defining assessment rules, scoring, and media requirements.
+ */
 class MultimediaAssessmentConfigController {
   // Validation schema for assessment configuration
   static assessmentConfigSchema = Joi.object({

@@ -13,7 +13,7 @@ class SupportTicketService {
     async createTicket(data, userId, userType) {
         const { subject, description, category, priority, attachments } = data;
 
-        // Fetch user details for email notification
+        // Retrieve user details from the appropriate collection for email notifications
         let userDetail;
         if (userType === 'dtuser') {
             userDetail = await DTUser.findById(userId);
@@ -25,11 +25,12 @@ class SupportTicketService {
             throw new NotFoundError('User not found');
         }
 
-        // Generate unique ticket number
+        // Generate a unique, human-readable ticket identifier for tracking
         const timestamp = Date.now();
         const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
         const ticketNumber = `TKT-${timestamp}-${random}`;
 
+        // Initialize the ticket with the user's initial problem description as the first message
         const ticket = await SupportTicket.create({
             ticketNumber,
             userId,
@@ -49,14 +50,14 @@ class SupportTicketService {
             }]
         });
 
-        // Send confirmation email to user
+        // Dispatch a confirmation email to the user asynchronously
         try {
             await sendTicketCreationEmail(userDetail.email, ticket);
         } catch (emailError) {
             console.error('Failed to send ticket creation email:', emailError);
         }
 
-        // Notify support admins
+        // Notify the administrative support team about the new inbound request
         try {
             await sendNewTicketNotificationToAdmin('support@mydeeptech.ng', ticket, userDetail);
         } catch (emailError) {
@@ -121,12 +122,12 @@ class SupportTicketService {
             throw new NotFoundError('Support ticket not found');
         }
 
-        // Check authorization
+        // Enforce access control: only the owner or an administrator can add messages
         if (!isAdmin && ticket.userId.toString() !== userId.toString()) {
             throw new ForbiddenError('You are not authorized to reply to this ticket');
         }
 
-        // Add message
+        // Construct the new message entry with appropriate sender attribution
         const newMessage = {
             sender: userId,
             senderModel: isAdmin ? 'DTUser' : (userType === 'dtuser' ? 'DTUser' : 'User'),
@@ -138,19 +139,18 @@ class SupportTicketService {
 
         ticket.messages.push(newMessage);
 
-        // Update status based on sender
+        // Transition ticket status based on whether it was a user reply or admin response
         if (isAdmin) {
             ticket.status = 'waiting_for_user';
         } else {
             ticket.status = 'in_progress';
-            // If it was already in progress or open, keep it as in_progress
         }
 
         await ticket.save();
 
-        // Notify the other party
+        // Dispatch in-app notifications to the relevant parties
         if (isAdmin) {
-            // Notify user of admin reply
+            // Notify the user that their ticket has received an official response
             await createNotification({
                 userId: ticket.userId,
                 type: 'support_update',
@@ -160,7 +160,7 @@ class SupportTicketService {
                 data: { ticketId: ticket._id, ticketNumber: ticket.ticketNumber }
             });
         } else if (ticket.assignedTo) {
-            // Notify assigned admin
+            // Notify the specific admin assigned to this ticket of the user's reply
             await createNotification({
                 userId: ticket.assignedTo,
                 type: 'support_update',

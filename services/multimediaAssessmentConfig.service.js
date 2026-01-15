@@ -4,18 +4,25 @@ import VideoReel from '../models/videoReel.model.js';
 import MultimediaAssessmentSubmission from '../models/multimediaAssessmentSubmission.model.js';
 import { NotFoundError, ValidationError } from '../utils/responseHandler.js';
 
+/**
+ * Service for configuring multimedia (video/audio) assessments.
+ * Manages assessment settings, scoring weights, and media reel requirements per niche.
+ */
 class MultimediaAssessmentConfigService {
     /**
      * Create multimedia assessment configuration
      */
+    /**
+     * Creates a new assessment configuration after validating score weights and media availability.
+     */
     async createAssessmentConfig(configData, adminId) {
-        // Check if project exists
+        // Validate that the target project exists and is eligible
         const project = await AnnotationProject.findById(configData.projectId);
         if (!project) {
             throw new NotFoundError('Project not found');
         }
 
-        // Check if assessment already exists for this project
+        // Prevent multiple active configurations for the same project
         const existingAssessment = await MultimediaAssessmentConfig.findOne({
             projectId: configData.projectId,
             isActive: true
@@ -25,7 +32,7 @@ class MultimediaAssessmentConfigService {
             throw new ValidationError('Active assessment configuration already exists for this project');
         }
 
-        // Validate score weights sum to 100
+        // Validate that scoring weights are mathematically sound (sum to 100)
         if (configData.scoring?.scoreWeights) {
             const weights = configData.scoring.scoreWeights;
             const total = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
@@ -34,7 +41,7 @@ class MultimediaAssessmentConfigService {
             }
         }
 
-        // Validate reel availability
+        // Verify that enough active reels exist in the inventory for the specified niches
         const reelsPerNiche = configData.videoReels?.reelsPerNiche || {};
         const totalConfiguredReels = Object.values(reelsPerNiche).reduce((sum, count) => sum + count, 0);
 
@@ -52,7 +59,7 @@ class MultimediaAssessmentConfigService {
             }
         }
 
-        // Create assessment configuration
+        // Save the new configuration with creator metadata
         const assessmentConfig = new MultimediaAssessmentConfig({
             ...configData,
             createdBy: adminId,

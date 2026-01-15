@@ -32,18 +32,16 @@ class ChatSupportController {
    * POST /api/chat/start
    */
   async startChatSession(req, res) {
-    try {
-      const { error, value } = ChatSupportController.startChatSchema.validate(req.body);
-      if (error) return ResponseHandler.error(res, error.details[0].message, 400);
 
-      const userId = req.user?.userId || req.dtuser?.userId;
-      const userType = req.dtuser ? 'dtuser' : 'user';
+    const { error, value } = ChatSupportController.startChatSchema.validate(req.body);
+    if (error) return ResponseHandler.error(res, error.details[0].message, 400);
 
-      const data = await chatSupportService.startChatSession(value, userId, userType);
-      return ResponseHandler.success(res, data, data.isNew ? 'Chat session started' : 'Resumed existing chat session', 201);
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+    const userId = req.user?.userId || req.dtuser?.userId;
+    const userType = req.dtuser ? 'dtuser' : 'user';
+
+    const data = await chatSupportService.startChatSession(value, userId, userType);
+    return ResponseHandler.success(res, data, data.isNew ? 'Chat session started' : 'Resumed existing chat session', 201);
+
   }
 
   /**
@@ -51,13 +49,10 @@ class ChatSupportController {
    * GET /api/chat/active
    */
   async getActiveChats(req, res) {
-    try {
-      const userId = req.user?.userId || req.dtuser?.userId;
-      const chats = await chatSupportService.getActiveChatsForUser(userId);
-      return ResponseHandler.success(res, chats, 'Active chats retrieved successfully');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+    const userId = req.user?.userId || req.dtuser?.userId;
+    const chats = await chatSupportService.getActiveChatsForUser(userId);
+    return ResponseHandler.success(res, chats, 'Active chats retrieved successfully');
+
   }
 
   /**
@@ -65,13 +60,9 @@ class ChatSupportController {
    * GET /api/chat/history
    */
   async getChatHistory(req, res) {
-    try {
-      const userId = req.user?.userId || req.dtuser?.userId;
-      const history = await chatSupportService.getChatHistory(userId);
-      return ResponseHandler.success(res, history, 'Chat history retrieved successfully');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+    const userId = req.user?.userId || req.dtuser?.userId;
+    const history = await chatSupportService.getChatHistory(userId);
+    return ResponseHandler.success(res, history, 'Chat history retrieved successfully');
   }
 
   /**
@@ -79,19 +70,16 @@ class ChatSupportController {
    * POST /api/chat/:ticketId/message
    */
   async sendChatMessage(req, res) {
-    try {
-      const { error, value } = ChatSupportController.sendMessageSchema.validate(req.body);
-      if (error) return ResponseHandler.error(res, error.details[0].message, 400);
+    const { error, value } = ChatSupportController.sendMessageSchema.validate(req.body);
+    if (error) return ResponseHandler.error(res, error.details[0].message, 400);
 
-      const userId = req.user?.userId || req.dtuser?.userId || req.admin?.userId;
-      const userType = req.dtuser ? 'dtuser' : 'user';
-      const isAdmin = !!(req.admin || req.dtuser?.role === 'ADMIN');
+    const userId = req.user?.userId || req.dtuser?.userId || req.admin?.userId;
+    const userType = req.dtuser ? 'dtuser' : 'user';
+    const isAdmin = !!(req.admin || req.dtuser?.role === 'ADMIN');
 
-      const savedMessage = await chatSupportService.sendChatMessage(req.params.ticketId, userId, userType, value, isAdmin);
-      return ResponseHandler.success(res, savedMessage, 'Message sent successfully');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+    const savedMessage = await chatSupportService.sendChatMessage(req.params.ticketId, userId, userType, value, isAdmin);
+    return ResponseHandler.success(res, savedMessage, 'Message sent successfully');
+
   }
 
   /**
@@ -99,19 +87,16 @@ class ChatSupportController {
    * GET /api/chat/:ticketId
    */
   async getChatTicketById(req, res) {
-    try {
-      const userId = req.user?.userId || req.dtuser?.userId;
-      const userType = req.dtuser ? 'dtuser' : 'user';
-      const isAdmin = !!(req.admin || req.dtuser?.role === 'ADMIN');
+    const userId = req.user?.userId || req.dtuser?.userId;
+    const userType = req.dtuser ? 'dtuser' : 'user';
+    const isAdmin = !!(req.admin || req.dtuser?.role === 'ADMIN');
 
-      // Re-using the logic from supportTicketService if compatible, or adding targeted logic here
-      // For now, assume we want full chat history which is in supportTicket model
-      const ticket = await chatSupportService.getActiveChatsForUser(userId); // This is not quite right for a single ID
-      // Let's use a more direct approach
-      return ResponseHandler.success(res, ticket, 'Chat details retrieved');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+    // Re-using the logic from supportTicketService if compatible, or adding targeted logic here
+    // For now, assume we want full chat history which is in supportTicket model
+    const ticket = await chatSupportService.getActiveChatsForUser(userId); // This is not quite right for a single ID
+    // Let's use a more direct approach
+    return ResponseHandler.success(res, ticket, 'Chat details retrieved');
+
   }
 
   // ADMIN METHODS
@@ -121,12 +106,8 @@ class ChatSupportController {
    * GET /api/chat/admin/active
    */
   async getActiveChatTickets(req, res) {
-    try {
-      const tickets = await chatSupportService.getActiveChatTicketsAdmin();
-      return ResponseHandler.success(res, tickets, 'Active chat tickets retrieved successfully');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+    const tickets = await chatSupportService.getActiveChatTicketsAdmin();
+    return ResponseHandler.success(res, tickets, 'Active chat tickets retrieved successfully');
   }
 
   /**
@@ -134,13 +115,9 @@ class ChatSupportController {
    * POST /api/chat/admin/join/:ticketId
    */
   async joinChatAsAdmin(req, res) {
-    try {
-      const adminId = req.admin?.userId || req.dtuser?.userId;
-      const ticket = await chatSupportService.joinChatAsAdmin(req.params.ticketId, adminId);
-      return ResponseHandler.success(res, ticket, 'Joined chat session successfully');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+    const adminId = req.admin?.userId || req.dtuser?.userId;
+    const ticket = await chatSupportService.joinChatAsAdmin(req.params.ticketId, adminId);
+    return ResponseHandler.success(res, ticket, 'Joined chat session successfully');
   }
 
   /**
@@ -148,16 +125,11 @@ class ChatSupportController {
    * POST /api/chat/admin/close/:ticketId
    */
   async closeChatSession(req, res) {
-    try {
-      const { error, value } = ChatSupportController.closeChatSchema.validate(req.body);
-      if (error) return ResponseHandler.error(res, error.details[0].message, 400);
-
-      const adminId = req.admin?.userId || req.dtuser?.userId;
-      const ticket = await chatSupportService.closeChatSession(req.params.ticketId, adminId, value.resolutionSummary);
-      return ResponseHandler.success(res, ticket, 'Chat session closed successfully');
-    } catch (error) {
-      return ResponseHandler.handleError(res, error);
-    }
+    const { error, value } = ChatSupportController.closeChatSchema.validate(req.body);
+    if (error) return ResponseHandler.error(res, error.details[0].message, 400);
+    const adminId = req.admin?.userId || req.dtuser?.userId;
+    const ticket = await chatSupportService.closeChatSession(req.params.ticketId, adminId, value.resolutionSummary);
+    return ResponseHandler.success(res, ticket, 'Chat session closed successfully');
   }
 }
 

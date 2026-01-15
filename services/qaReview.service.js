@@ -4,33 +4,40 @@ import DTUser from '../models/dtUser.model.js';
 import { NotFoundError, ValidationError } from '../utils/responseHandler.js';
 import mongoose from 'mongoose';
 
+/**
+ * Service for managing Quality Assurance (QA) reviews of multimedia assessments.
+ * Coordinates individual task auditing, final approval/rejection workflows, and batch review capabilities.
+ */
 class QAReviewService {
-        async getRejectedSubmissions(query) {
-            const { page = 1, limit = 20, sortBy = 'submittedAt', sortOrder = 'desc', filterBy = 'all' } = query;
-            const skip = (page - 1) * limit;
-            const sort = { [sortBy]: sortOrder === 'desc' ? -1 : 1 };
+    async getRejectedSubmissions(query) {
+        const { page = 1, limit = 20, sortBy = 'submittedAt', sortOrder = 'desc', filterBy = 'all' } = query;
+        const skip = (page - 1) * limit;
+        const sort = { [sortBy]: sortOrder === 'desc' ? -1 : 1 };
 
-            let matchQuery = { status: 'rejected' };
-            switch (filterBy) {
-                case 'recent':
-                    matchQuery.qaCompletedAt = { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) };
-                    break;
-                case 'low_score':
-                    matchQuery.totalScore = { $lt: 60 };
-                    break;
-                case 'retakes':
-                    matchQuery.attemptNumber = { $gt: 1 };
-                    break;
-            }
+        // Define criteria for rejected submissions with optional sub-filters
+        let matchQuery = { status: 'rejected' };
+        switch (filterBy) {
+            case 'recent':
+                matchQuery.qaCompletedAt = { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) };
+                break;
+            case 'low_score':
+                matchQuery.totalScore = { $lt: 60 };
+                break;
+            case 'retakes':
+                matchQuery.attemptNumber = { $gt: 1 };
+                break;
+        }
 
-            const submissions = await MultimediaAssessmentSubmission.aggregate([
-                { $match: matchQuery },
-                { $lookup: { from: 'dtusers', localField: 'annotatorId', foreignField: '_id', as: 'user' } },
-                { $unwind: '$user' },
-                { $lookup: { from: 'multimediaassessmentconfigs', localField: 'assessmentId', foreignField: '_id', as: 'assessment' } },
-                { $unwind: '$assessment' },
-                { $lookup: { from: 'qareviews', localField: '_id', foreignField: 'submissionId', as: 'qaReview' } },
-                { $addFields: {
+        // Execute aggregation to join submissions with users, configs, and their corresponding QA reviews
+        const submissions = await MultimediaAssessmentSubmission.aggregate([
+            { $match: matchQuery },
+            { $lookup: { from: 'dtusers', localField: 'annotatorId', foreignField: '_id', as: 'user' } },
+            { $unwind: '$user' },
+            { $lookup: { from: 'multimediaassessmentconfigs', localField: 'assessmentId', foreignField: '_id', as: 'assessment' } },
+            { $unwind: '$assessment' },
+            { $lookup: { from: 'qareviews', localField: '_id', foreignField: 'submissionId', as: 'qaReview' } },
+            {
+                $addFields: {
                     avgScore: {
                         $cond: {
                             if: { $gt: [{ $size: '$tasks' }, 0] },
@@ -43,9 +50,11 @@ class QAReviewService {
                     qaDecision: { $arrayElemAt: ['$qaReview.decision', 0] },
                     qaCompletedAt: { $arrayElemAt: ['$qaReview.completedAt', 0] },
                     qaFeedback: { $arrayElemAt: ['$qaReview.overallFeedback', 0] }
-                } },
-                { $lookup: { from: 'dtusers', localField: 'qaReviewer', foreignField: '_id', as: 'reviewer' } },
-                { $project: {
+                }
+            },
+            { $lookup: { from: 'dtusers', localField: 'qaReviewer', foreignField: '_id', as: 'reviewer' } },
+            {
+                $project: {
                     annotatorId: 1,
                     userName: '$user.fullName',
                     userEmail: '$user.email',
@@ -62,24 +71,25 @@ class QAReviewService {
                     totalTasks: '$assessment.numberOfTasks',
                     status: 1,
                     totalScore: 1
-                } },
-                { $sort: sort },
-                { $skip: skip },
-                { $limit: parseInt(limit) }
-            ]);
-
-            const totalCount = await MultimediaAssessmentSubmission.countDocuments(matchQuery);
-            return {
-                submissions,
-                pagination: {
-                    currentPage: parseInt(page),
-                    totalPages: Math.ceil(totalCount / limit),
-                    totalItems: totalCount,
-                    hasNext: page < Math.ceil(totalCount / limit),
-                    hasPrev: page > 1
                 }
-            };
-        }
+            },
+            { $sort: sort },
+            { $skip: skip },
+            { $limit: parseInt(limit) }
+        ]);
+
+        const totalCount = await MultimediaAssessmentSubmission.countDocuments(matchQuery);
+        return {
+            submissions,
+            pagination: {
+                currentPage: parseInt(page),
+                totalPages: Math.ceil(totalCount / limit),
+                totalItems: totalCount,
+                hasNext: page < Math.ceil(totalCount / limit),
+                hasPrev: page > 1
+            }
+        };
+    }
     async getPendingSubmissions(query) {
         const { page = 1, limit = 20, sortBy = 'submittedAt', sortOrder = 'desc', filterBy = 'all' } = query;
         const skip = (page - 1) * limit;
@@ -219,9 +229,14 @@ class QAReviewService {
         return { taskReview, totalTasksReviewed: qaReview.taskScores.length, overallScore: qaReview.overallScore };
     }
 
+    /**
+     * Finalizes the review for an entire submission.
+     * Updates submission status and the user's multimedia assessment status based on the decision.
+     */
     async submitFinalReview(reviewerId, data) {
         const { submissionId, overallScore, overallFeedback, decision, privateNotes } = data;
 
+        // Ensure a prerequisite task-by-task review has already been initiated
         const qaReview = await QAReview.findOne({ submissionId });
         if (!qaReview) throw new ValidationError('QA review not found. Please review individual tasks first.');
 
@@ -231,6 +246,7 @@ class QAReviewService {
 
         if (!submission) throw new NotFoundError('Submission not found');
 
+        // Update the QA record with the final verdict and administrative metadata
         qaReview.overallScore = overallScore;
         qaReview.overallFeedback = overallFeedback;
         qaReview.decision = decision;
@@ -239,11 +255,13 @@ class QAReviewService {
         qaReview.completedAt = new Date();
         await qaReview.save();
 
+        // Map the QA decision to the internal submission status (Approved/Rejected/Revision)
         let newSubmissionStatus = decision === 'Approve' ? 'approved' : decision === 'Reject' ? 'rejected' : 'revision_requested';
         submission.status = newSubmissionStatus;
         submission.qaCompletedAt = new Date();
         await submission.save();
 
+        // Synchronize the outcome back to the user's profile to affect eligibility
         if (decision === 'Approve') {
             await DTUser.findByIdAndUpdate(submission.annotatorId._id, { multimediaAssessmentStatus: 'approved', multimediaAssessmentCompletedAt: new Date() });
         } else if (decision === 'Reject') {

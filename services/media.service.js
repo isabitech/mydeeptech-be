@@ -11,6 +11,7 @@ class MediaService {
     async uploadImage(file, userId) {
         if (!file) throw new ValidationError('No image file provided');
 
+        // Map Cloudinary file metadata to internal schema
         const fileData = {
             publicId: file.filename,
             url: file.path,
@@ -18,6 +19,7 @@ class MediaService {
             size: file.size,
             format: file.format,
             resourceType: file.resource_type,
+            // Generate visual derivatives (thumbnail and optimized view)
             thumbnail: generateThumbnail(file.filename),
             optimizedUrl: generateOptimizedUrl(file.filename, { width: 800, height: 600 })
         };
@@ -82,7 +84,9 @@ class MediaService {
             format: file.format,
             resourceType: file.resource_type,
             duration: file.duration || null,
+            // Generate video preview thumbnail
             thumbnail: generateThumbnail(file.filename),
+            // Create adaptive streaming URL for video playback
             streamingUrl: generateOptimizedUrl(file.filename, {
                 resource_type: 'video',
                 format: 'mp4',
@@ -212,8 +216,10 @@ class MediaService {
     async updateProfilePicture(userId, userEmail, file) {
         if (!file) throw new ValidationError('No image file provided');
 
+        // Locate user to check for existing profile picture
         const user = await dtUserRepository.findById(userId);
 
+        // Attempt to purge the previous image from Cloudinary storage to save space
         if (user && user.profilePicture && user.profilePicture.publicId) {
             try {
                 await deleteCloudinaryFile(user.profilePicture.publicId);
@@ -222,6 +228,7 @@ class MediaService {
             }
         }
 
+        // Generate normalized profile picture data
         const profilePictureData = {
             publicId: file.filename,
             url: file.path,
@@ -229,6 +236,7 @@ class MediaService {
             optimizedUrl: generateOptimizedUrl(file.filename, { width: 300, height: 300 })
         };
 
+        // Update the user record with the new picture metadata
         await dtUserRepository.update(userId, {
             profilePicture: profilePictureData,
             updatedAt: new Date()

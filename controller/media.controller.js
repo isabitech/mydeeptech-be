@@ -1,6 +1,9 @@
 import mediaService from '../services/media.service.js';
 import { ResponseHandler } from '../utils/responseHandler.js';
 
+/**
+ * Controller for handling all media-related uploads and file management via Cloudinary.
+ */
 class MediaController {
   /**
    * Upload single image

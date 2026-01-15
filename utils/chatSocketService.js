@@ -574,6 +574,13 @@ const broadcastToAdmins = (event, data) => {
   }
 };
 
+const closeSocketIO = () => {
+  if (io) {
+    io.close();
+    io = null;
+  }
+};
+
 export {
   initializeSocketIO,
   getIO,
@@ -581,5 +588,6 @@ export {
   isUserOnline,
   getOnlineAdminsCount,
   sendNotificationToUser,
-  broadcastToAdmins
+  broadcastToAdmins,
+  closeSocketIO
 };

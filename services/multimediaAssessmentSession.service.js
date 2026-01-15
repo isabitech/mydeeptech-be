@@ -8,12 +8,20 @@ import { sendAssessmentCompletionEmail } from '../utils/multimediaAssessmentEmai
 import { sendProjectApplicationNotification } from '../utils/projectMailer.js';
 import { NotFoundError, ValidationError } from '../utils/responseHandler.js';
 
+/**
+ * Service managing individual multimedia assessment sessions for candidates.
+ * Orchestrates the interactive process of video reel presentation, conversation turns, and timer management.
+ */
 class MultimediaAssessmentSessionService {
     /**
      * Start multimedia assessment session
      */
+    /**
+     * Initiates a new multimedia assessment session.
+     * Randomizes video reels based on config requirements and establishes a starting timer state.
+     */
     async startAssessmentSession(userId, assessmentId, sessionMetadata = {}, clientIp) {
-        // Get assessment configuration
+        // Retrieve and validate the assessment configuration
         const assessmentConfig = await MultimediaAssessmentConfig.findById(assessmentId)
             .populate('projectId', 'projectName projectDescription');
 
@@ -21,13 +29,13 @@ class MultimediaAssessmentSessionService {
             throw new NotFoundError('Assessment configuration not found or inactive');
         }
 
-        // Check if user can take/retake
+        // Verify that the user is eligible for a new/retake assessment
         const retakeEligibility = await MultimediaAssessmentSubmission.canUserRetake(userId, assessmentId);
         if (!retakeEligibility.canRetake) {
             throw new ValidationError(`Cannot start assessment: ${retakeEligibility.reason}`);
         }
 
-        // Get attempt number
+        // Determine the attempt number based on user history
         const latestAttempt = await MultimediaAssessmentSubmission.findOne({
             annotatorId: userId,
             assessmentId
@@ -35,7 +43,7 @@ class MultimediaAssessmentSessionService {
 
         const attemptNumber = latestAttempt ? latestAttempt.attemptNumber + 1 : 1;
 
-        // Get randomized reels
+        // Fetch and randomize video reels according to the configured task count
         const availableReels = await VideoReel.getAssessmentReels(assessmentConfig);
         if (availableReels.length < assessmentConfig.requirements.tasksPerAssessment) {
             throw new Error(`Insufficient video reels available. Required: ${assessmentConfig.requirements.tasksPerAssessment}, Available: ${availableReels.length}`);
@@ -45,7 +53,7 @@ class MultimediaAssessmentSessionService {
             .sort(() => 0.5 - Math.random())
             .slice(0, assessmentConfig.requirements.tasksPerAssessment);
 
-        // Create submission
+        // Initialize the submission document with metadata and task skeletons
         const submission = new MultimediaAssessmentSubmission({
             assessmentId,
             annotatorId: userId,
@@ -80,11 +88,11 @@ class MultimediaAssessmentSessionService {
 
         await submission.save();
 
-        // Update stats
+        // Increment attempt tracking on the global configuration
         assessmentConfig.statistics.totalAttempts += 1;
         await assessmentConfig.save();
 
-        // Update user status
+        // Update the user's high-level assessment status
         await DTUser.findByIdAndUpdate(userId, {
             $set: { multimediaAssessmentStatus: 'in_progress' }
         });
@@ -220,6 +228,10 @@ class MultimediaAssessmentSessionService {
 
     /**
      * Submit final assessment
+     */
+    /**
+     * Submits the final assessment for grading/review.
+     * Stops the timer, updates user/project application statuses, and triggers administrative notifications.
      */
     async submitAssessment(submissionId, userId) {
         const submission = await MultimediaAssessmentSubmission.findOne({

@@ -7,6 +7,10 @@ import Joi from 'joi';
  * REST API endpoints with NO embedded business logic
  * All logic delegated to assessment service
  */
+/**
+ * Controller for managing multi-stage technical assessments (Spidey Assessments).
+ * Orchestrates candidate progress through various evaluation stages with strict timing and validation.
+ */
 class SpideyAssessmentController {
   // Validation schemas
   static startAssessmentSchema = Joi.object({
@@ -53,7 +57,7 @@ class SpideyAssessmentController {
 
       return ResponseHandler.success(res, result, 'Assessment started successfully');
     } catch (error) {
-      return ResponseHandler.handleError(res, error);
+      return ResponseHandler.error(res, error);
     }
   }
 

@@ -1,27 +1,36 @@
-import  Notification from '../models/notification.model.js'
+import Notification from '../models/notification.model.js'
+/**
+ * Service for managing user and system notifications.
+ * Handles in-app notification storage, summaries, and user preference tracking.
+ */
 class NotificationService {
     /**
      * Create a general notification
      * @param {Object} notificationData - Notification details
      */
+    /**
+     * Creates a new notification record in the database.
+     * Supports targeting different user models (DTUser by default).
+     */
     async createNotification(notificationData) {
-                    const { userId, type, title, message, data = {}, priority = 'medium' } = notificationData;
+        const { userId, type, title, message, data = {}, priority = 'medium' } = notificationData;
 
-            // Determine user model type
-            let userModel = notificationData.userModel || 'DTUser';
+        // Default to targeting the DTUser model unless explicitly specified
+        let userModel = notificationData.userModel || 'DTUser';
 
-            const notification = await Notification.create({
-                userId,
-                userModel,
-                type,
-                title,
-                message,
-                data,
-                priority
-            });
+        // Persist the notification record for the target user
+        const notification = await Notification.create({
+            userId,
+            userModel,
+            type,
+            title,
+            message,
+            data,
+            priority
+        });
 
-            console.log(`✅ Notification created in DB:`, notification._id);
-            return notification;
+        console.log(`✅ Notification created in DB:`, notification._id);
+        return notification;
     }
 
     /**
@@ -31,12 +40,14 @@ class NotificationService {
         const { isRead, limit = 20, page = 1 } = queryParams;
         const filter = { userId };
 
+        // Apply read/unread status filtering if requested
         if (isRead !== undefined) {
             filter.isRead = isRead === 'true';
         }
 
         const skip = (parseInt(page) - 1) * parseInt(limit);
 
+        // Fetch paginated notifications and total count in parallel
         const [notifications, total] = await Promise.all([
             Notification.find(filter)
                 .sort({ createdAt: -1 })
@@ -59,6 +70,7 @@ class NotificationService {
      * Mark notification as read
      */
     async markAsRead(notificationId, userId) {
+        // Find and update the notification uniquely identifier by both ID and owner
         const notification = await Notification.findOneAndUpdate(
             { _id: notificationId, userId },
             { isRead: true, readAt: new Date() },
@@ -76,6 +88,7 @@ class NotificationService {
      * Mark all notifications as read for a user
      */
     async markAllAsRead(userId) {
+        // Execute a bulk update for all currently unread notifications belonging to the user
         return await Notification.updateMany(
             { userId, isRead: false },
             { isRead: true, readAt: new Date() }
@@ -86,6 +99,7 @@ class NotificationService {
      * Delete notification
      */
     async deleteNotification(notificationId, userId) {
+        // Permanently remove the notification, enforcing ownership check
         const notification = await Notification.findOneAndDelete({ _id: notificationId, userId });
         if (!notification) {
             throw new Error('Notification not found or access denied');
@@ -103,6 +117,7 @@ class NotificationService {
 
         const skip = (parseInt(page) - 1) * parseInt(limit);
 
+        // Fetch system-wide notifications with sender profile information populated
         const [notifications, total] = await Promise.all([
             Notification.find(filter)
                 .populate('userId', 'fullName email username')
@@ -134,6 +149,7 @@ class NotificationService {
     // --- Additional Methods ---
 
     async getNotificationSummary(userId) {
+        // Aggregate various notification counts to provide a high-level user overview
         const [totalNotifications, unreadCount, readCount, highPriorityCount, mediumPriorityCount, lowPriorityCount, recentCount] = await Promise.all([
             Notification.countDocuments({ userId }),
             Notification.countDocuments({ userId, isRead: false }),
@@ -144,6 +160,7 @@ class NotificationService {
             Notification.countDocuments({ userId, createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } })
         ]);
 
+        // Generate a breakdown of notification counts categorized by type
         const typeBreakdown = await Notification.aggregate([
             { $match: { userId } },
             { $group: { _id: '$type', count: { $sum: 1 } } },

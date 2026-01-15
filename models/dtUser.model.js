@@ -220,5 +220,12 @@ const dtUserSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Indexes for better query performance
+dtUserSchema.index({ email: 1 });
+dtUserSchema.index({ annotatorStatus: 1 });
+dtUserSchema.index({ microTaskerStatus: 1 });
+dtUserSchema.index({ qaStatus: 1 });
+dtUserSchema.index({ isEmailVerified: 1 });
+
 const DTUser = mongoose.model("DTUser", dtUserSchema);
 export default DTUser;

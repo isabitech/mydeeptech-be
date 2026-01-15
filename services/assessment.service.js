@@ -8,15 +8,21 @@ import { NotFoundError, ValidationError } from '../utils/responseHandler.js';
 import mongoose from 'mongoose';
 
 class AssessmentService {
+    /**
+     * Handles the submission of an assessment, calculates the score, 
+     * updates user status, and sends notifications.
+     */
     async submitAssessment(userId, data, ip, userAgent) {
         const { assessmentType, startedAt, completedAt, answers, passingScore } = data;
 
         const user = await DTUser.findById(userId);
         if (!user) throw new NotFoundError('User not found');
 
+        // Enforce a strict 24-hour cooldown period between assessment attempts
         const canRetake = await Assessment.canUserRetake(userId, assessmentType, 24);
         if (!canRetake) throw new ValidationError('You must wait 24 hours before retaking the assessment');
 
+        // Retrieve historical attempts to determine the current attempt number
         const previousAttempts = await Assessment.find({ userId, assessmentType })
             .select('createdAt scorePercentage passed')
             .sort({ createdAt: -1 });
@@ -26,14 +32,17 @@ class AssessmentService {
         const totalQuestions = answers.length;
         const processedQuestions = [];
 
+        // Validate user answers against the master question bank
         for (const userAnswer of answers) {
             const dbQuestion = await AssessmentQuestion.findOne({ id: userAnswer.questionId, isActive: true });
             if (!dbQuestion) throw new ValidationError(`Question with ID ${userAnswer.questionId} not found`);
             if (dbQuestion.section !== userAnswer.section) throw new ValidationError(`Section mismatch for question ${userAnswer.questionId}`);
 
+            // Perform case-insensitive string comparison for the answer
             const isCorrect = userAnswer.userAnswer.trim().toLowerCase() === dbQuestion.answer.trim().toLowerCase();
             if (isCorrect) correctAnswers += dbQuestion.points;
 
+            // Map the submission turns to the audit trail record
             processedQuestions.push({
                 questionId: userAnswer.questionId.toString(),
                 questionText: dbQuestion.question,
@@ -55,6 +64,7 @@ class AssessmentService {
         const scorePercentage = Math.round((correctAnswers / totalQuestions) * 100);
         const passed = scorePercentage >= passingScore;
 
+        // Group performance results by section (Grammar, Writing, etc.) for detailed feedback
         const sectionPerformance = {};
         ['Comprehension', 'Vocabulary', 'Grammar', 'Writing'].forEach(section => {
             const sectionQuestions = processedQuestions.filter(q => q.section === section);
@@ -71,11 +81,14 @@ class AssessmentService {
         let newAnnotatorStatus = user.annotatorStatus;
         let newMicroTaskerStatus = user.microTaskerStatus;
 
+        // Transition the user's operational status based on the assessment outcome
         if (assessmentType === 'annotator_qualification') {
             if (passed) {
+                // Access granted to full annotation and microtasking projects
                 newAnnotatorStatus = 'approved';
                 if (user.microTaskerStatus === 'pending') newMicroTaskerStatus = 'approved';
             } else {
+                // Access restricted to microtasking only upon failure
                 newAnnotatorStatus = 'rejected';
                 newMicroTaskerStatus = 'approved';
             }
@@ -83,6 +96,7 @@ class AssessmentService {
 
         const timeSpentMinutes = Math.round((new Date(completedAt) - new Date(startedAt)) / (1000 * 60));
 
+        // Persist the assessment details for auditing and historical tracking
         const assessment = new Assessment({
             userId, assessmentType, totalQuestions, correctAnswers, scorePercentage,
             passed, passingScore, startedAt: new Date(startedAt), completedAt: new Date(completedAt),
@@ -97,6 +111,7 @@ class AssessmentService {
 
         await assessment.save();
 
+        // Atomic update of user status and trigger of automated notifications
         if (user.annotatorStatus !== newAnnotatorStatus || user.microTaskerStatus !== newMicroTaskerStatus) {
             user.annotatorStatus = newAnnotatorStatus;
             user.microTaskerStatus = newMicroTaskerStatus;
@@ -139,6 +154,7 @@ class AssessmentService {
         if (assessmentType) filter.assessmentType = assessmentType;
         if (passed !== undefined) filter.passed = passed;
 
+        // Retrieve paginated assessment history for the user, excluding sensitive metadata
         const assessments = await Assessment.find(filter)
             .select('-questions.correctAnswer -ipAddress -userAgent')
             .sort({ createdAt: -1 })
@@ -146,6 +162,8 @@ class AssessmentService {
             .skip((page - 1) * limit);
 
         const totalCount = await Assessment.countDocuments(filter);
+
+        // Aggregate high-level statistics (best score, pass rates, etc.) across all attempts
         const stats = await Assessment.aggregate([
             { $match: { userId: new mongoose.Types.ObjectId(userId) } },
             {
@@ -251,6 +269,7 @@ class AssessmentService {
     }
 
     async getAvailableAssessments(userId) {
+        // Define the standard language proficiency assessment configuration
         const englishAssessment = {
             id: 'english-proficiency', type: 'annotator_qualification', title: 'English Proficiency Assessment',
             description: 'Comprehensive assessment covering grammar, vocabulary, comprehension, and writing skills',
@@ -259,6 +278,7 @@ class AssessmentService {
             passingScore: 60, cooldownHours: 24, isActive: true
         };
 
+        // Enrich with user-specific attempt status and eligibility
         const latestAttempt = await Assessment.findOne({ userId, assessmentType: 'annotator_qualification' }).sort({ createdAt: -1 });
 
         englishAssessment.userStatus = {
@@ -267,6 +287,7 @@ class AssessmentService {
             canRetake: !latestAttempt || new Date() >= new Date(latestAttempt.createdAt.getTime() + 24 * 60 * 60 * 1000)
         };
 
+        // Fetch dynamic multimedia assessments linked to active projects
         const multimediaAssessments = await MultimediaAssessmentConfig.find({ isActive: true })
             .populate('projectId', 'projectName projectCategory projectDescription')
             .select('title description requirements scoring projectId createdAt');

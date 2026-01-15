@@ -30,102 +30,68 @@ class QAReviewController {
         return ResponseHandler.success(res, result, 'Rejected submissions retrieved successfully');
     }
     async getPendingSubmissions(req, res) {
-        try {
-            const result = await qaReviewService.getPendingSubmissions(req.query);
-            return ResponseHandler.success(res, result, 'Pending submissions retrieved successfully');
-        } catch (error) {
-            return ResponseHandler.error(res, error);
-        }
+
+        const result = await qaReviewService.getPendingSubmissions(req.query);
+        return ResponseHandler.success(res, result, 'Pending submissions retrieved successfully');
+
     }
 
     async getSubmissionForReview(req, res) {
-        try {
-            const { submissionId } = req.params;
-            const result = await qaReviewService.getSubmissionForReview(submissionId);
-            return ResponseHandler.success(res, result, 'Submission details retrieved successfully');
-        } catch (error) {
-            return ResponseHandler.error(res, error);
-        }
+        const { submissionId } = req.params;
+        const result = await qaReviewService.getSubmissionForReview(submissionId);
+        return ResponseHandler.success(res, result, 'Submission details retrieved successfully');
     }
 
     async reviewTask(req, res) {
-        try {
-            const { error, value } = QAReviewController.reviewTaskSchema.validate(req.body);
-            if (error) return ResponseHandler.error(res, { statusCode: 400, message: 'Validation error', details: error.details.map(d => d.message) });
 
-            const reviewerId = req.user?._id || req.user?.userId;
-            const result = await qaReviewService.reviewTask(reviewerId, value);
-            return ResponseHandler.success(res, result, 'Task reviewed successfully');
-        } catch (error) {
-            return ResponseHandler.error(res, error);
-        }
+        const { error, value } = QAReviewController.reviewTaskSchema.validate(req.body);
+        if (error) return ResponseHandler.error(res, { statusCode: 400, message: 'Validation error', details: error.details.map(d => d.message) });
+
+        const reviewerId = req.user?._id || req.user?.userId;
+        const result = await qaReviewService.reviewTask(reviewerId, value);
+        return ResponseHandler.success(res, result, 'Task reviewed successfully');
     }
 
     async submitFinalReview(req, res) {
-        try {
-            const { error, value } = QAReviewController.finalReviewSchema.validate(req.body);
-            if (error) return ResponseHandler.error(res, { statusCode: 400, message: 'Validation error', details: error.details.map(d => d.message) });
+        const { error, value } = QAReviewController.finalReviewSchema.validate(req.body);
+        if (error) return ResponseHandler.error(res, { statusCode: 400, message: 'Validation error', details: error.details.map(d => d.message) });
 
-            const reviewerId = req.user?._id || req.user?.userId;
-            const result = await qaReviewService.submitFinalReview(reviewerId, value);
-            return ResponseHandler.success(res, result, `Assessment ${value.decision.toLowerCase()}d successfully`);
-        } catch (error) {
-            return ResponseHandler.error(res, error);
-        }
+        const reviewerId = req.user?._id || req.user?.userId;
+        const result = await qaReviewService.submitFinalReview(reviewerId, value);
+        return ResponseHandler.success(res, result, `Assessment ${value.decision.toLowerCase()}d successfully`);
+
     }
 
     async getReviewerDashboard(req, res) {
-        try {
-            const reviewerId = req.user?._id || req.user?.userId;
-            const result = await qaReviewService.getReviewerDashboard(reviewerId);
-            return ResponseHandler.success(res, result, 'Reviewer dashboard data retrieved successfully');
-        } catch (error) {
-            return ResponseHandler.error(res, error);
-        }
+
+        const reviewerId = req.user?._id || req.user?.userId;
+        const result = await qaReviewService.getReviewerDashboard(reviewerId);
+        return ResponseHandler.success(res, result, 'Reviewer dashboard data retrieved successfully');
+
     }
 
     async batchReviewSubmissions(req, res) {
-        try {
-            const { error, value } = QAReviewController.batchReviewSchema.validate(req.body);
-            if (error) return ResponseHandler.error(res, { statusCode: 400, message: 'Validation error', details: error.details.map(d => d.message) });
+        const { error, value } = QAReviewController.batchReviewSchema.validate(req.body);
+        if (error) return ResponseHandler.error(res, { statusCode: 400, message: 'Validation error', details: error.details.map(d => d.message) });
 
-            const reviewerId = req.user?._id || req.user?.userId;
-            const result = await qaReviewService.batchReview(reviewerId, value);
-            return ResponseHandler.success(res, result, 'Batch review completed successfully');
-        } catch (error) {
-            return ResponseHandler.error(res, error);
-        }
+        const reviewerId = req.user?._id || req.user?.userId;
+        const result = await qaReviewService.batchReview(reviewerId, value);
+        return ResponseHandler.success(res, result, 'Batch review completed successfully');
+
     }
 
     async getSubmissionAnalytics(req, res) {
-        try {
-            const result = await qaReviewService.getAnalytics(req.query);
-            return ResponseHandler.success(res, result, 'Submission analytics retrieved successfully');
-        } catch (error) {
-            return ResponseHandler.error(res, error);
-        }
+        const result = await qaReviewService.getAnalytics(req.query);
+        return ResponseHandler.success(res, result, 'Submission analytics retrieved successfully');
+
     }
 
     async getApprovedSubmissions(req, res) {
-        try {
-            const result = await qaReviewService.getApprovedSubmissions(req.query);
-            return ResponseHandler.success(res, result, 'Approved submissions retrieved successfully');
-        } catch (error) {
-            return ResponseHandler.error(res, error);
-        }
+        const result = await qaReviewService.getApprovedSubmissions(req.query);
+        return ResponseHandler.success(res, result, 'Approved submissions retrieved successfully');
+
     }
 }
 
 const qaReviewController = new QAReviewController();
 export default qaReviewController;
-export const {
-    getPendingSubmissions,
-    getApprovedSubmissions,
-    getRejectedSubmissions,
-    getSubmissionForReview,
-    reviewTask,
-    submitFinalReview,
-    getReviewerDashboard,
-    batchReviewSubmissions,
-    getSubmissionAnalytics
-} = qaReviewController;

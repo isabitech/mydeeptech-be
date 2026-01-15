@@ -2,6 +2,10 @@ import assessmentService from '../services/assessment.service.js';
 import { ResponseHandler, ValidationError, AuthenticationError } from '../utils/responseHandler.js';
 import Joi from 'joi';
 
+/**
+ * Controller handling user assessment interactions.
+ * Manages assessment submissions, history tracking, and eligibility checks.
+ */
 class AssessmentController {
   static submitAssessmentSchema = Joi.object({
     assessmentType: Joi.string().valid('annotator_qualification', 'skill_assessment', 'project_specific').default('annotator_qualification'),
@@ -27,6 +31,10 @@ class AssessmentController {
     userId: Joi.string().optional()
   });
 
+  /**
+   * Processes a user's final assessment submission.
+   * Validates answers, updates user status, and records the result.
+   */
   async submitAssessment(req, res) {
     const userId = req.user?.userId || req.userId;
     if (!userId) throw new AuthenticationError("User authentication required");
@@ -128,6 +136,10 @@ class AssessmentController {
     ResponseHandler.success(res, result, "User assessment overview retrieved successfully");
   }
 
+  /**
+   * Starts or resumes an assessment for a user.
+   * Handles both section-based and multimedia assessments.
+   */
   async startAssessmentById(req, res) {
     const userId = req.user?.userId || req.userId;
     const { assessmentId } = req.params;

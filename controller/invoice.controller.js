@@ -2,6 +2,10 @@ import invoiceService from '../services/invoice.service.js';
 import { ResponseHandler, ValidationError } from '../utils/responseHandler.js';
 import Joi from 'joi';
 
+/**
+ * Controller handling all invoicing and payment-related API endpoints.
+ * Provides administrative tools for payroll management and user vistas of their earnings.
+ */
 class InvoiceController {
   // Validation schema for creating invoices
   static createInvoiceSchema = Joi.object({
@@ -99,6 +103,9 @@ class InvoiceController {
   /**
    * Admin function: Generate Paystack CSV for selected invoices
    * GET /api/admin/invoices/export/paystack
+   */
+  /**
+   * Generates a Paystack-compatible CSV for bulk payouts in Nigerian Naira.
    */
   async generatePaystackCSV(req, res) {
     const { invoiceIds } = req.query;

@@ -6,6 +6,10 @@ import Joi from 'joi';
  * MULTIMEDIA ASSESSMENT SESSION CONTROLLER
  * REST API for candidate assessment sessions
  */
+/**
+ * Controller for candidate-facing multimedia assessment sessions.
+ * Manages the interactive session flow, including auto-saving progress and timer controls.
+ */
 class MultimediaAssessmentSessionController {
   // Validation schemas
   static startAssessmentSchema = Joi.object({

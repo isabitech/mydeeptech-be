@@ -18,8 +18,18 @@ import {
   dtUserPasswordResetSchema
 } from "../utils/authValidator.js";
 
+/**
+ * Controller managing all user-related operations including authentication, 
+ * profile management, and administrative actions.
+ * Orchestrates calls between various specialized services.
+ */
 class DTUserController {
   // Option 1: Send email with timeout (current implementation)
+  // --- User Registration & Authentication ---
+
+  /**
+   * Registers a new Deep Tech User.
+   */
   async createDTUser(req, res) {
     const user = await dtUserAuthService.register(req.body);
     ResponseHandler.success(res, user, "User created successfully. Verification email sent.", 201);
@@ -63,6 +73,9 @@ class DTUserController {
   }
 
   // DTUser login function
+  /**
+   * Log in a user and return a JWT token.
+   */
   async dtUserLogin(req, res) {
     const { error } = dtUserLoginSchema.validate(req.body);
     if (error) throw new ValidationError(error.details[0].message);
@@ -141,6 +154,11 @@ class DTUserController {
   }
 
   // Admin function: Get all DTUsers
+  // --- Administrative Functions ---
+
+  /**
+   * Administrative view of all registered DTUsers.
+   */
   async getAllDTUsers(req, res) {
     const data = await dtUserAdminService.getAllUsers(req.query);
     ResponseHandler.success(res, data, "DTUsers retrieved successfully");
@@ -319,6 +337,11 @@ class DTUserController {
   }
 
   // DTUser function: Get all user invoices with statistics
+  // --- Financial & Project Operations ---
+
+  /**
+   * Retrieves all invoices associated with the authenticated user.
+   */
   async getUserInvoices(req, res) {
     const data = await invoiceService.getUserInvoices(req.user.userId, req.query);
     ResponseHandler.success(res, data, "Invoices retrieved successfully");
