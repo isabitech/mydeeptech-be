@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules npx jest",
+    "test": "echo \"Error: no test specified\" && exit 1",
     "seed-questions": "node scripts/seedQuestions.js seed",
     "list-questions": "node scripts/seedQuestions.js list",
     "seed-section-questions": "node scripts/sectionBasedSeeder.js seed",
@@ -52,14 +52,6 @@
   },
   "description": "",
   "devDependencies": {
-    "@eslint/js": "^9.39.2",
-    "cross-env": "^10.1.0",
-    "eslint": "^9.39.2",
-    "globals": "^17.0.0",
-    "jest": "^30.2.0",
-    "mongodb-memory-server": "^11.0.1",
-    "nock": "^14.0.10",
-    "nodemon": "^3.1.11",
-    "supertest": "^7.2.2"
+    "nodemon": "^3.1.11"
   }
 }
