@@ -5,7 +5,7 @@ export const envSchema = Joi.object({
     .valid("development", "production", "test")
     .default("development"),
 
-  PORT: Joi.number().default(5000),
+  PORT: Joi.number().default(4000),
 
   // MongoDB
   OLD_MONGO_URI: Joi.string().uri().optional(),

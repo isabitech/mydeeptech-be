@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import url from 'url';
-import {server } from './app.js';
+import { server } from './app.js';
 import { initRedis, closeRedis } from './config/redis.js';
 import envConfig from './config/envConfig.js';
 
@@ -81,7 +81,7 @@ if (process.argv[1] && import.meta.url === url.pathToFileURL(process.argv[1]).hr
     process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
     process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-    const PORT = envConfig.PORT || 5000;
+    const PORT = envConfig.PORT || 4000;
     server.listen(PORT, () => {
         console.log(`🚀 Server running on port ${PORT}`);
         console.log(`💬 Socket.IO chat server active`);
