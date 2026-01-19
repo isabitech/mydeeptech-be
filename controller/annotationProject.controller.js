@@ -11,36 +11,205 @@ class AnnotationProjectController {
    * Joi validation schemas
    */
   static createProjectSchema = Joi.object({
-    projectName: Joi.string().required().trim(),
-    projectDescription: Joi.string().required().trim(),
-    projectCategory: Joi.string().required(),
-    payRate: Joi.number().required().min(0),
-    status: Joi.string().valid('open', 'closed', 'in_progress', 'completed').default('open'),
-    maxAnnotators: Joi.number().integer().min(1),
-    requirements: Joi.array().items(Joi.string()),
-    tags: Joi.array().items(Joi.string()),
-    projectGuidelineLink: Joi.string().uri().allow(''),
-    projectGuidelineVideo: Joi.string().uri().allow(''),
-    projectCommunityLink: Joi.string().uri().allow(''),
-    projectTrackerLink: Joi.string().uri().allow(''),
-    estimatedDuration: Joi.string().allow('')
+    // Basic project info
+    projectName: Joi.string().trim().max(200).required(),
+    projectDescription: Joi.string().trim().max(2000).required(),
+
+    projectCategory: Joi.string()
+      .valid(
+        "Text Annotation",
+        "Image Annotation",
+        "Audio Annotation",
+        "Video Annotation",
+        "Data Labeling",
+        "Content Moderation",
+        "Transcription",
+        "Translation",
+        "Sentiment Analysis",
+        "Entity Recognition",
+        "Classification",
+        "Object Detection",
+        "Semantic Segmentation",
+        "Survey Research",
+        "Data Entry",
+        "Quality Assurance",
+        "Other"
+      )
+      .required(),
+
+    payRate: Joi.number().min(0).required(),
+
+    payRateCurrency: Joi.string()
+      .valid("USD", "EUR", "GBP", "NGN", "KES", "GHS")
+      .default("USD"),
+
+    payRateType: Joi.string()
+      .valid("per_task", "per_hour", "per_project", "per_annotation")
+      .default("per_task"),
+
+    // Project settings
+    status: Joi.string()
+      .valid("draft", "active", "paused", "completed", "cancelled")
+      .default("active"),
+
+    maxAnnotators: Joi.number().integer().min(1).allow(null),
+
+    deadline: Joi.date().greater("now").allow(null),
+
+    estimatedDuration: Joi.string().allow(null, ""),
+
+    difficultyLevel: Joi.string()
+      .valid("beginner", "intermediate", "advanced", "expert")
+      .default("intermediate"),
+
+    // Requirements
+    requiredSkills: Joi.array().items(Joi.string()).default([]),
+
+    minimumExperience: Joi.string()
+      .valid("none", "beginner", "intermediate", "advanced")
+      .default("none"),
+
+    languageRequirements: Joi.array().items(Joi.string()).default([]),
+
+    // Project visibility & metadata
+    tags: Joi.array().items(Joi.string()).default([]),
+
+    isPublic: Joi.boolean().default(true),
+
+    applicationDeadline: Joi.date().greater("now").allow(null),
+
+    // Guideline & resource links
+    projectGuidelineLink: Joi.string().uri().required(),
+
+    projectGuidelineVideo: Joi.string().uri().allow(null, ""),
+
+    projectCommunityLink: Joi.string().uri().allow(null, ""),
+
+    projectTrackerLink: Joi.string().uri().allow(null, ""),
+
+    // Assessment config (optional)
+    assessment: Joi.object({
+      isRequired: Joi.boolean().default(false),
+
+      assessmentId: Joi.string()
+        .regex(/^[0-9a-fA-F]{24}$/)
+        .allow(null),
+
+      assessmentInstructions: Joi.string().max(1000).allow("", null),
+
+      attachedAt: Joi.date().allow(null),
+
+      attachedBy: Joi.string()
+        .regex(/^[0-9a-fA-F]{24}$/)
+        .allow(null)
+    }).optional()
   });
 
   static updateProjectSchema = Joi.object({
-    projectName: Joi.string().trim(),
-    projectDescription: Joi.string().trim(),
-    projectCategory: Joi.string(),
+    // Basic project info
+    projectName: Joi.string().trim().max(200),
+
+    projectDescription: Joi.string().trim().max(2000),
+
+    projectCategory: Joi.string().valid(
+      "Text Annotation",
+      "Image Annotation",
+      "Audio Annotation",
+      "Video Annotation",
+      "Data Labeling",
+      "Content Moderation",
+      "Transcription",
+      "Translation",
+      "Sentiment Analysis",
+      "Entity Recognition",
+      "Classification",
+      "Object Detection",
+      "Semantic Segmentation",
+      "Survey Research",
+      "Data Entry",
+      "Quality Assurance",
+      "Other"
+    ),
+
     payRate: Joi.number().min(0),
-    status: Joi.string().valid('open', 'closed', 'in_progress', 'completed'),
-    maxAnnotators: Joi.number().integer().min(1),
-    requirements: Joi.array().items(Joi.string()),
+
+    payRateCurrency: Joi.string().valid("USD", "EUR", "GBP", "NGN", "KES", "GHS"),
+
+    payRateType: Joi.string().valid(
+      "per_task",
+      "per_hour",
+      "per_project",
+      "per_annotation"
+    ),
+
+    // Project settings
+    status: Joi.string().valid(
+      "draft",
+      "active",
+      "paused",
+      "completed",
+      "cancelled"
+    ),
+
+    maxAnnotators: Joi.number().integer().min(1).allow(null),
+
+    deadline: Joi.date().greater("now").allow(null),
+
+    estimatedDuration: Joi.string().allow(null, ""),
+
+    difficultyLevel: Joi.string().valid(
+      "beginner",
+      "intermediate",
+      "advanced",
+      "expert"
+    ),
+
+    // Requirements
+    requiredSkills: Joi.array().items(Joi.string()),
+
+    minimumExperience: Joi.string().valid(
+      "none",
+      "beginner",
+      "intermediate",
+      "advanced"
+    ),
+
+    languageRequirements: Joi.array().items(Joi.string()),
+
+    // Metadata & visibility
     tags: Joi.array().items(Joi.string()),
-    projectGuidelineLink: Joi.string().uri().allow(''),
-    projectGuidelineVideo: Joi.string().uri().allow(''),
-    projectCommunityLink: Joi.string().uri().allow(''),
-    projectTrackerLink: Joi.string().uri().allow(''),
-    estimatedDuration: Joi.string().allow('')
-  });
+
+    isPublic: Joi.boolean(),
+
+    applicationDeadline: Joi.date().greater("now").allow(null),
+
+    // Guideline & resource links
+    projectGuidelineLink: Joi.string().uri().allow(null, ""),
+
+    projectGuidelineVideo: Joi.string().uri().allow(null, ""),
+
+    projectCommunityLink: Joi.string().uri().allow(null, ""),
+
+    projectTrackerLink: Joi.string().uri().allow(null, ""),
+
+    // Assessment update (optional)
+    assessment: Joi.object({
+      isRequired: Joi.boolean(),
+
+      assessmentId: Joi.string()
+        .regex(/^[0-9a-fA-F]{24}$/)
+        .allow(null),
+
+      assessmentInstructions: Joi.string().max(1000).allow("", null),
+
+      attachedAt: Joi.date().allow(null),
+
+      attachedBy: Joi.string()
+        .regex(/^[0-9a-fA-F]{24}$/)
+        .allow(null)
+    }).optional()
+  })
+    .min(1);
 
   static removeApplicantSchema = Joi.object({
     removalReason: Joi.string().required().valid(
