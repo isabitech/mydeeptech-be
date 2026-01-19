@@ -1,31 +1,31 @@
-const axios = require('axios');
-const { extractYouTubeVideoData, validateYouTubeUrl, extractVideoId } = require('./youTubeService');
+import axios from 'axios';
+import { extractYouTubeVideoData, validateYouTubeUrl, extractVideoId } from './youTubeService.js';
 
 /**
  * Process YouTube Shorts video for assessment system
  * @param {string} youtubeUrl - YouTube Shorts URL
  * @returns {Object} Processed video data
  */
-const processYouTubeVideo = async (youtubeUrl) => {
+export const processYouTubeVideo = async (youtubeUrl) => {
     try {
         console.log('🎬 Processing YouTube video:', youtubeUrl);
-        
+
         // Validate URL
         if (!validateYouTubeUrl(youtubeUrl)) {
             throw new Error('Invalid YouTube URL format');
         }
-        
+
         // Extract video data
         const videoData = await extractYouTubeVideoData(youtubeUrl);
         if (!videoData) {
             throw new Error('Failed to extract video data from YouTube');
         }
-        
+
         // Validate it's suitable for assessment (duration check)
         if (videoData.duration > 60) {
             console.warn('⚠️ Video duration exceeds 60 seconds, may not be optimal for assessment');
         }
-        
+
         return {
             success: true,
             data: {
@@ -61,7 +61,7 @@ const processYouTubeVideo = async (youtubeUrl) => {
  * @param {string} quality - Thumbnail quality (default, mqdefault, hqdefault, maxresdefault)
  * @returns {string} Thumbnail URL
  */
-const generateYouTubeThumbnail = (videoId, quality = 'hqdefault') => {
+export const generateYouTubeThumbnail = (videoId, quality = 'hqdefault') => {
     return `https://img.youtube.com/vi/${videoId}/${quality}.jpg`;
 };
 
@@ -70,27 +70,27 @@ const generateYouTubeThumbnail = (videoId, quality = 'hqdefault') => {
  * @param {Object} videoData - Video data from YouTube API
  * @returns {Object} Validation result
  */
-const validateVideoForAssessment = (videoData) => {
+export const validateVideoForAssessment = (videoData) => {
     const issues = [];
     const recommendations = [];
-    
+
     // Check duration
     if (videoData.duration > 60) {
         issues.push('Video exceeds 60 seconds maximum for Shorts');
     } else if (videoData.duration < 10) {
         recommendations.push('Very short video may not provide enough context for assessment');
     }
-    
+
     // Check aspect ratio
     if (videoData.aspectRatio !== 'portrait') {
         recommendations.push('Portrait aspect ratio (9:16) is recommended for mobile viewing');
     }
-    
+
     // Check engagement metrics (if available)
     if (videoData.viewCount < 100) {
         recommendations.push('Low view count may indicate poor quality content');
     }
-    
+
     return {
         isValid: issues.length === 0,
         issues,
@@ -104,7 +104,7 @@ const validateVideoForAssessment = (videoData) => {
  * @param {string} url - YouTube URL
  * @returns {string|null} Video ID or null if invalid
  */
-const extractYouTubeVideoId = (url) => {
+export const extractYouTubeVideoId = (url) => {
     return extractVideoId(url);
 };
 
@@ -113,9 +113,9 @@ const extractYouTubeVideoId = (url) => {
  * @param {Array<string>} urls - Array of YouTube URLs
  * @returns {Array<Object>} Processing results for each URL
  */
-const batchProcessYouTubeVideos = async (urls) => {
+export const batchProcessYouTubeVideos = async (urls) => {
     const results = [];
-    
+
     for (const url of urls) {
         try {
             const result = await processYouTubeVideo(url);
@@ -123,7 +123,7 @@ const batchProcessYouTubeVideos = async (urls) => {
                 url,
                 ...result
             });
-            
+
             // Rate limiting delay
             await new Promise(resolve => setTimeout(resolve, 200));
         } catch (error) {
@@ -135,7 +135,7 @@ const batchProcessYouTubeVideos = async (urls) => {
             });
         }
     }
-    
+
     return results;
 };
 

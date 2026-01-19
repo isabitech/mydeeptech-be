@@ -1,10 +1,10 @@
-const { Server } = require('socket.io');
-const jwt = require('jsonwebtoken');
-const SupportTicket = require('../models/supportTicket.model');
-const DTUser = require('../models/dtUser.model');
-const User = require('../models/user');
-const { createNotification } = require('./notificationService');
-const { sendNewTicketNotificationToAdmin, sendTicketStatusUpdateEmail } = require('./supportEmailTemplates');
+import { Server } from 'socket.io';
+import jwt from 'jsonwebtoken';
+import SupportTicket from '../models/supportTicket.model.js';
+import DTUser from '../models/dtUser.model.js';
+import User from '../models/user.js';
+import { createNotification } from './notificationService.js';
+import { sendNewTicketNotificationToAdmin, sendTicketStatusUpdateEmail } from './supportEmailTemplates.js';
 
 let io;
 const connectedUsers = new Map(); // Track online users: { userId: socketId }
@@ -32,12 +32,12 @@ const initializeSocketIO = (server) => {
       }
 
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      
+
       // Check if it's a user or admin
       let user = await DTUser.findById(decoded.userId);
       let userType = 'dtuser';
-      let isAdmin = false;
-      
+      let isAdminValue = false;
+
       if (!user) {
         user = await User.findById(decoded.userId);
         userType = 'user';
@@ -47,15 +47,15 @@ const initializeSocketIO = (server) => {
         return next(new Error('User not found'));
       }
 
-      // Check if user is admin by email domain
-      isAdmin = user.email && user.email.includes('@mydeeptech.ng');
+      // Check if user is admin by role (from database)
+      isAdminValue = user.role === 'ADMIN';
 
       socket.userId = decoded.userId;
       socket.userType = userType;
-      socket.isAdmin = isAdmin;
+      socket.isAdmin = isAdminValue;
       socket.userEmail = user.email;
       socket.userName = user.fullName || user.username;
-      
+
       next();
     } catch (error) {
       next(new Error('Authentication error'));
@@ -64,7 +64,7 @@ const initializeSocketIO = (server) => {
 
   io.on('connection', (socket) => {
     console.log(`🔗 User connected: ${socket.userName} (${socket.userId})`);
-    
+
     // Track connected users/admins
     if (socket.isAdmin) {
       connectedAdmins.set(socket.userId, socket.id);
@@ -116,7 +116,7 @@ const initializeSocketIO = (server) => {
     socket.on('get_chat_history', async (data) => {
       try {
         const { ticketId } = data;
-        
+
         const ticket = await SupportTicket.findOne({
           _id: ticketId,
           userId: socket.userId,
@@ -152,7 +152,7 @@ const initializeSocketIO = (server) => {
     socket.on('rejoin_ticket', async (data) => {
       try {
         const { ticketId } = data;
-        
+
         const ticket = await SupportTicket.findOne({
           _id: ticketId,
           userId: socket.userId,
@@ -197,14 +197,14 @@ const initializeSocketIO = (server) => {
         if (existingTicket) {
           // Join existing chat ticket room
           socket.join(`ticket_${existingTicket._id}`);
-          
+
           socket.emit('chat_started', {
             ticketId: existingTicket._id,
             ticketNumber: existingTicket.ticketNumber,
             messages: existingTicket.messages,
             status: existingTicket.status
           });
-          
+
           return;
         }
 
@@ -384,7 +384,7 @@ const initializeSocketIO = (server) => {
     socket.on('join_ticket', async (data) => {
       try {
         const { ticketId } = data;
-        
+
         if (!connectedAdmins.has(socket.userId)) {
           socket.emit('error', { message: 'Admin access required' });
           return;
@@ -498,9 +498,9 @@ const initializeSocketIO = (server) => {
           isChat: true,
           status: { $in: ['open', 'in_progress', 'waiting_for_user'] }
         })
-        .populate('userId', 'fullName email')
-        .populate('assignedTo', 'fullName')
-        .sort({ lastUpdated: -1 });
+          .populate('userId', 'fullName email')
+          .populate('assignedTo', 'fullName')
+          .sort({ lastUpdated: -1 });
 
         socket.emit('active_chats', activeChats);
 
@@ -513,7 +513,7 @@ const initializeSocketIO = (server) => {
     // Handle disconnect
     socket.on('disconnect', () => {
       console.log(`🔌 User disconnected: ${socket.userName}`);
-      
+
       if (socket.isAdmin) {
         connectedAdmins.delete(socket.userId);
       } else {
@@ -574,12 +574,20 @@ const broadcastToAdmins = (event, data) => {
   }
 };
 
-module.exports = {
+const closeSocketIO = () => {
+  if (io) {
+    io.close();
+    io = null;
+  }
+};
+
+export {
   initializeSocketIO,
   getIO,
   isAdminOnline,
   isUserOnline,
   getOnlineAdminsCount,
   sendNotificationToUser,
-  broadcastToAdmins
+  broadcastToAdmins,
+  closeSocketIO
 };

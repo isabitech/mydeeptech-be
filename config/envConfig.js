@@ -1,0 +1,85 @@
+import dotenv from "dotenv";
+import { envSchema } from "./_schemas/envSchema.js";
+
+// Default to development if NODE_ENV is not set
+const nodeEnv = process.env.NODE_ENV || "development";
+const envFile = nodeEnv === "development" ? ".env.development" : ".env";
+
+// Load environment variables from the appropriate file
+dotenv.config({ path: envFile });
+
+// Validate environment variables with Joi
+const { value: env, error } = envSchema.validate(process.env, {
+  abortEarly: false,
+});
+
+
+if (error) {
+  throw new Error(
+    `Environment validation error:\n${error.details
+      .map((d) => `- ${d.message}`)
+      .join("\n")}`
+  );
+}
+
+const envConfig = {
+  PORT: env.PORT,
+
+  mongo: {
+    OLD_MONGO_URI: env.OLD_MONGO_URI,
+    MONGO_URI: env.MONGO_URI,
+    NEW_MONGODB_PASSWORD: env.NEW_MONGODB_PASSWORD,
+  },
+
+  jwt: {
+    JWT_SECRET: env.JWT_SECRET,
+  },
+
+  email: {
+    brevo: {
+      BREVO_API_KEY: env.BREVO_API_KEY,
+      BREVO_SENDER_EMAIL: env.BREVO_SENDER_EMAIL,
+      BREVO_SENDER_NAME: env.BREVO_SENDER_NAME,
+      BREVO_PROJECT_SENDER_EMAIL: env.BREVO_PROJECT_SENDER_EMAIL,
+      BREVO_PROJECT_SENDER_NAME: env.BREVO_PROJECT_SENDER_NAME,
+      SMTP_SERVER: env.SMTP_SERVER,
+      SMTP_PORT: env.SMTP_PORT,
+      SMTP_LOGIN: env.SMTP_LOGIN,
+      SMTP_KEY: env.SMTP_KEY,
+    },
+    legacy: {
+      EMAIL_USER: env.EMAIL_USER,
+      EMAIL_PASS: env.EMAIL_PASS,
+    },
+  },
+
+  redis: {
+    HOST: env.REDIS_HOST,
+    PORT: env.REDIS_PORT,
+    PASSWORD: env.REDIS_PASSWORD,
+    DB: env.REDIS_DB,
+  },
+
+  admin: {
+    NAME: env.NEW_ADMIN_NAME,
+    EMAIL: env.NEW_ADMIN_EMAIL,
+    PHONE: env.NEW_ADMIN_PHONE,
+    PASSWORD: env.NEW_ADMIN_PASSWORD,
+    CREATION_KEY: env.ADMIN_CREATION_KEY,
+  },
+
+  cloudinary: {
+    CLOUD_NAME: env.CLOUDINARY_CLOUD_NAME,
+    API_KEY: env.CLOUDINARY_API_KEY,
+    API_SECRET: env.CLOUDINARY_API_SECRET,
+  },
+
+  YOUTUBE_API_KEY: env.YOUTUBE_API_KEY,
+  ip: env.ip,
+  EXCHANGE_RATE_API_KEY: env.EXCHANGE_RATE_API_KEY,
+  EXCHANGE_RATES_API_KEY: env.EXCHANGE_RATES_API_KEY,
+
+ NODE_ENV: env.NODE_ENV || nodeEnv
+};
+
+export default envConfig;

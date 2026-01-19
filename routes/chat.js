@@ -1,6 +1,10 @@
-const express = require('express');
-const { authenticateToken } = require('../middleware/auth.js');
-const { authenticateAdmin } = require('../middleware/adminAuth.js');
+import express from 'express';
+import { authenticateToken } from '../middleware/auth.js';
+import { authenticateAdmin } from '../middleware/adminAuth.js';
+import chatSupportController from '../controller/chatSupport.controller.js';
+import tryCatch from '../utils/tryCatch.js';
+const router = express.Router();
+
 const {
   startChatSession,
   getActiveChats,
@@ -10,9 +14,7 @@ const {
   joinChatAsAdmin,
   closeChatSession,
   getChatTicketById
-} = require('../controller/chatSupport.controller.js');
-
-const router = express.Router();
+} = chatSupportController;
 
 // ======================
 // USER CHAT ROUTES
@@ -22,31 +24,31 @@ const router = express.Router();
  * Start a new chat session (creates ticket if none exists)
  * POST /api/chat/start
  */
-router.post('/start', authenticateToken, startChatSession);
+router.post('/start', authenticateToken, tryCatch(startChatSession));
 
 /**
  * Get active chat sessions for user
  * GET /api/chat/active
  */
-router.get('/active', authenticateToken, getActiveChats);
+router.get('/active', authenticateToken, tryCatch(getActiveChats));
 
 /**
  * Get chat history for user
  * GET /api/chat/history
  */
-router.get('/history', authenticateToken, getChatHistory);
+router.get('/history', authenticateToken, tryCatch(getChatHistory));
 
 /**
  * Send chat message (REST fallback for non-WebSocket clients)
  * POST /api/chat/:ticketId/message
  */
-router.post('/:ticketId/message', authenticateToken, sendChatMessage);
+router.post('/:ticketId/message', authenticateToken, tryCatch(sendChatMessage));
 
 /**
  * Get specific chat ticket details
  * GET /api/chat/:ticketId
  */
-router.get('/:ticketId', authenticateToken, getChatTicketById);
+router.get('/:ticketId', authenticateToken, tryCatch(getChatTicketById));
 
 // ======================
 // ADMIN CHAT ROUTES
@@ -56,7 +58,7 @@ router.get('/:ticketId', authenticateToken, getChatTicketById);
  * Get all active chat tickets (admin only)
  * GET /api/chat/admin/active
  */
-router.get('/admin/active', authenticateAdmin, getActiveChatTickets);
+router.get('/admin/active', authenticateAdmin, tryCatch(getActiveChatTickets));
 
 /**
  * Join chat as admin (REST endpoint)
@@ -68,6 +70,6 @@ router.post('/admin/join/:ticketId', authenticateAdmin, joinChatAsAdmin);
  * Close chat session (admin only)
  * POST /api/chat/admin/close/:ticketId
  */
-router.post('/admin/close/:ticketId', authenticateAdmin, closeChatSession);
+router.post('/admin/close/:ticketId', authenticateAdmin, tryCatch(closeChatSession));
 
-module.exports = router;
+export default router;

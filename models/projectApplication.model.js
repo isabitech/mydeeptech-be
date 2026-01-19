@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const projectApplicationSchema = new mongoose.Schema(
   {
@@ -13,7 +13,7 @@ const projectApplicationSchema = new mongoose.Schema(
       ref: "DTUser",
       required: true
     },
-    
+
     // Application status and timeline
     status: {
       type: String,
@@ -68,7 +68,7 @@ const projectApplicationSchema = new mongoose.Schema(
       type: String,
       enum: [
         "insufficient_experience",
-        "not_suitable_skills", 
+        "not_suitable_skills",
         "project_full",
         "application_quality",
         "availability_mismatch",
@@ -123,7 +123,7 @@ const projectApplicationSchema = new mongoose.Schema(
       enum: [
         "performance_issues",
         "project_cancelled",
-        "violates_guidelines", 
+        "violates_guidelines",
         "unavailable",
         "quality_concerns",
         "admin_decision",
@@ -191,11 +191,12 @@ projectApplicationSchema.virtual('reviewer', {
 projectApplicationSchema.set('toJSON', { virtuals: true });
 
 // Pre-save middleware to update timestamps
-projectApplicationSchema.pre('save', function(next) {
+projectApplicationSchema.pre('save', function (next) {
   if (this.isModified('status') && this.status !== 'pending') {
     this.reviewedAt = new Date();
   }
   next();
 });
 
-module.exports = mongoose.model("ProjectApplication", projectApplicationSchema);
+const ProjectApplication = mongoose.model("ProjectApplication", projectApplicationSchema);
+export default ProjectApplication;

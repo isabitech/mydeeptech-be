@@ -1,45 +1,45 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
 const dtUserSchema = new mongoose.Schema(
   {
     // Basic registration fields
-    fullName: { 
-        type: String, 
-        required: true 
+    fullName: {
+      type: String,
+      required: true
     },
-    phone: { 
-        type: String, 
-        required: true 
+    phone: {
+      type: String,
+      required: true
     },
-    email: { 
-        type: String, 
-        required: true, 
-        unique: true 
+    email: {
+      type: String,
+      required: true,
+      unique: true
     },
-    domains: { 
-        type: [String], 
-        default: [] 
+    domains: {
+      type: [String],
+      default: []
     },
-    socialsFollowed: { 
-        type: [String], 
-        default: [] 
+    socialsFollowed: {
+      type: [String],
+      default: []
     },
-    consent: { 
-        type: Boolean, 
-        required: true 
+    consent: {
+      type: Boolean,
+      required: true
     },
 
     // Authentication fields
-    password: { 
-      type: String, 
-      default: null 
+    password: {
+      type: String,
+      default: null
     },
-    hasSetPassword: { 
-      type: Boolean, 
-      default: false 
+    hasSetPassword: {
+      type: Boolean,
+      default: false
     },
     isEmailVerified: { type: Boolean, default: false },
-    
+
     // Password reset fields
     passwordResetToken: {
       type: String,
@@ -96,14 +96,14 @@ const dtUserSchema = new mongoose.Schema(
         format: { type: String, default: "" }
       },
       submissionDate: { type: Date, default: Date.now },
-      projectId: { 
+      projectId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "AnnotationProject",
         default: null
       },
       taskId: { type: String, default: "" }, // For future task tracking
-      status: { 
-        type: String, 
+      status: {
+        type: String,
         enum: ["pending", "processing", "stored", "failed"],
         default: "pending"
       },
@@ -120,10 +120,10 @@ const dtUserSchema = new mongoose.Schema(
       country: { type: String, default: "" },
       time_zone: { type: String, default: "" },
       available_hours_per_week: { type: Number, default: 0 },
-      preferred_communication_channel: { 
-        type: String, 
+      preferred_communication_channel: {
+        type: String,
         enum: ["email", "phone", "whatsapp", "telegram", "slack", ""],
-        default: "" 
+        default: ""
       }
     },
 
@@ -132,23 +132,23 @@ const dtUserSchema = new mongoose.Schema(
       account_number: { type: String, default: "" },
       bank_name: { type: String, default: "" },
       bank_code: { type: String, default: "" }, // For Paystack integration
-      payment_method: { 
-        type: String, 
+      payment_method: {
+        type: String,
         enum: ["bank_transfer", "paypal", "crypto", "mobile_money", ""],
-        default: "" 
+        default: ""
       },
-      payment_currency: { 
-        type: String, 
+      payment_currency: {
+        type: String,
         enum: ["USD", "EUR", "GBP", "NGN", "KES", "GHS", ""],
-        default: "" 
+        default: ""
       }
     },
 
     professional_background: {
       education_field: { type: String, default: "" },
       years_of_experience: { type: Number, default: 0 },
-      annotation_experience_types: { 
-        type: [String], 
+      annotation_experience_types: {
+        type: [String],
         default: [],
         enum: ["text_annotation", "image_annotation", "audio_annotation", "video_annotation", "data_labeling", "content_moderation", "transcription", "translation"]
       }
@@ -169,23 +169,23 @@ const dtUserSchema = new mongoose.Schema(
     language_proficiency: {
       primary_language: { type: String, default: "" },
       other_languages: { type: [String], default: [] },
-      english_fluency_level: { 
-        type: String, 
+      english_fluency_level: {
+        type: String,
         enum: ["basic", "intermediate", "advanced", "native", ""],
-        default: "" 
+        default: ""
       }
     },
 
     system_info: {
-      device_type: { 
-        type: String, 
+      device_type: {
+        type: String,
         enum: ["desktop", "laptop", "tablet", "mobile", ""],
-        default: "" 
+        default: ""
       },
-      operating_system: { 
-        type: String, 
+      operating_system: {
+        type: String,
         enum: ["windows", "macos", "linux", "android", "ios", ""],
-        default: "" 
+        default: ""
       },
       internet_speed_mbps: { type: Number, default: 0 },
       power_backup: { type: Boolean, default: false },
@@ -195,10 +195,10 @@ const dtUserSchema = new mongoose.Schema(
 
     project_preferences: {
       domains_of_interest: { type: [String], default: [] },
-      availability_type: { 
-        type: String, 
+      availability_type: {
+        type: String,
         enum: ["full_time", "part_time", "project_based", "flexible", ""],
-        default: "" 
+        default: ""
       },
       nda_signed: { type: Boolean, default: false }
     },
@@ -220,4 +220,12 @@ const dtUserSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("DTUser", dtUserSchema);
+// Indexes for better query performance
+dtUserSchema.index({ email: 1 });
+dtUserSchema.index({ annotatorStatus: 1 });
+dtUserSchema.index({ microTaskerStatus: 1 });
+dtUserSchema.index({ qaStatus: 1 });
+dtUserSchema.index({ isEmailVerified: 1 });
+
+const DTUser = mongoose.model("DTUser", dtUserSchema);
+export default DTUser;

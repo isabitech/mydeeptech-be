@@ -43,7 +43,7 @@
       "name": "Authentication",
       "item": [
         {
-          "name": "Register User",
+          "name": "Register DT User",
           "request": {
             "method": "POST",
             "header": [
@@ -54,19 +54,105 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fullName\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"phone\": \"+1234567890\",\n  \"consent\": true,\n  \"domains\": [\"technology\", \"healthcare\"]\n}"
+              "raw": "{\n  \"fullName\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"phone\": \"+1234567890\",\n  \"consent\": true,\n  \"domains\": [\"Text Annotation\", \"Image Annotation\"],\n  \"socialsFollowed\": [\"Twitter\", \"LinkedIn\"]\n}"
             },
             "url": {
-              "raw": "{{base_url}}/auth/dtUserRegister",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "dtUserRegister"]
+              "raw": "{{base_url}}/auth/createDTuser",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "createDTuser"
+              ]
             },
-            "description": "Register a new user account"
+            "description": "Register a new DT User account. Triggers a verification email."
           },
           "response": []
         },
         {
-          "name": "Login User",
+          "name": "Verify Email",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/verifyDTusermail/{{user_id}}?email=john@example.com",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "verifyDTusermail",
+                "{{user_id}}"
+              ],
+              "query": [
+                {
+                  "key": "email",
+                  "value": "john@example.com"
+                }
+              ]
+            },
+            "description": "Verify user email using the ID and email from the verification link."
+          },
+          "response": []
+        },
+        {
+          "name": "Resend Verification Email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/resendVerificationEmail",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "resendVerificationEmail"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Setup Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{user_id}}\",\n  \"email\": \"john@example.com\",\n  \"password\": \"securePassword123\",\n  \"confirmPassword\": \"securePassword123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/setupPassword",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "setupPassword"
+              ]
+            },
+            "description": "Set up password after email verification."
+          },
+          "response": []
+        },
+        {
+          "name": "Login DT User",
           "event": [
             {
               "listen": "test",
@@ -76,7 +162,7 @@
                   "    const response = pm.response.json();",
                   "    if (response.token) {",
                   "        pm.collectionVariables.set('jwt_token', response.token);",
-                  "        pm.collectionVariables.set('user_id', response.user._id);",
+                  "        pm.collectionVariables.set('user_id', response.user.id);",
                   "        console.log('JWT token saved:', response.token.substring(0, 20) + '...');",
                   "    }",
                   "}"
@@ -98,20 +184,79 @@
             },
             "url": {
               "raw": "{{base_url}}/auth/dtUserLogin",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "dtUserLogin"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "dtUserLogin"
+              ]
             },
-            "description": "Login user and get JWT token"
+            "description": "Login DT User and get JWT token."
+          },
+          "response": []
+        },
+        {
+          "name": "Forgot Password (DT User)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/dtuser-forgot-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "dtuser-forgot-password"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reset Password (DT User)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"abc-123\",\n  \"newPassword\": \"newSecurePassword123\",\n  \"confirmPassword\": \"newSecurePassword123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/dtuser-reset-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "dtuser-reset-password"
+              ]
+            }
           },
           "response": []
         }
       ]
     },
     {
-      "name": "File Upload",
+      "name": "File Upload & Media",
       "item": [
         {
-          "name": "Upload Resume (Required for Applications)",
+          "name": "Upload Resume",
           "request": {
             "method": "POST",
             "header": [
@@ -133,8 +278,13 @@
             },
             "url": {
               "raw": "{{base_url}}/auth/upload-resume",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "upload-resume"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "upload-resume"
+              ]
             },
             "description": "Upload resume - REQUIRED before applying to projects"
           },
@@ -157,16 +307,54 @@
                   "key": "idDocument",
                   "type": "file",
                   "src": "",
-                  "description": "ID document file (PDF, JPG, PNG)"
+                  "description": "ID document file"
                 }
               ]
             },
             "url": {
               "raw": "{{base_url}}/auth/upload-id-document",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "upload-id-document"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "upload-id-document"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Upload General Image",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
             },
-            "description": "Upload identification document"
+            "url": {
+              "raw": "{{base_url}}/media/upload/image",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "media",
+                "upload",
+                "image"
+              ]
+            }
           },
           "response": []
         }
@@ -184,9 +372,8 @@
                 "exec": [
                   "if (pm.response.code === 200) {",
                   "    const response = pm.response.json();",
-                  "    if (response.data.projects && response.data.projects.length > 0) {",
-                  "        pm.collectionVariables.set('project_id', response.data.projects[0]._id);",
-                  "        console.log('Project ID saved:', response.data.projects[0]._id);",
+                  "    if (response.data && response.data.length > 0) {",
+                  "        pm.collectionVariables.set('project_id', response.data[0]._id);",
                   "    }",
                   "}"
                 ]
@@ -202,9 +389,14 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/auth/projects/available?page=1&limit=10",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "projects", "available"],
+              "raw": "{{base_url}}/auth/projects?page=1&limit=10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "projects"
+              ],
               "query": [
                 {
                   "key": "page",
@@ -221,7 +413,7 @@
           "response": []
         },
         {
-          "name": "Apply to Project (Requires Resume)",
+          "name": "Apply to Project",
           "request": {
             "method": "POST",
             "header": [
@@ -236,52 +428,25 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"coverLetter\": \"I am interested in contributing to this annotation project. I have experience in data annotation and would like to participate.\",\n  \"proposedRate\": 15,\n  \"availability\": \"part_time\",\n  \"estimatedCompletionTime\": \"2 weeks\"\n}"
+              "raw": "{\n  \"coverLetter\": \"I am interested in contributing to this annotation project.\",\n  \"proposedRate\": 15,\n  \"availability\": \"part_time\",\n  \"estimatedCompletionTime\": \"2 weeks\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/auth/projects/{{project_id}}/apply",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "projects", "{{project_id}}", "apply"]
-            },
-            "description": "Apply to a project - REQUIRES resume to be uploaded first"
-          },
-          "response": [
-            {
-              "name": "Resume Required Error",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Authorization",
-                    "value": "Bearer {{jwt_token}}"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"coverLetter\": \"Test application\"\n}"
-                },
-                "url": {
-                  "raw": "{{base_url}}/auth/projects/{{project_id}}/apply",
-                  "host": ["{{base_url}}"],
-                  "path": ["auth", "projects", "{{project_id}}", "apply"]
-                }
-              },
-              "status": "Bad Request",
-              "code": 400,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
+              "host": [
+                "{{base_url}}"
               ],
-              "cookie": [],
-              "body": "{\n  \"success\": false,\n  \"message\": \"Please upload your resume in your profile section\",\n  \"error\": {\n    \"code\": \"RESUME_REQUIRED\",\n    \"reason\": \"A resume is required to apply to projects\",\n    \"action\": \"Upload your resume in the profile section before applying\"\n  }\n}"
+              "path": [
+                "auth",
+                "projects",
+                "{{project_id}}",
+                "apply"
+              ]
             }
-          ]
+          },
+          "response": []
         },
         {
-          "name": "Get Project Guidelines (Approved Users Only)",
+          "name": "Get Project Guidelines",
           "request": {
             "method": "GET",
             "header": [
@@ -292,10 +457,40 @@
             ],
             "url": {
               "raw": "{{base_url}}/auth/projects/{{project_id}}/guidelines",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "projects", "{{project_id}}", "guidelines"]
-            },
-            "description": "Access project guidelines and resources (only for approved applicants)"
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "projects",
+                "{{project_id}}",
+                "guidelines"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get User Active Projects",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/activeProjects/{{user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "activeProjects",
+                "{{user_id}}"
+              ]
+            }
           },
           "response": []
         }
@@ -315,9 +510,15 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/auth/dtUserProfile",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "dtUserProfile"]
+              "raw": "{{base_url}}/auth/dtUserProfile/{{user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "dtUserProfile",
+                "{{user_id}}"
+              ]
             },
             "description": "Get current user profile information"
           },
@@ -326,7 +527,7 @@
         {
           "name": "Update User Profile",
           "request": {
-            "method": "PUT",
+            "method": "PATCH",
             "header": [
               {
                 "key": "Authorization",
@@ -339,14 +540,444 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"personal_info\": {\n    \"country\": \"United States\",\n    \"time_zone\": \"America/New_York\",\n    \"available_hours_per_week\": 20\n  },\n  \"professional_background\": {\n    \"education_field\": \"Computer Science\",\n    \"years_of_experience\": 3\n  }\n}"
+              "raw": "{\n  \"personalInfo\": {\n    \"country\": \"Nigeria\",\n    \"timeZone\": \"Africa/Lagos\",\n    \"availableHoursPerWeek\": 30\n  },\n  \"professionalBackground\": {\n    \"educationField\": \"Computer Science\",\n    \"yearsOfExperience\": 2\n  }\n}"
             },
             "url": {
-              "raw": "{{base_url}}/auth/dtUserProfile",
-              "host": ["{{base_url}}"],
-              "path": ["auth", "dtUserProfile"]
+              "raw": "{{base_url}}/auth/dtUserProfile/{{user_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "dtUserProfile",
+                "{{user_id}}"
+              ]
             },
-            "description": "Update user profile information"
+            "description": "Update user profile information using PATCH"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Admin Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@mydeeptech.ng\",\n  \"password\": \"adminPassword123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/admin/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Admin Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/dashboard",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "dashboard"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "User Management",
+          "item": [
+            {
+              "name": "Get All DT Users",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin/dtusers",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "dtusers"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Approve Annotator",
+              "request": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin/dtusers/{{user_id}}/approve",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "dtusers",
+                    "{{user_id}}",
+                    "approve"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Project Management",
+          "item": [
+            {
+              "name": "Create Project",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"projectName\": \"New Data Project\",\n  \"projectDescription\": \"Description of the project\",\n  \"projectCategory\": \"Text Annotation\",\n  \"payRate\": 10,\n  \"payRateCurrency\": \"USD\",\n  \"projectGuidelineLink\": \"https://example.com/guidelines\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/admin/projects",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "projects"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "Application Management",
+          "item": [
+            {
+              "name": "Get All Applications",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin/applications?status=pending",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "applications"
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "pending"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Bulk Reject Applications",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"applicationIds\": [\"app_id_1\", \"app_id_2\"],\n  \"rejectionReason\": \"Does not meet quality standards\",\n  \"reviewNotes\": \"Multiple errors found in the entry tasks.\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/admin/applications/bulk-reject",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "applications",
+                    "bulk-reject"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Approved Applicants",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin/projects/{{project_id}}/approved-applicants",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "admin",
+                    "projects",
+                    "{{project_id}}",
+                    "approved-applicants"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Assessments",
+      "item": [
+        {
+          "name": "Get Available Assessments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/assessments/available",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "assessments",
+                "available"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Start Assessment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/assessments/start/english-proficiency",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "assessments",
+                "start",
+                "english-proficiency"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Get Notification Summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/notifications/summary",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "notifications",
+                "summary"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Notifications",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/notifications",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "notifications"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Support",
+      "item": [
+        {
+          "name": "Create Support Ticket",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"Issue with assessment\",\n  \"message\": \"I am unable to start the multimedia assessment.\",\n  \"category\": \"Technical Issue\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/support/tickets",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "support",
+                "tickets"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get My Tickets",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/support/tickets",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "support",
+                "tickets"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Chat",
+      "item": [
+        {
+          "name": "Start Chat Session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/chat/start",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "chat",
+                "start"
+              ]
+            }
           },
           "response": []
         }

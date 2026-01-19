@@ -1,15 +1,16 @@
-const brevo = require('@getbrevo/brevo');
+import brevo from '@getbrevo/brevo';
+import envConfig from '../config/envConfig.js';
 
 // Initialize Brevo API client (using modern API configuration like paymentMailer.js)
 const apiInstance = new brevo.TransactionalEmailsApi();
-apiInstance.setApiKey(brevo.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY);
+apiInstance.setApiKey(brevo.TransactionalEmailsApiApiKeys.apiKey, envConfig.email.brevo.BREVO_API_KEY);
 
 // Validate Brevo configuration
-if (!process.env.BREVO_API_KEY) {
+if (!envConfig.email.brevo.BREVO_API_KEY) {
   console.error("❌ Brevo API key missing. Please set BREVO_API_KEY in your .env file");
 }
 
-if (!process.env.BREVO_SENDER_EMAIL) {
+if (!envConfig.email.brevo.BREVO_SENDER_EMAIL) {
   console.error("❌ Brevo sender email missing. Please set BREVO_SENDER_EMAIL in your .env file");
 }
 
@@ -17,7 +18,7 @@ const sendVerificationEmailBrevo = async (email, name, userId) => {
   try {
     // Use modern SendSmtpEmail initialization (consistent with paymentMailer.js)
     const sendSmtpEmail = new brevo.SendSmtpEmail();
-    
+
     // Configure email content
     sendSmtpEmail.subject = "Verify Your Email Address - MyDeepTech";
     sendSmtpEmail.htmlContent = `
@@ -74,42 +75,42 @@ const sendVerificationEmailBrevo = async (email, name, userId) => {
       
       © 2025 MyDeepTech. All rights reserved.
     `;
-    
+
     // Configure sender (consistent with other mailers)
     sendSmtpEmail.sender = {
-      name: process.env.BREVO_SENDER_NAME || "MyDeepTech Team",
-      email: process.env.BREVO_SENDER_EMAIL
+      name: envConfig.email.brevo.BREVO_SENDER_NAME || "MyDeepTech Team",
+      email: envConfig.email.brevo.BREVO_SENDER_EMAIL
     };
-    
+
     sendSmtpEmail.to = [{
       email: email,
       name: name
     }];
-    
+
     // Add tags for tracking
     sendSmtpEmail.tags = ["email-verification", "user-signup"];
-    
+
     // Send email using the properly configured API instance
     const result = await apiInstance.sendTransacEmail(sendSmtpEmail);
-    
+
     console.log(`✅ Brevo verification email sent to ${email}`, result.messageId);
-    
-    return { 
-      success: true, 
+
+    return {
+      success: true,
       messageId: result.messageId,
       provider: 'brevo-api'
     };
-    
+
   } catch (error) {
     console.error("❌ Error sending Brevo email:", error);
-    
+
     // Enhanced error handling for better debugging
     if (error.response && error.response.body) {
       const errorBody = error.response.body;
       console.error("Brevo API Error Details:", errorBody);
       throw new Error(`Brevo API Error: ${errorBody.message || errorBody.code || 'Unknown error'}`);
     }
-    
+
     throw new Error(`Failed to send verification email via Brevo API: ${error.message}`);
   }
 };
@@ -119,8 +120,8 @@ const testBrevoConnection = async () => {
   try {
     // Use AccountApi to test connection (same approach as paymentMailer.js pattern)
     const accountApi = new brevo.AccountApi();
-    accountApi.setApiKey(brevo.AccountApiApiKeys.apiKey, process.env.BREVO_API_KEY);
-    
+    accountApi.setApiKey(brevo.AccountApiApiKeys.apiKey, envConfig.email.brevo.BREVO_API_KEY);
+
     const account = await accountApi.getAccount();
     console.log("✅ Brevo API connection successful!", {
       email: account.email,
@@ -137,7 +138,7 @@ const testBrevoConnection = async () => {
   }
 };
 
-module.exports = { 
-  sendVerificationEmailBrevo, 
-  testBrevoConnection 
+export {
+  sendVerificationEmailBrevo,
+  testBrevoConnection
 };

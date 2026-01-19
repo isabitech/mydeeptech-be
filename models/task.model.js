@@ -1,7 +1,6 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const taskSchema = new mongoose.Schema({
-
     taskLink: {
         type: String,
         required: true,
@@ -10,7 +9,7 @@ const taskSchema = new mongoose.Schema({
                 return /^(http|https):\/\/[^\s$.?#].[^\s]*$/.test(v); // Regex for URL validation
             },
             message: props => `${props.value} is not a valid URL!`,
-    }
+        }
     },
     taskGuidelineLink: {
         type: String,
@@ -20,30 +19,28 @@ const taskSchema = new mongoose.Schema({
     taskName: {
         type: String,
         minlength: 4,
-        required: true 
+        required: true
     },
     createdBy: {
         type: String,
         minlength: 4,
-        required: true 
+        required: true
     },
-    dateCreated:{
+    dateCreated: {
         type: String,
         default: new Date().toJSON()
     },
     dueDate: {
-        type: Date, // Specifies the data type as Date
-        required: [true, 'Due date is required'], // Makes the field mandatory and provides a custom error message
-        validate: { // Adds custom validation logic for this field
-          validator: function (value) {
-            return value > Date.now(); // Ensure the due date is in the future
-          },
-          message: 'Due date must be in the future', // Error message shown if validation fails
+        type: Date,
+        required: [true, 'Due date is required'],
+        validate: {
+            validator: function (value) {
+                return value > Date.now();
+            },
+            message: 'Due date must be in the future',
         },
     }
-
 });
 
 const Task = mongoose.model('Task', taskSchema);
-
-module.exports = Task;
+export default Task;

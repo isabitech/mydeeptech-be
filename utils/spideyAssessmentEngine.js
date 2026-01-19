@@ -1,7 +1,10 @@
-const SpideyAssessmentStateMachine = require('./spideyAssessmentStateMachine');
-const SpideyStageExecutor = require('./spideyStageExecutor');
-const SpideyFileEnforcer = require('./spideyFileEnforcer');
-const mongoose = require('mongoose');
+import SpideyAssessmentStateMachine from './spideyAssessmentStateMachine.js';
+import SpideyStageExecutor from './spideyStageExecutor.js';
+import SpideyFileEnforcer from './spideyFileEnforcer.js';
+import SpideyAssessmentConfig from '../models/spideyAssessmentConfig.model.js';
+import SpideyAssessmentSubmission from '../models/spideyAssessmentSubmission.model.js';
+import AuditLog from '../models/auditLog.model.js';
+import mongoose from 'mongoose';
 
 /**
  * SPIDEY ASSESSMENT ENGINE
@@ -13,10 +16,6 @@ class SpideyAssessmentEngine {
     this.stateMachine = new SpideyAssessmentStateMachine();
     this.stageExecutor = new SpideyStageExecutor();
     this.fileEnforcer = new SpideyFileEnforcer();
-    
-    this.SpideyAssessmentConfig = require('../models/spideyAssessmentConfig.model');
-    this.SpideyAssessmentSubmission = require('../models/spideyAssessmentSubmission.model');
-    this.AuditLog = require('../models/auditLog.model');
 
     // Stage progression timeouts (in seconds)
     this.STAGE_TIMEOUTS = {
@@ -35,18 +34,18 @@ class SpideyAssessmentEngine {
     try {
       // Load assessment configuration
       const assessment = await this.stateMachine.loadAssessment(assessmentId);
-      
+
       // Initialize candidate progress
       const submission = await this.stateMachine.initializeCandidateProgress(
-        assessmentId, 
+        assessmentId,
         candidateId
       );
 
       // Record session metadata
-      if (sessionData.ipAddress) submission.ipAddress = sessionData.ipAddress;
-      if (sessionData.userAgent) submission.userAgent = sessionData.userAgent;
-      if (sessionData.sessionId) submission.sessionId = sessionData.sessionId;
-      
+      if (sessionData.ipAddress) submission.securityData.ipAddress = sessionData.ipAddress;
+      if (sessionData.userAgent) submission.securityData.userAgent = sessionData.userAgent;
+      if (sessionData.sessionId) submission.securityData.sessionId = sessionData.sessionId;
+
       await submission.save();
 
       // Advance to Stage 1 (from null)
@@ -86,7 +85,7 @@ class SpideyAssessmentEngine {
     try {
       // Get current assessment state
       const state = await this.stateMachine.getAssessmentState(submissionId);
-      
+
       if (state.isTerminal) {
         throw new Error(`Assessment is in terminal state: ${state.status}`);
       }
@@ -160,13 +159,13 @@ class SpideyAssessmentEngine {
     try {
       // Determine next stage
       const nextStage = this._getNextStage(stage);
-      
+
       if (nextStage === 'completed') {
         // Assessment completed successfully
         await this.stateMachine.advanceToStage(submissionId, 'completed', stageResult);
-        
+
         const finalScore = await this._calculateFinalScore(submissionId);
-        
+
         await this._logAction('ASSESSMENT_COMPLETED', {
           submissionId,
           stage,
@@ -186,7 +185,7 @@ class SpideyAssessmentEngine {
       } else {
         // Progress to next stage
         await this.stateMachine.advanceToStage(submissionId, nextStage, stageResult);
-        
+
         await this._logAction('STAGE_COMPLETED', {
           submissionId,
           stage,
@@ -224,7 +223,7 @@ class SpideyAssessmentEngine {
     try {
       // Advance to failed state
       await this.stateMachine.advanceToStage(submissionId, 'failed', stageResult);
-      
+
       await this._logAction('STAGE_FAILED', {
         submissionId,
         stage,
@@ -259,7 +258,6 @@ class SpideyAssessmentEngine {
   async _terminateForViolations(submissionId, stage, violations) {
     try {
       const criticalViolations = violations.filter(v => v.severity === 'critical');
-      const errorViolations = violations.filter(v => v.severity === 'error');
 
       const stageResult = {
         passed: false,
@@ -306,8 +304,8 @@ class SpideyAssessmentEngine {
   async getAssessmentStatus(submissionId) {
     try {
       const state = await this.stateMachine.getAssessmentState(submissionId);
-      const submission = await this.SpideyAssessmentSubmission.findById(submissionId);
-      
+      const submission = await SpideyAssessmentSubmission.findById(submissionId);
+
       return {
         success: true,
         submissionId,
@@ -341,15 +339,15 @@ class SpideyAssessmentEngine {
    */
   async _calculateFinalScore(submissionId) {
     try {
-      const submission = await this.SpideyAssessmentSubmission.findById(submissionId)
+      const submission = await SpideyAssessmentSubmission.findById(submissionId)
         .populate('assessmentId');
-      
+
       const assessment = submission.assessmentId;
-      const scoringWeights = assessment.scoringWeights || {
-        stage1Weight: 0.15,
-        stage2Weight: 0.30,
-        stage3Weight: 0.35,
-        stage4Weight: 0.20
+      const scoringWeights = assessment.scoring?.weights || {
+        stage1: 0.20,
+        stage2: 0.30,
+        stage3: 0.30,
+        stage4: 0.20
       };
 
       let totalScore = 0;
@@ -357,15 +355,22 @@ class SpideyAssessmentEngine {
 
       // Calculate weighted score from stage history
       for (const stageRecord of submission.stageHistory) {
-        const stageWeight = scoringWeights[`${stageRecord.stage}Weight`] || 0;
+        const stageWeight = scoringWeights[stageRecord.stage] || 0;
         totalScore += (stageRecord.score || 0) * stageWeight;
         totalWeight += stageWeight;
       }
 
       const finalScore = totalWeight > 0 ? Math.round(totalScore / totalWeight) : 0;
-      
+
       // Update submission with final score
-      submission.finalScore = finalScore;
+      // Note: submission.finalScore is an object in the schema, we might need to adapt this
+      if (typeof submission.finalScore === 'object') {
+        submission.finalScore.percentage = finalScore;
+        submission.finalScore.passed = finalScore >= (assessment.scoring?.passingScore || 85);
+      } else {
+        submission.finalScore = finalScore;
+      }
+
       await submission.save();
 
       return finalScore;
@@ -389,7 +394,7 @@ class SpideyAssessmentEngine {
       'stage3': 'stage4',
       'stage4': 'completed'
     };
-    
+
     return progression[currentStage] || 'completed';
   }
 
@@ -402,7 +407,7 @@ class SpideyAssessmentEngine {
     }
 
     const actions = ['submit_stage', 'get_status'];
-    
+
     if (state.currentStage && this.STAGE_TIMEOUTS[state.currentStage]) {
       actions.push('check_time_remaining');
     }
@@ -415,8 +420,8 @@ class SpideyAssessmentEngine {
    */
   async checkTimeViolations(submissionId) {
     try {
-      const submission = await this.SpideyAssessmentSubmission.findById(submissionId);
-      
+      const submission = await SpideyAssessmentSubmission.findById(submissionId);
+
       if (submission.isExpired()) {
         const stageResult = {
           passed: false,
@@ -431,7 +436,7 @@ class SpideyAssessmentEngine {
         };
 
         await this.stateMachine.advanceToStage(submissionId, 'failed', stageResult);
-        
+
         await this._logAction('ASSESSMENT_EXPIRED', {
           submissionId,
           expirationTime: submission.expiresAt,
@@ -446,7 +451,7 @@ class SpideyAssessmentEngine {
 
       return {
         expired: false,
-        timeRemaining: Math.max(0, submission.expiresAt - new Date()),
+        timeRemaining: Math.max(0, submission.expiresAt.getTime() - Date.now()),
         message: 'Assessment is still active'
       };
 
@@ -464,7 +469,7 @@ class SpideyAssessmentEngine {
    */
   async getAssessmentAnalytics(assessmentId) {
     try {
-      const submissions = await this.SpideyAssessmentSubmission.find({
+      const submissions = await SpideyAssessmentSubmission.find({
         assessmentId
       }).populate('candidateId assessmentId');
 
@@ -474,20 +479,20 @@ class SpideyAssessmentEngine {
         failed: submissions.filter(s => s.status === 'failed').length,
         inProgress: submissions.filter(s => s.status === 'in_progress').length,
         expired: submissions.filter(s => s.status === 'expired').length,
-        
+
         passRate: 0,
         averageFinalScore: 0,
         averageTimeSpent: 0,
-        
+
         stageFailures: {
           stage1: 0,
           stage2: 0,
           stage3: 0,
           stage4: 0
         },
-        
+
         commonViolations: new Map(),
-        
+
         passRateByStage: {
           stage1: 0,
           stage2: 0,
@@ -497,23 +502,23 @@ class SpideyAssessmentEngine {
       };
 
       // Calculate pass rate
-      const completedSubmissions = submissions.filter(s => 
+      const completedSubmissions = submissions.filter(s =>
         ['completed', 'failed'].includes(s.status)
       );
-      
+
       if (completedSubmissions.length > 0) {
         analytics.passRate = (analytics.completed / completedSubmissions.length) * 100;
       }
 
       // Calculate averages
       const passedSubmissions = submissions.filter(s => s.status === 'completed');
-      
+
       if (passedSubmissions.length > 0) {
-        analytics.averageFinalScore = passedSubmissions.reduce((sum, s) => 
-          sum + (s.finalScore || 0), 0
+        analytics.averageFinalScore = passedSubmissions.reduce((sum, s) =>
+          sum + (s.finalScore?.percentage || 0), 0
         ) / passedSubmissions.length;
 
-        analytics.averageTimeSpent = passedSubmissions.reduce((sum, s) => 
+        analytics.averageTimeSpent = passedSubmissions.reduce((sum, s) =>
           sum + s.getTimeSpentInMinutes(), 0
         ) / passedSubmissions.length;
       }
@@ -536,11 +541,11 @@ class SpideyAssessmentEngine {
 
       // Calculate pass rates by stage
       for (const stage of Object.keys(analytics.passRateByStage)) {
-        const stageAttempts = submissions.filter(s => 
+        const stageAttempts = submissions.filter(s =>
           s.stageHistory.some(h => h.stage === stage)
         ).length;
-        
-        const stagePasses = submissions.filter(s => 
+
+        const stagePasses = submissions.filter(s =>
           s.stageHistory.some(h => h.stage === stage && h.passed)
         ).length;
 
@@ -568,10 +573,11 @@ class SpideyAssessmentEngine {
    */
   async _logAction(action, details) {
     try {
-      const auditEntry = new this.AuditLog({
+      const auditEntry = new AuditLog({
         entityType: 'SpideyAssessmentEngine',
         action,
         details,
+        success: true,
         source: 'AssessmentEngine'
       });
       await auditEntry.save();
@@ -582,10 +588,12 @@ class SpideyAssessmentEngine {
 
   async _logError(errorType, details) {
     try {
-      const auditEntry = new this.AuditLog({
+      const auditEntry = new AuditLog({
         entityType: 'SpideyAssessmentEngine',
         action: `ERROR_${errorType}`,
         details: { ...details, severity: 'ERROR' },
+        success: false,
+        errorMessage: details.error,
         source: 'AssessmentEngine'
       });
       await auditEntry.save();
@@ -595,4 +603,4 @@ class SpideyAssessmentEngine {
   }
 }
 
-module.exports = SpideyAssessmentEngine;
+export default SpideyAssessmentEngine;

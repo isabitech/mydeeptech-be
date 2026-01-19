@@ -1,173 +1,174 @@
-const { sendEmail } = require('./brevoSMTP');
+import { sendEmail } from './brevoSMTP.js';
 
 /**
  * Send ticket creation confirmation email to user
- * @param {Object} userEmail - User's email address
+ * @param {string} userEmail - User's email address
  * @param {Object} ticket - Support ticket details
  */
-const sendTicketCreationEmail = async (userEmail, ticket) => {
-  try {
-    const subject = `Support Ticket Created - ${ticket.ticketNumber}`;
-    
-    const htmlContent = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <title>Support Ticket Created</title>
-        <style>
-            body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
-            .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden; }
-            .header { background: linear-gradient(135deg, #007bff, #0056b3); color: white; padding: 30px; text-align: center; }
-            .content { padding: 30px; }
-            .ticket-info { background: #f8f9fa; border-left: 4px solid #007bff; padding: 20px; margin: 20px 0; border-radius: 5px; }
-            .footer { background: #f8f9fa; padding: 20px; text-align: center; color: #6c757d; }
-            .btn { display: inline-block; padding: 12px 24px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; margin: 10px 0; }
-            .status-badge { background: #28a745; color: white; padding: 5px 10px; border-radius: 15px; font-size: 12px; font-weight: bold; }
-            .priority-badge { padding: 5px 10px; border-radius: 15px; font-size: 12px; font-weight: bold; }
-            .priority-low { background: #e3f2fd; color: #1976d2; }
-            .priority-medium { background: #fff3e0; color: #f57c00; }
-            .priority-high { background: #fce4ec; color: #c2185b; }
-            .priority-urgent { background: #ffebee; color: #d32f2f; }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <div class="header">
-                <h1 style="margin: 0; font-size: 28px;">🎫 Support Ticket Created</h1>
-                <p style="margin: 10px 0 0 0; opacity: 0.9;">We've received your support request</p>
-            </div>
+export const sendTicketCreationEmail = async (userEmail, ticket) => {
+    try {
+        const subject = `Support Ticket Created - ${ticket.ticketNumber}`;
+
+        const htmlContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta charset="UTF-8">
+                <title>Support Ticket Created</title>
+                <style>
+                    body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
+                    .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden; }
+                    .header { background: linear-gradient(135deg, #007bff, #0056b3); color: white; padding: 30px; text-align: center; }
+                    .content { padding: 30px; }
+                    .ticket-info { background: #f8f9fa; border-left: 4px solid #007bff; padding: 20px; margin: 20px 0; border-radius: 5px; }
+                    .footer { background: #f8f9fa; padding: 20px; text-align: center; color: #6c757d; }
+                    .btn { display: inline-block; padding: 12px 24px; background: #007bff; color: white; text-decoration: none; border-radius: 5px; margin: 10px 0; }
+                    .status-badge { background: #28a745; color: white; padding: 5px 10px; border-radius: 15px; font-size: 12px; font-weight: bold; }
+                    .priority-badge { padding: 5px 10px; border-radius: 15px; font-size: 12px; font-weight: bold; }
+                    .priority-low { background: #e3f2fd; color: #1976d2; }
+                    .priority-medium { background: #fff3e0; color: #f57c00; }
+                    .priority-high { background: #fce4ec; color: #c2185b; }
+                    .priority-urgent { background: #ffebee; color: #d32f2f; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <h1 style="margin: 0; font-size: 28px;">🎫 Support Ticket Created</h1>
+                        <p style="margin: 10px 0 0 0; opacity: 0.9;">We've received your support request</p>
+                    </div>
+                    
+                    <div class="content">
+                        <p style="font-size: 16px; margin-bottom: 25px;">
+                            Hello! Your support ticket has been successfully created and our team has been notified.
+                        </p>
+                        
+                        <div class="ticket-info">
+                            <h3 style="margin-top: 0; color: #007bff;">📋 Ticket Details</h3>
+                            <p><strong>Ticket Number:</strong> ${ticket.ticketNumber}</p>
+                            <p><strong>Subject:</strong> ${ticket.subject}</p>
+                            <p><strong>Category:</strong> ${ticket.category.replace('_', ' ').toUpperCase()}</p>
+                            <p><strong>Priority:</strong> 
+                                <span class="priority-badge priority-${ticket.priority}">${ticket.priority.toUpperCase()}</span>
+                            </p>
+                            <p><strong>Status:</strong> 
+                                <span class="status-badge">OPEN</span>
+                            </p>
+                            <p><strong>Created:</strong> ${new Date(ticket.createdAt).toLocaleString()}</p>
+                        </div>
+                        
+                        <div style="background: #e8f4f8; padding: 20px; border-radius: 8px; margin: 25px 0;">
+                            <h4 style="margin-top: 0; color: #0056b3;">📝 Your Message</h4>
+                            <p style="font-style: italic; color: #555; margin-bottom: 0;">"${ticket.description}"</p>
+                        </div>
+                        
+                        <h3 style="color: #333;">🕐 What happens next?</h3>
+                        <ul style="color: #555; line-height: 1.8;">
+                            <li>Our support team will review your ticket within 24 hours</li>
+                            <li>You'll receive email notifications for any updates</li>
+                            <li>You can reply to this email to add more information</li>
+                            <li>Track your ticket status in your dashboard</li>
+                        </ul>
+                        
+                        <div style="text-align: center; margin: 30px 0;">
+                            <a href="${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/dashboard/support" class="btn">
+                                View Ticket in Dashboard
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <div class="footer">
+                        <p style="margin: 0 0 10px 0; color: #333;"><strong>📞 Need Immediate Help?</strong></p>
+                        <p style="margin: 5px 0;">
+                            📧 Email: <a href="mailto:support@mydeeptech.ng" style="color: #007bff;">support@mydeeptech.ng</a><br>
+                            💬 Live Chat: Available on our website<br>
+                            🕐 Response Time: Within 24 hours
+                        </p>
+                        
+                        <hr style="border: none; height: 1px; background: #dee2e6; margin: 20px 0;">
+                        <p style="margin: 0; font-size: 12px; color: #6c757d;">
+                            This email was sent regarding your support ticket ${ticket.ticketNumber}.<br>
+                            MyDeepTech Support Team | <a href="https://mydeeptech.ng" style="color: #007bff;">mydeeptech.ng</a>
+                        </p>
+                    </div>
+                </div>
+            </body>
+            </html>
+         `;
+
+        const textContent = `
+                Support Ticket Created - ${ticket.ticketNumber}
+
+                Hello! Your support ticket has been successfully created.
+
+                Ticket Details:
+                - Ticket Number: ${ticket.ticketNumber}
+                - Subject: ${ticket.subject}
+                - Category: ${ticket.category.replace('_', ' ').toUpperCase()}
+                - Priority: ${ticket.priority.toUpperCase()}
+                - Status: OPEN
+                - Created: ${new Date(ticket.createdAt).toLocaleString()}
+
+                Your Message: "${ticket.description}"
+
+                What happens next?
+                - Our support team will review your ticket within 24 hours
+                - You'll receive email notifications for any updates
+                - You can reply to this email to add more information
+
+                Need immediate help? Contact us at support@mydeeptech.ng
+
+                MyDeepTech Support Team
             
-            <div class="content">
-                <p style="font-size: 16px; margin-bottom: 25px;">
-                    Hello! Your support ticket has been successfully created and our team has been notified.
-                </p>
-                
-                <div class="ticket-info">
-                    <h3 style="margin-top: 0; color: #007bff;">📋 Ticket Details</h3>
-                    <p><strong>Ticket Number:</strong> ${ticket.ticketNumber}</p>
-                    <p><strong>Subject:</strong> ${ticket.subject}</p>
-                    <p><strong>Category:</strong> ${ticket.category.replace('_', ' ').toUpperCase()}</p>
-                    <p><strong>Priority:</strong> 
-                        <span class="priority-badge priority-${ticket.priority}">${ticket.priority.toUpperCase()}</span>
-                    </p>
-                    <p><strong>Status:</strong> 
-                        <span class="status-badge">OPEN</span>
-                    </p>
-                    <p><strong>Created:</strong> ${new Date(ticket.createdAt).toLocaleString()}</p>
-                </div>
-                
-                <div style="background: #e8f4f8; padding: 20px; border-radius: 8px; margin: 25px 0;">
-                    <h4 style="margin-top: 0; color: #0056b3;">📝 Your Message</h4>
-                    <p style="font-style: italic; color: #555; margin-bottom: 0;">"${ticket.description}"</p>
-                </div>
-                
-                <h3 style="color: #333;">🕐 What happens next?</h3>
-                <ul style="color: #555; line-height: 1.8;">
-                    <li>Our support team will review your ticket within 24 hours</li>
-                    <li>You'll receive email notifications for any updates</li>
-                    <li>You can reply to this email to add more information</li>
-                    <li>Track your ticket status in your dashboard</li>
-                </ul>
-                
-                <div style="text-align: center; margin: 30px 0;">
-                    <a href="${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/dashboard/support" class="btn">
-                        View Ticket in Dashboard
-                    </a>
-                </div>
-            </div>
-            
-            <div class="footer">
-                <p style="margin: 0 0 10px 0; color: #333;"><strong>📞 Need Immediate Help?</strong></p>
-                <p style="margin: 5px 0;">
-                    📧 Email: <a href="mailto:support@mydeeptech.ng" style="color: #007bff;">support@mydeeptech.ng</a><br>
-                    💬 Live Chat: Available on our website<br>
-                    🕐 Response Time: Within 24 hours
-                </p>
-                
-                <hr style="border: none; height: 1px; background: #dee2e6; margin: 20px 0;">
-                <p style="margin: 0; font-size: 12px; color: #6c757d;">
-                    This email was sent regarding your support ticket ${ticket.ticketNumber}.<br>
-                    MyDeepTech Support Team | <a href="https://mydeeptech.ng" style="color: #007bff;">mydeeptech.ng</a>
-                </p>
-            </div>
-        </div>
-    </body>
-    </html>
-    `;
+        `;
 
-    const textContent = `
-Support Ticket Created - ${ticket.ticketNumber}
-
-Hello! Your support ticket has been successfully created.
-
-Ticket Details:
-- Ticket Number: ${ticket.ticketNumber}
-- Subject: ${ticket.subject}
-- Category: ${ticket.category.replace('_', ' ').toUpperCase()}
-- Priority: ${ticket.priority.toUpperCase()}
-- Status: OPEN
-- Created: ${new Date(ticket.createdAt).toLocaleString()}
-
-Your Message: "${ticket.description}"
-
-What happens next?
-- Our support team will review your ticket within 24 hours
-- You'll receive email notifications for any updates
-- You can reply to this email to add more information
-
-Need immediate help? Contact us at support@mydeeptech.ng
-
-MyDeepTech Support Team
-    `;
-
-    await sendEmail(userEmail, subject, textContent, htmlContent);
-    console.log(`✅ Ticket creation email sent to ${userEmail} for ticket ${ticket.ticketNumber}`);
-  } catch (error) {
-    console.error('❌ Error sending ticket creation email:', error);
-    throw error;
-  }
+        await sendEmail({ to: userEmail, subject, text: textContent, html: htmlContent });
+        console.log(`✅ Ticket creation email sent to ${userEmail} for ticket ${ticket.ticketNumber}`);
+    } catch (error) {
+        console.error('❌ Error sending ticket creation email:', error);
+        throw error;
+    }
 };
 
 /**
  * Send ticket status update email to user
- * @param {String} userEmail - User's email address
+ * @param {string} userEmail - User's email address
  * @param {Object} ticket - Support ticket details
- * @param {String} oldStatus - Previous status
- * @param {String} newStatus - New status
+ * @param {string} oldStatus - Previous status
+ * @param {string} newStatus - New status
  */
-const sendTicketStatusUpdateEmail = async (userEmail, ticket, oldStatus, newStatus) => {
-  try {
-    const subject = `Ticket Status Update - ${ticket.ticketNumber}`;
-    
-    let statusMessage = '';
-    let statusColor = '#007bff';
-    let nextSteps = '';
+export const sendTicketStatusUpdateEmail = async (userEmail, ticket, oldStatus, newStatus) => {
+    try {
+        const subject = `Ticket Status Update - ${ticket.ticketNumber}`;
 
-    switch (newStatus) {
-      case 'in_progress':
-        statusMessage = 'Your ticket is now being actively worked on by our support team.';
-        statusColor = '#ffc107';
-        nextSteps = 'Our team is investigating your issue. You\'ll be notified of any updates or if we need additional information.';
-        break;
-      case 'waiting_for_user':
-        statusMessage = 'We need additional information from you to proceed.';
-        statusColor = '#fd7e14';
-        nextSteps = 'Please check your ticket for our latest message and provide the requested information.';
-        break;
-      case 'resolved':
-        statusMessage = 'Great news! Your support ticket has been resolved.';
-        statusColor = '#28a745';
-        nextSteps = 'Please review the resolution and let us know if you need any clarification or if the issue persists.';
-        break;
-      case 'closed':
-        statusMessage = 'Your support ticket has been closed.';
-        statusColor = '#6c757d';
-        nextSteps = 'If you need further assistance with this issue, feel free to create a new support ticket.';
-        break;
-    }
+        let statusMessage = '';
+        let statusColor = '#007bff';
+        let nextSteps = '';
 
-    const htmlContent = `
+        switch (newStatus) {
+            case 'in_progress':
+                statusMessage = 'Your ticket is now being actively worked on by our support team.';
+                statusColor = '#ffc107';
+                nextSteps = 'Our team is investigating your issue. You\'ll be notified of any updates or if we need additional information.';
+                break;
+            case 'waiting_for_user':
+                statusMessage = 'We need additional information from you to proceed.';
+                statusColor = '#fd7e14';
+                nextSteps = 'Please check your ticket for our latest message and provide the requested information.';
+                break;
+            case 'resolved':
+                statusMessage = 'Great news! Your support ticket has been resolved.';
+                statusColor = '#28a745';
+                nextSteps = 'Please review the resolution and let us know if you need any clarification or if the issue persists.';
+                break;
+            case 'closed':
+                statusMessage = 'Your support ticket has been closed.';
+                statusColor = '#6c757d';
+                nextSteps = 'If you need further assistance with this issue, feel free to create a new support ticket.';
+                break;
+        }
+
+        const htmlContent = `
     <!DOCTYPE html>
     <html>
     <head>
@@ -248,7 +249,7 @@ const sendTicketStatusUpdateEmail = async (userEmail, ticket, oldStatus, newStat
     </html>
     `;
 
-    const textContent = `
+        const textContent = `
 Ticket Status Update - ${ticket.ticketNumber}
 
 ${ticket.subject}
@@ -267,25 +268,25 @@ Need help? Reply to this email or contact support@mydeeptech.ng
 MyDeepTech Support Team
     `;
 
-    await sendEmail(userEmail, subject, textContent, htmlContent);
-    console.log(`✅ Status update email sent to ${userEmail} for ticket ${ticket.ticketNumber}`);
-  } catch (error) {
-    console.error('❌ Error sending status update email:', error);
-    throw error;
-  }
+        await sendEmail({ to: userEmail, subject, text: textContent, html: htmlContent });
+        console.log(`✅ Status update email sent to ${userEmail} for ticket ${ticket.ticketNumber}`);
+    } catch (error) {
+        console.error('❌ Error sending status update email:', error);
+        throw error;
+    }
 };
 
 /**
  * Send new ticket notification email to admin
- * @param {String} adminEmail - Admin's email address
+ * @param {string} adminEmail - Admin's email address
  * @param {Object} ticket - Support ticket details
  * @param {Object} user - User who created the ticket
  */
-const sendNewTicketNotificationToAdmin = async (adminEmail, ticket, user) => {
-  try {
-    const subject = `New Support Ticket - ${ticket.ticketNumber} (${ticket.priority.toUpperCase()})`;
-    
-    const htmlContent = `
+export const sendNewTicketNotificationToAdmin = async (adminEmail, ticket, user) => {
+    try {
+        const subject = `New Support Ticket - ${ticket.ticketNumber} (${ticket.priority.toUpperCase()})`;
+
+        const htmlContent = `
     <!DOCTYPE html>
     <html>
     <head>
@@ -360,7 +361,7 @@ const sendNewTicketNotificationToAdmin = async (adminEmail, ticket, user) => {
     </html>
     `;
 
-    const textContent = `
+        const textContent = `
 New Support Ticket - ${ticket.ticketNumber} (${ticket.priority.toUpperCase()})
 
 A new support ticket requires attention from the support team.
@@ -386,24 +387,24 @@ Please respond within 24 hours to maintain service quality standards.
 MyDeepTech Support Admin
     `;
 
-    await sendEmail(adminEmail, subject, textContent, htmlContent);
-    console.log(`✅ New ticket notification email sent to admin ${adminEmail} for ticket ${ticket.ticketNumber}`);
-  } catch (error) {
-    console.error('❌ Error sending admin notification email:', error);
-    throw error;
-  }
+        await sendEmail({ to: adminEmail, subject, text: textContent, html: htmlContent });
+        console.log(`✅ New ticket notification email sent to admin ${adminEmail} for ticket ${ticket.ticketNumber}`);
+    } catch (error) {
+        console.error('❌ Error sending admin notification email:', error);
+        throw error;
+    }
 };
 
 /**
  * Send ticket assignment notification email to admin
- * @param {String} adminEmail - Admin's email address
+ * @param {string} adminEmail - Admin's email address
  * @param {Object} ticket - Support ticket details
  */
-const sendTicketAssignmentEmail = async (adminEmail, ticket) => {
-  try {
-    const subject = `Ticket Assigned to You - ${ticket.ticketNumber}`;
-    
-    const htmlContent = `
+export const sendTicketAssignmentEmail = async (adminEmail, ticket) => {
+    try {
+        const subject = `Ticket Assigned to You - ${ticket.ticketNumber}`;
+
+        const htmlContent = `
     <!DOCTYPE html>
     <html>
     <head>
@@ -458,22 +459,42 @@ const sendTicketAssignmentEmail = async (adminEmail, ticket) => {
     </html>
     `;
 
-    await sendEmail(adminEmail, subject, '', htmlContent);
-    console.log(`✅ Assignment email sent to admin ${adminEmail} for ticket ${ticket.ticketNumber}`);
-  } catch (error) {
-    console.error('❌ Error sending assignment email:', error);
-    throw error;
-  }
+        await sendEmail({ to: adminEmail, subject, text: '', html: htmlContent });
+        console.log(`✅ Assignment email sent to admin ${adminEmail} for ticket ${ticket.ticketNumber}`);
+    } catch (error) {
+        console.error('❌ Error sending assignment email:', error);
+        throw error;
+    }
+};
+
+/**
+ * Calculate waiting time for customer
+ */
+const getWaitingTime = (startTime) => {
+    const now = new Date();
+    const start = new Date(startTime);
+    const diffMs = now - start;
+
+    const minutes = Math.floor(diffMs / 60000);
+    const seconds = Math.floor((diffMs % 60000) / 1000);
+
+    if (minutes > 0) {
+        return `${minutes} minute${minutes > 1 ? 's' : ''} ${seconds} second${seconds !== 1 ? 's' : ''}`;
+    }
+    return `${seconds} second${seconds !== 1 ? 's' : ''}`;
 };
 
 /**
  * Send email notification to support team when no agents are online
+ * @param {string} supportEmail - Support email address
+ * @param {Object} ticket - Support ticket details
+ * @param {Object} user - User details
  */
-const sendOfflineAgentNotification = async (supportEmail, ticket, user) => {
-  try {
-    const subject = `🚨 URGENT: New Chat Request - No Agents Online - ${ticket.ticketNumber}`;
-    
-    const htmlContent = `
+export const sendOfflineAgentNotification = async (supportEmail, ticket, user) => {
+    try {
+        const subject = `🚨 URGENT: New Chat Request - No Agents Online - ${ticket.ticketNumber}`;
+
+        const htmlContent = `
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -515,28 +536,28 @@ const sendOfflineAgentNotification = async (supportEmail, ticket, user) => {
                     <p><strong>Status:</strong> Waiting for Agent</p>
                     <p class="timestamp"><strong>Started At:</strong> ${new Date(ticket.createdAt).toLocaleString()}</p>
                 </div>
-
+ 
                 <div class="user-info">
                     <h2>👤 Customer Information</h2>
                     <p><strong>Name:</strong> ${user.fullName || user.username || 'N/A'}</p>
                     <p><strong>Email:</strong> ${user.email}</p>
                     <p><strong>User ID:</strong> ${user._id}</p>
                 </div>
-
+ 
                 ${ticket.description ? `
                 <div class="message-preview">
                     <h3>💬 Initial Message</h3>
                     <p><em>"${ticket.description}"</em></p>
                 </div>
                 ` : ''}
-
+ 
                 <div style="text-align: center; margin: 30px 0;">
                     <a href="${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/admin/support/chat/${ticket._id}" 
                        class="action-button">
                         🚀 JOIN CHAT NOW
                     </a>
                 </div>
-
+ 
                 <div style="background: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 5px; margin: 20px 0;">
                     <p><strong>⚠️ Action Required:</strong></p>
                     <ul>
@@ -547,7 +568,7 @@ const sendOfflineAgentNotification = async (supportEmail, ticket, user) => {
                     </ul>
                 </div>
             </div>
-
+ 
             <div class="footer">
                 <p><strong>MyDeepTech Support System</strong></p>
                 <p>This is an automated notification. Customer waiting time: <strong>${getWaitingTime(ticket.createdAt)}</strong></p>
@@ -561,7 +582,7 @@ const sendOfflineAgentNotification = async (supportEmail, ticket, user) => {
     </html>
     `;
 
-    const textContent = `
+        const textContent = `
 🚨 URGENT: New Chat Request - No Agents Online
 
 Ticket: ${ticket.ticketNumber}
@@ -582,37 +603,12 @@ Direct Chat: ${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/admin/suppor
 MyDeepTech Support System
     `;
 
-    await sendEmail(supportEmail, subject, textContent, htmlContent);
-    console.log(`📧 Offline agent notification sent to ${supportEmail} for ticket ${ticket.ticketNumber}`);
-    return { success: true };
+        await sendEmail({ to: supportEmail, subject, text: textContent, html: htmlContent });
+        console.log(`📧 Offline agent notification sent to ${supportEmail} for ticket ${ticket.ticketNumber}`);
+        return { success: true };
 
-  } catch (error) {
-    console.error('❌ Error sending offline agent notification:', error);
-    return { success: false, error: error.message };
-  }
-};
-
-/**
- * Calculate waiting time for customer
- */
-const getWaitingTime = (startTime) => {
-  const now = new Date();
-  const start = new Date(startTime);
-  const diffMs = now - start;
-  
-  const minutes = Math.floor(diffMs / 60000);
-  const seconds = Math.floor((diffMs % 60000) / 1000);
-  
-  if (minutes > 0) {
-    return `${minutes} minute${minutes > 1 ? 's' : ''} ${seconds} second${seconds !== 1 ? 's' : ''}`;
-  }
-  return `${seconds} second${seconds !== 1 ? 's' : ''}`;
-};
-
-module.exports = {
-  sendTicketCreationEmail,
-  sendTicketStatusUpdateEmail,
-  sendNewTicketNotificationToAdmin,
-  sendTicketAssignmentEmail,
-  sendOfflineAgentNotification
+    } catch (error) {
+        console.error('❌ Error sending offline agent notification:', error);
+        return { success: false, error: error.message };
+    }
 };

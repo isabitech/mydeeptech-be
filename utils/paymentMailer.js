@@ -1,4 +1,4 @@
-const brevo = require('@getbrevo/brevo');
+import brevo from '@getbrevo/brevo';
 
 // Initialize Brevo API client
 const apiInstance = new brevo.TransactionalEmailsApi();
@@ -7,14 +7,14 @@ apiInstance.setApiKey(brevo.TransactionalEmailsApiApiKeys.apiKey, process.env.BR
 /**
  * Send new invoice notification to DTUser
  */
-const sendInvoiceNotification = async (dtUserEmail, dtUserName, invoiceData) => {
+export const sendInvoiceNotification = async (dtUserEmail, dtUserName, invoiceData) => {
   const { invoiceNumber, projectName, amount, currency, dueDate, description } = invoiceData;
-  
+
   const formattedAmount = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currency || 'USD'
   }).format(amount);
-  
+
   const formattedDueDate = new Date(dueDate).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
@@ -139,7 +139,7 @@ const sendInvoiceNotification = async (dtUserEmail, dtUserName, invoiceData) => 
     email: 'payments@mydeeptech.ng'
   };
   sendSmtpEmail.to = [{ email: dtUserEmail, name: dtUserName }];
-  
+
   // Add reply-to for payments team
   sendSmtpEmail.replyTo = {
     email: 'payments@mydeeptech.ng',
@@ -159,15 +159,15 @@ const sendInvoiceNotification = async (dtUserEmail, dtUserName, invoiceData) => 
 /**
  * Send payment confirmation to DTUser
  */
-const sendPaymentConfirmation = async (dtUserEmail, dtUserName, invoiceData, paymentDetails) => {
+export const sendPaymentConfirmation = async (dtUserEmail, dtUserName, invoiceData, paymentDetails) => {
   const { invoiceNumber, projectName, amount, currency, paidAt } = invoiceData;
   const { paymentMethod, paymentReference } = paymentDetails;
-  
+
   const formattedAmount = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currency || 'USD'
   }).format(amount);
-  
+
   const formattedPaidDate = new Date(paidAt).toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
@@ -308,9 +308,9 @@ const sendPaymentConfirmation = async (dtUserEmail, dtUserName, invoiceData, pay
 /**
  * Send payment reminder to DTUser for overdue invoices
  */
-const sendPaymentReminder = async (dtUserEmail, dtUserName, invoiceData) => {
+export const sendPaymentReminder = async (dtUserEmail, dtUserName, invoiceData) => {
   const { invoiceNumber, projectName, amount, currency, dueDate, daysOverdue } = invoiceData;
-  
+
   const formattedAmount = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currency || 'USD'
@@ -393,7 +393,7 @@ const sendPaymentReminder = async (dtUserEmail, dtUserName, invoiceData) => {
   }
 };
 
-module.exports = {
+export default {
   sendInvoiceNotification,
   sendPaymentConfirmation,
   sendPaymentReminder

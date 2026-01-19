@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const assessmentSchema = new mongoose.Schema(
   {
@@ -17,7 +17,7 @@ const assessmentSchema = new mongoose.Schema(
       default: 'annotator_qualification',
       required: true
     },
-    
+
     // Assessment scoring
     totalQuestions: {
       type: Number,
@@ -35,7 +35,7 @@ const assessmentSchema = new mongoose.Schema(
       min: 0,
       max: 100
     },
-    
+
     // Assessment result
     passed: {
       type: Boolean,
@@ -139,7 +139,7 @@ const assessmentSchema = new mongoose.Schema(
       enum: ['beginner', 'intermediate', 'advanced'],
       default: 'intermediate'
     },
-    
+
     // IP and session tracking for security
     ipAddress: {
       type: String,
@@ -149,7 +149,7 @@ const assessmentSchema = new mongoose.Schema(
       type: String,
       default: null
     },
-    
+
     // Retake information
     attemptNumber: {
       type: Number,
@@ -191,8 +191,10 @@ const assessmentSchema = new mongoose.Schema(
       maxlength: 500
     }
   },
-  { 
-    timestamps: true 
+  {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
   }
 );
 
@@ -204,11 +206,11 @@ assessmentSchema.index({ scorePercentage: -1 });
 assessmentSchema.index({ assessmentType: 1, passed: 1 });
 
 // Virtual to calculate time spent in a readable format
-assessmentSchema.virtual('timeSpentFormatted').get(function() {
+assessmentSchema.virtual('timeSpentFormatted').get(function () {
   const minutes = this.timeSpentMinutes;
   const hours = Math.floor(minutes / 60);
   const remainingMinutes = minutes % 60;
-  
+
   if (hours > 0) {
     return `${hours}h ${remainingMinutes}m`;
   }
@@ -216,7 +218,7 @@ assessmentSchema.virtual('timeSpentFormatted').get(function() {
 });
 
 // Static method to get user's best score
-assessmentSchema.statics.getUserBestScore = function(userId, assessmentType = 'annotator_qualification') {
+assessmentSchema.statics.getUserBestScore = function (userId, assessmentType = 'annotator_qualification') {
   return this.findOne({
     userId: userId,
     assessmentType: assessmentType
@@ -224,7 +226,7 @@ assessmentSchema.statics.getUserBestScore = function(userId, assessmentType = 'a
 };
 
 // Static method to get user's latest attempt
-assessmentSchema.statics.getUserLatestAttempt = function(userId, assessmentType = 'annotator_qualification') {
+assessmentSchema.statics.getUserLatestAttempt = function (userId, assessmentType = 'annotator_qualification') {
   return this.findOne({
     userId: userId,
     assessmentType: assessmentType
@@ -232,9 +234,9 @@ assessmentSchema.statics.getUserLatestAttempt = function(userId, assessmentType 
 };
 
 // Static method to check if user can retake (e.g., wait period)
-assessmentSchema.statics.canUserRetake = function(userId, assessmentType = 'annotator_qualification', waitHours = 24) {
+assessmentSchema.statics.canUserRetake = function (userId, assessmentType = 'annotator_qualification', waitHours = 24) {
   const waitTime = new Date(Date.now() - waitHours * 60 * 60 * 1000);
-  
+
   return this.findOne({
     userId: userId,
     assessmentType: assessmentType,
@@ -245,7 +247,7 @@ assessmentSchema.statics.canUserRetake = function(userId, assessmentType = 'anno
 };
 
 // Instance method to calculate grade
-assessmentSchema.methods.getGrade = function() {
+assessmentSchema.methods.getGrade = function () {
   const score = this.scorePercentage;
   if (score >= 90) return 'A';
   if (score >= 80) return 'B';
@@ -255,21 +257,22 @@ assessmentSchema.methods.getGrade = function() {
 };
 
 // Pre-save hook to calculate derived fields
-assessmentSchema.pre('save', function(next) {
+assessmentSchema.pre('save', function (next) {
   // Calculate score percentage
   if (this.totalQuestions > 0) {
     this.scorePercentage = Math.round((this.correctAnswers / this.totalQuestions) * 100);
   }
-  
+
   // Determine if passed
   this.passed = this.scorePercentage >= this.passingScore;
-  
+
   // Calculate time spent in minutes
   if (this.startedAt && this.completedAt) {
     this.timeSpentMinutes = Math.round((this.completedAt - this.startedAt) / (1000 * 60));
   }
-  
+
   next();
 });
 
-module.exports = mongoose.model('Assessment', assessmentSchema);
+const Assessment = mongoose.model('Assessment', assessmentSchema);
+export default Assessment;
