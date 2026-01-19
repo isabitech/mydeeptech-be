@@ -1,10 +1,10 @@
-import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import url from 'url';
 import { app, server } from './app.js';
 import { initRedis, closeRedis } from './config/redis.js';
+import envConfig from './config/envConfig.js';
 
-dotenv.config({ path: './.env' });
+// dotenv.config({ path: './.env' });
 
 // Initialize Redis connection
 const initializeRedis = async () => {
@@ -29,7 +29,7 @@ const connectDB = async () => {
         try {
             console.log(`🔄 Attempting MongoDB connection (attempt ${retries + 1}/${maxRetries})...`);
 
-            const conn = await mongoose.connect(process.env.MONGO_URI, {
+            const conn = await mongoose.connect(envConfig.mongo.MONGO_URI, {
                 serverSelectionTimeoutMS: 60000,
                 socketTimeoutMS: 60000,
                 connectTimeoutMS: 60000,
@@ -81,7 +81,7 @@ if (process.argv[1] && import.meta.url === url.pathToFileURL(process.argv[1]).hr
     process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
     process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-    const PORT = process.env.PORT || 5000;
+    const PORT = envConfig.PORT || 5000;
     server.listen(PORT, () => {
         console.log(`🚀 Server running on port ${PORT}`);
         console.log(`💬 Socket.IO chat server active`);

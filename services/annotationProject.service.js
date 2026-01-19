@@ -753,9 +753,10 @@ class AnnotationProjectService {
         const approvedApplications = await ProjectApplication.find({ projectId, status: 'approved' })
             .populate('applicantId', 'fullName email phone')
             .sort({ reviewedAt: -1 });
-
         return approvedApplications;
     }
+
+
     async attachAssessment(projectId, admin, body) {
         const { assessmentId, isRequired = true, assessmentInstructions = '' } = body;
 

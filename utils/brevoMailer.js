@@ -1,15 +1,16 @@
 import brevo from '@getbrevo/brevo';
+import envConfig from '../config/envConfig.js';
 
 // Initialize Brevo API client (using modern API configuration like paymentMailer.js)
 const apiInstance = new brevo.TransactionalEmailsApi();
-apiInstance.setApiKey(brevo.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY);
+apiInstance.setApiKey(brevo.TransactionalEmailsApiApiKeys.apiKey, envConfig.email.brevo.BREVO_API_KEY);
 
 // Validate Brevo configuration
-if (!process.env.BREVO_API_KEY) {
+if (!envConfig.email.brevo.BREVO_API_KEY) {
   console.error("❌ Brevo API key missing. Please set BREVO_API_KEY in your .env file");
 }
 
-if (!process.env.BREVO_SENDER_EMAIL) {
+if (!envConfig.email.brevo.BREVO_SENDER_EMAIL) {
   console.error("❌ Brevo sender email missing. Please set BREVO_SENDER_EMAIL in your .env file");
 }
 
@@ -77,8 +78,8 @@ const sendVerificationEmailBrevo = async (email, name, userId) => {
 
     // Configure sender (consistent with other mailers)
     sendSmtpEmail.sender = {
-      name: process.env.BREVO_SENDER_NAME || "MyDeepTech Team",
-      email: process.env.BREVO_SENDER_EMAIL
+      name: envConfig.email.brevo.BREVO_SENDER_NAME || "MyDeepTech Team",
+      email: envConfig.email.brevo.BREVO_SENDER_EMAIL
     };
 
     sendSmtpEmail.to = [{
@@ -119,7 +120,7 @@ const testBrevoConnection = async () => {
   try {
     // Use AccountApi to test connection (same approach as paymentMailer.js pattern)
     const accountApi = new brevo.AccountApi();
-    accountApi.setApiKey(brevo.AccountApiApiKeys.apiKey, process.env.BREVO_API_KEY);
+    accountApi.setApiKey(brevo.AccountApiApiKeys.apiKey, envConfig.email.brevo.BREVO_API_KEY);
 
     const account = await accountApi.getAccount();
     console.log("✅ Brevo API connection successful!", {
