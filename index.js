@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import url from 'url';
-import { app, server } from './app.js';
+import {server } from './app.js';
 import { initRedis, closeRedis } from './config/redis.js';
 import envConfig from './config/envConfig.js';
 
