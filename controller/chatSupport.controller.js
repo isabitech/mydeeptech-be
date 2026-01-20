@@ -58,8 +58,6 @@ const startChatSession = async (req, res) => {
       });
     }
 
-    console.log(`🚀 Starting chat session for user: ${userId} with category: ${validatedCategory}`);
-
     // Check if user already has an active chat ticket
     const existingTicket = await SupportTicket.findOne({
       userId,
@@ -96,8 +94,6 @@ const startChatSession = async (req, res) => {
       });
     }
 
-    console.log(`👤 Creating ticket for user: ${user.fullName || user.username} (${userModel})`);
-
     // Generate ticket number using timestamp + userId for uniqueness
     const generateTicketNumber = () => {
       try {
@@ -105,7 +101,6 @@ const startChatSession = async (req, res) => {
         const userIdShort = userId.toString().slice(-8); // Last 8 chars of userId
         const ticketNumber = `TKT-${timestamp}-${userIdShort}`;
         
-        console.log(`🎫 Generated unique ticket number: ${ticketNumber}`);
         return ticketNumber;
       } catch (error) {
         console.error('❌ Error generating ticket number:', error);
@@ -136,8 +131,6 @@ const startChatSession = async (req, res) => {
         timestamp: new Date()
       }]
     };
-
-    console.log('🎫 Creating ticket with data:', JSON.stringify({...ticketData, messages: '[messages]'}, null, 2));
 
     const ticket = await SupportTicket.create(ticketData);
 
@@ -183,8 +176,6 @@ const startChatSession = async (req, res) => {
         isExisting: false
       }
     });
-
-    console.log(`💬 New chat session started: ${ticket.ticketNumber} by ${user.fullName || user.username}`);
 
   } catch (error) {
     console.error('❌ Error starting chat session:', error);
@@ -501,8 +492,6 @@ const joinChatAsAdmin = async (req, res) => {
       }
     });
 
-    console.log(`👨‍💼 Admin ${req.admin.fullName} joined chat ticket ${ticket.ticketNumber}`);
-
   } catch (error) {
     console.error('❌ Error joining chat as admin:', error);
     res.status(500).json({
@@ -570,8 +559,6 @@ const closeChatSession = async (req, res) => {
         resolutionSummary
       }
     });
-
-    console.log(`✅ Chat ticket ${ticket.ticketNumber} closed by ${req.admin.fullName}`);
 
   } catch (error) {
     console.error('❌ Error closing chat session:', error);

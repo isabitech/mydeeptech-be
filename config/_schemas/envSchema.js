@@ -1,6 +1,6 @@
-import Joi from "joi";
+const Joi = require("joi");
 
-export const envSchema = Joi.object({
+ const envSchema = Joi.object({
   NODE_ENV: Joi.string()
     .valid("development", "production", "test")
     .default("development"),
@@ -54,3 +54,5 @@ export const envSchema = Joi.object({
   EXCHANGE_RATE_API_KEY: Joi.string().required(),
   EXCHANGE_RATES_API_KEY: Joi.string().required(),
 }).unknown(true); // allow other env vars like PATH, HOME, etc.
+
+module.exports = envSchema;

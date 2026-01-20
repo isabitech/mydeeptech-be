@@ -1,5 +1,5 @@
-import dotenv from "dotenv";
-import { envSchema } from "./_schemas/envSchema.js";
+const dotenv = require("dotenv");
+const envSchema = require("./_schemas/envSchema");
 
 // Default to development if NODE_ENV is not set
 const nodeEnv = process.env.NODE_ENV || "development";
@@ -69,9 +69,9 @@ const envConfig = {
   },
 
   cloudinary: {
-    CLOUD_NAME: env.CLOUDINARY_CLOUD_NAME,
-    API_KEY: env.CLOUDINARY_API_KEY,
-    API_SECRET: env.CLOUDINARY_API_SECRET,
+    CLOUDINARY_CLOUD_NAME: env.CLOUDINARY_CLOUD_NAME,
+    CLOUDINARY_API_KEY: env.CLOUDINARY_API_KEY,
+    CLOUDINARY_API_SECRET: env.CLOUDINARY_API_SECRET,
   },
 
   YOUTUBE_API_KEY: env.YOUTUBE_API_KEY,
@@ -82,4 +82,4 @@ const envConfig = {
  NODE_ENV: env.NODE_ENV || nodeEnv
 };
 
-export default envConfig;
+module.exports = envConfig;

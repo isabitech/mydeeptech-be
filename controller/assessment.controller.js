@@ -63,8 +63,6 @@ const submitAssessment = async (req, res) => {
       passingScore 
     } = value;
 
-    console.log(`📝 User ${userId} submitting ${assessmentType} assessment with ${answers.length} questions`);
-
     // Get user's current status
     const user = await DTUser.findById(userId);
     if (!user) {
@@ -157,7 +155,6 @@ const submitAssessment = async (req, res) => {
     const scorePercentage = Math.round((correctAnswers / totalQuestions) * 100);
     const passed = scorePercentage >= passingScore;
 
-    console.log(`📊 Assessment Results: ${correctAnswers}/${totalQuestions} correct (${scorePercentage}%) - ${passed ? 'PASSED' : 'FAILED'}`);
 
     // Calculate section-wise performance
     const sectionPerformance = {};
@@ -244,7 +241,6 @@ const submitAssessment = async (req, res) => {
       user.microTaskerStatus = newMicroTaskerStatus;
       await user.save();
 
-      console.log(`✅ User status updated: annotator: ${user.annotatorStatus}, microTasker: ${user.microTaskerStatus}`);
 
       // Create notification for status change
       try {
@@ -294,7 +290,6 @@ const submitAssessment = async (req, res) => {
           const { sendAnnotatorRejectionEmail } = require('../utils/annotatorMailer');
           await sendAnnotatorRejectionEmail(user.email, user.fullName);
         }
-        console.log(`✅ Email notification sent to user: ${user.email}`);
       } catch (emailError) {
         console.error('⚠️ Failed to send email notification:', emailError);
       }
@@ -588,8 +583,6 @@ const getAssessmentQuestions = async (req, res) => {
     const { questionsPerSection = 5 } = req.query;
     const sections = ['Comprehension', 'Vocabulary', 'Grammar', 'Writing'];
     
-    console.log(`📝 Getting ${questionsPerSection} questions per section for user ${userId}`);
-
     // Get random questions from each section
     const allQuestions = [];
     
@@ -620,8 +613,6 @@ const getAssessmentQuestions = async (req, res) => {
 
     // Shuffle the final question order so sections are mixed
     const shuffledQuestions = allQuestions.sort(() => Math.random() - 0.5);
-
-    console.log(`📝 Sent ${shuffledQuestions.length} questions across ${sections.length} sections`);
 
     res.status(200).json({
       success: true,
@@ -978,8 +969,6 @@ const getAllAssessments = async (req, res) => {
       return a.difficulty.localeCompare(b.difficulty);
     });
 
-    console.log(`✅ Retrieved ${assessments.length} available assessments for user`);
-
     res.status(200).json({
       success: true,
       message: `Found ${assessments.length} available assessments`,
@@ -1026,8 +1015,6 @@ const startAssessmentById = async (req, res) => {
         message: "User authentication required"
       });
     }
-
-    console.log(`🚀 User ${userId} starting assessment: ${assessmentId}`);
 
     // Handle English Proficiency Assessment
     if (assessmentId === 'english-proficiency') {
@@ -1146,8 +1133,6 @@ const getAssessmentSubmissions = async (req, res) => {
         message: "Access denied. You can only view your own submissions unless you are an admin."
       });
     }
-
-    console.log(`📊 ${isAdmin ? 'Admin' : 'User'} requesting submissions for assessment: ${assessmentId}`);
 
     let submissions = [];
     let totalCount = 0;
@@ -1330,8 +1315,6 @@ const getAssessmentSubmissions = async (req, res) => {
     // Remove helper field
     delete statistics.processedCount;
 
-    console.log(`✅ Retrieved ${submissions.length} submissions for assessment ${assessmentId}`);
-
     res.status(200).json({
       success: true,
       message: `Assessment submissions retrieved successfully`,
@@ -1379,8 +1362,6 @@ const getAdminAssessmentsOverview = async (req, res) => {
         message: "Admin authentication required"
       });
     }
-
-    console.log(`📊 Admin ${req.admin.email} requesting assessments overview`);
 
     const assessments = [];
 
@@ -1574,8 +1555,6 @@ const getAdminAssessmentsOverview = async (req, res) => {
       ? Math.round((overallStats.averageCompletionRate / overallStats.activeAssessments) * 10) / 10 
       : 0;
 
-    console.log(`✅ Retrieved ${assessments.length} assessment types with statistics`);
-
     res.status(200).json({
       success: true,
       message: "Assessment overview retrieved successfully",
@@ -1608,8 +1587,6 @@ const getUserAssessmentsOverview = async (req, res) => {
         message: "User authentication required"
       });
     }
-
-    console.log(`👤 User ${req.user?.email} requesting personal assessment overview`);
 
     const assessments = [];
 
@@ -1877,8 +1854,6 @@ const getUserAssessmentsOverview = async (req, res) => {
         })()
       }
     };
-
-    console.log(`✅ Retrieved assessment overview for user with ${assessments.length} assessments`);
 
     res.status(200).json({
       success: true,

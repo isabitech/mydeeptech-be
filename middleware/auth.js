@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const DTUser = require('../models/dtUser.model');
+const envConfig = require('./../config/envConfig');
 
 // JWT Authentication Middleware
 const authenticateToken = async (req, res, next) => {
@@ -19,17 +20,11 @@ const authenticateToken = async (req, res, next) => {
     }
 
     // Verify the token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-    console.log('🔓 JWT decoded:', { userId: decoded.userId, email: decoded.email });
+    
+    const decoded = jwt.verify(token, envConfig.jwt.JWT_SECRET || 'your-secret-key');
     
     // Optional: Check if user still exists and is active
     const user = await DTUser.findById(decoded.userId);
-    console.log('👤 User found in DB:', {
-      found: !!user,
-      email: user?.email,
-      annotatorStatus: user?.annotatorStatus,
-      isEmailVerified: user?.isEmailVerified
-    });
     
     if (!user) {
       return res.status(401).json({
@@ -40,7 +35,6 @@ const authenticateToken = async (req, res, next) => {
     }
 
     if (!user.isEmailVerified) {
-      console.log('❌ Email not verified for user:', user.email);
       return res.status(401).json({
         success: false,
         message: 'Email not verified. Please verify your email first.',
@@ -56,7 +50,6 @@ const authenticateToken = async (req, res, next) => {
       userDoc: user // Full user document if needed
     };
 
-    console.log(`🔐 Authenticated user: ${decoded.email} (ID: ${decoded.userId})`);
     next();
 
   } catch (error) {

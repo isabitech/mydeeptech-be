@@ -1,5 +1,5 @@
 const redis = require('redis');
-const { default: envConfig } = require('./envConfig');
+const envConfig = require('./envConfig');
 
 // Global variables for Redis client
 let redisClient = null;

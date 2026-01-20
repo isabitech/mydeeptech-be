@@ -29,7 +29,6 @@ const createInvoiceSchema = Joi.object({
 // Admin function: Create invoice for DTUser
 const createInvoice = async (req, res) => {
   try {
-    console.log(`💰 Admin ${req.admin.email} creating invoice`);
 
     // Validate request body
     const { error, value } = createInvoiceSchema.validate(req.body);
@@ -530,7 +529,6 @@ const deleteInvoice = async (req, res) => {
 // Admin function: Bulk authorize payment for all unpaid invoices
 const bulkAuthorizePayment = async (req, res) => {
   try {
-    console.log(`💰 Admin ${req.admin.email} initiating bulk payment authorization`);
 
     // Get all unpaid invoices
     const unpaidInvoices = await Invoice.find({ 
@@ -552,8 +550,6 @@ const bulkAuthorizePayment = async (req, res) => {
         }
       });
     }
-
-    console.log(`📊 Found ${unpaidInvoices.length} unpaid invoices to process`);
 
     const results = {
       processedInvoices: 0,
@@ -590,7 +586,6 @@ const bulkAuthorizePayment = async (req, res) => {
           );
           results.emailsSent++;
         } catch (emailError) {
-          console.error(`❌ Failed to send payment email for invoice ${invoice.invoiceNumber}:`, emailError);
           results.errors.push({
             invoiceNumber: invoice.invoiceNumber,
             error: 'Email sending failed',
@@ -599,7 +594,6 @@ const bulkAuthorizePayment = async (req, res) => {
         }
 
       } catch (invoiceError) {
-        console.error(`❌ Failed to process invoice ${invoice.invoiceNumber}:`, invoiceError);
         results.errors.push({
           invoiceNumber: invoice.invoiceNumber,
           error: 'Payment processing failed',
@@ -608,7 +602,6 @@ const bulkAuthorizePayment = async (req, res) => {
       }
     }
 
-    console.log(`✅ Bulk payment authorization completed. Processed: ${results.processedInvoices}, Emails sent: ${results.emailsSent}`);
 
     res.status(200).json({
       success: true,
@@ -629,7 +622,6 @@ const bulkAuthorizePayment = async (req, res) => {
 // Admin function: Generate Paystack CSV for selected invoices
 const generatePaystackCSV = async (req, res) => {
   try {
-    console.log(`📊 Admin ${req.admin.email} generating Paystack CSV`);
 
     // Get invoice IDs from query parameters (optional - if not provided, process all unpaid)
     const { invoiceIds } = req.query;
@@ -637,7 +629,6 @@ const generatePaystackCSV = async (req, res) => {
     
     // If specific invoice IDs are provided, filter by those IDs
     if (invoiceIds && Array.isArray(invoiceIds) && invoiceIds.length > 0) {
-      console.log(`🎯 Processing specific invoices: ${invoiceIds.length} selected`);
       
       // Validate all invoice IDs before proceeding
       const invalidIds = [];
@@ -699,7 +690,6 @@ const generatePaystackCSV = async (req, res) => {
         });
       }
       
-      console.log(`🎯 Processing single invoice: ${invoiceIds}`);
       invoiceFilter = {
         _id: new mongoose.Types.ObjectId(invoiceIds),
         paymentStatus: { $in: ['unpaid', 'overdue'] }
@@ -736,10 +726,8 @@ const generatePaystackCSV = async (req, res) => {
     let exchangeRateError = null;
     try {
       await convertUSDToNGN(1); // Test conversion with $1
-      console.log('✅ Exchange rate API is working');
     } catch (rateError) {
       exchangeRateError = rateError.message;
-      console.error('❌ Exchange rate API failed:', exchangeRateError);
       
       return res.status(503).json({
         success: false,
@@ -781,12 +769,9 @@ const generatePaystackCSV = async (req, res) => {
       try {
         const user = invoice.dtUserId;
         
-        console.log(`✅ Processing invoice ${invoice.invoiceNumber} for ${user.email}`);
-
         // Validate payment info
         const validation = validatePaymentInfo(user.payment_info);
         if (!validation.isValid) {
-          console.log(`❌ Invalid payment info for ${user.email}:`, validation.errors);
           results.errors.push({
             userId: user._id,
             userEmail: user.email,
@@ -796,8 +781,6 @@ const generatePaystackCSV = async (req, res) => {
           });
           continue;
         }
-
-        console.log(`✅ Payment info valid for ${user.email}`);
 
         // Convert USD to NGN
         const amountNGN = await convertUSDToNGN(invoice.invoiceAmount);
@@ -847,9 +830,6 @@ const generatePaystackCSV = async (req, res) => {
       row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(',')
     ).join('\n');
 
-    console.log(`✅ Generated Paystack CSV for ${results.processedInvoices} invoices`);
-    console.log(`💰 Total: $${results.totalAmountUSD.toFixed(2)} USD / ₦${results.totalAmountNGN.toFixed(2)} NGN`);
-
     // Set CSV download headers
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="paystack-bulk-transfer-${new Date().toISOString().split('T')[0]}.csv"`);
@@ -876,15 +856,12 @@ const generatePaystackCSV = async (req, res) => {
 // Admin function: Generate MPESA CSV for selected invoices
 const generateMPESACSV = async (req, res) => {
   try {
-    console.log(`📊 Admin ${req.admin.email} generating MPESA CSV`);
-
     // Get invoice IDs from query parameters (optional - if not provided, process all unpaid)
     const { invoiceIds } = req.query;
     let invoiceFilter = { paymentStatus: { $in: ['unpaid', 'overdue'] } };
     
     // If specific invoice IDs are provided, filter by those IDs
     if (invoiceIds && Array.isArray(invoiceIds) && invoiceIds.length > 0) {
-      console.log(`🎯 Processing specific invoices: ${invoiceIds.length} selected`);
       
       // Validate all invoice IDs before proceeding
       const invalidIds = [];
@@ -946,7 +923,6 @@ const generateMPESACSV = async (req, res) => {
         });
       }
       
-      console.log(`🎯 Processing single invoice: ${invoiceIds}`);
       invoiceFilter = {
         _id: new mongoose.Types.ObjectId(invoiceIds),
         paymentStatus: { $in: ['unpaid', 'overdue'] }
@@ -1002,11 +978,8 @@ const generateMPESACSV = async (req, res) => {
       try {
         const user = invoice.dtUserId;
         
-        console.log(`✅ Processing invoice ${invoice.invoiceNumber} for ${user.email}`);
-
         // Check if invoice has an amount
         if (!invoice.invoiceAmount || invoice.invoiceAmount <= 0) {
-          console.log(`⚠️ Skipping invoice ${invoice.invoiceNumber} - no valid amount (${invoice.invoiceAmount})`);
           results.errors.push({
             userId: user._id,
             userEmail: user.email,
@@ -1019,7 +992,6 @@ const generateMPESACSV = async (req, res) => {
 
         // Validate payment info (basic validation for MPESA)
         if (!user.payment_info?.account_number) {
-          console.log(`❌ Missing MPESA account number for ${user.email}`);
           results.errors.push({
             userId: user._id,
             userEmail: user.email,
@@ -1031,7 +1003,6 @@ const generateMPESACSV = async (req, res) => {
         }
 
         if (!user.payment_info?.account_name) {
-          console.log(`❌ Missing account name for ${user.email}`);
           results.errors.push({
             userId: user._id,
             userEmail: user.email,
@@ -1041,8 +1012,6 @@ const generateMPESACSV = async (req, res) => {
           });
           continue;
         }
-
-        console.log(`✅ Payment info valid for ${user.email}`);
 
         // Create transfer note
         const transferNote = `${invoice.description || 'Payment'} for ${user.fullName}`;
@@ -1074,9 +1043,6 @@ const generateMPESACSV = async (req, res) => {
 
     // Generate CSV content
     const csvContent = csvRows.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
-
-    console.log(`✅ Generated MPESA CSV for ${results.processedInvoices} invoices`);
-    console.log(`💰 Total: $${results.totalAmountUSD.toFixed(2)} USD`);
 
     // Set CSV download headers
     res.setHeader('Content-Type', 'text/csv');

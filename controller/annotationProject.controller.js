@@ -58,9 +58,6 @@ const removeApplicantSchema = Joi.object({
 // Admin function: Create a new annotation project
 const createAnnotationProject = async (req, res) => {
   try {
-    console.log(`🏗️ Admin creating new annotation project`);
-    console.log('🔍 Debug - req.admin:', req.admin);
-    console.log('🔍 Debug - req.userId:', req.userId);
 
     // Validate request body
     const { error, value } = createProjectSchema.validate(req.body);
@@ -76,7 +73,6 @@ const createAnnotationProject = async (req, res) => {
     const adminId = req.admin?.userId || req.userId || req.admin?.userDoc?._id;
     
     if (!adminId) {
-      console.log('❌ No admin ID found in request');
       return res.status(400).json({
         success: false,
         message: "Admin identification required to create project"
@@ -89,16 +85,12 @@ const createAnnotationProject = async (req, res) => {
       assignedAdmins: [adminId]
     };
 
-    console.log('🔍 Debug - projectData.createdBy:', projectData.createdBy);
-
     const project = new AnnotationProject(projectData);
     await project.save();
 
     // Populate creator information
     await project.populate('createdBy', 'fullName email');
     await project.populate('assignedAdmins', 'fullName email');
-
-    console.log(`✅ Annotation project created successfully: ${project.projectName} (ID: ${project._id})`);
 
     res.status(201).json({
       success: true,
@@ -121,8 +113,6 @@ const createAnnotationProject = async (req, res) => {
 // Admin function: Get all annotation projects
 const getAllAnnotationProjects = async (req, res) => {
   try {
-    console.log(`🔍 Admin ${req.admin.email} requesting annotation projects list`);
-
     // Get query parameters
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -144,8 +134,6 @@ const getAllAnnotationProjects = async (req, res) => {
       ];
     }
 
-    console.log('🔍 Annotation projects filter:', JSON.stringify(filter, null, 2));
-
     // Get projects with pagination
     const projects = await AnnotationProject.find(filter)
       .populate('createdBy', 'fullName email')
@@ -166,8 +154,6 @@ const getAllAnnotationProjects = async (req, res) => {
     const categorySummary = await AnnotationProject.aggregate([
       { $group: { _id: '$projectCategory', count: { $sum: 1 } } }
     ]);
-
-    console.log(`✅ Found ${projects.length} annotation projects (${totalProjects} total)`);
 
     // Calculate pagination info
     const totalPages = Math.ceil(totalProjects / limit);
@@ -214,7 +200,6 @@ const getAllAnnotationProjects = async (req, res) => {
 const getAnnotationProjectDetails = async (req, res) => {
   try {
     const { projectId } = req.params;
-    console.log(`🔍 Admin ${req.admin.email} requesting annotation project details: ${projectId}`);
 
     const project = await AnnotationProject.findById(projectId)
       .populate('createdBy', 'fullName email phone')
@@ -344,7 +329,6 @@ const getAnnotationProjectDetails = async (req, res) => {
     .limit(10)
     .select('status reviewedAt reviewedBy applicantId reviewNotes rejectionReason');
 
-    console.log(`✅ Found project with ${annotatorStats.total} total annotators (${annotatorStats.approved} approved, ${annotatorStats.rejected} rejected, ${annotatorStats.pending} pending)`);
 
     res.status(200).json({
       success: true,
@@ -380,7 +364,6 @@ const getAnnotationProjectDetails = async (req, res) => {
 const updateAnnotationProject = async (req, res) => {
   try {
     const { projectId } = req.params;
-    console.log(`🔄 Admin ${req.admin.email} updating annotation project: ${projectId}`);
 
     // Validate request body (allow partial updates)
     const updateSchema = createProjectSchema.fork(Object.keys(createProjectSchema.describe().keys), (schema) => schema.optional());
@@ -408,8 +391,6 @@ const updateAnnotationProject = async (req, res) => {
       });
     }
 
-    console.log(`✅ Annotation project updated successfully: ${project.projectName}`);
-
     res.status(200).json({
       success: true,
       message: "Annotation project updated successfully",
@@ -432,7 +413,6 @@ const updateAnnotationProject = async (req, res) => {
 const deleteAnnotationProject = async (req, res) => {
   try {
     const { projectId } = req.params;
-    console.log(`🗑️ Admin ${req.admin.email} deleting annotation project: ${projectId}`);
 
     const project = await AnnotationProject.findById(projectId);
     if (!project) {
@@ -465,8 +445,6 @@ const deleteAnnotationProject = async (req, res) => {
     await AnnotationProject.findByIdAndDelete(projectId);
     await ProjectApplication.deleteMany({ projectId: projectId });
 
-    console.log(`✅ Annotation project deleted successfully: ${project.projectName}`);
-
     res.status(200).json({
       success: true,
       message: "Annotation project deleted successfully"
@@ -486,7 +464,6 @@ const deleteAnnotationProject = async (req, res) => {
 const requestProjectDeletionOTP = async (req, res) => {
   try {
     const { projectId } = req.params;
-    console.log(`🔐 Admin ${req.admin.email} requesting deletion OTP for project: ${projectId}`);
 
     const project = await AnnotationProject.findById(projectId);
     if (!project) {
@@ -540,8 +517,6 @@ const requestProjectDeletionOTP = async (req, res) => {
 
       await sendProjectDeletionOTP(projectsOfficerEmail, deletionData);
       
-      console.log(`✅ Deletion OTP sent to Projects Officer: ${projectsOfficerEmail}`);
-
       res.status(200).json({
         success: true,
         message: "Deletion OTP sent to Projects Officer for approval",
@@ -587,8 +562,6 @@ const verifyOTPAndDeleteProject = async (req, res) => {
     const { projectId } = req.params;
     const { otp, confirmationMessage } = req.body;
     
-    console.log(`🔐 Admin ${req.admin.email} verifying deletion OTP for project: ${projectId}`);
-
     // Validate input
     if (!otp) {
       return res.status(400).json({
@@ -661,9 +634,6 @@ const verifyOTPAndDeleteProject = async (req, res) => {
     await AnnotationProject.findByIdAndDelete(projectId);
     await ProjectApplication.deleteMany({ projectId: projectId });
 
-    console.log(`✅ Project FORCE DELETED with OTP verification: ${project.projectName}`);
-    console.log(`📊 Deleted ${allApplications.length} applications (${activeApplications} were active)`);
-
     // Send notification to Projects Officer about successful deletion
     try {
       const { sendProjectDeletionConfirmation } = require('../utils/projectMailer');
@@ -687,8 +657,6 @@ const verifyOTPAndDeleteProject = async (req, res) => {
 
       await sendProjectDeletionConfirmation('projects@mydeeptech.ng', confirmationData);
       
-      console.log(`✅ Deletion confirmation sent to Projects Officer`);
-
     } catch (emailError) {
       console.warn(`⚠️ Failed to send deletion confirmation:`, emailError.message);
     }
@@ -731,8 +699,6 @@ const verifyOTPAndDeleteProject = async (req, res) => {
 // Admin function: Get all applications for annotation projects
 const getAnnotationProjectApplications = async (req, res) => {
   try {
-    console.log(`🔍 Admin ${req.admin.email} requesting annotation project applications`);
-
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
@@ -743,8 +709,6 @@ const getAnnotationProjectApplications = async (req, res) => {
     const filter = {};
     if (status) filter.status = status;
     if (projectId) filter.projectId = projectId;
-
-    console.log('🔍 Applications filter:', JSON.stringify(filter, null, 2));
 
     // Get applications with populated data
     const applications = await ProjectApplication.find(filter)
@@ -771,8 +735,6 @@ const getAnnotationProjectApplications = async (req, res) => {
       { $match: filter },
       { $group: { _id: '$status', count: { $sum: 1 } } }
     ]);
-
-    console.log(`✅ Found ${applications.length} applications (${totalApplications} total)`);
 
     // Calculate pagination info
     const totalPages = Math.ceil(totalApplications / limit);
@@ -817,8 +779,6 @@ const approveAnnotationProjectApplication = async (req, res) => {
     const { applicationId } = req.params;
     const { reviewNotes } = req.body;
     
-    console.log(`✅ Admin ${req.admin.email} approving application: ${applicationId}`);
-
     // Find and update application
     const application = await ProjectApplication.findById(applicationId)
       .populate({
@@ -886,13 +846,9 @@ const approveAnnotationProjectApplication = async (req, res) => {
         projectData
       );
 
-      console.log(`✅ Approval notification with guidelines sent to: ${application.applicantId.email}`);
-
     } catch (emailError) {
       console.error(`⚠️ Failed to send approval notification:`, emailError.message);
     }
-
-    console.log(`✅ Application approved successfully for project: ${project.projectName}`);
 
     res.status(200).json({
       success: true,
@@ -921,8 +877,6 @@ const rejectAnnotationProjectApplication = async (req, res) => {
     const { applicationId } = req.params;
     const { rejectionReason, reviewNotes } = req.body;
     
-    console.log(`❌ Admin ${req.admin.email} rejecting application: ${applicationId}`);
-
     // Find and update application
     const application = await ProjectApplication.findById(applicationId)
       .populate({
@@ -972,8 +926,6 @@ const rejectAnnotationProjectApplication = async (req, res) => {
         projectData
       );
 
-      console.log(`✅ Rejection notification sent to: ${application.applicantId.email}`);
-
     } catch (emailError) {
       console.error(`⚠️ Failed to send rejection notification:`, emailError.message);
     }
@@ -992,12 +944,9 @@ const rejectAnnotationProjectApplication = async (req, res) => {
           _id: application._id
         }
       );
-      console.log(`✅ In-app notification created for rejected applicant: ${application.applicantId.fullName}`);
     } catch (notificationError) {
       console.error(`⚠️ Failed to create rejection notification:`, notificationError.message);
     }
-
-    console.log(`✅ Application rejected successfully for project: ${application.projectId.projectName}`);
 
     res.status(200).json({
       success: true,
@@ -1026,8 +975,6 @@ const removeApprovedApplicant = async (req, res) => {
     const { applicationId } = req.params;
     const { removalReason, removalNotes } = req.body;
     
-    console.log(`🗑️  Admin ${req.admin.email} attempting to remove approved applicant: ${applicationId}`);
-
     // Validate request body
     const { error, value } = removeApplicantSchema.validate(req.body);
     if (error) {
@@ -1088,8 +1035,6 @@ const removeApprovedApplicant = async (req, res) => {
       { $inc: { approvedAnnotators: -1 } }
     );
 
-    console.log(`✅ Successfully removed approved applicant ${originalData.applicantName} from project "${originalData.projectName}"`);
-
     // Send notification email to the removed applicant
     try {
       const { sendApplicantRemovalNotification } = require('../utils/projectMailer');
@@ -1108,7 +1053,6 @@ const removeApprovedApplicant = async (req, res) => {
           }
         }
       );
-      console.log(`📧 Removal notification sent to ${originalData.applicantEmail}`);
     } catch (emailError) {
       console.error('❌ Failed to send removal notification email:', emailError);
       // Don't fail the request if email fails
@@ -1182,8 +1126,6 @@ const getRemovableApplicants = async (req, res) => {
   try {
     const { projectId } = req.params;
     
-    console.log(`🔍 Admin ${req.admin.email} requesting removable applicants for project: ${projectId}`);
-
     // Find the project
     const project = await AnnotationProject.findById(projectId);
     if (!project) {
@@ -1254,8 +1196,6 @@ const exportApprovedAnnotatorsCSV = async (req, res) => {
   try {
     const { projectId } = req.params;
     
-    console.log(`📊 Admin ${req.admin.email} exporting approved annotators for project: ${projectId}`);
-
     // Find the project
     const project = await AnnotationProject.findById(projectId);
     if (!project) {
@@ -1264,8 +1204,6 @@ const exportApprovedAnnotatorsCSV = async (req, res) => {
         message: "Project not found"
       });
     }
-
-    console.log(`📋 Found project: ${project.projectName}`);
 
     // Get all approved applications for this project
     const approvedApplications = await ProjectApplication.find({
@@ -1277,8 +1215,6 @@ const exportApprovedAnnotatorsCSV = async (req, res) => {
       select: 'fullName email phone personal_info'
     })
     .sort({ reviewedAt: -1 });
-
-    console.log(`✅ Found ${approvedApplications.length} approved annotators`);
 
     if (approvedApplications.length === 0) {
       return res.status(404).json({
@@ -1321,8 +1257,6 @@ const exportApprovedAnnotatorsCSV = async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
     
-    console.log(`📄 Sending CSV file: ${filename} with ${approvedApplications.length} annotators`);
-
     // Send CSV content
     res.status(200).send(csvContent);
 
@@ -1344,8 +1278,6 @@ const attachAssessmentToProject = async (req, res) => {
     const { projectId } = req.params;
     const { assessmentId, isRequired = true, assessmentInstructions = '' } = req.body;
     
-    console.log(`🎯 Admin ${req.admin.email} attaching assessment ${assessmentId} to project: ${projectId}`);
-
     // Validate inputs
     if (!assessmentId) {
       return res.status(400).json({
@@ -1389,8 +1321,6 @@ const attachAssessmentToProject = async (req, res) => {
     // Populate the assessment config for response
     await project.populate('assessment.assessmentId', 'title description numberOfTasks estimatedDuration');
 
-    console.log(`✅ Assessment ${assessmentConfig.title} attached to project: ${project.projectName}`);
-
     res.json({
       success: true,
       message: `Assessment "${assessmentConfig.title}" attached to project successfully`,
@@ -1419,8 +1349,6 @@ const removeAssessmentFromProject = async (req, res) => {
   try {
     const { projectId } = req.params;
     
-    console.log(`🗑️ Admin ${req.admin.email} removing assessment from project: ${projectId}`);
-
     // Find and update project
     const project = await AnnotationProject.findById(projectId);
     if (!project) {
@@ -1442,8 +1370,6 @@ const removeAssessmentFromProject = async (req, res) => {
     };
 
     await project.save();
-
-    console.log(`✅ Assessment removed from project: ${project.projectName}`);
 
     res.json({
       success: true,
@@ -1471,8 +1397,6 @@ const removeAssessmentFromProject = async (req, res) => {
  */
 const getAvailableAssessments = async (req, res) => {
   try {
-    console.log(`📋 Admin ${req.admin.email} fetching available assessments`);
-
     const MultimediaAssessmentConfig = require('../models/multimediaAssessmentConfig.model');
     
     const assessments = await MultimediaAssessmentConfig.find({ isActive: true })

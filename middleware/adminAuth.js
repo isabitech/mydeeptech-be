@@ -56,7 +56,6 @@ const authenticateAdmin = async (req, res, next) => {
     // Also set req.userId for backward compatibility
     req.userId = decoded.userId;
 
-    console.log(`🔑 Admin authenticated: ${decoded.email}, ID: ${decoded.userId}`);
     next();
 
   } catch (error) {
