@@ -120,6 +120,8 @@ router.get('/result-submissions', authenticateToken, getUserResultSubmissions);
 
 // Upload ID Document Route - adds to profile information
 router.post('/upload-id-document', authenticateToken, (req, res, next) => {
+  console.log('🚀 ID document upload endpoint hit');
+
   // Create a flexible upload handler for ID documents
   const upload = idDocumentUpload.fields([
     { name: 'idDocument', maxCount: 1 },
@@ -127,6 +129,7 @@ router.post('/upload-id-document', authenticateToken, (req, res, next) => {
     { name: 'document', maxCount: 1 },
     { name: 'file', maxCount: 1 }
   ]);
+
 
   upload(req, res, (err) => {
     if (err) {

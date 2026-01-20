@@ -31,7 +31,7 @@ const assessmentRoute = require('./routes/assessment');
 const supportRoute = require('./routes/support');
 const chatRoute = require('./routes/chat');
 const qaRoute = require('./routes/qa');
-const { default: envConfig } = require('./config/envConfig');
+const envConfig = require('./config/envConfig');
 
 const app = express();
 const server = createServer(app);
@@ -42,9 +42,9 @@ initializeSocketIO(server);
 // CORS Configuration - Development and Production
 const corsOptions = {
     origin: [
-        'http://localhost:5173', 
-        'http://127.0.0.1:5173', 
-        'https://mydeeptech.ng', 
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+        'https://mydeeptech.ng',
         'https://www.mydeeptech.ng',
         'https://mydeeptech-be.onrender.com',
         'https://mydeeptech-frontend.onrender.com'
@@ -55,7 +55,7 @@ const corsOptions = {
 };
 
 app.get("/", (req, res) => {
-    res.send('Welcome to My Deep Tech')
+    res.send('Welcome to My Deep Tech');
 });
 
 // Enhanced health check endpoint with database ping
