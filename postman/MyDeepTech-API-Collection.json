@@ -1,0 +1,356 @@
+{
+  "info": {
+    "name": "MyDeepTech API Collection",
+    "description": "Complete API collection for MyDeepTech annotation platform with resume requirements and project resources",
+    "version": "1.0.0",
+    "_postman_id": "mydeeptech-api-v1",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwt_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000/api",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "project_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"John Doe\",\n  \"email\": \"john@example.com\",\n  \"phone\": \"+1234567890\",\n  \"consent\": true,\n  \"domains\": [\"technology\", \"healthcare\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/dtUserRegister",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "dtUserRegister"]
+            },
+            "description": "Register a new user account"
+          },
+          "response": []
+        },
+        {
+          "name": "Login User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.token) {",
+                  "        pm.collectionVariables.set('jwt_token', response.token);",
+                  "        pm.collectionVariables.set('user_id', response.user._id);",
+                  "        console.log('JWT token saved:', response.token.substring(0, 20) + '...');",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\",\n  \"password\": \"securePassword123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/dtUserLogin",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "dtUserLogin"]
+            },
+            "description": "Login user and get JWT token"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "File Upload",
+      "item": [
+        {
+          "name": "Upload Resume (Required for Applications)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "resume",
+                  "type": "file",
+                  "src": "",
+                  "description": "Resume file (PDF, DOC, DOCX)"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/upload-resume",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "upload-resume"]
+            },
+            "description": "Upload resume - REQUIRED before applying to projects"
+          },
+          "response": []
+        },
+        {
+          "name": "Upload ID Document",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "idDocument",
+                  "type": "file",
+                  "src": "",
+                  "description": "ID document file (PDF, JPG, PNG)"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/upload-id-document",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "upload-id-document"]
+            },
+            "description": "Upload identification document"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Projects",
+      "item": [
+        {
+          "name": "Get Available Projects",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.data.projects && response.data.projects.length > 0) {",
+                  "        pm.collectionVariables.set('project_id', response.data.projects[0]._id);",
+                  "        console.log('Project ID saved:', response.data.projects[0]._id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/projects/available?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "projects", "available"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Get list of available projects for application"
+          },
+          "response": []
+        },
+        {
+          "name": "Apply to Project (Requires Resume)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"coverLetter\": \"I am interested in contributing to this annotation project. I have experience in data annotation and would like to participate.\",\n  \"proposedRate\": 15,\n  \"availability\": \"part_time\",\n  \"estimatedCompletionTime\": \"2 weeks\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/projects/{{project_id}}/apply",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "projects", "{{project_id}}", "apply"]
+            },
+            "description": "Apply to a project - REQUIRES resume to be uploaded first"
+          },
+          "response": [
+            {
+              "name": "Resume Required Error",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{jwt_token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"coverLetter\": \"Test application\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/auth/projects/{{project_id}}/apply",
+                  "host": ["{{base_url}}"],
+                  "path": ["auth", "projects", "{{project_id}}", "apply"]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Please upload your resume in your profile section\",\n  \"error\": {\n    \"code\": \"RESUME_REQUIRED\",\n    \"reason\": \"A resume is required to apply to projects\",\n    \"action\": \"Upload your resume in the profile section before applying\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Project Guidelines (Approved Users Only)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/projects/{{project_id}}/guidelines",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "projects", "{{project_id}}", "guidelines"]
+            },
+            "description": "Access project guidelines and resources (only for approved applicants)"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "User Profile",
+      "item": [
+        {
+          "name": "Get User Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/dtUserProfile",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "dtUserProfile"]
+            },
+            "description": "Get current user profile information"
+          },
+          "response": []
+        },
+        {
+          "name": "Update User Profile",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"personal_info\": {\n    \"country\": \"United States\",\n    \"time_zone\": \"America/New_York\",\n    \"available_hours_per_week\": 20\n  },\n  \"professional_background\": {\n    \"education_field\": \"Computer Science\",\n    \"years_of_experience\": 3\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/dtUserProfile",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "dtUserProfile"]
+            },
+            "description": "Update user profile information"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
