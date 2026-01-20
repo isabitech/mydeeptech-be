@@ -1,18 +1,29 @@
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const multer = require('multer');
+const { default: envConfig } = require('./envConfig');
 
 // Configure Cloudinary
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
+  cloud_name: envConfig.cloudinary.CLOUDINARY_CLOUD_NAME,
+  api_key: envConfig.cloudinary.CLOUDINARY_API_KEY,
+  api_secret: envConfig.cloudinary.CLOUDINARY_API_SECRET
 });
 
 // Verify Cloudinary configuration
 const verifyCloudinaryConfig = () => {
-  const requiredEnvVars = ['CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'];
-  const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+    const requiredCloudinaryVars = {
+    CLOUDINARY_CLOUD_NAME: envConfig.cloudinary.CLOUDINARY_CLOUD_NAME,
+    CLOUDINARY_API_KEY: envConfig.cloudinary.CLOUDINARY_API_KEY,
+    CLOUDINARY_API_SECRET: envConfig.cloudinary.CLOUDINARY_API_SECRET,
+  };
+
+
+const missingVars = Object.entries(requiredCloudinaryVars)
+  .filter(([, value]) => !value)
+  .map(([key]) => key);
+
   
   if (missingVars.length > 0) {
     console.log(`⚠️ Missing Cloudinary environment variables: ${missingVars.join(', ')}`);

@@ -1,4 +1,5 @@
 const redis = require('redis');
+const { default: envConfig } = require('./envConfig');
 
 // Global variables for Redis client
 let redisClient = null;
@@ -8,15 +9,15 @@ const maxRetries = 1;
 
 // Parse Redis host and port from environment
 const parseRedisConfig = () => {
-    const redisHost = process.env.REDIS_HOST || 'localhost';
-    const redisPort = process.env.REDIS_PORT || 6379;
+    const redisHost = envConfig.redis.REDIS_HOST || 'localhost';
+    const redisPort = envConfig.redis.REDIS_PORT || 6379;
     
     // Debug: Log what we're reading from environment
     console.log('🔍 Environment variables:');
-    console.log(`   REDIS_HOST: ${process.env.REDIS_HOST}`);
-    console.log(`   REDIS_PORT: ${process.env.REDIS_PORT}`);
-    console.log(`   REDIS_PASSWORD: ${process.env.REDIS_PASSWORD ? '[HIDDEN]' : 'Not set'}`);
-    console.log(`   REDIS_DB: ${process.env.REDIS_DB}`);
+    console.log(`   REDIS_HOST: ${envConfig.redis.REDIS_HOST}`);
+    console.log(`   REDIS_PORT: ${envConfig.redis.REDIS_PORT}`);
+    console.log(`   REDIS_PASSWORD: ${envConfig.redis.REDIS_PASSWORD ? '[HIDDEN]' : 'Not set'}`);
+    console.log(`   REDIS_DB: ${envConfig.redis.REDIS_DB}`);
     
     // Check if host includes port (for Redis Cloud URLs like "host:port")
     if (redisHost.includes(':') && !redisHost.startsWith('redis://')) {
@@ -40,8 +41,8 @@ const createRedisClient = async () => {
         const redisConfig = {
             host: host,
             port: port,
-            password: process.env.REDIS_PASSWORD || null,
-            db: parseInt(process.env.REDIS_DB) || 0, // Parse as integer, ignore non-numeric values
+            password: envConfig.redis.REDIS_PASSWORD || null,
+            db: parseInt(envConfig.redis.REDIS_DB) || 0, // Parse as integer, ignore non-numeric values
             retryDelayOnFailover: 100,
             enableOfflineQueue: false,
             maxRetriesPerRequest: 1,
@@ -182,7 +183,7 @@ const redisHealthCheck = async () => {
             config: {
                 host: host,
                 port: port,
-                db: parseInt(process.env.REDIS_DB) || 0
+                db: parseInt(envConfig.redis.REDIS_DB) || 0
             }
         };
     } catch (error) {

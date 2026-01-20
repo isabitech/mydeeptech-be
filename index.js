@@ -31,6 +31,7 @@ const assessmentRoute = require('./routes/assessment');
 const supportRoute = require('./routes/support');
 const chatRoute = require('./routes/chat');
 const qaRoute = require('./routes/qa');
+const { default: envConfig } = require('./config/envConfig');
 
 const app = express();
 const server = createServer(app);
@@ -161,7 +162,7 @@ const connectDB = async () => {
         try {
             console.log(`🔄 Attempting MongoDB connection (attempt ${retries + 1}/${maxRetries})...`);
             
-            const conn = await mongoose.connect(process.env.MONGO_URI, {
+            const conn = await mongoose.connect(envConfig.mongo.MONGO_URI, {
                 // Production-optimized timeouts
                 serverSelectionTimeoutMS: 60000, // 60 seconds
                 socketTimeoutMS: 60000,          // 60 seconds  
@@ -230,7 +231,7 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Start Server
-const PORT = process.env.PORT || 5000;
+const PORT = envConfig.PORT || 5000;
 server.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`💬 Socket.IO chat server active`);
