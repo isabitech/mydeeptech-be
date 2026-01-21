@@ -1,5 +1,5 @@
-import dotenv from "dotenv";
-import { envSchema } from "./_schemas/envSchema.js";
+const dotenv = require("dotenv");
+const envSchema = require("./_schemas/envSchema");
 
 // Default to development if NODE_ENV is not set
 const nodeEnv = process.env.NODE_ENV || "development";
@@ -54,24 +54,24 @@ const envConfig = {
   },
 
   redis: {
-    HOST: env.REDIS_HOST,
-    PORT: env.REDIS_PORT,
-    PASSWORD: env.REDIS_PASSWORD,
-    DB: env.REDIS_DB,
+    REDIS_HOST: env.REDIS_HOST,
+    REDIS_PORT: env.REDIS_PORT,
+    REDIS_PASSWORD: env.REDIS_PASSWORD,
+    REDIS_DB: env.REDIS_DB,
   },
 
   admin: {
-    NAME: env.NEW_ADMIN_NAME,
-    EMAIL: env.NEW_ADMIN_EMAIL,
-    PHONE: env.NEW_ADMIN_PHONE,
-    PASSWORD: env.NEW_ADMIN_PASSWORD,
-    CREATION_KEY: env.ADMIN_CREATION_KEY,
+    NEW_ADMIN_NAME: env.NEW_ADMIN_NAME,
+    NEW_ADMIN_EMAIL: env.NEW_ADMIN_EMAIL,
+    NEW_ADMIN_PHONE: env.NEW_ADMIN_PHONE,
+    NEW_ADMIN_PASSWORD: env.NEW_ADMIN_PASSWORD,
+    ADMIN_CREATION_KEY: env.ADMIN_CREATION_KEY,
   },
 
   cloudinary: {
-    CLOUD_NAME: env.CLOUDINARY_CLOUD_NAME,
-    API_KEY: env.CLOUDINARY_API_KEY,
-    API_SECRET: env.CLOUDINARY_API_SECRET,
+    CLOUDINARY_CLOUD_NAME: env.CLOUDINARY_CLOUD_NAME,
+    CLOUDINARY_API_KEY: env.CLOUDINARY_API_KEY,
+    CLOUDINARY_API_SECRET: env.CLOUDINARY_API_SECRET,
   },
 
   YOUTUBE_API_KEY: env.YOUTUBE_API_KEY,
@@ -82,4 +82,4 @@ const envConfig = {
  NODE_ENV: env.NODE_ENV || nodeEnv
 };
 
-export default envConfig;
+module.exports = envConfig;

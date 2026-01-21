@@ -1,49 +1,47 @@
-import jwt from 'jsonwebtoken';
-import dtUserRepository from '../repositories/dtUser.repository.js';
-import { ResponseHandler, AuthenticationError, AuthorizationError } from '../utils/responseHandler.js';
+const jwt = require('jsonwebtoken');
+const DTUser = require('../models/dtUser.model');
 
-/**
- * Admin authentication middleware
- */
-export const authenticateAdmin = async (req, res, next) => {
+// Admin authentication middleware
+const authenticateAdmin = async (req, res, next) => {
   try {
     // Get token from Authorization header
     const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.startsWith('Bearer ')
-      ? authHeader.split(' ')[1]
+    const token = authHeader && authHeader.startsWith('Bearer ') 
+      ? authHeader.split(' ')[1] 
       : req.headers.token || req.body.token || req.query.token;
 
     if (!token) {
-      throw new AuthenticationError('Admin access token required');
-    }
-
-    // Verify the token
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) {
-      console.error('FATAL: JWT_SECRET environment variable is not defined.');
-      return res.status(500).json({
+      return res.status(401).json({
         success: false,
-        message: 'Authentication service misconfigured',
-        code: 'INTERNAL_ERROR'
+        message: 'Admin access token required',
+        code: 'ADMIN_TOKEN_MISSING'
       });
     }
 
-    const decoded = jwt.verify(token, jwtSecret);
-
+    // Verify the token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    
     // Check if user exists
-    const user = await dtUserRepository.findById(decoded.userId);
+    const user = await DTUser.findById(decoded.userId);
     if (!user) {
-      throw new AuthenticationError('Admin token is valid but user no longer exists');
+      return res.status(401).json({
+        success: false,
+        message: 'Admin token is valid but user no longer exists',
+        code: 'ADMIN_NOT_FOUND'
+      });
     }
 
     // Check if user has admin privileges
+    // For now, we'll use a simple check - you can enhance this later
     const adminEmails = process.env.ADMIN_EMAILS ? process.env.ADMIN_EMAILS.split(',') : [];
-    const isAdmin = adminEmails.includes(user.email.toLowerCase()) ||
-      user.email.endsWith('@mydeeptech.ng') ||
-      user.role === 'ADMIN';
+    const isAdmin = adminEmails.includes(user.email.toLowerCase()) || user.email.endsWith('@mydeeptech.ng');
 
     if (!isAdmin) {
-      throw new AuthorizationError('Admin privileges required. Access denied.');
+      return res.status(403).json({
+        success: false,
+        message: 'Admin privileges required. Access denied.',
+        code: 'ADMIN_ACCESS_DENIED'
+      });
     }
 
     // Add admin info to request object
@@ -52,30 +50,41 @@ export const authenticateAdmin = async (req, res, next) => {
       email: decoded.email,
       fullName: decoded.fullName,
       userDoc: user,
-      _id: user._id
+      _id: user._id  // Add this as backup
     };
 
     // Also set req.userId for backward compatibility
     req.userId = decoded.userId;
 
-    console.log(`🔑 Admin authenticated: ${decoded.email}, ID: ${decoded.userId}`);
     next();
 
   } catch (error) {
     console.error('❌ Admin authentication failed:', error.message);
-
+    
     if (error.name === 'JsonWebTokenError') {
-      return ResponseHandler.error(res, new AuthenticationError('Invalid admin token format'));
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid admin token format',
+        code: 'INVALID_ADMIN_TOKEN'
+      });
     }
-
+    
     if (error.name === 'TokenExpiredError') {
-      return ResponseHandler.error(res, new AuthenticationError('Admin token has expired. Please login again.'));
+      return res.status(401).json({
+        success: false,
+        message: 'Admin token has expired. Please login again.',
+        code: 'ADMIN_TOKEN_EXPIRED'
+      });
     }
 
-    return ResponseHandler.error(res, error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error during admin authentication',
+      error: error.message
+    });
   }
 };
 
-export default {
+module.exports = {
   authenticateAdmin
 };

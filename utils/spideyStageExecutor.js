@@ -1,7 +1,4 @@
-import mongoose from 'mongoose';
-import SpideyAssessmentConfig from '../models/spideyAssessmentConfig.model.js';
-import SpideyAssessmentSubmission from '../models/spideyAssessmentSubmission.model.js';
-import AuditLog from '../models/auditLog.model.js';
+const mongoose = require('mongoose');
 
 /**
  * SPIDEY ASSESSMENT STAGE EXECUTION ENGINE
@@ -10,6 +7,10 @@ import AuditLog from '../models/auditLog.model.js';
  */
 class SpideyStageExecutor {
   constructor() {
+    this.SpideyAssessmentConfig = require('../models/spideyAssessmentConfig.model');
+    this.SpideyAssessmentSubmission = require('../models/spideyAssessmentSubmission.model');
+    this.AuditLog = require('../models/auditLog.model');
+    
     // Stage type handlers - each stage has specific validation logic
     this.STAGE_HANDLERS = {
       quiz: this._handleQuizStage.bind(this),
@@ -33,9 +34,9 @@ class SpideyStageExecutor {
    */
   async executeStage(submissionId, stage, submissionData) {
     try {
-      const submission = await SpideyAssessmentSubmission.findById(submissionId)
+      const submission = await this.SpideyAssessmentSubmission.findById(submissionId)
         .populate('assessmentId');
-
+      
       if (!submission) {
         throw new Error(`Submission not found: ${submissionId}`);
       }
@@ -43,7 +44,7 @@ class SpideyStageExecutor {
       // Get stage configuration from assessment JSON
       const assessmentConfig = submission.assessmentId;
       const stageConfig = assessmentConfig.stages[stage];
-
+      
       if (!stageConfig || !stageConfig.enabled) {
         throw new Error(`Stage not available: ${stage}`);
       }
@@ -51,7 +52,7 @@ class SpideyStageExecutor {
       // Determine stage type and get appropriate handler
       const stageType = this.STAGE_TYPES[stage];
       const handler = this.STAGE_HANDLERS[stageType];
-
+      
       if (!handler) {
         throw new Error(`No handler for stage type: ${stageType}`);
       }
@@ -61,12 +62,12 @@ class SpideyStageExecutor {
 
       // Execute stage-specific validation
       const result = await handler(submission, stageConfig, submissionData);
-
+      
       // Apply hard fail conditions
       const hardFailResult = await this._checkHardFailConditions(
-        submission,
-        stageConfig,
-        submissionData,
+        submission, 
+        stageConfig, 
+        submissionData, 
         result
       );
 
@@ -82,10 +83,10 @@ class SpideyStageExecutor {
       return result;
 
     } catch (error) {
-      await this._logError('STAGE_EXECUTION_FAILED', {
-        submissionId,
-        stage,
-        error: error.message
+      await this._logError('STAGE_EXECUTION_FAILED', { 
+        submissionId, 
+        stage, 
+        error: error.message 
       });
       throw error;
     }
@@ -147,7 +148,7 @@ class SpideyStageExecutor {
 
       // Score the question
       const isCorrect = this._scoreQuestion(question, response);
-
+      
       if (isCorrect) {
         totalScore += question.points || 1;
       }
@@ -193,7 +194,7 @@ class SpideyStageExecutor {
     const requiredFields = stageConfig.requiredFields || [];
     for (const field of requiredFields) {
       const value = submissionData[field.fieldId];
-
+      
       if (!value || (typeof value === 'string' && value.trim().length === 0)) {
         result.violations.push({
           rule: 'MISSING_REQUIRED_FIELD',
@@ -214,10 +215,10 @@ class SpideyStageExecutor {
 
       // File reference validation
       if (field.mustReferenceFiles && field.mustReferenceFiles.length > 0) {
-        const hasRequiredReferences = field.mustReferenceFiles.every(fileId =>
+        const hasRequiredReferences = field.mustReferenceFiles.every(fileId => 
           value.toLowerCase().includes(fileId.toLowerCase())
         );
-
+        
         if (!hasRequiredReferences) {
           result.violations.push({
             rule: 'MISSING_FILE_REFERENCE',
@@ -231,7 +232,7 @@ class SpideyStageExecutor {
     // Forbidden keyword scan
     const forbiddenKeywords = stageConfig.forbiddenKeywords || [];
     const promptText = submissionData.promptText || '';
-
+    
     for (const keyword of forbiddenKeywords) {
       if (promptText.toLowerCase().includes(keyword.toLowerCase())) {
         result.violations.push({
@@ -269,7 +270,7 @@ class SpideyStageExecutor {
     // Validate golden solution file
     if (requiredSubmissions.goldenSolution) {
       const goldenSolution = submissionData.goldenSolution;
-
+      
       if (!goldenSolution) {
         result.violations.push({
           rule: 'MISSING_GOLDEN_SOLUTION',
@@ -281,7 +282,7 @@ class SpideyStageExecutor {
         // File format validation
         const allowedFormats = requiredSubmissions.goldenSolution.allowedFormats || [];
         const fileFormat = goldenSolution.format || goldenSolution.mimetype;
-
+        
         if (allowedFormats.length > 0 && !allowedFormats.includes(fileFormat)) {
           result.violations.push({
             rule: 'INVALID_FILE_FORMAT',
@@ -293,7 +294,7 @@ class SpideyStageExecutor {
         // File size validation
         const minSizeKB = requiredSubmissions.goldenSolution.minFileSizeKB || 0;
         const fileSizeKB = (goldenSolution.size || 0) / 1024;
-
+        
         if (fileSizeKB < minSizeKB) {
           result.violations.push({
             rule: 'FILE_TOO_SMALL',
@@ -308,7 +309,7 @@ class SpideyStageExecutor {
     if (requiredSubmissions.reasoningExplanation) {
       const reasoning = submissionData.reasoningExplanation;
       const minLength = requiredSubmissions.reasoningExplanation.minLength || 0;
-
+      
       if (!reasoning || reasoning.length < minLength) {
         result.violations.push({
           rule: 'INSUFFICIENT_REASONING',
@@ -321,10 +322,10 @@ class SpideyStageExecutor {
     // Validate rubrics
     const positiveRubrics = submissionData.positiveRubrics || [];
     const negativeRubrics = submissionData.negativeRubrics || [];
-
+    
     const minPositive = requiredSubmissions.positiveRubrics?.minItems || 0;
     const minNegative = requiredSubmissions.negativeRubrics?.minItems || 0;
-
+    
     if (positiveRubrics.length < minPositive) {
       result.violations.push({
         rule: 'INSUFFICIENT_POSITIVE_RUBRICS',
@@ -335,7 +336,7 @@ class SpideyStageExecutor {
 
     if (negativeRubrics.length < minNegative) {
       result.violations.push({
-        rule: 'INSUFFICIENT_NEGATIVE_RUBRICS',
+        rule: 'INSUFFICIENT_NEGATIVE_RUBRICS', 
         description: `Need at least ${minNegative} negative rubrics`,
         severity: 'error'
       });
@@ -345,7 +346,7 @@ class SpideyStageExecutor {
     const totalChecks = 5; // Golden solution, reasoning, positive/negative rubrics, format
     const violations = result.violations.filter(v => v.severity !== 'critical').length;
     const passedChecks = totalChecks - violations;
-
+    
     result.score = Math.round((passedChecks / totalChecks) * 100);
     result.passed = result.score >= (stageConfig.passingScore || 80) && !result.hardFail;
 
@@ -366,11 +367,11 @@ class SpideyStageExecutor {
 
     const expectedBehavior = stageConfig.expectedBehavior || {};
     const response = submissionData.response || '';
-
+    
     // Check if violation was flagged
     const mustFlagViolation = expectedBehavior.mustFlagViolation || false;
     const violationFlagged = this._detectViolationFlag(response);
-
+    
     if (mustFlagViolation && !violationFlagged) {
       result.violations.push({
         rule: 'FAILED_TO_FLAG_VIOLATION',
@@ -383,7 +384,7 @@ class SpideyStageExecutor {
     // Check if alternative was proposed
     const mustProposeAlternative = expectedBehavior.mustProposeAlternative || false;
     const alternativeProposed = this._detectAlternativeProposal(response);
-
+    
     if (mustProposeAlternative && !alternativeProposed) {
       result.violations.push({
         rule: 'NO_ALTERNATIVE_PROPOSED',
@@ -395,7 +396,7 @@ class SpideyStageExecutor {
 
     // Check for blind compliance (automatic failure)
     const blindCompliance = this._detectBlindCompliance(response, stageConfig.trapPrompt);
-
+    
     if (blindCompliance) {
       result.violations.push({
         rule: 'BLIND_COMPLIANCE',
@@ -455,19 +456,19 @@ class SpideyStageExecutor {
     switch (question.questionType) {
       case 'multiple_choice':
         return response.userAnswer === question.correctAnswer;
-
+        
       case 'true_false':
         return response.userAnswer === question.correctAnswer;
-
+        
       case 'text_input':
         // Check for required keywords
         const requiredKeywords = question.requiredKeywords || [];
         const userAnswer = (response.userAnswer || '').toLowerCase();
-
-        return requiredKeywords.every(keyword =>
+        
+        return requiredKeywords.every(keyword => 
           userAnswer.includes(keyword.toLowerCase())
         );
-
+        
       default:
         return false;
     }
@@ -481,7 +482,7 @@ class SpideyStageExecutor {
       'violation', 'against policy', 'inappropriate', 'cannot', 'refuse',
       'not allowed', 'prohibited', 'forbidden', 'unethical', 'improper'
     ];
-
+    
     const lowerResponse = response.toLowerCase();
     return flagIndicators.some(indicator => lowerResponse.includes(indicator));
   }
@@ -491,7 +492,7 @@ class SpideyStageExecutor {
       'instead', 'alternative', 'suggest', 'propose', 'different approach',
       'better way', 'compliant', 'acceptable'
     ];
-
+    
     const lowerResponse = response.toLowerCase();
     return alternativeIndicators.some(indicator => lowerResponse.includes(indicator));
   }
@@ -500,9 +501,9 @@ class SpideyStageExecutor {
     // Check if response attempts to fulfill the forbidden request
     const forbiddenActions = this._extractForbiddenActions(trapPrompt);
     const lowerResponse = response.toLowerCase();
-
-    return forbiddenActions.some(action =>
-      lowerResponse.includes(action.toLowerCase()) &&
+    
+    return forbiddenActions.some(action => 
+      lowerResponse.includes(action.toLowerCase()) && 
       !this._detectViolationFlag(response)
     );
   }
@@ -514,8 +515,8 @@ class SpideyStageExecutor {
       'personal information', 'private data', 'confidential',
       'harmful content', 'inappropriate'
     ];
-
-    return forbiddenPatterns.filter(pattern =>
+    
+    return forbiddenPatterns.filter(pattern => 
       trapPrompt.toLowerCase().includes(pattern)
     );
   }
@@ -524,7 +525,7 @@ class SpideyStageExecutor {
    * Audit and logging methods
    */
   async _logStageStart(submissionId, stage) {
-    const auditEntry = new AuditLog({
+    const auditEntry = new this.AuditLog({
       entityType: 'SpideyStageExecution',
       entityId: submissionId,
       action: 'STAGE_STARTED',
@@ -535,12 +536,12 @@ class SpideyStageExecutor {
   }
 
   async _logStageCompletion(submissionId, stage, result) {
-    const auditEntry = new AuditLog({
-      entityType: 'SpideyStageExecution',
+    const auditEntry = new this.AuditLog({
+      entityType: 'SpideyStageExecution', 
       entityId: submissionId,
       action: 'STAGE_COMPLETED',
-      details: {
-        stage,
+      details: { 
+        stage, 
         passed: result.passed,
         score: result.score,
         hardFail: result.hardFail,
@@ -554,7 +555,7 @@ class SpideyStageExecutor {
 
   async _logError(errorType, details) {
     try {
-      const auditEntry = new AuditLog({
+      const auditEntry = new this.AuditLog({
         entityType: 'SpideyStageExecution',
         action: `ERROR_${errorType}`,
         details: { ...details, severity: 'ERROR' },
@@ -573,16 +574,16 @@ class SpideyStageExecutor {
     switch (condition.type) {
       case 'forbidden_keyword':
         return this._checkForbiddenKeyword(condition.keywords, submissionData);
-
+      
       case 'missing_requirement':
         return this._checkMissingRequirement(condition.requirement, submissionData);
-
+      
       case 'invalid_format':
         return this._checkInvalidFormat(condition.allowedFormats, submissionData);
-
+      
       case 'size_violation':
         return this._checkSizeViolation(condition.limits, submissionData);
-
+      
       default:
         return false;
     }
@@ -594,8 +595,8 @@ class SpideyStageExecutor {
   }
 
   _checkMissingRequirement(requirement, submissionData) {
-    return !submissionData[requirement.field] ||
-      submissionData[requirement.field].length < (requirement.minLength || 1);
+    return !submissionData[requirement.field] || 
+           submissionData[requirement.field].length < (requirement.minLength || 1);
   }
 
   _checkInvalidFormat(allowedFormats, submissionData) {
@@ -605,11 +606,11 @@ class SpideyStageExecutor {
 
   _checkSizeViolation(limits, submissionData) {
     const files = submissionData.files || [];
-    return files.some(file =>
-      file.size > (limits.maxSizeKB * 1024) ||
+    return files.some(file => 
+      file.size > (limits.maxSizeKB * 1024) || 
       file.size < (limits.minSizeKB * 1024)
     );
   }
 }
 
-export default SpideyStageExecutor;
+module.exports = SpideyStageExecutor;

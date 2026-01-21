@@ -1,4 +1,4 @@
-import { sendVerificationEmail } from './mailer.js';
+const { sendVerificationEmail } = require('./mailer'); // Now supports Brevo + Gmail fallback
 
 // Simple in-memory queue for emails (in production, use Redis or a proper queue)
 class EmailQueue {
@@ -17,23 +17,23 @@ class EmailQueue {
   // Process emails in the queue
   async processQueue() {
     if (this.processing || this.queue.length === 0) return;
-
+    
     this.processing = true;
     console.log(`🔄 Processing ${this.queue.length} emails in queue...`);
-
+    
     while (this.queue.length > 0) {
       const emailTask = this.queue.shift();
-
+      
       try {
         const startTime = Date.now();
         const result = await sendVerificationEmail(emailTask.email, emailTask.name);
         const endTime = Date.now();
-
+        
         console.log(`✅ Email sent successfully to ${emailTask.email} via ${result.provider} (${endTime - startTime}ms)`);
       } catch (error) {
         emailTask.attempts++;
         console.error(`❌ Email failed for ${emailTask.email} (attempt ${emailTask.attempts}):`, error.message);
-
+        
         // Retry if under max attempts
         if (emailTask.attempts < emailTask.maxAttempts) {
           console.log(`🔄 Retrying email for ${emailTask.email}...`);
@@ -47,11 +47,11 @@ class EmailQueue {
           console.error(`💀 Max attempts reached for ${emailTask.email}. Email abandoned.`);
         }
       }
-
+      
       // Small delay between emails to avoid rate limiting
       await new Promise(resolve => setTimeout(resolve, 500));
     }
-
+    
     this.processing = false;
     console.log('✅ Email queue processing completed');
   }
@@ -72,4 +72,4 @@ class EmailQueue {
 
 const emailQueue = new EmailQueue();
 
-export { emailQueue };
+module.exports = { emailQueue };

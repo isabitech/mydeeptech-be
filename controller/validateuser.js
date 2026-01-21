@@ -1,24 +1,31 @@
-import surveyUserService from '../services/surveyUser.service.js';
-import { ResponseHandler, ValidationError } from '../utils/responseHandler.js';
-import Joi from 'joi';
+const { isValidEmailFormat } = require('../utils/emailvalidator');
+const User = require('../models/surveyuser.model'); // import your model
 
-class ValidateUserController {
-  // SCHEMAS
-  static validateVisitorSchema = Joi.object({
-    email: Joi.string().email().required().lowercase().trim()
-  });
+const validateVisitor = async (req, res) => {
+  const { email } = req.body;
 
-  /**
-   * Validate a visitor email against recognized survey users
-   * POST /api/validate/visitor
-   */
-  async validateVisitor(req, res) {
-    const { error, value } = ValidateUserController.validateVisitorSchema.validate(req.body);
-    if (error) throw new ValidationError(error.details[0].message);
-
-    const data = await surveyUserService.validateVisitor(value.email);
-    ResponseHandler.success(res, data, 'Visitor validated');
+  if (!email) {
+    return res.status(400).json({ success: false, message: 'Email is required' });
   }
-}
 
-export default new ValidateUserController();
+  const normalizedEmail = email.trim().toLowerCase();
+
+  if (!isValidEmailFormat(normalizedEmail)) {
+    return res.status(400).json({ success: false, message: 'Invalid email format' });
+  }
+
+  try {
+    const user = await User.findOne({ email: normalizedEmail });
+
+    if (user) {
+      return res.status(200).json({ success: true, message: 'Visitor validated' });
+    } else {
+      return res.status(403).json({ success: false, message: 'Email not recognized' });
+    }
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
+};
+
+module.exports = { validateVisitor };

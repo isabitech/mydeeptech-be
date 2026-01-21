@@ -1,9 +1,7 @@
-import express from 'express';
-import qaReviewController from '../controller/qaReview.controller.js';
-import { authenticateToken } from '../middleware/auth.js';
-import tryCatch from '../utils/tryCatch.js';
+const express = require('express');
 const router = express.Router();
 
+// Import QA controllers
 const {
   getPendingSubmissions,
   getApprovedSubmissions,
@@ -14,20 +12,76 @@ const {
   getReviewerDashboard,
   batchReviewSubmissions,
   getSubmissionAnalytics
-} = qaReviewController;
+} = require('../controller/qaReview.controller');
+
+// Import middleware
+const { authenticateToken } = require('../middleware/auth');
 
 // ==========================================
 // QA REVIEW SYSTEM ROUTES
 // ==========================================
 
-router.get('/submissions/pending', authenticateToken, tryCatch(getPendingSubmissions));
-router.get('/submissions/approved', authenticateToken, tryCatch(getApprovedSubmissions));
-router.get('/submissions/rejected', authenticateToken, tryCatch(getRejectedSubmissions));
-router.get('/submissions/:submissionId/review', authenticateToken, tryCatch(getSubmissionForReview));
-router.post('/submissions/review-task', tryCatch(reviewTask));
-router.post('/submissions/final-review', authenticateToken, tryCatch(submitFinalReview));
-router.get('/dashboard', authenticateToken, tryCatch(getReviewerDashboard));
-router.post('/submissions/batch-review', authenticateToken, tryCatch(batchReviewSubmissions));
-router.get('/analytics', authenticateToken, tryCatch(getSubmissionAnalytics));
+/**
+ * @route GET /api/qa/submissions/pending
+ * @desc Get pending submissions for QA review
+ * @access Private (QA Reviewer)
+ */
+router.get('/submissions/pending', authenticateToken, getPendingSubmissions);
 
-export default router;
+/**
+ * @route GET /api/qa/submissions/approved
+ * @desc Get approved submissions
+ * @access Private (QA Reviewer)
+ */
+router.get('/submissions/approved', authenticateToken, getApprovedSubmissions);
+
+/**
+ * @route GET /api/qa/submissions/rejected
+ * @desc Get rejected submissions
+ * @access Private (QA Reviewer)
+ */
+router.get('/submissions/rejected', authenticateToken, getRejectedSubmissions);
+
+/**
+ * @route GET /api/qa/submissions/:submissionId/review
+ * @desc Get submission details for review
+ * @access Private (QA Reviewer)
+ */
+router.get('/submissions/:submissionId/review', authenticateToken, getSubmissionForReview);
+
+/**
+ * @route POST /api/qa/submissions/review-task
+ * @desc Review individual task in a submission
+ * @access Private (QA Reviewer) - Temporarily public for testing
+ */
+router.post('/submissions/review-task', reviewTask);
+
+/**
+ * @route POST /api/qa/submissions/final-review
+ * @desc Submit final review for a submission
+ * @access Private (QA Reviewer)
+ */
+router.post('/submissions/final-review', authenticateToken, submitFinalReview);
+
+/**
+ * @route GET /api/qa/dashboard
+ * @desc Get QA reviewer dashboard with statistics
+ * @access Private (QA Reviewer)
+ */
+router.get('/dashboard', authenticateToken, getReviewerDashboard);
+
+/**
+ * @route POST /api/qa/submissions/batch-review
+ * @desc Batch process multiple submissions
+ * @access Private (QA Reviewer)
+ */
+router.post('/submissions/batch-review', authenticateToken, batchReviewSubmissions);
+
+/**
+ * @route GET /api/qa/analytics
+ * @desc Get QA analytics and submission statistics
+ * @access Private (QA Reviewer)
+ */
+router.get('/analytics', authenticateToken, getSubmissionAnalytics);
+
+module.exports = router;

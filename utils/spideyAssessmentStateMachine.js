@@ -1,7 +1,4 @@
-import mongoose from 'mongoose';
-import SpideyAssessmentConfig from '../models/spideyAssessmentConfig.model.js';
-import SpideyAssessmentSubmission from '../models/spideyAssessmentSubmission.model.js';
-import AuditLog from '../models/auditLog.model.js';
+const mongoose = require('mongoose');
 
 /**
  * SPIDEY ASSESSMENT STATE MACHINE
@@ -10,11 +7,15 @@ import AuditLog from '../models/auditLog.model.js';
  */
 class SpideyAssessmentStateMachine {
   constructor() {
+    this.SpideyAssessmentConfig = require('../models/spideyAssessmentConfig.model');
+    this.SpideyAssessmentSubmission = require('../models/spideyAssessmentSubmission.model');
+    this.AuditLog = require('../models/auditLog.model');
+    
     // Valid stage transitions - IMMUTABLE
     this.VALID_TRANSITIONS = {
       null: ['stage1'],
       'stage1': ['stage2'],
-      'stage2': ['stage3'],
+      'stage2': ['stage3'],  
       'stage3': ['stage4'],
       'stage4': ['completed'],
       'failed': [], // Terminal state
@@ -25,7 +26,7 @@ class SpideyAssessmentStateMachine {
     this.STAGE_TYPES = {
       stage1: 'quiz',
       stage2: 'structured_submission',
-      stage3: 'file_and_rubric_submission',
+      stage3: 'file_and_rubric_submission', 
       stage4: 'trap_evaluation'
     };
   }
@@ -36,9 +37,9 @@ class SpideyAssessmentStateMachine {
    */
   async loadAssessment(assessmentId) {
     try {
-      const assessment = await SpideyAssessmentConfig.findById(assessmentId)
+      const assessment = await this.SpideyAssessmentConfig.findById(assessmentId)
         .populate('projectId');
-
+      
       if (!assessment) {
         throw new Error(`Assessment not found: ${assessmentId}`);
       }
@@ -60,7 +61,7 @@ class SpideyAssessmentStateMachine {
    */
   async initializeCandidateProgress(assessmentId, candidateId) {
     try {
-      let submission = await SpideyAssessmentSubmission.findOne({
+      let submission = await this.SpideyAssessmentSubmission.findOne({
         assessmentId,
         candidateId,
         status: { $in: ['in_progress', 'submitted'] }
@@ -68,7 +69,7 @@ class SpideyAssessmentStateMachine {
 
       if (!submission) {
         // Create new submission with strict initial state
-        submission = new SpideyAssessmentSubmission({
+        submission = new this.SpideyAssessmentSubmission({
           assessmentId,
           candidateId,
           currentStage: null, // Must start from null - no shortcuts
@@ -81,7 +82,7 @@ class SpideyAssessmentStateMachine {
         });
 
         await submission.save();
-
+        
         await this._logAudit('ASSESSMENT_STARTED', {
           assessmentId,
           candidateId,
@@ -103,8 +104,8 @@ class SpideyAssessmentStateMachine {
    */
   async validateStageTransition(submissionId, fromStage, toStage) {
     try {
-      const submission = await SpideyAssessmentSubmission.findById(submissionId);
-
+      const submission = await this.SpideyAssessmentSubmission.findById(submissionId);
+      
       if (!submission) {
         throw new Error(`Submission not found: ${submissionId}`);
       }
@@ -116,7 +117,7 @@ class SpideyAssessmentStateMachine {
 
       // Validate transition against state machine
       const validNextStages = this.VALID_TRANSITIONS[fromStage] || [];
-
+      
       if (!validNextStages.includes(toStage)) {
         // IMMEDIATE FAILURE for invalid transitions
         await this._terminateAssessment(submissionId, 'INVALID_STAGE_TRANSITION', {
@@ -129,11 +130,11 @@ class SpideyAssessmentStateMachine {
 
       return true;
     } catch (error) {
-      await this._logError('STAGE_TRANSITION_FAILED', {
-        submissionId,
-        fromStage,
-        toStage,
-        error: error.message
+      await this._logError('STAGE_TRANSITION_FAILED', { 
+        submissionId, 
+        fromStage, 
+        toStage, 
+        error: error.message 
       });
       throw error;
     }
@@ -145,7 +146,7 @@ class SpideyAssessmentStateMachine {
    */
   async advanceToStage(submissionId, nextStage, stageResult = null) {
     try {
-      const submission = await SpideyAssessmentSubmission.findById(submissionId);
+      const submission = await this.SpideyAssessmentSubmission.findById(submissionId);
       const currentStage = submission.currentStage;
 
       // Validate transition first
@@ -185,7 +186,7 @@ class SpideyAssessmentStateMachine {
       // Advance to next stage
       submission.currentStage = nextStage;
       submission.lastActivityAt = new Date();
-
+      
       // Mark as completed if final stage
       if (nextStage === 'completed') {
         submission.status = 'completed';
@@ -203,10 +204,10 @@ class SpideyAssessmentStateMachine {
 
       return submission;
     } catch (error) {
-      await this._logError('STAGE_ADVANCE_FAILED', {
-        submissionId,
-        nextStage,
-        error: error.message
+      await this._logError('STAGE_ADVANCE_FAILED', { 
+        submissionId, 
+        nextStage, 
+        error: error.message 
       });
       throw error;
     }
@@ -218,7 +219,7 @@ class SpideyAssessmentStateMachine {
    */
   async getAssessmentState(submissionId) {
     try {
-      const submission = await SpideyAssessmentSubmission.findById(submissionId)
+      const submission = await this.SpideyAssessmentSubmission.findById(submissionId)
         .populate('assessmentId');
 
       if (!submission) {
@@ -252,13 +253,13 @@ class SpideyAssessmentStateMachine {
    */
   async _terminateAssessment(submissionId, reason, details = {}) {
     try {
-      const submission = await SpideyAssessmentSubmission.findById(submissionId);
-
+      const submission = await this.SpideyAssessmentSubmission.findById(submissionId);
+      
       submission.status = 'failed';
       submission.currentStage = 'failed';
       submission.completedAt = new Date();
       submission.failureReason = reason;
-
+      
       // Record violation
       submission.ruleViolations.push({
         reason,
@@ -288,7 +289,7 @@ class SpideyAssessmentStateMachine {
    */
   async _logAudit(action, details) {
     try {
-      const auditEntry = new AuditLog({
+      const auditEntry = new this.AuditLog({
         entityType: 'SpideyAssessment',
         action,
         details,
@@ -317,4 +318,4 @@ class SpideyAssessmentStateMachine {
   }
 }
 
-export default SpideyAssessmentStateMachine;
+module.exports = SpideyAssessmentStateMachine;

@@ -1,4 +1,4 @@
-import axios from 'axios';
+const axios = require('axios');
 
 // In-memory cache for exchange rates
 let rateCache = {
@@ -11,10 +11,10 @@ let rateCache = {
  * Fetches USD to NGN exchange rate from exchangeratesapi.io
  * @returns {Promise<number>} Exchange rate (USD to NGN)
  */
-export const getUSDToNGNRate = async () => {
+const getUSDToNGNRate = async () => {
   try {
     const now = Date.now();
-
+    
     // Check if cached rate is still valid
     if (rateCache.rate && rateCache.timestamp && (now - rateCache.timestamp) < rateCache.ttl) {
       console.log(`💰 Using cached USD/NGN rate: ${rateCache.rate}`);
@@ -22,7 +22,7 @@ export const getUSDToNGNRate = async () => {
     }
 
     console.log('📊 Fetching fresh USD/NGN exchange rate...');
-
+    
     // Check if API key is available
     const apiKey = process.env.EXCHANGE_RATES_API_KEY;
     if (!apiKey) {
@@ -46,7 +46,7 @@ export const getUSDToNGNRate = async () => {
 
     const eurToUsd = response.data?.rates?.USD;
     const eurToNgn = response.data?.rates?.NGN;
-
+    
     if (!eurToUsd || !eurToNgn || typeof eurToUsd !== 'number' || typeof eurToNgn !== 'number') {
       throw new Error('Invalid currency rates received from API');
     }
@@ -66,13 +66,13 @@ export const getUSDToNGNRate = async () => {
 
   } catch (error) {
     console.error('❌ Failed to fetch exchange rate:', error.message);
-
+    
     // Log more details for debugging
     if (error.response) {
       console.error('API Response Status:', error.response.status);
       console.error('API Response Data:', error.response.data);
     }
-
+    
     // Don't fallback - let the error propagate so dependent operations can fail gracefully
     throw new Error(`Exchange rate service unavailable: ${error.message}`);
   }
@@ -83,7 +83,7 @@ export const getUSDToNGNRate = async () => {
  * @param {number} usdAmount - Amount in USD
  * @returns {Promise<number>} Amount in NGN
  */
-export const convertUSDToNGN = async (usdAmount) => {
+const convertUSDToNGN = async (usdAmount) => {
   try {
     if (!usdAmount || typeof usdAmount !== 'number') {
       throw new Error('Invalid USD amount provided');
@@ -91,10 +91,10 @@ export const convertUSDToNGN = async (usdAmount) => {
 
     const rate = await getUSDToNGNRate();
     const ngnAmount = usdAmount * rate;
-
+    
     console.log(`💱 Converted $${usdAmount} USD to ₦${ngnAmount.toFixed(2)} NGN`);
     return Math.round(ngnAmount * 100) / 100; // Round to 2 decimal places
-
+    
   } catch (error) {
     console.error('❌ Currency conversion failed:', error.message);
     throw error;
@@ -105,10 +105,10 @@ export const convertUSDToNGN = async (usdAmount) => {
  * Gets current cached rate info for debugging
  * @returns {object} Cache information
  */
-export const getCacheInfo = () => {
+const getCacheInfo = () => {
   const now = Date.now();
   const isExpired = !rateCache.timestamp || (now - rateCache.timestamp) >= rateCache.ttl;
-
+  
   return {
     rate: rateCache.rate,
     timestamp: rateCache.timestamp,
@@ -121,7 +121,7 @@ export const getCacheInfo = () => {
 /**
  * Clears the rate cache (for testing/debugging)
  */
-export const clearCache = () => {
+const clearCache = () => {
   rateCache = {
     rate: null,
     timestamp: null,
@@ -130,7 +130,7 @@ export const clearCache = () => {
   console.log('🗑️ Exchange rate cache cleared');
 };
 
-export default {
+module.exports = {
   getUSDToNGNRate,
   convertUSDToNGN,
   getCacheInfo,

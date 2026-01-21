@@ -1,16 +1,13 @@
-import express from 'express';
-import { authenticateToken } from '../middleware/auth.js';
-import {
-  imageUpload,
-  documentUpload,
-  videoUpload,
+const express = require('express');
+const router = express.Router();
+const { authenticateToken } = require('../middleware/auth');
+const { 
+  imageUpload, 
+  documentUpload, 
+  videoUpload, 
   audioUpload,
   generalUpload
-} from '../config/cloudinary.js';
-import mediaController from '../controller/media.controller.js';
-import tryCatch from '../utils/tryCatch.js';
-
-const router = express.Router();
+} = require('../config/cloudinary');
 
 const {
   uploadImage,
@@ -22,7 +19,7 @@ const {
   deleteFile,
   getFileInfo,
   updateProfilePicture
-} = mediaController;
+} = require('../controller/media.controller');
 
 // All media routes require authentication
 router.use(authenticateToken);
@@ -31,46 +28,118 @@ router.use(authenticateToken);
 // IMAGE UPLOAD ROUTES
 // ==============================================
 
-router.post('/upload/image', imageUpload.single('image'), tryCatch(uploadImage));
-router.post('/upload/images', imageUpload.array('images', 10), tryCatch(uploadMultipleImages));
-router.post('/upload/profile-picture', imageUpload.single('profilePicture'), tryCatch(updateProfilePicture));
+/**
+ * @route   POST /api/media/upload/image
+ * @desc    Upload single image
+ * @access  Private (Authenticated users only)
+ * @body    image file (multipart/form-data)
+ * @returns {Object} Uploaded image data with optimized URLs
+ */
+router.post('/upload/image', imageUpload.single('image'), uploadImage);
+
+/**
+ * @route   POST /api/media/upload/images
+ * @desc    Upload multiple images (max 10)
+ * @access  Private (Authenticated users only)
+ * @body    image files (multipart/form-data)
+ * @returns {Object} Array of uploaded images data
+ */
+router.post('/upload/images', imageUpload.array('images', 10), uploadMultipleImages);
+
+/**
+ * @route   POST /api/media/upload/profile-picture
+ * @desc    Upload and set user profile picture
+ * @access  Private (DTUsers only)
+ * @body    image file (multipart/form-data)
+ * @returns {Object} Updated profile picture data
+ */
+router.post('/upload/profile-picture', imageUpload.single('profilePicture'), updateProfilePicture);
 
 // ==============================================
 // DOCUMENT UPLOAD ROUTES
 // ==============================================
 
-router.post('/upload/document', documentUpload.single('document'), tryCatch(uploadDocument));
+/**
+ * @route   POST /api/media/upload/document
+ * @desc    Upload document (PDF, DOC, DOCX, TXT, etc.)
+ * @access  Private (Authenticated users only)
+ * @body    document file (multipart/form-data)
+ * @returns {Object} Uploaded document data
+ */
+router.post('/upload/document', documentUpload.single('document'), uploadDocument);
 
 // ==============================================
 // VIDEO UPLOAD ROUTES
 // ==============================================
 
-router.post('/upload/video', videoUpload.single('video'), tryCatch(uploadVideo));
+/**
+ * @route   POST /api/media/upload/video
+ * @desc    Upload video file
+ * @access  Private (Authenticated users only)
+ * @body    video file (multipart/form-data)
+ * @returns {Object} Uploaded video data with streaming URL
+ */
+router.post('/upload/video', videoUpload.single('video'), uploadVideo);
 
 // ==============================================
 // AUDIO UPLOAD ROUTES
 // ==============================================
 
-router.post('/upload/audio', audioUpload.single('audio'), tryCatch(uploadAudio));
+/**
+ * @route   POST /api/media/upload/audio
+ * @desc    Upload audio file
+ * @access  Private (Authenticated users only)
+ * @body    audio file (multipart/form-data)
+ * @returns {Object} Uploaded audio data with streaming URL
+ */
+router.post('/upload/audio', audioUpload.single('audio'), uploadAudio);
 
 // ==============================================
 // GENERAL FILE UPLOAD ROUTES
 // ==============================================
 
-router.post('/upload/file', generalUpload.single('file'), tryCatch(uploadFile));
+/**
+ * @route   POST /api/media/upload/file
+ * @desc    Upload any file type
+ * @access  Private (Authenticated users only)
+ * @body    file (multipart/form-data)
+ * @returns {Object} Uploaded file data
+ */
+router.post('/upload/file', generalUpload.single('file'), uploadFile);
 
 // ==============================================
 // FILE MANAGEMENT ROUTES
 // ==============================================
 
-router.get('/file/:publicId', tryCatch(getFileInfo));
-router.delete('/file/:publicId', tryCatch(deleteFile));
+/**
+ * @route   GET /api/media/file/:publicId
+ * @desc    Get file information from Cloudinary
+ * @access  Private (Authenticated users only)
+ * @param   {string} publicId - Cloudinary public ID
+ * @returns {Object} File information and metadata
+ */
+router.get('/file/:publicId', getFileInfo);
+
+/**
+ * @route   DELETE /api/media/file/:publicId
+ * @desc    Delete file from Cloudinary
+ * @access  Private (Authenticated users only)
+ * @param   {string} publicId - Cloudinary public ID
+ * @returns {Object} Deletion confirmation
+ */
+router.delete('/file/:publicId', deleteFile);
 
 // ==============================================
 // HELPER ROUTES
 // ==============================================
 
-router.get('/health', tryCatch((req, res) => {
+/**
+ * @route   GET /api/media/health
+ * @desc    Check media service health
+ * @access  Private (Authenticated users only)
+ * @returns {Object} Service status
+ */
+router.get('/health', (req, res) => {
   res.status(200).json({
     success: true,
     message: 'Media service is running',
@@ -90,9 +159,15 @@ router.get('/health', tryCatch((req, res) => {
       general: '100MB'
     }
   });
-}));
+});
 
-router.get('/info', tryCatch((req, res) => {
+/**
+ * @route   GET /api/media/info
+ * @desc    Get media upload information and limits
+ * @access  Private (Authenticated users only)
+ * @returns {Object} Upload guidelines and limits
+ */
+router.get('/info', (req, res) => {
   res.status(200).json({
     success: true,
     message: 'Media upload information',
@@ -141,6 +216,6 @@ router.get('/info', tryCatch((req, res) => {
       }
     }
   });
-}));
+});
 
-export default router;
+module.exports = router;

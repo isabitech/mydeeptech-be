@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+const mongoose = require('mongoose');
 
 // Spidey Assessment Submission - integrates with existing submission system
 // Follows same patterns as MultimediaAssessmentSubmission but with Spidey-specific validation
@@ -27,14 +27,14 @@ const spideyAssessmentSubmissionSchema = new mongoose.Schema({
     ref: 'AnnotationProject',
     required: true
   },
-
+  
   // Assessment type integration
   assessmentType: {
     type: String,
     default: 'spidey_assessment',
     required: true
   },
-
+  
   // State machine progression
   currentStage: {
     type: String,
@@ -42,14 +42,14 @@ const spideyAssessmentSubmissionSchema = new mongoose.Schema({
     default: null, // Must start from null - state machine enforces progression
     required: false
   },
-
+  
   // Stage completion tracking
   stages: {
     stage1: {
-      status: {
-        type: String,
+      status: { 
+        type: String, 
         enum: ['not_started', 'in_progress', 'completed', 'failed'],
-        default: 'not_started'
+        default: 'not_started' 
       },
       startedAt: Date,
       completedAt: Date,
@@ -71,12 +71,12 @@ const spideyAssessmentSubmissionSchema = new mongoose.Schema({
         details: mongoose.Schema.Types.Mixed
       }]
     },
-
+    
     stage2: {
-      status: {
-        type: String,
+      status: { 
+        type: String, 
         enum: ['not_started', 'in_progress', 'completed', 'failed'],
-        default: 'not_started'
+        default: 'not_started' 
       },
       startedAt: Date,
       completedAt: Date,
@@ -104,12 +104,12 @@ const spideyAssessmentSubmissionSchema = new mongoose.Schema({
         details: mongoose.Schema.Types.Mixed
       }]
     },
-
+    
     stage3: {
-      status: {
-        type: String,
+      status: { 
+        type: String, 
         enum: ['not_started', 'in_progress', 'completed', 'failed'],
-        default: 'not_started'
+        default: 'not_started' 
       },
       startedAt: Date,
       completedAt: Date,
@@ -158,12 +158,12 @@ const spideyAssessmentSubmissionSchema = new mongoose.Schema({
         details: mongoose.Schema.Types.Mixed
       }]
     },
-
+    
     stage4: {
-      status: {
-        type: String,
+      status: { 
+        type: String, 
         enum: ['not_started', 'in_progress', 'completed', 'failed'],
-        default: 'not_started'
+        default: 'not_started' 
       },
       startedAt: Date,
       completedAt: Date,
@@ -189,7 +189,7 @@ const spideyAssessmentSubmissionSchema = new mongoose.Schema({
       }]
     }
   },
-
+  
   // Overall assessment status (integrates with existing system)
   status: {
     type: String,
@@ -246,7 +246,7 @@ const spideyAssessmentSubmissionSchema = new mongoose.Schema({
     type: String,
     enum: [
       'INVALID_STAGE_TRANSITION',
-      'HARD_FAIL_VIOLATION',
+      'HARD_FAIL_VIOLATION', 
       'STAGE_FAILED',
       'TIME_EXPIRED',
       'INTEGRITY_VIOLATION',
@@ -273,17 +273,17 @@ const spideyAssessmentSubmissionSchema = new mongoose.Schema({
   },
   expiresAt: {
     type: Date,
-    default: function () {
+    default: function() {
       // 7 days from start by default
       return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     }
   },
-
+  
   // Timing and session tracking
   totalTimeSpent: { type: Number, default: 0 }, // in seconds
   sessionStarted: { type: Date, required: true },
   submittedAt: Date,
-
+  
   // Scoring (only calculated after hard rules pass)
   finalScore: {
     totalPoints: Number,
@@ -298,7 +298,7 @@ const spideyAssessmentSubmissionSchema = new mongoose.Schema({
     passed: Boolean,
     autoApproved: Boolean
   },
-
+  
   // Hard rule violations (any = immediate fail)
   hardRuleViolations: [{
     rule: String,
@@ -307,7 +307,7 @@ const spideyAssessmentSubmissionSchema = new mongoose.Schema({
     timestamp: Date,
     severity: { type: String, enum: ['warning', 'fail'], default: 'fail' }
   }],
-
+  
   // Security and audit
   securityData: {
     ipAddress: String,
@@ -320,22 +320,22 @@ const spideyAssessmentSubmissionSchema = new mongoose.Schema({
       severity: { type: String, enum: ['low', 'medium', 'high'] }
     }]
   },
-
+  
   // Integration with existing QA system
   qaReview: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'QAReview'
   },
-
+  
   // Attempt tracking
   attemptNumber: { type: Number, default: 1 },
-
+  
   // Failure analysis for improvement
   failureAnalysis: {
     primaryFailureStage: String,
-    failureCategory: {
-      type: String,
-      enum: ['hard_rule', 'scoring', 'integrity', 'technical', 'time_limit']
+    failureCategory: { 
+      type: String, 
+      enum: ['hard_rule', 'scoring', 'integrity', 'technical', 'time_limit'] 
     },
     improvementSuggestions: [String],
     retakeEligible: { type: Boolean, default: false }
@@ -353,29 +353,29 @@ spideyAssessmentSubmissionSchema.index({ 'finalScore.passed': 1 });
 spideyAssessmentSubmissionSchema.index({ assessmentType: 1 });
 
 // Method to validate stage progression (implements state machine)
-spideyAssessmentSubmissionSchema.methods.canProgressToStage = function (targetStage) {
+spideyAssessmentSubmissionSchema.methods.canProgressToStage = function(targetStage) {
   const validTransitions = {
     'stage1': ['stage2'],
     'stage2': ['stage3'],
     'stage3': ['stage4'],
     'stage4': ['completed']
   };
-
+  
   return validTransitions[this.currentStage]?.includes(targetStage) || false;
 };
 
 // State machine methods for strict enforcement
-spideyAssessmentSubmissionSchema.methods.isExpired = function () {
+spideyAssessmentSubmissionSchema.methods.isExpired = function() {
   return this.status === 'in_progress' && new Date() > this.expiresAt;
 };
 
-spideyAssessmentSubmissionSchema.methods.getTimeSpentInMinutes = function () {
+spideyAssessmentSubmissionSchema.methods.getTimeSpentInMinutes = function() {
   if (!this.startedAt) return 0;
   const endTime = this.completedAt || new Date();
   return Math.round((endTime - this.startedAt) / (1000 * 60));
 };
 
-spideyAssessmentSubmissionSchema.methods.addRuleViolation = function (reason, details, severity = 'error') {
+spideyAssessmentSubmissionSchema.methods.addRuleViolation = function(reason, details, severity = 'error') {
   this.ruleViolations.push({
     reason,
     details,
@@ -384,7 +384,7 @@ spideyAssessmentSubmissionSchema.methods.addRuleViolation = function (reason, de
   });
 };
 
-spideyAssessmentSubmissionSchema.methods.addAuditEntry = function (action, details, stage = null) {
+spideyAssessmentSubmissionSchema.methods.addAuditEntry = function(action, details, stage = null) {
   this.auditTrail.push({
     action,
     details,
@@ -394,56 +394,56 @@ spideyAssessmentSubmissionSchema.methods.addAuditEntry = function (action, detai
 };
 
 // Method to fail assessment with reason
-spideyAssessmentSubmissionSchema.methods.failAssessment = function (stage, reason, violationType = 'hard_rule') {
+spideyAssessmentSubmissionSchema.methods.failAssessment = function(stage, reason, violationType = 'hard_rule') {
   this.status = 'failed';
   this.currentStage = 'failed';
   this.submittedAt = new Date();
-
+  
   // Mark the failing stage
   if (this.stages[stage]) {
     this.stages[stage].status = 'failed';
     this.stages[stage].failureReason = reason;
     this.stages[stage].completedAt = new Date();
   }
-
+  
   // Record failure analysis
   this.failureAnalysis = {
     primaryFailureStage: stage,
     failureCategory: violationType,
     retakeEligible: violationType !== 'hard_rule' // Hard rules = no retake
   };
-
+  
   return this.save();
 };
 
 // Method to progress to next stage
-spideyAssessmentSubmissionSchema.methods.progressToNextStage = function () {
+spideyAssessmentSubmissionSchema.methods.progressToNextStage = function() {
   const stageOrder = ['stage1', 'stage2', 'stage3', 'stage4', 'completed'];
   const currentIndex = stageOrder.indexOf(this.currentStage);
-
+  
   if (currentIndex >= 0 && currentIndex < stageOrder.length - 1) {
     this.currentStage = stageOrder[currentIndex + 1];
     return true;
   }
-
+  
   return false;
 };
 
 // Method to add audit log entry
-spideyAssessmentSubmissionSchema.methods.addAuditLog = function (stage, action, details) {
+spideyAssessmentSubmissionSchema.methods.addAuditLog = function(stage, action, details) {
   if (!this.stages[stage]) return false;
-
+  
   this.stages[stage].auditLog.push({
     timestamp: new Date(),
     action,
     details
   });
-
+  
   return this.save();
 };
 
 // Static method to find submissions pending QA review
-spideyAssessmentSubmissionSchema.statics.findPendingQAReview = function () {
+spideyAssessmentSubmissionSchema.statics.findPendingQAReview = function() {
   return this.find({
     status: 'submitted',
     assessmentType: 'spidey_assessment',
@@ -452,29 +452,29 @@ spideyAssessmentSubmissionSchema.statics.findPendingQAReview = function () {
 };
 
 // Static method to check retake eligibility
-spideyAssessmentSubmissionSchema.statics.checkRetakeEligibility = async function (userId, assessmentId) {
+spideyAssessmentSubmissionSchema.statics.checkRetakeEligibility = async function(userId, assessmentId) {
   const attempts = await this.find({
     annotatorId: userId,
     assessmentId: assessmentId
   }).sort({ createdAt: -1 });
-
+  
   if (attempts.length === 0) return { eligible: true, reason: 'First attempt' };
-
+  
   const lastAttempt = attempts[0];
   if (lastAttempt.status === 'approved') {
     return { eligible: false, reason: 'Already passed' };
   }
-
+  
   // Check retake policy from config
   // This would need to be populated with actual config
   return { eligible: false, reason: 'Retakes not allowed for Spidey assessment' };
 };
 
 // Pre-save middleware for state machine enforcement
-spideyAssessmentSubmissionSchema.pre('save', function (next) {
+spideyAssessmentSubmissionSchema.pre('save', function(next) {
   // Update lastActivityAt on any change
   this.lastActivityAt = new Date();
-
+  
   // Auto-expire check
   if (this.isExpired() && this.status === 'in_progress') {
     this.status = 'expired';
@@ -482,15 +482,15 @@ spideyAssessmentSubmissionSchema.pre('save', function (next) {
     this.failureReason = 'TIME_EXPIRED';
     this.completedAt = new Date();
   }
-
+  
   // Set candidateId from annotatorId for state machine compatibility
   if (this.annotatorId && !this.candidateId) {
     this.candidateId = this.annotatorId;
   }
-
+  
   next();
 });
 
 const SpideyAssessmentSubmission = mongoose.model('SpideyAssessmentSubmission', spideyAssessmentSubmissionSchema);
 
-export default SpideyAssessmentSubmission;
+module.exports = SpideyAssessmentSubmission;

@@ -1,18 +1,18 @@
-import mongoose from "mongoose";
+const mongoose = require("mongoose");
 
 const invoiceSchema = new mongoose.Schema(
   {
     // Invoice identification
     invoiceNumber: {
       type: String,
-      required: function () {
+      required: function() {
         // Only required if document is being saved and it's not new (to allow pre-save to generate it)
         return !this.isNew;
       },
       unique: true,
       trim: true
     },
-
+    
     // Project and user information
     projectId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -42,7 +42,7 @@ const invoiceSchema = new mongoose.Schema(
       enum: ["USD", "EUR", "GBP", "NGN", "KES", "GHS"],
       default: "USD"
     },
-
+    
     // Date information
     invoiceDate: {
       type: Date,
@@ -53,7 +53,7 @@ const invoiceSchema = new mongoose.Schema(
       type: Date,
       required: true
     },
-
+    
     // Work period (optional)
     workPeriodStart: {
       type: Date
@@ -61,7 +61,7 @@ const invoiceSchema = new mongoose.Schema(
     workPeriodEnd: {
       type: Date
     },
-
+    
     // Invoice details
     description: {
       type: String,
@@ -73,14 +73,14 @@ const invoiceSchema = new mongoose.Schema(
       trim: true,
       maxlength: 2000
     },
-
+    
     // Payment status
     paymentStatus: {
       type: String,
       enum: ["unpaid", "paid", "overdue", "cancelled", "disputed"],
       default: "unpaid"
     },
-
+    
     // Payment details
     paidAt: {
       type: Date
@@ -102,7 +102,7 @@ const invoiceSchema = new mongoose.Schema(
       trim: true,
       maxlength: 500
     },
-
+    
     // Work tracking
     hoursWorked: {
       type: Number,
@@ -117,14 +117,14 @@ const invoiceSchema = new mongoose.Schema(
       min: 0,
       max: 100
     },
-
+    
     // Status and tracking
     status: {
       type: String,
       enum: ["draft", "sent", "viewed", "paid", "overdue", "cancelled"],
       default: "draft"
     },
-
+    
     // Email tracking
     emailSent: {
       type: Boolean,
@@ -139,21 +139,21 @@ const invoiceSchema = new mongoose.Schema(
     emailViewedAt: {
       type: Date
     },
-
+    
     // Admin notes
     adminNotes: {
       type: String,
       trim: true,
       maxlength: 1000
     },
-
+    
     // Invoice metadata
     invoiceType: {
       type: String,
       enum: ["project_completion", "milestone", "hourly", "fixed_rate", "bonus"],
       default: "project_completion"
     },
-
+    
     // Approval workflow
     approvedBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -162,7 +162,7 @@ const invoiceSchema = new mongoose.Schema(
     approvedAt: {
       type: Date
     },
-
+    
     // Dispute handling
     disputedAt: {
       type: Date
@@ -175,7 +175,7 @@ const invoiceSchema = new mongoose.Schema(
     disputeResolvedAt: {
       type: Date
     },
-
+    
     // Attachments
     attachments: [{
       fileName: String,
@@ -195,7 +195,7 @@ const invoiceSchema = new mongoose.Schema(
 );
 
 // Virtual for days overdue
-invoiceSchema.virtual('daysOverdue').get(function () {
+invoiceSchema.virtual('daysOverdue').get(function() {
   if (this.paymentStatus === 'paid' || this.paymentStatus === 'cancelled') {
     return 0;
   }
@@ -206,7 +206,7 @@ invoiceSchema.virtual('daysOverdue').get(function () {
 });
 
 // Virtual for payment amount due
-invoiceSchema.virtual('amountDue').get(function () {
+invoiceSchema.virtual('amountDue').get(function() {
   if (this.paymentStatus === 'paid') {
     return 0;
   }
@@ -214,7 +214,7 @@ invoiceSchema.virtual('amountDue').get(function () {
 });
 
 // Virtual for formatted invoice number
-invoiceSchema.virtual('formattedInvoiceNumber').get(function () {
+invoiceSchema.virtual('formattedInvoiceNumber').get(function() {
   return `INV-${this.invoiceNumber}`;
 });
 
@@ -226,55 +226,55 @@ invoiceSchema.index({ invoiceDate: -1 });
 invoiceSchema.index({ dueDate: 1 });
 
 // Pre-save middleware to generate invoice number
-invoiceSchema.pre('save', async function (next) {
+invoiceSchema.pre('save', async function(next) {
   if (this.isNew && !this.invoiceNumber) {
     const year = new Date().getFullYear();
     const month = String(new Date().getMonth() + 1).padStart(2, '0');
-
+    
     // Find the last invoice for this month to generate sequential number
     const lastInvoice = await mongoose.model('Invoice').findOne({
       invoiceNumber: new RegExp(`^${year}${month}`)
     }).sort({ invoiceNumber: -1 });
-
+    
     let sequenceNumber = 1;
     if (lastInvoice) {
       const lastSequence = parseInt(lastInvoice.invoiceNumber.slice(-4));
       sequenceNumber = lastSequence + 1;
     }
-
+    
     this.invoiceNumber = `${year}${month}${String(sequenceNumber).padStart(4, '0')}`;
   }
-
+  
   // Auto-update status based on payment status
   if (this.paymentStatus === 'paid' && this.status !== 'paid') {
     this.status = 'paid';
   }
-
+  
   // Check if invoice is overdue
   if (this.paymentStatus === 'unpaid' && new Date() > this.dueDate) {
     this.paymentStatus = 'overdue';
   }
-
+  
   next();
 });
 
 // Static method to get invoice statistics
-invoiceSchema.statics.getInvoiceStats = async function (dtUserId, adminId = null) {
+invoiceSchema.statics.getInvoiceStats = async function(dtUserId, adminId = null) {
   // Ensure dtUserId is ObjectId if provided
   const matchCondition = {};
   if (dtUserId) {
-    matchCondition.dtUserId = mongoose.Types.ObjectId.isValid(dtUserId)
-      ? new mongoose.Types.ObjectId(dtUserId)
+    matchCondition.dtUserId = mongoose.Types.ObjectId.isValid(dtUserId) 
+      ? new mongoose.Types.ObjectId(dtUserId) 
       : dtUserId;
   }
   if (adminId) {
-    matchCondition.createdBy = mongoose.Types.ObjectId.isValid(adminId)
-      ? new mongoose.Types.ObjectId(adminId)
+    matchCondition.createdBy = mongoose.Types.ObjectId.isValid(adminId) 
+      ? new mongoose.Types.ObjectId(adminId) 
       : adminId;
   }
-
+  
   console.log(`🔍 Invoice stats match condition:`, matchCondition);
-
+  
   const stats = await this.aggregate([
     { $match: matchCondition },
     {
@@ -282,42 +282,42 @@ invoiceSchema.statics.getInvoiceStats = async function (dtUserId, adminId = null
         _id: null,
         totalInvoices: { $sum: 1 },
         totalAmount: { $sum: '$invoiceAmount' },
-        paidAmount: {
-          $sum: {
-            $cond: [{ $eq: ['$paymentStatus', 'paid'] }, '$invoiceAmount', 0]
-          }
+        paidAmount: { 
+          $sum: { 
+            $cond: [{ $eq: ['$paymentStatus', 'paid'] }, '$invoiceAmount', 0] 
+          } 
         },
-        unpaidAmount: {
-          $sum: {
-            $cond: [{ $eq: ['$paymentStatus', 'unpaid'] }, '$invoiceAmount', 0]
-          }
+        unpaidAmount: { 
+          $sum: { 
+            $cond: [{ $eq: ['$paymentStatus', 'unpaid'] }, '$invoiceAmount', 0] 
+          } 
         },
-        overdueAmount: {
-          $sum: {
-            $cond: [{ $eq: ['$paymentStatus', 'overdue'] }, '$invoiceAmount', 0]
-          }
+        overdueAmount: { 
+          $sum: { 
+            $cond: [{ $eq: ['$paymentStatus', 'overdue'] }, '$invoiceAmount', 0] 
+          } 
         },
         unpaidCount: {
-          $sum: {
-            $cond: [{ $eq: ['$paymentStatus', 'unpaid'] }, 1, 0]
+          $sum: { 
+            $cond: [{ $eq: ['$paymentStatus', 'unpaid'] }, 1, 0] 
           }
         },
         paidCount: {
-          $sum: {
-            $cond: [{ $eq: ['$paymentStatus', 'paid'] }, 1, 0]
+          $sum: { 
+            $cond: [{ $eq: ['$paymentStatus', 'paid'] }, 1, 0] 
           }
         },
         overdueCount: {
-          $sum: {
-            $cond: [{ $eq: ['$paymentStatus', 'overdue'] }, 1, 0]
+          $sum: { 
+            $cond: [{ $eq: ['$paymentStatus', 'overdue'] }, 1, 0] 
           }
         }
       }
     }
   ]);
-
+  
   console.log(`📊 Raw aggregation result:`, stats);
-
+  
   const result = stats[0] || {
     totalInvoices: 0,
     totalAmount: 0,
@@ -328,18 +328,18 @@ invoiceSchema.statics.getInvoiceStats = async function (dtUserId, adminId = null
     paidCount: 0,
     overdueCount: 0
   };
-
+  
   console.log(`📈 Final stats result:`, result);
   return result;
 };
 
 // Instance method to mark as paid
-invoiceSchema.methods.markAsPaid = function (paymentDetails = {}) {
+invoiceSchema.methods.markAsPaid = function(paymentDetails = {}) {
   this.paymentStatus = 'paid';
   this.status = 'paid';
   this.paidAt = new Date();
   this.paidAmount = this.invoiceAmount;
-
+  
   if (paymentDetails.paymentMethod) {
     this.paymentMethod = paymentDetails.paymentMethod;
   }
@@ -349,10 +349,10 @@ invoiceSchema.methods.markAsPaid = function (paymentDetails = {}) {
   if (paymentDetails.paymentNotes) {
     this.paymentNotes = paymentDetails.paymentNotes;
   }
-
+  
   return this.save();
 };
 
 const Invoice = mongoose.model("Invoice", invoiceSchema);
 
-export default Invoice;
+module.exports = Invoice;

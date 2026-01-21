@@ -1,7 +1,6 @@
-import { promises as fs } from 'fs';
-import path from 'path';
-import crypto from 'crypto';
-import AuditLog from '../models/auditLog.model.js';
+const fs = require('fs').promises;
+const path = require('path');
+const crypto = require('crypto');
 
 /**
  * SPIDEY FILE & CONTENT ENFORCEMENT LAYER
@@ -35,6 +34,8 @@ class SpideyFileEnforcer {
       minSize: 1 * 1024,            // 1KB
       maxFiles: 10
     };
+
+    this.AuditLog = require('../models/auditLog.model');
   }
 
   /**
@@ -62,7 +63,7 @@ class SpideyFileEnforcer {
       // Process each file
       for (const file of files) {
         const fileResult = await this._validateSingleFile(file, requirements);
-
+        
         if (fileResult.violations.length > 0) {
           validationResult.violations.push(...fileResult.violations);
         }
@@ -74,14 +75,14 @@ class SpideyFileEnforcer {
       }
 
       // Check total size
-      const maxTotalSize = requirements.maxTotalSizeMB ?
-        requirements.maxTotalSizeMB * 1024 * 1024 :
+      const maxTotalSize = requirements.maxTotalSizeMB ? 
+        requirements.maxTotalSizeMB * 1024 * 1024 : 
         this.DEFAULT_LIMITS.maxSize;
 
       if (validationResult.totalSize > maxTotalSize) {
         validationResult.violations.push({
           rule: 'TOTAL_SIZE_EXCEEDED',
-          description: `Total size ${Math.round(validationResult.totalSize / (1024 * 1024))}MB exceeds limit`,
+          description: `Total size ${Math.round(validationResult.totalSize / (1024*1024))}MB exceeds limit`,
           severity: 'error'
         });
       }
@@ -101,9 +102,9 @@ class SpideyFileEnforcer {
       return validationResult;
 
     } catch (error) {
-      await this._logError('FILE_VALIDATION_FAILED', {
-        error: error.message,
-        submissionId
+      await this._logError('FILE_VALIDATION_FAILED', { 
+        error: error.message, 
+        submissionId 
       });
       throw error;
     }
@@ -139,7 +140,7 @@ class SpideyFileEnforcer {
 
       // 2. ALLOWED FORMAT CHECK
       if (requirements.allowedFormats && requirements.allowedFormats.length > 0) {
-        const isAllowed = requirements.allowedFormats.some(format =>
+        const isAllowed = requirements.allowedFormats.some(format => 
           fileExtension === format.toLowerCase() ||
           mimeType === format ||
           fileName.toLowerCase().endsWith(format.toLowerCase())
@@ -161,7 +162,7 @@ class SpideyFileEnforcer {
       if (fileSize < minSize) {
         result.violations.push({
           rule: 'FILE_TOO_SMALL',
-          description: `File size ${Math.round(fileSize / 1024)}KB below minimum ${Math.round(minSize / 1024)}KB`,
+          description: `File size ${Math.round(fileSize/1024)}KB below minimum ${Math.round(minSize/1024)}KB`,
           severity: 'error'
         });
       }
@@ -169,7 +170,7 @@ class SpideyFileEnforcer {
       if (fileSize > maxSize) {
         result.violations.push({
           rule: 'FILE_TOO_LARGE',
-          description: `File size ${Math.round(fileSize / (1024 * 1024))}MB exceeds maximum ${Math.round(maxSize / (1024 * 1024))}MB`,
+          description: `File size ${Math.round(fileSize/(1024*1024))}MB exceeds maximum ${Math.round(maxSize/(1024*1024))}MB`,
           severity: 'error'
         });
       }
@@ -253,7 +254,7 @@ class SpideyFileEnforcer {
 
     try {
       const extension = path.extname(file.originalname || file.name).toLowerCase();
-
+      
       // Determine content type and validator
       let contentType = null;
       if (['.pdf'].includes(extension)) contentType = 'pdf';
@@ -346,7 +347,7 @@ class SpideyFileEnforcer {
     try {
       const content = file.buffer.toString('utf8');
       const lines = content.split('\n').filter(line => line.trim().length > 0);
-
+      
       result.metadata.rowCount = lines.length;
       result.metadata.estimatedColumns = lines[0] ? lines[0].split(',').length : 0;
 
@@ -396,7 +397,7 @@ class SpideyFileEnforcer {
 
     try {
       const content = file.buffer.toString('utf8');
-
+      
       result.metadata.characterCount = content.length;
       result.metadata.wordCount = content.split(/\s+/).filter(word => word.length > 0).length;
       result.metadata.lineCount = content.split('\n').length;
@@ -438,7 +439,7 @@ class SpideyFileEnforcer {
 
     try {
       const content = file.buffer.toString('utf8');
-
+      
       // Parse JSON to validate format
       let parsed;
       try {
@@ -457,7 +458,7 @@ class SpideyFileEnforcer {
 
       // Check required JSON structure
       if (requirements.requiredJsonKeys) {
-        const missingKeys = requirements.requiredJsonKeys.filter(key =>
+        const missingKeys = requirements.requiredJsonKeys.filter(key => 
           !parsed.hasOwnProperty(key)
         );
 
@@ -491,7 +492,7 @@ class SpideyFileEnforcer {
     try {
       // Basic image header validation
       const buffer = file.buffer;
-
+      
       // PNG signature check
       if (file.originalname.endsWith('.png')) {
         const pngSignature = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
@@ -606,13 +607,13 @@ class SpideyFileEnforcer {
       // Check for required file dependencies
       if (requirements.requiredFileDependencies) {
         for (const dependency of requirements.requiredFileDependencies) {
-          const dependentFile = files.find(f =>
+          const dependentFile = files.find(f => 
             f.originalname.includes(dependency.sourceFile)
           );
-
+          
           if (dependentFile) {
             const requiredFiles = dependency.requiredFiles || [];
-            const missingFiles = requiredFiles.filter(reqFile =>
+            const missingFiles = requiredFiles.filter(reqFile => 
               !files.some(f => f.originalname.includes(reqFile))
             );
 
@@ -646,7 +647,7 @@ class SpideyFileEnforcer {
    */
   async _logEnforcement(submissionId, action, details) {
     try {
-      const auditEntry = new AuditLog({
+      const auditEntry = new this.AuditLog({
         entityType: 'SpideyFileEnforcement',
         entityId: submissionId,
         action,
@@ -661,7 +662,7 @@ class SpideyFileEnforcer {
 
   async _logError(errorType, details) {
     try {
-      const auditEntry = new AuditLog({
+      const auditEntry = new this.AuditLog({
         entityType: 'SpideyFileEnforcement',
         action: `ERROR_${errorType}`,
         details: { ...details, severity: 'ERROR' },
@@ -674,4 +675,4 @@ class SpideyFileEnforcer {
   }
 }
 
-export default SpideyFileEnforcer;
+module.exports = SpideyFileEnforcer;

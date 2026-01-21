@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+const mongoose = require('mongoose');
 
 // Assessment Question Schema - Matches the provided JSON structure
 const assessmentQuestionSchema = new mongoose.Schema({
@@ -48,25 +48,23 @@ assessmentQuestionSchema.index({ id: 1 });
 assessmentQuestionSchema.index({ order: 1 });
 
 // Static method to get randomized questions per section
-assessmentQuestionSchema.statics.getRandomizedQuestions = function (questionsPerSection = 5) {
+assessmentQuestionSchema.statics.getRandomizedQuestions = function(questionsPerSection = 5) {
   const sections = ['Comprehension', 'Vocabulary', 'Grammar', 'Writing'];
-
+  
   const pipeline = sections.map(section => ({
     $facet: {
       [section]: [
         { $match: { section: section, isActive: true } },
         { $sample: { size: questionsPerSection } },
-        {
-          $project: {
-            id: 1,
-            section: 1,
-            question: 1,
-            options: 1,
-            // Don't include the answer in the response
-            points: 1,
-            _id: 0
-          }
-        }
+        { $project: { 
+          id: 1,
+          section: 1,
+          question: 1,
+          options: 1,
+          // Don't include the answer in the response
+          points: 1,
+          _id: 0
+        }}
       ]
     }
   }));
@@ -75,22 +73,22 @@ assessmentQuestionSchema.statics.getRandomizedQuestions = function (questionsPer
 };
 
 // Static method to get questions by section
-assessmentQuestionSchema.statics.getQuestionsBySection = function (section, limit = null) {
+assessmentQuestionSchema.statics.getQuestionsBySection = function(section, limit = null) {
   const query = { section: section, isActive: true };
   let mongoQuery = this.find(query).sort({ order: 1, id: 1 });
-
+  
   if (limit) {
     mongoQuery = mongoQuery.limit(limit);
   }
-
+  
   return mongoQuery;
 };
 
 // Static method to get question count by section
-assessmentQuestionSchema.statics.getQuestionCountBySection = function () {
+assessmentQuestionSchema.statics.getQuestionCountBySection = function() {
   return this.aggregate([
     { $match: { isActive: true } },
-    {
+    { 
       $group: {
         _id: '$section',
         count: { $sum: 1 }
@@ -112,16 +110,16 @@ assessmentQuestionSchema.statics.getQuestionCountBySection = function () {
 };
 
 // Instance method to validate answer
-assessmentQuestionSchema.methods.validateAnswer = function (userAnswer) {
+assessmentQuestionSchema.methods.validateAnswer = function(userAnswer) {
   // Trim and compare case-insensitively
   const correctAnswer = this.answer.trim().toLowerCase();
   const providedAnswer = userAnswer.trim().toLowerCase();
-
+  
   return correctAnswer === providedAnswer;
 };
 
 // Instance method to get question without answer (for client)
-assessmentQuestionSchema.methods.toClientObject = function () {
+assessmentQuestionSchema.methods.toClientObject = function() {
   return {
     id: this.id,
     section: this.section,
@@ -131,5 +129,4 @@ assessmentQuestionSchema.methods.toClientObject = function () {
   };
 };
 
-const AssessmentQuestion = mongoose.model('AssessmentQuestion', assessmentQuestionSchema);
-export default AssessmentQuestion;
+module.exports = mongoose.model('AssessmentQuestion', assessmentQuestionSchema);

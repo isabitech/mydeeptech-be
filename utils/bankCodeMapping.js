@@ -3,7 +3,7 @@
  * Maps bank names to their corresponding Paystack bank codes for bulk transfer CSV generation
  */
 
-export const NIGERIAN_BANKS_MAPPING = [
+const NIGERIAN_BANKS_MAPPING = [
   { name: "Access Bank", label: "Access Bank", bankCode: "access-bank" },
   { name: "Fidelity Bank", label: "Fidelity Bank", bankCode: "fidelity-bank" },
   { name: "First Bank of Nigeria", label: "First Bank of Nigeria", bankCode: "first-bank-of-nigeria" },
@@ -31,7 +31,7 @@ NIGERIAN_BANKS_MAPPING.forEach(bank => {
   // Add multiple lookup variations for flexibility
   bankNameToCodeMap.set(bank.name.toLowerCase(), bank.bankCode);
   bankNameToCodeMap.set(bank.label.toLowerCase(), bank.bankCode);
-
+  
   // Add shorter versions without common suffixes
   const shortName = bank.name.replace(/\s+(Bank|Limited|Ltd|Plc|Nigeria)$/i, '').toLowerCase();
   if (shortName !== bank.name.toLowerCase()) {
@@ -44,11 +44,11 @@ NIGERIAN_BANKS_MAPPING.forEach(bank => {
  * @param {string} bankName - Bank name to lookup
  * @returns {string|null} Paystack bank code or null if not found
  */
-export const getBankCode = (bankName) => {
+const getBankCode = (bankName) => {
   if (!bankName || typeof bankName !== 'string') {
     return null;
   }
-
+  
   const normalizedName = bankName.toLowerCase().trim();
   return bankNameToCodeMap.get(normalizedName) || null;
 };
@@ -58,7 +58,7 @@ export const getBankCode = (bankName) => {
  * @param {string} bankName - Bank name to validate
  * @returns {boolean} True if bank is supported
  */
-export const isSupportedBank = (bankName) => {
+const isSupportedBank = (bankName) => {
   return getBankCode(bankName) !== null;
 };
 
@@ -66,7 +66,7 @@ export const isSupportedBank = (bankName) => {
  * Gets list of all supported banks for frontend display
  * @returns {Array} Array of supported banks with names, labels, and codes
  */
-export const getSupportedBanks = () => {
+const getSupportedBanks = () => {
   return NIGERIAN_BANKS_MAPPING.map(bank => ({
     name: bank.name,
     label: bank.label,
@@ -79,13 +79,13 @@ export const getSupportedBanks = () => {
  * @param {string} bankName - Bank name to match
  * @returns {object|null} Best matching bank or null
  */
-export const findBestBankMatch = (bankName) => {
+const findBestBankMatch = (bankName) => {
   if (!bankName || typeof bankName !== 'string') {
     return null;
   }
 
   const searchTerm = bankName.toLowerCase().trim();
-
+  
   // First try exact match
   const exactMatch = getBankCode(searchTerm);
   if (exactMatch) {
@@ -96,10 +96,10 @@ export const findBestBankMatch = (bankName) => {
   const partialMatches = NIGERIAN_BANKS_MAPPING.filter(bank => {
     const bankNameLower = bank.name.toLowerCase();
     const labelLower = bank.label.toLowerCase();
-    return bankNameLower.includes(searchTerm) ||
-      labelLower.includes(searchTerm) ||
-      searchTerm.includes(bankNameLower.split(' ')[0]) ||
-      searchTerm.includes(labelLower.split(' ')[0]);
+    return bankNameLower.includes(searchTerm) || 
+           labelLower.includes(searchTerm) ||
+           searchTerm.includes(bankNameLower.split(' ')[0]) ||
+           searchTerm.includes(labelLower.split(' ')[0]);
   });
 
   return partialMatches.length > 0 ? partialMatches[0] : null;
@@ -110,7 +110,7 @@ export const findBestBankMatch = (bankName) => {
  * @param {object} paymentInfo - DTUser payment_info object
  * @returns {object} Validation result with isValid flag and error message
  */
-export const validatePaymentInfo = (paymentInfo) => {
+const validatePaymentInfo = (paymentInfo) => {
   const result = {
     isValid: true,
     errors: [],
@@ -153,7 +153,7 @@ export const validatePaymentInfo = (paymentInfo) => {
   return result;
 };
 
-export default {
+module.exports = {
   NIGERIAN_BANKS_MAPPING,
   getBankCode,
   isSupportedBank,

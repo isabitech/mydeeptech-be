@@ -1,4 +1,4 @@
-import { sendProjectEmail } from './brevoSMTP.js';
+const { sendProjectEmail } = require('./brevoSMTP');
 
 /**
  * Send approval notification email to annotator
@@ -7,7 +7,7 @@ import { sendProjectEmail } from './brevoSMTP.js';
  */
 const sendAnnotatorApprovalEmail = async (email, fullName) => {
   const subject = 'Congratulations! You are now an approved annotator';
-
+  
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -90,7 +90,7 @@ https://mydeeptech.ng
       html: htmlContent,
       text: textContent
     });
-
+    
     console.log(`✅ Annotator approval email sent to: ${email}`);
   } catch (error) {
     console.error(`❌ Failed to send annotator approval email to ${email}:`, error);
@@ -105,7 +105,7 @@ https://mydeeptech.ng
  */
 const sendAnnotatorRejectionEmail = async (email, fullName) => {
   const subject = 'Micro Tasker Approval - MyDeeptech';
-
+  
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -188,7 +188,7 @@ https://mydeeptech.ng
       html: htmlContent,
       text: textContent
     });
-
+    
     console.log(`✅ Micro tasker approval email sent to: ${email}`);
   } catch (error) {
     console.error(`❌ Failed to send micro tasker approval email to ${email}:`, error);
@@ -196,7 +196,7 @@ https://mydeeptech.ng
   }
 };
 
-export {
+module.exports = {
   sendAnnotatorApprovalEmail,
   sendAnnotatorRejectionEmail
 };

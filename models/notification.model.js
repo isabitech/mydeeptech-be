@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+const mongoose = require('mongoose');
 
 const notificationSchema = new mongoose.Schema({
   userId: {
@@ -13,34 +13,19 @@ const notificationSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    required: true,
-    enum: [
-      'application_status',
-      'assessment_completed',
-      'system_announcement',
-      'message',
-      'payment',
-      'other'
-    ]
+    required: true
   },
   title: {
     type: String,
-    required: true,
-    trim: true
+    required: true
   },
   message: {
     type: String,
-    required: true,
-    trim: true
+    required: true
   },
   data: {
-    type: mongoose.Schema.Types.Mixed,
+    type: Object,
     default: {}
-  },
-  priority: {
-    type: String,
-    enum: ['low', 'medium', 'high'],
-    default: 'medium'
   },
   isRead: {
     type: Boolean,
@@ -49,13 +34,16 @@ const notificationSchema = new mongoose.Schema({
   readAt: {
     type: Date,
     default: null
+  },
+  priority: {
+    type: String,
+    enum: ['low', 'medium', 'high'],
+    default: 'medium'
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
   }
-}, {
-  timestamps: true
 });
 
-// Index for faster queries
-notificationSchema.index({ userId: 1, isRead: 1, createdAt: -1 });
-
-const Notification = mongoose.model('Notification', notificationSchema);
-export default Notification;
+module.exports = mongoose.model('Notification', notificationSchema);

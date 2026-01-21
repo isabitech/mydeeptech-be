@@ -1,4 +1,4 @@
-import { sendProjectEmail } from './brevoSMTP.js';
+const { sendProjectEmail } = require('./brevoSMTP');
 
 /**
  * Send assessment invitation email to user
@@ -6,10 +6,10 @@ import { sendProjectEmail } from './brevoSMTP.js';
  * @param {string} fullName - User's full name
  * @param {Object} assessmentInfo - Assessment details
  */
-export const sendAssessmentInvitationEmail = async (email, fullName, assessmentInfo = {}) => {
-    const subject = `Assessment Invitation - ${assessmentInfo.title || 'Multimedia Assessment'}`;
-
-    const htmlContent = `
+const sendAssessmentInvitationEmail = async (email, fullName, assessmentInfo = {}) => {
+  const subject = `Assessment Invitation - ${assessmentInfo.title || 'Multimedia Assessment'}`;
+  
+  const htmlContent = `
     <!DOCTYPE html>
     <html>
     <head>
@@ -69,14 +69,14 @@ export const sendAssessmentInvitationEmail = async (email, fullName, assessmentI
     </html>
   `;
 
-    try {
-        await sendProjectEmail({ to: email, subject, html: htmlContent });
-        console.log(`✅ Assessment invitation email sent to ${email}`);
-        return { success: true, message: 'Assessment invitation email sent successfully' };
-    } catch (error) {
-        console.error('❌ Error sending assessment invitation email:', error);
-        return { success: false, message: 'Failed to send assessment invitation email', error: error.message };
-    }
+  try {
+    await sendProjectEmail(email, subject, htmlContent);
+    console.log(`✅ Assessment invitation email sent to ${email}`);
+    return { success: true, message: 'Assessment invitation email sent successfully' };
+  } catch (error) {
+    console.error('❌ Error sending assessment invitation email:', error);
+    return { success: false, message: 'Failed to send assessment invitation email', error: error.message };
+  }
 };
 
 /**
@@ -85,15 +85,15 @@ export const sendAssessmentInvitationEmail = async (email, fullName, assessmentI
  * @param {string} fullName - User's full name
  * @param {Object} assessmentResult - Assessment completion details
  */
-export const sendAssessmentCompletionEmail = async (email, fullName, assessmentResult = {}) => {
-    const subject = `Assessment Completed - ${assessmentResult.assessmentTitle || 'Multimedia Assessment'}`;
-
-    const isPass = assessmentResult.status === 'passed';
-    const statusColor = isPass ? '#4caf50' : '#f44336';
-    const statusIcon = isPass ? '✅' : '❌';
-    const statusText = isPass ? 'Passed' : 'Not Passed';
-
-    const htmlContent = `
+const sendAssessmentCompletionEmail = async (email, fullName, assessmentResult = {}) => {
+  const subject = `Assessment Completed - ${assessmentResult.assessmentTitle || 'Multimedia Assessment'}`;
+  
+  const isPass = assessmentResult.status === 'passed';
+  const statusColor = isPass ? '#4caf50' : '#f44336';
+  const statusIcon = isPass ? '✅' : '❌';
+  const statusText = isPass ? 'Passed' : 'Not Passed';
+  
+  const htmlContent = `
     <!DOCTYPE html>
     <html>
     <head>
@@ -176,12 +176,17 @@ export const sendAssessmentCompletionEmail = async (email, fullName, assessmentR
     </html>
   `;
 
-    try {
-        await sendProjectEmail({ to: email, subject, html: htmlContent });
-        console.log(`✅ Assessment completion email sent to ${email}`);
-        return { success: true, message: 'Assessment completion email sent successfully' };
-    } catch (error) {
-        console.error('❌ Error sending assessment completion email:', error);
-        return { success: false, message: 'Failed to send assessment completion email', error: error.message };
-    }
+  try {
+    await sendProjectEmail(email, subject, htmlContent);
+    console.log(`✅ Assessment completion email sent to ${email}`);
+    return { success: true, message: 'Assessment completion email sent successfully' };
+  } catch (error) {
+    console.error('❌ Error sending assessment completion email:', error);
+    return { success: false, message: 'Failed to send assessment completion email', error: error.message };
+  }
+};
+
+module.exports = {
+  sendAssessmentInvitationEmail,
+  sendAssessmentCompletionEmail
 };

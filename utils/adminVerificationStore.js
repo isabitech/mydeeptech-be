@@ -1,4 +1,4 @@
-import { getRedisClient } from '../config/redis.js';
+const { getRedisClient } = require('../config/redis');
 
 // Fallback in-memory storage (when Redis is not available)
 const fallbackStore = new Map();
@@ -38,14 +38,14 @@ class AdminVerificationStore {
             try {
                 const redisClient = getRedisClient();
                 const key = this.getRedisKey(email);
-
+                
                 // Store as JSON string with expiration
                 await redisClient.setEx(
-                    key,
-                    VERIFICATION_EXPIRY,
+                    key, 
+                    VERIFICATION_EXPIRY, 
                     JSON.stringify(verificationData)
                 );
-
+                
                 console.log(`✅ Admin verification code stored in Redis for ${email} (expires in ${VERIFICATION_EXPIRY}s)`);
                 return true;
             } catch (error) {
@@ -67,7 +67,7 @@ class AdminVerificationStore {
             try {
                 const redisClient = getRedisClient();
                 const key = this.getRedisKey(email);
-
+                
                 const data = await redisClient.get(key);
                 if (!data) {
                     console.log(`🔍 No admin verification data found in Redis for ${email}`);
@@ -75,7 +75,7 @@ class AdminVerificationStore {
                 }
 
                 const verificationData = JSON.parse(data);
-
+                
                 // Check if expired (double check, even though Redis should handle this)
                 if (Date.now() > verificationData.expiresAt) {
                     await redisClient.del(key);
@@ -102,7 +102,7 @@ class AdminVerificationStore {
             try {
                 const redisClient = getRedisClient();
                 const key = this.getRedisKey(email);
-
+                
                 const data = await redisClient.get(key);
                 if (!data) {
                     return 0;
@@ -110,13 +110,13 @@ class AdminVerificationStore {
 
                 const verificationData = JSON.parse(data);
                 verificationData.attempts += 1;
-
+                
                 // Get remaining TTL and update the data
                 const ttl = await redisClient.ttl(key);
                 if (ttl > 0) {
                     await redisClient.setEx(key, ttl, JSON.stringify(verificationData));
                 }
-
+                
                 console.log(`📈 Admin verification attempts incremented to ${verificationData.attempts} for ${email}`);
                 return verificationData.attempts;
             } catch (error) {
@@ -134,10 +134,10 @@ class AdminVerificationStore {
             try {
                 const redisClient = getRedisClient();
                 const key = this.getRedisKey(email);
-
+                
                 const result = await redisClient.del(key);
                 if (result === 1) {
-                    console.log(`️ Admin verification code removed from Redis for ${email}`);
+                    console.log(`�️ Admin verification code removed from Redis for ${email}`);
                 } else {
                     console.log(`🔍 No admin verification code found to remove for ${email}`);
                 }
@@ -158,7 +158,7 @@ class AdminVerificationStore {
                 const redisClient = getRedisClient();
                 const pattern = `${REDIS_PREFIX}*`;
                 const keys = await redisClient.keys(pattern);
-
+                
                 if (keys.length === 0) {
                     return [];
                 }
@@ -168,7 +168,7 @@ class AdminVerificationStore {
                     try {
                         const data = await redisClient.get(key);
                         const ttl = await redisClient.ttl(key);
-
+                        
                         if (data) {
                             const verificationData = JSON.parse(data);
                             const email = key.replace(REDIS_PREFIX, '');
@@ -178,7 +178,7 @@ class AdminVerificationStore {
                         console.error(`Error parsing admin verification data for key ${key}:`, parseError);
                     }
                 }
-
+                
                 console.log(`🔍 Retrieved ${pending.length} pending admin verifications from Redis`);
                 return pending;
             } catch (error) {
@@ -194,7 +194,7 @@ class AdminVerificationStore {
     setVerificationCodeFallback(email, verificationData) {
         fallbackStore.set(email.toLowerCase(), verificationData);
         console.log(`⚠️ Admin verification code stored in fallback memory for ${email}`);
-
+        
         // Auto cleanup after expiry time
         setTimeout(() => {
             if (fallbackStore.has(email.toLowerCase())) {
@@ -244,7 +244,7 @@ class AdminVerificationStore {
     getAllPendingFallback() {
         const now = Date.now();
         const pending = [];
-
+        
         for (const [email, data] of fallbackStore.entries()) {
             if (now <= data.expiresAt) {
                 const timeLeft = Math.floor((data.expiresAt - now) / 1000);
@@ -253,7 +253,7 @@ class AdminVerificationStore {
                 fallbackStore.delete(email);
             }
         }
-
+        
         console.log(`🔍 Retrieved ${pending.length} pending admin verifications from fallback memory`);
         return pending;
     }
@@ -270,7 +270,7 @@ class AdminVerificationStore {
                 const redisClient = getRedisClient();
                 const pattern = `${REDIS_PREFIX}*`;
                 const keys = await redisClient.keys(pattern);
-
+                
                 return {
                     type: 'Redis',
                     activeVerifications: keys.length,
@@ -298,5 +298,12 @@ class AdminVerificationStore {
 // Create singleton instance
 const adminVerificationStore = new AdminVerificationStore();
 
-export { adminVerificationStore };
-export default adminVerificationStore;
+module.exports = {
+    setVerificationCode: (email, code, adminData) => adminVerificationStore.setVerificationCode(email, code, adminData),
+    getVerificationData: (email) => adminVerificationStore.getVerificationData(email),
+    incrementAttempts: (email) => adminVerificationStore.incrementAttempts(email),
+    removeVerificationCode: (email) => adminVerificationStore.removeVerificationCode(email),
+    getAllPending: () => adminVerificationStore.getAllPending(),
+    getStorageType: () => adminVerificationStore.getStorageType(),
+    getStorageStats: () => adminVerificationStore.getStorageStats()
+};

@@ -1,26 +1,26 @@
-import mongoose from "mongoose";
+const mongoose = require("mongoose");
 
 const annotationProjectSchema = new mongoose.Schema(
   {
     // Basic project information
-    projectName: {
-      type: String,
+    projectName: { 
+      type: String, 
       required: true,
       trim: true,
       maxlength: 200
     },
-    projectDescription: {
-      type: String,
+    projectDescription: { 
+      type: String, 
       required: true,
       trim: true,
       maxlength: 2000
     },
-    projectCategory: {
-      type: String,
+    projectCategory: { 
+      type: String, 
       required: true,
       enum: [
         "Text Annotation",
-        "Image Annotation",
+        "Image Annotation", 
         "Audio Annotation",
         "Video Annotation",
         "Data Labeling",
@@ -77,7 +77,7 @@ const annotationProjectSchema = new mongoose.Schema(
       enum: ["beginner", "intermediate", "advanced", "expert"],
       default: "intermediate"
     },
-
+    
     // Requirements
     requiredSkills: {
       type: [String],
@@ -92,7 +92,7 @@ const annotationProjectSchema = new mongoose.Schema(
       type: [String],
       default: []
     },
-
+    
     // Admin/Creator info
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -113,14 +113,14 @@ const annotationProjectSchema = new mongoose.Schema(
       type: Number,
       default: 0
     },
-
+    
     // Project guidelines and resources
     projectGuidelineLink: {
       type: String,
       required: true,
       trim: true,
       validate: {
-        validator: function (v) {
+        validator: function(v) {
           return /^https?:\/\/.+/.test(v);
         },
         message: 'Project guideline link must be a valid URL'
@@ -130,7 +130,7 @@ const annotationProjectSchema = new mongoose.Schema(
       type: String,
       trim: true,
       validate: {
-        validator: function (v) {
+        validator: function(v) {
           return !v || /^https?:\/\/.+/.test(v);
         },
         message: 'Project guideline video must be a valid URL'
@@ -141,7 +141,7 @@ const annotationProjectSchema = new mongoose.Schema(
       type: String,
       trim: true,
       validate: {
-        validator: function (v) {
+        validator: function(v) {
           return !v || /^https?:\/\/.+/.test(v);
         },
         message: 'Project community link must be a valid URL'
@@ -152,7 +152,7 @@ const annotationProjectSchema = new mongoose.Schema(
       type: String,
       trim: true,
       validate: {
-        validator: function (v) {
+        validator: function(v) {
           return !v || /^https?:\/\/.+/.test(v);
         },
         message: 'Project tracker link must be a valid URL'
@@ -184,10 +184,10 @@ const annotationProjectSchema = new mongoose.Schema(
       resourceType: { type: String, enum: ["image", "video", "raw"], required: true },
       thumbnail: { type: String, default: null },
       optimizedUrl: { type: String, default: null },
-      uploadedBy: {
+      uploadedBy: { 
         type: mongoose.Schema.Types.ObjectId,
         ref: "DTUser",
-        required: true
+        required: true 
       },
       uploadedAt: { type: Date, default: Date.now }
     }],
@@ -217,18 +217,18 @@ const annotationProjectSchema = new mongoose.Schema(
     deletionOTP: {
       code: { type: String, default: null },
       expiresAt: { type: Date, default: null },
-      requestedBy: {
+      requestedBy: { 
         type: mongoose.Schema.Types.ObjectId,
         ref: "DTUser",
-        default: null
+        default: null 
       },
       requestedAt: { type: Date, default: null },
       verified: { type: Boolean, default: false },
       verifiedAt: { type: Date, default: null },
-      verifiedBy: {
+      verifiedBy: { 
         type: mongoose.Schema.Types.ObjectId,
         ref: "DTUser",
-        default: null
+        default: null 
       }
     },
 
@@ -280,5 +280,4 @@ annotationProjectSchema.virtual('applicationCount', {
 // Ensure virtual fields are serialized
 annotationProjectSchema.set('toJSON', { virtuals: true });
 
-const AnnotationProject = mongoose.model("AnnotationProject", annotationProjectSchema);
-export default AnnotationProject;
+module.exports = mongoose.model("AnnotationProject", annotationProjectSchema);

@@ -1,30 +1,47 @@
-import { v2 as cloudinary } from 'cloudinary';
-import { CloudinaryStorage } from 'multer-storage-cloudinary';
-import multer from 'multer';
+const cloudinary = require('cloudinary').v2;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const multer = require('multer');
+const envConfig = require('./envConfig');
+
+
 
 // Configure Cloudinary
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
+  cloud_name: envConfig.cloudinary.CLOUDINARY_CLOUD_NAME,
+  api_key: envConfig.cloudinary.CLOUDINARY_API_KEY,
+  api_secret: envConfig.cloudinary.CLOUDINARY_API_SECRET
 });
 
 // Verify Cloudinary configuration
-export const verifyCloudinaryConfig = () => {
-  const requiredEnvVars = ['CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'];
-  const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+const verifyCloudinaryConfig = () => {
 
+  console.log({
+  api_key: envConfig.cloudinary.CLOUDINARY_API_KEY
+});
+
+    const requiredCloudinaryVars = {
+    CLOUDINARY_CLOUD_NAME: envConfig.cloudinary.CLOUDINARY_CLOUD_NAME,
+    CLOUDINARY_API_KEY: envConfig.cloudinary.CLOUDINARY_API_KEY,
+    CLOUDINARY_API_SECRET: envConfig.cloudinary.CLOUDINARY_API_SECRET,
+  };
+
+
+const missingVars = Object.entries(requiredCloudinaryVars)
+  .filter(([, value]) => !value)
+  .map(([key]) => key);
+
+  
   if (missingVars.length > 0) {
     console.log(`⚠️ Missing Cloudinary environment variables: ${missingVars.join(', ')}`);
     return false;
   }
-
+  
   console.log('✅ Cloudinary configuration loaded');
   return true;
 };
 
 // Storage configuration for different file types
-export const createCloudinaryStorage = (folder, allowedFormats = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'mp4', 'mov'], resourceType = 'auto') => {
+const createCloudinaryStorage = (folder, allowedFormats = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'mp4', 'mov'], resourceType = 'auto') => {
   return new CloudinaryStorage({
     cloudinary: cloudinary,
     params: {
@@ -39,26 +56,26 @@ export const createCloudinaryStorage = (folder, allowedFormats = ['jpg', 'jpeg',
 };
 
 // Image storage (for profile pictures, project images, etc.)
-export const imageStorage = createCloudinaryStorage('images', ['jpg', 'jpeg', 'png', 'gif', 'webp'], 'image');
+const imageStorage = createCloudinaryStorage('images', ['jpg', 'jpeg', 'png', 'gif', 'webp'], 'image');
 
 // Document storage (for PDFs, docs, etc.) - using raw resource type
-export const documentStorage = createCloudinaryStorage('documents', ['pdf', 'doc', 'docx', 'txt'], 'raw');
+const documentStorage = createCloudinaryStorage('documents', ['pdf', 'doc', 'docx', 'txt'], 'raw');
 
 // Video storage (for video annotations, tutorials, etc.)
-export const videoStorage = createCloudinaryStorage('videos', ['mp4', 'avi', 'mov', 'wmv', 'flv'], 'video');
+const videoStorage = createCloudinaryStorage('videos', ['mp4', 'avi', 'mov', 'wmv', 'flv'], 'video');
 
 // Audio storage (for audio annotations, recordings, etc.)
-export const audioStorage = createCloudinaryStorage('audio', ['mp3', 'wav', 'aac', 'ogg'], 'video');
+const audioStorage = createCloudinaryStorage('audio', ['mp3', 'wav', 'aac', 'ogg'], 'video');
 
 // General file storage - using raw for mixed file types
-export const generalStorage = createCloudinaryStorage('files', ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx', 'mp4', 'mp3', 'wav'], 'auto');
+const generalStorage = createCloudinaryStorage('files', ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx', 'mp4', 'mp3', 'wav'], 'auto');
 
 // Specialized storage for user documents (ID and Resume)
-export const idDocumentStorage = createCloudinaryStorage('user_documents/id_documents', ['pdf', 'jpg', 'jpeg', 'png'], 'raw');
-export const resumeStorage = createCloudinaryStorage('user_documents/resumes', ['pdf', 'doc', 'docx'], 'raw');
+const idDocumentStorage = createCloudinaryStorage('user_documents/id_documents', ['pdf', 'jpg', 'jpeg', 'png'], 'raw');
+const resumeStorage = createCloudinaryStorage('user_documents/resumes', ['pdf', 'doc', 'docx'], 'raw');
 
 // Multer configurations
-export const imageUpload = multer({
+const imageUpload = multer({
   storage: imageStorage,
   limits: {
     fileSize: 5 * 1024 * 1024 // 5MB limit for images
@@ -72,7 +89,7 @@ export const imageUpload = multer({
   }
 });
 
-export const documentUpload = multer({
+const documentUpload = multer({
   storage: documentStorage,
   limits: {
     fileSize: 10 * 1024 * 1024 // 10MB limit for documents
@@ -87,7 +104,7 @@ export const documentUpload = multer({
   }
 });
 
-export const videoUpload = multer({
+const videoUpload = multer({
   storage: videoStorage,
   limits: {
     fileSize: 50 * 1024 * 1024 // 50MB limit for videos
@@ -101,7 +118,7 @@ export const videoUpload = multer({
   }
 });
 
-export const audioUpload = multer({
+const audioUpload = multer({
   storage: audioStorage,
   limits: {
     fileSize: 20 * 1024 * 1024 // 20MB limit for audio
@@ -115,7 +132,7 @@ export const audioUpload = multer({
   }
 });
 
-export const generalUpload = multer({
+const generalUpload = multer({
   storage: generalStorage,
   limits: {
     fileSize: 25 * 1024 * 1024 // 25MB limit for general files
@@ -127,7 +144,7 @@ export const generalUpload = multer({
       'text/plain', 'text/csv', 'application/json',
       'video/mp4', 'video/avi', 'video/mov', 'audio/mp3', 'audio/wav', 'audio/aac'
     ];
-
+    
     if (allowedMimes.includes(file.mimetype)) {
       cb(null, true);
     } else {
@@ -137,7 +154,7 @@ export const generalUpload = multer({
 });
 
 // ID Document Upload - for identification documents
-export const idDocumentUpload = multer({
+const idDocumentUpload = multer({
   storage: idDocumentStorage,
   limits: {
     fileSize: 10 * 1024 * 1024 // 10MB limit for ID documents
@@ -153,7 +170,7 @@ export const idDocumentUpload = multer({
 });
 
 // Resume Upload - for CV/Resume documents
-export const resumeUpload = multer({
+const resumeUpload = multer({
   storage: resumeStorage,
   limits: {
     fileSize: 10 * 1024 * 1024 // 10MB limit for resumes
@@ -169,12 +186,20 @@ export const resumeUpload = multer({
 });
 
 // Specific upload configuration for result files - more flexible field names
-export const resultFileUpload = multer({
+const resultFileUpload = multer({
   storage: generalStorage,
   limits: {
     fileSize: 25 * 1024 * 1024 // 25MB limit for result files
   },
   fileFilter: (req, file, cb) => {
+    // Log the incoming file for debugging
+    console.log('📁 Incoming file details:', {
+      fieldname: file.fieldname,
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size
+    });
+
     const allowedMimes = [
       'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
       'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -182,17 +207,18 @@ export const resultFileUpload = multer({
       'video/mp4', 'video/avi', 'video/mov', 'video/quicktime',
       'audio/mp3', 'audio/wav', 'audio/aac', 'audio/mpeg'
     ];
-
+    
     if (allowedMimes.includes(file.mimetype)) {
       cb(null, true);
     } else {
+      console.log(`❌ File type rejected: ${file.mimetype}`);
       cb(new Error(`File type not allowed: ${file.mimetype}. Supported formats: Images, Documents, Videos, Audio files`), false);
     }
   }
 });
 
 // Helper functions for file operations
-export const deleteCloudinaryFile = async (publicId) => {
+const deleteCloudinaryFile = async (publicId) => {
   try {
     const result = await cloudinary.uploader.destroy(publicId);
     console.log(`🗑️ Deleted file from Cloudinary: ${publicId}`);
@@ -203,7 +229,7 @@ export const deleteCloudinaryFile = async (publicId) => {
   }
 };
 
-export const getCloudinaryFileInfo = async (publicId) => {
+const getCloudinaryFileInfo = async (publicId) => {
   try {
     const result = await cloudinary.api.resource(publicId);
     return result;
@@ -214,7 +240,7 @@ export const getCloudinaryFileInfo = async (publicId) => {
 };
 
 // Generate optimized URLs for different use cases
-export const generateOptimizedUrl = (publicId, options = {}) => {
+const generateOptimizedUrl = (publicId, options = {}) => {
   const {
     width = null,
     height = null,
@@ -232,13 +258,12 @@ export const generateOptimizedUrl = (publicId, options = {}) => {
     crop,
     gravity,
     fetch_format: 'auto',
-    dpr: 'auto',
-    secure: true
+    dpr: 'auto'
   });
 };
 
 // Generate thumbnail URLs
-export const generateThumbnail = (publicId, size = 150) => {
+const generateThumbnail = (publicId, size = 150) => {
   return generateOptimizedUrl(publicId, {
     width: size,
     height: size,
@@ -247,11 +272,11 @@ export const generateThumbnail = (publicId, size = 150) => {
   });
 };
 
-export { cloudinary };
-
-export default {
+module.exports = {
   cloudinary,
   verifyCloudinaryConfig,
+  
+  // Upload middleware
   imageUpload,
   documentUpload,
   videoUpload,
@@ -260,10 +285,14 @@ export default {
   resultFileUpload,
   idDocumentUpload,
   resumeUpload,
+  
+  // Helper functions
   deleteCloudinaryFile,
   getCloudinaryFileInfo,
   generateOptimizedUrl,
   generateThumbnail,
+  
+  // Storage instances (for custom configurations)
   imageStorage,
   documentStorage,
   videoStorage,

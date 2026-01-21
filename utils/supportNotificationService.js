@@ -1,7 +1,6 @@
-import { createNotification } from './notificationService.js';
-import { SupportTicket } from '../models/supportTicket.model.js';
-import { DTUser } from '../models/dtUser.model.js';
-
+const { createNotification } = require('./notificationService');
+const SupportTicket = require('../models/supportTicket.model');
+const DTUser = require('../models/dtUser.model');
 
 /**
  * Notify admins about new support tickets
@@ -12,10 +11,10 @@ const notifyAdminsOfNewTicket = async (ticket) => {
     // Get all admins (assuming admins are DTUsers with admin role or specific criteria)
     // For now, we'll notify all DTUsers with admin role
     const admins = await DTUser.find({ /* Add admin filter criteria here if you have admin role field */ });
-
+    
     if (admins.length > 0) {
       // Create notifications for all admins
-      const adminNotifications = admins.map(admin =>
+      const adminNotifications = admins.map(admin => 
         createNotification({
           userId: admin._id,
           type: 'support_ticket_admin',
@@ -190,7 +189,7 @@ const sendEscalationNotification = async (ticket) => {
     if (ticket.priority === 'urgent') {
       // Get senior admins or escalation contacts
       const admins = await DTUser.find({ /* Add senior admin criteria */ });
-
+      
       const escalationNotifications = admins.map(admin =>
         createNotification({
           userId: admin._id,
@@ -222,7 +221,7 @@ const sendEscalationNotification = async (ticket) => {
 const sendTicketReminders = async () => {
   try {
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-
+    
     // Find open tickets older than 24 hours
     const staleTickets = await SupportTicket.find({
       status: 'open',
@@ -242,7 +241,7 @@ const sendTicketReminders = async () => {
   }
 };
 
-export default {
+module.exports = {
   notifyAdminsOfNewTicket,
   notifyUserOfStatusUpdate,
   notifyAdminOfAssignment,

@@ -1,4 +1,4 @@
-import { sendProjectEmail } from './brevoSMTP.js';
+const { sendProjectEmail } = require('./brevoSMTP');
 
 // Send project deletion OTP to Projects Officer
 const sendProjectDeletionOTP = async (projectsOfficerEmail, deletionData) => {
@@ -16,7 +16,7 @@ const sendProjectDeletionOTP = async (projectsOfficerEmail, deletionData) => {
   } = deletionData;
 
   const subject = `🚨 PROJECT DELETION AUTHORIZATION REQUIRED - ${projectName}`;
-
+  
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -150,7 +150,7 @@ MyDeepTech Projects Officer Authorization System
       html: htmlContent,
       text: textContent
     });
-
+    
     console.log(`✅ Project deletion OTP sent to: ${projectsOfficerEmail}`);
   } catch (error) {
     console.error(`❌ Failed to send deletion OTP:`, error);
@@ -173,7 +173,7 @@ const sendProjectDeletionConfirmation = async (projectsOfficerEmail, confirmatio
   } = confirmationData;
 
   const subject = `✅ PROJECT DELETION COMPLETED - ${projectName}`;
-
+  
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -290,7 +290,7 @@ Completed: ${new Date().toLocaleString()}
       html: htmlContent,
       text: textContent
     });
-
+    
     console.log(`✅ Project deletion confirmation sent to: ${projectsOfficerEmail}`);
   } catch (error) {
     console.error(`❌ Failed to send deletion confirmation:`, error);
@@ -306,9 +306,9 @@ Completed: ${new Date().toLocaleString()}
  */
 const sendProjectApplicationNotification = async (adminEmail, adminName, applicationData) => {
   const { applicantName, applicantEmail, resumeUrl, projectName, projectCategory, payRate, coverLetter, appliedAt } = applicationData;
-
+  
   const subject = `New Project Application: ${projectName}`;
-
+  
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -437,7 +437,7 @@ https://mydeeptech.ng
       html: htmlContent,
       text: textContent
     });
-
+    
     console.log(`✅ Project application notification sent to admin: ${adminEmail}`);
   } catch (error) {
     console.error(`❌ Failed to send project application notification to ${adminEmail}:`, error);
@@ -452,20 +452,20 @@ https://mydeeptech.ng
  * @param {object} projectData - Project details
  */
 const sendProjectApprovalNotification = async (applicantEmail, applicantName, projectData) => {
-  const {
-    projectName,
-    projectCategory,
-    payRate,
-    adminName,
+  const { 
+    projectName, 
+    projectCategory, 
+    payRate, 
+    adminName, 
     reviewNotes,
     projectGuidelineLink,
     projectGuidelineVideo,
     projectCommunityLink,
     projectTrackerLink
   } = projectData;
-
+  
   const subject = `🎉 Welcome to ${projectName} - Let's Get Started!`;
-
+  
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -711,7 +711,7 @@ https://mydeeptech.ng
       html: htmlContent,
       text: textContent
     });
-
+    
     console.log(`✅ Project approval notification with guidelines sent to: ${applicantEmail}`);
   } catch (error) {
     console.error(`❌ Failed to send project approval notification to ${applicantEmail}:`, error);
@@ -727,9 +727,9 @@ https://mydeeptech.ng
  */
 const sendProjectRejectionNotification = async (applicantEmail, applicantName, projectData) => {
   const { projectName, projectCategory, adminName, rejectionReason, reviewNotes } = projectData;
-
+  
   const subject = `Application Update: ${projectName}`;
-
+  
   const reasonText = {
     'insufficient_experience': 'Insufficient experience for this project',
     'not_suitable_skills': 'Skills do not match project requirements',
@@ -739,7 +739,7 @@ const sendProjectRejectionNotification = async (applicantEmail, applicantName, p
     'rate_mismatch': 'Rate expectations do not align',
     'other': 'Other reasons (see admin notes)'
   };
-
+  
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -852,7 +852,7 @@ https://mydeeptech.ng
       html: htmlContent,
       text: textContent
     });
-
+    
     console.log(`✅ Project rejection notification sent to: ${applicantEmail}`);
   } catch (error) {
     console.error(`❌ Failed to send project rejection notification to ${applicantEmail}:`, error);
@@ -868,7 +868,7 @@ https://mydeeptech.ng
  */
 const sendApplicantRemovalNotification = async (applicantEmail, applicantName, removalData) => {
   const { projectName, projectCategory, adminName, removalReason, removalNotes, workStartedAt, totalWorkDays } = removalData;
-
+  
   const reasonText = {
     'performance_issues': 'Performance did not meet project standards',
     'project_cancelled': 'Project has been cancelled',
@@ -878,9 +878,9 @@ const sendApplicantRemovalNotification = async (applicantEmail, applicantName, r
     'admin_decision': 'Administrative decision',
     'other': 'Other reasons (see admin notes)'
   };
-
+  
   const subject = `Project Assignment Update: ${projectName}`;
-
+  
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -1011,7 +1011,7 @@ https://mydeeptech.ng
       html: htmlContent,
       text: textContent
     });
-
+    
     console.log(`✅ Applicant removal notification sent to: ${applicantEmail}`);
   } catch (error) {
     console.error(`❌ Failed to send applicant removal notification to ${applicantEmail}:`, error);
@@ -1026,19 +1026,19 @@ https://mydeeptech.ng
  * @param {object} removalData - Removal details
  */
 const sendProjectAnnotatorRemovedNotification = async (adminEmail, adminName, removalData) => {
-  const {
-    applicantName,
-    applicantEmail,
-    projectName,
-    projectCategory,
-    removalReason,
-    removalNotes,
+  const { 
+    applicantName, 
+    applicantEmail, 
+    projectName, 
+    projectCategory, 
+    removalReason, 
+    removalNotes, 
     removedBy,
     workStartedAt,
     totalWorkDays,
-    tasksCompleted
+    tasksCompleted 
   } = removalData;
-
+  
   const reasonText = {
     'performance_issues': 'Performance did not meet project standards',
     'project_cancelled': 'Project has been cancelled',
@@ -1048,9 +1048,9 @@ const sendProjectAnnotatorRemovedNotification = async (adminEmail, adminName, re
     'admin_decision': 'Administrative decision',
     'other': 'Other reasons (see admin notes)'
   };
-
+  
   const subject = `Annotator Removed from Project: ${projectName}`;
-
+  
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -1198,7 +1198,7 @@ https://mydeeptech.ng
       html: htmlContent,
       text: textContent
     });
-
+    
     console.log(`✅ Project annotator removal notification sent to admin: ${adminEmail}`);
   } catch (error) {
     console.error(`❌ Failed to send annotator removal notification to ${adminEmail}:`, error);
@@ -1206,7 +1206,7 @@ https://mydeeptech.ng
   }
 };
 
-export {
+module.exports = {
   sendProjectApplicationNotification,
   sendProjectApprovalNotification,
   sendProjectRejectionNotification,

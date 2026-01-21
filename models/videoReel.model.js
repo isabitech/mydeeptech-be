@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+const mongoose = require('mongoose');
 
 const videoReelSchema = new mongoose.Schema({
   // Basic video information
@@ -14,14 +14,14 @@ const videoReelSchema = new mongoose.Schema({
     maxlength: 1000,
     default: ''
   },
-
+  
   // YouTube embed information
   youtubeUrl: {
     type: String,
     required: true,
     unique: true,
     validate: {
-      validator: function (v) {
+      validator: function(v) {
         // Validate YouTube embed URL format
         return /^https:\/\/www\.youtube\.com\/embed\/[a-zA-Z0-9_-]{11}(\?.*)?$/.test(v);
       },
@@ -33,7 +33,7 @@ const videoReelSchema = new mongoose.Schema({
     required: true,
     unique: true
   },
-
+  
   // Thumbnail information (extracted from YouTube)
   thumbnailUrl: {
     type: String,
@@ -43,7 +43,7 @@ const videoReelSchema = new mongoose.Schema({
     type: String,
     default: null
   },
-
+  
   // Categorization
   niche: {
     type: String,
@@ -71,7 +71,7 @@ const videoReelSchema = new mongoose.Schema({
       'other'
     ]
   },
-
+  
   // Video metadata (from YouTube API)
   duration: {
     type: Number, // in seconds
@@ -106,7 +106,7 @@ const videoReelSchema = new mongoose.Schema({
       default: []
     }
   },
-
+  
   // Upload and management info
   uploadedBy: {
     type: mongoose.Schema.Types.ObjectId,
@@ -117,7 +117,7 @@ const videoReelSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
-
+  
   // Usage statistics
   usageCount: {
     type: Number,
@@ -127,13 +127,13 @@ const videoReelSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
-
+  
   // Assessment specific fields
   assessmentProjects: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'MultimediaAssessmentConfig'
   }],
-
+  
   // Quality control
   isApproved: {
     type: Boolean,
@@ -144,13 +144,13 @@ const videoReelSchema = new mongoose.Schema({
     ref: 'DTUser',
     default: null
   },
-
+  
   // Content tags for filtering
   tags: [{
     type: String,
     trim: true
   }],
-
+  
   // Content warnings if any
   contentWarnings: [{
     type: String,
@@ -167,31 +167,32 @@ videoReelSchema.index({ niche: 1, isActive: 1 });
 videoReelSchema.index({ uploadedBy: 1, createdAt: -1 });
 videoReelSchema.index({ usageCount: -1 });
 videoReelSchema.index({ isActive: 1, isApproved: 1 });
+// Note: Removed cloudinaryData.publicId unique index as YouTube videos don't have Cloudinary data
 
 // Virtual for formatted duration
-videoReelSchema.virtual('formattedDuration').get(function () {
+videoReelSchema.virtual('formattedDuration').get(function() {
   const minutes = Math.floor(this.duration / 60);
   const seconds = this.duration % 60;
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 });
 
 // Virtual for file size in MB
-videoReelSchema.virtual('fileSizeMB').get(function () {
+videoReelSchema.virtual('fileSizeMB').get(function() {
   return (this.metadata.fileSize / (1024 * 1024)).toFixed(2);
 });
 
 // Static method to get random reels by niche
-videoReelSchema.statics.getRandomReelsByNiche = async function (niche, limit = 5, excludeIds = []) {
+videoReelSchema.statics.getRandomReelsByNiche = async function(niche, limit = 5, excludeIds = []) {
   const matchStage = {
     isActive: true,
     isApproved: true,
     niche: niche
   };
-
+  
   if (excludeIds.length > 0) {
     matchStage._id = { $nin: excludeIds };
   }
-
+  
   return this.aggregate([
     { $match: matchStage },
     { $sample: { size: limit } },
@@ -206,11 +207,11 @@ videoReelSchema.statics.getRandomReelsByNiche = async function (niche, limit = 5
         aspectRatio: 1,
         metadata: 1,
         tags: 1,
-        formattedDuration: {
+        formattedDuration: { 
           $concat: [
             { $toString: { $floor: { $divide: ['$duration', 60] } } },
             ':',
-            {
+            { 
               $cond: [
                 { $lt: [{ $mod: ['$duration', 60] }, 10] },
                 { $concat: ['0', { $toString: { $mod: ['$duration', 60] } }] },
@@ -225,15 +226,15 @@ videoReelSchema.statics.getRandomReelsByNiche = async function (niche, limit = 5
 };
 
 // Static method to get reels for assessment
-videoReelSchema.statics.getAssessmentReels = async function (assessmentConfig, excludeUserReels = []) {
+videoReelSchema.statics.getAssessmentReels = async function(assessmentConfig, excludeUserReels = []) {
   const reelsPerNiche = assessmentConfig.videoReels.reelsPerNiche;
   const allReels = [];
-
+  
   for (const [niche, count] of Object.entries(reelsPerNiche)) {
     const reels = await this.getRandomReelsByNiche(niche, count, excludeUserReels);
     allReels.push(...reels);
   }
-
+  
   // Shuffle the combined array if randomization is enabled
   if (assessmentConfig.videoReels.randomizationEnabled) {
     for (let i = allReels.length - 1; i > 0; i--) {
@@ -241,19 +242,19 @@ videoReelSchema.statics.getAssessmentReels = async function (assessmentConfig, e
       [allReels[i], allReels[j]] = [allReels[j], allReels[i]];
     }
   }
-
+  
   return allReels;
 };
 
 // Instance method to increment usage count
-videoReelSchema.methods.incrementUsage = async function () {
+videoReelSchema.methods.incrementUsage = async function() {
   this.usageCount += 1;
   this.lastUsedAt = new Date();
   return this.save();
 };
 
 // Pre-save middleware to validate video metadata
-videoReelSchema.pre('save', function (next) {
+videoReelSchema.pre('save', function(next) {
   // Ensure portrait aspect ratio for reels
   if (this.aspectRatio === 'portrait' && this.metadata.resolution) {
     const [width, height] = this.metadata.resolution.split('x').map(Number);
@@ -261,9 +262,8 @@ videoReelSchema.pre('save', function (next) {
       return next(new Error('Portrait videos must have height greater than width'));
     }
   }
-
+  
   next();
 });
 
-const VideoReel = mongoose.model('VideoReel', videoReelSchema);
-export default VideoReel;
+module.exports = mongoose.model('VideoReel', videoReelSchema);

@@ -1,4 +1,4 @@
-import { sendEmail } from './brevoSMTP.js';
+const { sendEmail } = require('./brevoSMTP');
 
 const sendAdminVerificationEmail = async (email, verificationCode, adminName) => {
     try {
@@ -72,34 +72,34 @@ const sendAdminVerificationEmail = async (email, verificationCode, adminName) =>
                 </html>
             `,
             text: `
-                Admin Account Verification - MyDeepTech
+Admin Account Verification - MyDeepTech
 
-                Hello ${adminName || 'Admin'},
+Hello ${adminName || 'Admin'},
 
-                A new admin account creation request has been initiated for this email address.
+A new admin account creation request has been initiated for this email address.
 
-                Your Verification Code: ${verificationCode}
+Your Verification Code: ${verificationCode}
 
-                This code expires in 15 minutes.
+This code expires in 15 minutes.
 
-                Security Information:
-                - This verification code is required to complete admin account creation
-                - Code is valid for 15 minutes only
-                - Maximum 3 verification attempts allowed
-                - If you didn't request this, please ignore this email
+Security Information:
+- This verification code is required to complete admin account creation
+- Code is valid for 15 minutes only
+- Maximum 3 verification attempts allowed
+- If you didn't request this, please ignore this email
 
-                IMPORTANT SECURITY NOTICE:
-                Admin accounts have elevated privileges in the MyDeepTech system. If you did not request admin account creation, please contact the system administrator immediately.
+IMPORTANT SECURITY NOTICE:
+Admin accounts have elevated privileges in the MyDeepTech system. If you did not request admin account creation, please contact the system administrator immediately.
 
-                Next Steps:
-                1. Use the verification code above in your admin creation request
-                2. Complete the admin account setup process
-                3. Secure your admin account with a strong password
+Next Steps:
+1. Use the verification code above in your admin creation request
+2. Complete the admin account setup process
+3. Secure your admin account with a strong password
 
-                If you have any questions or didn't request this admin account, please contact support.
+If you have any questions or didn't request this admin account, please contact support.
 
-                © 2025 MyDeepTech. All rights reserved.
-                This is an automated security email. Please do not reply.
+© 2025 MyDeepTech. All rights reserved.
+This is an automated security email. Please do not reply.
             `
         };
 
@@ -113,6 +113,6 @@ const sendAdminVerificationEmail = async (email, verificationCode, adminName) =>
     }
 };
 
-export {
+module.exports = {
     sendAdminVerificationEmail
 };

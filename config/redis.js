@@ -1,16 +1,24 @@
-import redis from 'redis';
+const redis = require('redis');
+const envConfig = require('./envConfig');
 
 // Global variables for Redis client
 let redisClient = null;
-let isRedisConnectedValue = false;
+let isRedisConnected = false;
 let redisConnectionAttempts = 0;
 const maxRetries = 1;
 
 // Parse Redis host and port from environment
 const parseRedisConfig = () => {
-    const redisHost = process.env.REDIS_HOST || 'localhost';
-    const redisPort = process.env.REDIS_PORT || 6379;
-
+    const redisHost = envConfig.redis.REDIS_HOST || 'localhost';
+    const redisPort = envConfig.redis.REDIS_PORT || 6379;
+    
+    // Debug: Log what we're reading from environment
+    console.log('🔍 Environment variables:');
+    console.log(`   REDIS_HOST: ${envConfig.redis.REDIS_HOST}`);
+    console.log(`   REDIS_PORT: ${envConfig.redis.REDIS_PORT}`);
+    console.log(`   REDIS_PASSWORD: ${envConfig.redis.REDIS_PASSWORD ? '[HIDDEN]' : 'Not set'}`);
+    console.log(`   REDIS_DB: ${envConfig.redis.REDIS_DB}`);
+    
     // Check if host includes port (for Redis Cloud URLs like "host:port")
     if (redisHost.includes(':') && !redisHost.startsWith('redis://')) {
         const [host, port] = redisHost.split(':');
@@ -19,7 +27,7 @@ const parseRedisConfig = () => {
             port: parseInt(port) || redisPort
         };
     }
-
+    
     return {
         host: redisHost,
         port: parseInt(redisPort)
@@ -28,12 +36,13 @@ const parseRedisConfig = () => {
 
 const createRedisClient = async () => {
     try {
+        // Parse configuration at connection time (not at module load time)
         const { host, port } = parseRedisConfig();
         const redisConfig = {
             host: host,
             port: port,
-            password: process.env.REDIS_PASSWORD || null,
-            db: parseInt(process.env.REDIS_DB) || 0,
+            password: envConfig.redis.REDIS_PASSWORD || null,
+            db: parseInt(envConfig.redis.REDIS_DB) || 0, // Parse as integer, ignore non-numeric values
             retryDelayOnFailover: 100,
             enableOfflineQueue: false,
             maxRetriesPerRequest: 1,
@@ -44,14 +53,14 @@ const createRedisClient = async () => {
 
         console.log('🔄 Attempting to connect to Redis...');
         console.log(`📍 Redis Config: ${redisConfig.host}:${redisConfig.port}, DB: ${redisConfig.db}`);
-
+        
         redisClient = redis.createClient({
             socket: {
                 host: redisConfig.host,
                 port: redisConfig.port,
                 connectTimeout: redisConfig.connectTimeout,
                 commandTimeout: redisConfig.commandTimeout,
-                reconnectStrategy: () => false
+                reconnectStrategy: () => false // Disable reconnection
             },
             password: redisConfig.password,
             database: redisConfig.db,
@@ -59,33 +68,36 @@ const createRedisClient = async () => {
             enableOfflineQueue: redisConfig.enableOfflineQueue
         });
 
+        // Event handlers
         redisClient.on('connect', () => {
             console.log('🟢 Redis client connected');
         });
 
         redisClient.on('ready', () => {
             console.log('✅ Redis client ready to use');
-            isRedisConnectedValue = true;
+            isRedisConnected = true;
             redisConnectionAttempts = 0;
         });
 
         redisClient.on('error', (err) => {
             console.error('❌ Redis client error:', err.code || err.message);
-            isRedisConnectedValue = false;
+            isRedisConnected = false;
         });
 
         redisClient.on('end', () => {
             console.log('🔌 Redis client disconnected');
-            isRedisConnectedValue = false;
+            isRedisConnected = false;
         });
 
+        // Connect to Redis with timeout
         const connectPromise = redisClient.connect();
         const timeoutPromise = new Promise((_, reject) => {
             setTimeout(() => reject(new Error('Redis connection timeout')), redisConfig.connectTimeout);
         });
 
         await Promise.race([connectPromise, timeoutPromise]);
-
+        
+        // Test connection
         const pong = await redisClient.ping();
         if (pong === 'PONG') {
             console.log('🏓 Redis connection test successful');
@@ -97,12 +109,14 @@ const createRedisClient = async () => {
     } catch (error) {
         console.error(`❌ Redis connection failed: ${error.message}`);
         redisConnectionAttempts++;
-        isRedisConnectedValue = false;
+        isRedisConnected = false;
 
         if (redisClient) {
             try {
                 await redisClient.quit();
-            } catch (quitError) { }
+            } catch (quitError) {
+                // Ignore quit errors
+            }
             redisClient = null;
         }
 
@@ -111,6 +125,7 @@ const createRedisClient = async () => {
     }
 };
 
+// Initialize Redis connection
 const initRedis = async () => {
     try {
         return await createRedisClient();
@@ -120,18 +135,20 @@ const initRedis = async () => {
     }
 };
 
+// Get Redis client (with fallback check)
 const getRedisClient = () => {
-    if (!isRedisConnectedValue || !redisClient) {
+    if (!isRedisConnected || !redisClient) {
         return null;
     }
     return redisClient;
 };
 
+// Graceful shutdown
 const closeRedis = async () => {
     if (redisClient) {
         try {
             console.log('🔄 Closing Redis connection...');
-            if (isRedisConnectedValue) {
+            if (isRedisConnected) {
                 await redisClient.quit();
             } else {
                 await redisClient.disconnect();
@@ -141,30 +158,32 @@ const closeRedis = async () => {
             console.error('❌ Error closing Redis connection:', error.message);
         } finally {
             redisClient = null;
-            isRedisConnectedValue = false;
+            isRedisConnected = false;
         }
     }
 };
 
+// Health check
 const redisHealthCheck = async () => {
     try {
-        if (!redisClient || !isRedisConnectedValue) {
+        if (!redisClient || !isRedisConnected) {
             return { status: 'disconnected', message: 'Redis client not connected' };
         }
-
+        
         const start = Date.now();
         await redisClient.ping();
         const latency = Date.now() - start;
-
+        
+        // Get current config for health check
         const { host, port } = parseRedisConfig();
-
-        return {
-            status: 'connected',
+        
+        return { 
+            status: 'connected', 
             latency: `${latency}ms`,
             config: {
                 host: host,
                 port: port,
-                db: parseInt(process.env.REDIS_DB) || 0
+                db: parseInt(envConfig.redis.REDIS_DB) || 0
             }
         };
     } catch (error) {
@@ -172,12 +191,10 @@ const redisHealthCheck = async () => {
     }
 };
 
-const isRedisConnected = () => isRedisConnectedValue;
-
-export {
+module.exports = {
     initRedis,
     getRedisClient,
     closeRedis,
     redisHealthCheck,
-    isRedisConnected
+    isRedisConnected: () => isRedisConnected
 };
