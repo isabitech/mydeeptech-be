@@ -46,7 +46,7 @@ const removeApplicantSchema = Joi.object({
   removalReason: Joi.string().valid(
     "performance_issues",
     "project_cancelled",
-    "violates_guidelines", 
+    "violates_guidelines",
     "unavailable",
     "quality_concerns",
     "admin_decision",
@@ -71,7 +71,7 @@ const createAnnotationProject = async (req, res) => {
 
     // Create project with admin as creator
     const adminId = req.admin?.userId || req.userId || req.admin?.userDoc?._id;
-    
+
     if (!adminId) {
       return res.status(400).json({
         success: false,
@@ -225,39 +225,39 @@ const getAnnotationProjectDetails = async (req, res) => {
       .limit(5);
 
     // Get approved annotators (approved applications with detailed info)
-    const approvedAnnotators = await ProjectApplication.find({ 
+    const approvedAnnotators = await ProjectApplication.find({
       projectId: project._id,
       status: 'approved'
     })
-    .populate({
-      path: 'applicantId',
-      select: 'fullName email phone annotatorStatus microTaskerStatus personal_info professional_background payment_info attachments profilePicture createdAt'
-    })
-    .populate('reviewedBy', 'fullName email')
-    .sort({ reviewedAt: -1 });
+      .populate({
+        path: 'applicantId',
+        select: 'fullName email phone annotatorStatus microTaskerStatus personal_info professional_background payment_info attachments profilePicture createdAt'
+      })
+      .populate('reviewedBy', 'fullName email')
+      .sort({ reviewedAt: -1 });
 
     // Get rejected annotators (rejected applications with detailed info)
-    const rejectedAnnotators = await ProjectApplication.find({ 
+    const rejectedAnnotators = await ProjectApplication.find({
       projectId: project._id,
       status: 'rejected'
     })
-    .populate({
-      path: 'applicantId',
-      select: 'fullName email phone annotatorStatus microTaskerStatus personal_info professional_background attachments profilePicture createdAt'
-    })
-    .populate('reviewedBy', 'fullName email')
-    .sort({ reviewedAt: -1 });
+      .populate({
+        path: 'applicantId',
+        select: 'fullName email phone annotatorStatus microTaskerStatus personal_info professional_background attachments profilePicture createdAt'
+      })
+      .populate('reviewedBy', 'fullName email')
+      .sort({ reviewedAt: -1 });
 
     // Get pending annotators for completeness
-    const pendingAnnotators = await ProjectApplication.find({ 
+    const pendingAnnotators = await ProjectApplication.find({
       projectId: project._id,
       status: 'pending'
     })
-    .populate({
-      path: 'applicantId',
-      select: 'fullName email phone annotatorStatus microTaskerStatus personal_info professional_background attachments profilePicture createdAt'
-    })
-    .sort({ appliedAt: -1 });
+      .populate({
+        path: 'applicantId',
+        select: 'fullName email phone annotatorStatus microTaskerStatus personal_info professional_background attachments profilePicture createdAt'
+      })
+      .sort({ appliedAt: -1 });
 
     // Format annotators data with application details
     const formatAnnotatorData = (applications) => {
@@ -313,21 +313,21 @@ const getAnnotationProjectDetails = async (req, res) => {
       approved: approvedAnnotators.length,
       rejected: rejectedAnnotators.length,
       pending: pendingAnnotators.length,
-      approvalRate: (approvedAnnotators.length + rejectedAnnotators.length) > 0 ? 
+      approvalRate: (approvedAnnotators.length + rejectedAnnotators.length) > 0 ?
         Math.round((approvedAnnotators.length / (approvedAnnotators.length + rejectedAnnotators.length)) * 100) : 0
     };
 
     // Get annotator activity summary (recent reviews)
-    const recentReviewActivity = await ProjectApplication.find({ 
+    const recentReviewActivity = await ProjectApplication.find({
       projectId: project._id,
       status: { $in: ['approved', 'rejected'] },
       reviewedAt: { $exists: true }
     })
-    .populate('applicantId', 'fullName email')
-    .populate('reviewedBy', 'fullName email')
-    .sort({ reviewedAt: -1 })
-    .limit(10)
-    .select('status reviewedAt reviewedBy applicantId reviewNotes rejectionReason');
+      .populate('applicantId', 'fullName email')
+      .populate('reviewedBy', 'fullName email')
+      .sort({ reviewedAt: -1 })
+      .limit(10)
+      .select('status reviewedAt reviewedBy applicantId reviewNotes rejectionReason');
 
 
     res.status(200).json({
@@ -368,7 +368,7 @@ const updateAnnotationProject = async (req, res) => {
     // Validate request body (allow partial updates)
     const updateSchema = createProjectSchema.fork(Object.keys(createProjectSchema.describe().keys), (schema) => schema.optional());
     const { error, value } = updateSchema.validate(req.body);
-    
+
     if (error) {
       return res.status(400).json({
         success: false,
@@ -382,7 +382,7 @@ const updateAnnotationProject = async (req, res) => {
       { ...value, updatedAt: new Date() },
       { new: true }
     ).populate('createdBy', 'fullName email')
-     .populate('assignedAdmins', 'fullName email');
+      .populate('assignedAdmins', 'fullName email');
 
     if (!project) {
       return res.status(404).json({
@@ -498,10 +498,10 @@ const requestProjectDeletionOTP = async (req, res) => {
 
     // Send OTP to Projects Officer email
     const projectsOfficerEmail = 'projects@mydeeptech.ng';
-    
+
     try {
       const { sendProjectDeletionOTP } = require('../utils/projectMailer');
-      
+
       const deletionData = {
         projectName: project.projectName,
         projectId: projectId,
@@ -516,7 +516,7 @@ const requestProjectDeletionOTP = async (req, res) => {
       };
 
       await sendProjectDeletionOTP(projectsOfficerEmail, deletionData);
-      
+
       res.status(200).json({
         success: true,
         message: "Deletion OTP sent to Projects Officer for approval",
@@ -534,11 +534,11 @@ const requestProjectDeletionOTP = async (req, res) => {
 
     } catch (emailError) {
       console.error(`❌ Failed to send deletion OTP:`, emailError.message);
-      
+
       // Remove OTP from project if email failed
       project.deletionOTP = undefined;
       await project.save();
-      
+
       return res.status(500).json({
         success: false,
         message: "Failed to send deletion OTP to Projects Officer",
@@ -561,7 +561,7 @@ const verifyOTPAndDeleteProject = async (req, res) => {
   try {
     const { projectId } = req.params;
     const { otp, confirmationMessage } = req.body;
-    
+
     // Validate input
     if (!otp) {
       return res.status(400).json({
@@ -591,7 +591,7 @@ const verifyOTPAndDeleteProject = async (req, res) => {
       // Clear expired OTP
       project.deletionOTP = undefined;
       await project.save();
-      
+
       return res.status(400).json({
         success: false,
         message: "OTP has expired. Please request a new OTP."
@@ -637,7 +637,7 @@ const verifyOTPAndDeleteProject = async (req, res) => {
     // Send notification to Projects Officer about successful deletion
     try {
       const { sendProjectDeletionConfirmation } = require('../utils/projectMailer');
-      
+
       const confirmationData = {
         projectName: project.projectName,
         projectId: projectId,
@@ -656,7 +656,7 @@ const verifyOTPAndDeleteProject = async (req, res) => {
       };
 
       await sendProjectDeletionConfirmation('projects@mydeeptech.ng', confirmationData);
-      
+
     } catch (emailError) {
       console.warn(`⚠️ Failed to send deletion confirmation:`, emailError.message);
     }
@@ -778,7 +778,7 @@ const approveAnnotationProjectApplication = async (req, res) => {
   try {
     const { applicationId } = req.params;
     const { reviewNotes } = req.body;
-    
+
     // Find and update application
     const application = await ProjectApplication.findById(applicationId)
       .populate({
@@ -827,7 +827,7 @@ const approveAnnotationProjectApplication = async (req, res) => {
     // Send approval email to applicant
     try {
       const { sendProjectApprovalNotification } = require('../utils/projectMailer');
-      
+
       const projectData = {
         projectName: project.projectName,
         projectCategory: project.projectCategory,
@@ -876,7 +876,7 @@ const rejectAnnotationProjectApplication = async (req, res) => {
   try {
     const { applicationId } = req.params;
     const { rejectionReason, reviewNotes } = req.body;
-    
+
     // Find and update application
     const application = await ProjectApplication.findById(applicationId)
       .populate({
@@ -911,7 +911,7 @@ const rejectAnnotationProjectApplication = async (req, res) => {
     // Send rejection email to applicant
     try {
       const { sendProjectRejectionNotification } = require('../utils/projectMailer');
-      
+
       const projectData = {
         projectName: application.projectId.projectName,
         projectCategory: application.projectId.projectCategory,
@@ -974,7 +974,7 @@ const removeApprovedApplicant = async (req, res) => {
   try {
     const { applicationId } = req.params;
     const { removalReason, removalNotes } = req.body;
-    
+
     // Validate request body
     const { error, value } = removeApplicantSchema.validate(req.body);
     if (error) {
@@ -1125,7 +1125,7 @@ const removeApprovedApplicant = async (req, res) => {
 const getRemovableApplicants = async (req, res) => {
   try {
     const { projectId } = req.params;
-    
+
     // Find the project
     const project = await AnnotationProject.findById(projectId);
     if (!project) {
@@ -1140,8 +1140,8 @@ const getRemovableApplicants = async (req, res) => {
       projectId: projectId,
       status: 'approved'
     })
-    .populate('applicantId', 'fullName email phone')
-    .sort({ reviewedAt: -1 });
+      .populate('applicantId', 'fullName email phone')
+      .sort({ reviewedAt: -1 });
 
     // Format the data for easy removal management
     const removableApplicants = approvedApplications.map(app => ({
@@ -1195,7 +1195,7 @@ const getRemovableApplicants = async (req, res) => {
 const exportApprovedAnnotatorsCSV = async (req, res) => {
   try {
     const { projectId } = req.params;
-    
+
     // Find the project
     const project = await AnnotationProject.findById(projectId);
     if (!project) {
@@ -1210,11 +1210,11 @@ const exportApprovedAnnotatorsCSV = async (req, res) => {
       projectId: projectId,
       status: 'approved'
     })
-    .populate({
-      path: 'applicantId',
-      select: 'fullName email phone personal_info'
-    })
-    .sort({ reviewedAt: -1 });
+      .populate({
+        path: 'applicantId',
+        select: 'fullName email phone personal_info'
+      })
+      .sort({ reviewedAt: -1 });
 
     if (approvedApplications.length === 0) {
       return res.status(404).json({
@@ -1231,19 +1231,19 @@ const exportApprovedAnnotatorsCSV = async (req, res) => {
     approvedApplications.forEach(app => {
       const applicant = app.applicantId;
       const personalInfo = applicant.personal_info || {};
-      
+
       const row = [
         `"${applicant.fullName || 'N/A'}"`,
         `"${personalInfo.country || 'N/A'}"`,
         `"${applicant.email || 'N/A'}"`
       ];
-      
+
       csvRows.push(row.join(','));
     });
 
     // Generate CSV content
     const csvContent = csvRows.join('\n');
-    
+
     // Create filename with project name and timestamp
     const timestamp = new Date().toISOString().split('T')[0];
     const sanitizedProjectName = project.projectName
@@ -1256,7 +1256,7 @@ const exportApprovedAnnotatorsCSV = async (req, res) => {
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
-    
+
     // Send CSV content
     res.status(200).send(csvContent);
 
@@ -1277,7 +1277,7 @@ const attachAssessmentToProject = async (req, res) => {
   try {
     const { projectId } = req.params;
     const { assessmentId, isRequired = true, assessmentInstructions = '' } = req.body;
-    
+
     // Validate inputs
     if (!assessmentId) {
       return res.status(400).json({
@@ -1307,7 +1307,7 @@ const attachAssessmentToProject = async (req, res) => {
 
     // Update project with assessment configuration
     const adminId = req.admin?.userId || req.userId || req.admin?.userDoc?._id;
-    
+
     project.assessment = {
       isRequired,
       assessmentId,
@@ -1348,7 +1348,7 @@ const attachAssessmentToProject = async (req, res) => {
 const removeAssessmentFromProject = async (req, res) => {
   try {
     const { projectId } = req.params;
-    
+
     // Find and update project
     const project = await AnnotationProject.findById(projectId);
     if (!project) {
@@ -1359,7 +1359,7 @@ const removeAssessmentFromProject = async (req, res) => {
     }
 
     const wasRequired = project.assessment?.isRequired;
-    
+
     // Clear assessment configuration
     project.assessment = {
       isRequired: false,
@@ -1398,7 +1398,7 @@ const removeAssessmentFromProject = async (req, res) => {
 const getAvailableAssessments = async (req, res) => {
   try {
     const MultimediaAssessmentConfig = require('../models/multimediaAssessmentConfig.model');
-    
+
     const assessments = await MultimediaAssessmentConfig.find({ isActive: true })
       .populate('projectId', 'projectName')
       .sort({ createdAt: -1 })
@@ -1415,7 +1415,7 @@ const getAvailableAssessments = async (req, res) => {
       createdAt: assessment.createdAt,
       // Usage statistics
       usageCount: assessment.statistics?.totalSubmissions || 0,
-      approvalRate: assessment.statistics?.totalSubmissions > 0 ? 
+      approvalRate: assessment.statistics?.totalSubmissions > 0 ?
         (assessment.statistics.approvedSubmissions / assessment.statistics.totalSubmissions * 100).toFixed(1) : 0
     }));
 
@@ -1431,6 +1431,138 @@ const getAvailableAssessments = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch available assessments',
+      error: error.message
+    });
+  }
+};
+const getApprovedApplicants = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(projectId)) {
+      throw new ValidationError('Invalid project ID');
+    }
+
+    const project = await AnnotationProject.findById(projectId);
+    if (!project) throw new NotFoundError('Project not found');
+
+    const approvedApplications = await ProjectApplication.find({
+      projectId,
+      status: 'approved'
+    })
+      .populate('applicantId', 'fullName email phone')
+      .sort({ reviewedAt: -1 });
+
+    return res.json({
+      success: true,
+      total: approvedApplications.length,
+      data: approvedApplications
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get approved applicants',
+      error: error.message
+    });
+  }
+};
+
+// Bulk reject pending applications
+const rejectApplicationsBulk = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const { applicationIds, admin, rejectionReason = 'other', reviewNotes = '' } = req.body;
+
+    if (!admin || !admin.userId) throw new ValidationError('Admin information is required');
+
+    if (!Array.isArray(applicationIds) || applicationIds.length === 0) {
+      throw new ValidationError('No application IDs provided');
+    }
+
+    const validIds = applicationIds.filter(id => mongoose.Types.ObjectId.isValid(id));
+    if (!validIds.length) throw new ValidationError('No valid application IDs provided');
+
+    // Fetch pending applications
+    const applications = await ProjectApplication.find({
+      _id: { $in: validIds },
+      status: 'pending'
+    })
+      .populate('projectId', 'projectName projectCategory')
+      .populate('applicantId', 'fullName email')
+      .session(session);
+
+    if (!applications.length) {
+      throw new NotFoundError('No pending applications found with the provided IDs');
+    }
+
+    // Bulk update
+    await ProjectApplication.updateMany(
+      { _id: { $in: applications.map(app => app._id) } },
+      {
+        $set: {
+          status: 'rejected',
+          reviewedBy: admin.userId,
+          reviewedAt: new Date(),
+          rejectionReason,
+          reviewNotes
+        }
+      },
+      { session }
+    );
+
+    await session.commitTransaction();
+    session.endSession();
+
+    // Send notifications asynchronously (fault-tolerant)
+    const notificationResults = await Promise.allSettled(
+      applications.map(async application => {
+        try {
+          await sendProjectRejectionNotification(
+            application.applicantId.email,
+            application.applicantId.fullName,
+            {
+              projectName: application.projectId.projectName,
+              projectCategory: application.projectId.projectCategory,
+              adminName: admin.fullName,
+              rejectionReason,
+              reviewNotes
+            }
+          );
+
+          await notificationService.createApplicationStatusNotification(
+            application.applicantId._id,
+            'rejected',
+            application.projectId,
+            application
+          );
+
+          return { id: application._id, status: 'success' };
+        } catch (error) {
+          console.error(`Notification failed for application ${application._id}:`, error.message);
+          return { id: application._id, status: 'notification_failed', message: error.message };
+        }
+      })
+    );
+
+    const successCount = notificationResults.filter(
+      r => r.status === 'fulfilled' && r.value.status === 'success'
+    ).length;
+
+    return res.status(200).json({
+      totalRequested: applicationIds.length,
+      processed: applications.length,
+      rejected: applications.length,
+      notificationSuccess: successCount,
+      notificationFailed: applications.length - successCount
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    res.status(500).json({
+      success: false,
+      message: 'Bulk rejection failed',
       error: error.message
     });
   }
@@ -1452,5 +1584,7 @@ module.exports = {
   exportApprovedAnnotatorsCSV,
   attachAssessmentToProject,
   removeAssessmentFromProject,
-  getAvailableAssessments
+  getAvailableAssessments,
+  rejectApplicationsBulk,
+  getApprovedApplicants
 };
