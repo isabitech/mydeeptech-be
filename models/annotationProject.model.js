@@ -258,6 +258,13 @@ const annotationProjectSchema = new mongoose.Schema(
         ref: "DTUser",
         default: null
       }
+    },
+
+    // Simple active/inactive toggle
+    isActive: {
+      type: Boolean,
+      default: true,
+      index: true
     }
   },
   { timestamps: true }
@@ -267,6 +274,7 @@ const annotationProjectSchema = new mongoose.Schema(
 annotationProjectSchema.index({ projectCategory: 1, status: 1 });
 annotationProjectSchema.index({ createdBy: 1 });
 annotationProjectSchema.index({ status: 1, isPublic: 1 });
+annotationProjectSchema.index({ isActive: 1 });
 annotationProjectSchema.index({ tags: 1 });
 
 // Virtual for application count
