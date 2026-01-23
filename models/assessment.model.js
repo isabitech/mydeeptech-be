@@ -18,6 +18,13 @@ const assessmentSchema = new mongoose.Schema(
       required: true
     },
     
+    // Language for language-specific assessments
+    language: {
+      type: String,
+      enum: ['en', 'akan', null],
+      default: null // null for non-language specific assessments
+    },
+    
     // Assessment scoring
     totalQuestions: {
       type: Number,

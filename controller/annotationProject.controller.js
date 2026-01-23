@@ -1568,6 +1568,185 @@ const rejectApplicationsBulk = async (req, res) => {
   }
 };
 
+// Bulk approve applications
+const bulkApproveApplications = async (req, res) => {
+  try {
+    const { applicationIds } = req.body;
+
+    if (!applicationIds || !Array.isArray(applicationIds) || applicationIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Application IDs are required and must be a non-empty array"
+      });
+    }
+
+    const results = [];
+    const errors = [];
+
+    for (const applicationId of applicationIds) {
+      try {
+        // Find and update application
+        const application = await ProjectApplication.findById(applicationId)
+          .populate({
+            path: 'projectId',
+            select: 'projectName projectCategory payRate approvedAnnotators maxAnnotators'
+          })
+          .populate('applicantId', 'fullName email');
+
+        if (!application) {
+          errors.push({ applicationId, error: "Application not found" });
+          continue;
+        }
+
+        if (application.status !== 'pending') {
+          errors.push({ applicationId, error: `Application is already ${application.status}` });
+          continue;
+        }
+
+        // Check if project has reached max annotators
+        if (application.projectId.maxAnnotators && 
+            application.projectId.approvedAnnotators && 
+            application.projectId.approvedAnnotators.length >= application.projectId.maxAnnotators) {
+          errors.push({ applicationId, error: "Project has reached maximum annotators" });
+          continue;
+        }
+
+        // Update application status
+        application.status = 'approved';
+        application.reviewedAt = new Date();
+        application.reviewedBy = req.admin._id;
+        application.reviewNotes = 'Bulk approved by admin';
+
+        await application.save();
+
+        // Add annotator to project's approved list
+        if (!application.projectId.approvedAnnotators.includes(application.applicantId._id)) {
+          await AnnotationProject.findByIdAndUpdate(
+            application.projectId._id,
+            { $push: { approvedAnnotators: application.applicantId._id } }
+          );
+        }
+
+        results.push({
+          applicationId,
+          applicantName: application.applicantId?.fullName || 'Unknown',
+          projectName: application.projectId?.projectName || 'Unknown',
+          status: 'approved'
+        });
+
+      } catch (error) {
+        errors.push({ applicationId, error: error.message });
+      }
+    }
+
+    const totalProcessed = results.length + errors.length;
+    const successCount = results.length;
+    const errorCount = errors.length;
+
+    res.status(200).json({
+      success: true,
+      message: `Bulk approval completed: ${successCount} approved, ${errorCount} failed`,
+      data: {
+        totalProcessed,
+        successCount,
+        errorCount,
+        approvedApplications: results,
+        errors: errors
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error bulk approving applications:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error bulk approving applications",
+      error: error.message
+    });
+  }
+};
+
+// Bulk reject applications
+const bulkRejectApplications = async (req, res) => {
+  try {
+    const { applicationIds, rejectionReason = 'other', reviewNotes = 'Bulk rejected by admin' } = req.body;
+
+    if (!applicationIds || !Array.isArray(applicationIds) || applicationIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Application IDs are required and must be a non-empty array"
+      });
+    }
+
+    const results = [];
+    const errors = [];
+
+    for (const applicationId of applicationIds) {
+      try {
+        // Find and update application
+        const application = await ProjectApplication.findById(applicationId)
+          .populate({
+            path: 'projectId',
+            select: 'projectName projectCategory'
+          })
+          .populate('applicantId', 'fullName email');
+
+        if (!application) {
+          errors.push({ applicationId, error: "Application not found" });
+          continue;
+        }
+
+        if (application.status !== 'pending') {
+          errors.push({ applicationId, error: `Application is already ${application.status}` });
+          continue;
+        }
+
+        // Update application status
+        application.status = 'rejected';
+        application.reviewedAt = new Date();
+        application.reviewedBy = req.admin._id;
+        application.rejectionReason = rejectionReason;
+        application.reviewNotes = reviewNotes;
+
+        await application.save();
+
+        results.push({
+          applicationId,
+          applicantName: application.applicantId?.fullName || 'Unknown',
+          projectName: application.projectId?.projectName || 'Unknown',
+          status: 'rejected'
+        });
+
+      } catch (error) {
+        errors.push({ applicationId, error: error.message });
+      }
+    }
+
+    const totalProcessed = results.length + errors.length;
+    const successCount = results.length;
+    const errorCount = errors.length;
+
+    res.status(200).json({
+      success: true,
+      message: `Bulk rejection completed: ${successCount} rejected, ${errorCount} failed`,
+      data: {
+        totalProcessed,
+        successCount,
+        errorCount,
+        rejectedApplications: results,
+        errors: errors
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error bulk rejecting applications:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error bulk rejecting applications",
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   createAnnotationProject,
   getAllAnnotationProjects,
@@ -1586,5 +1765,7 @@ module.exports = {
   removeAssessmentFromProject,
   getAvailableAssessments,
   rejectApplicationsBulk,
-  getApprovedApplicants
+  getApprovedApplicants,
+  bulkApproveApplications,
+  bulkRejectApplications
 };
