@@ -1473,8 +1473,8 @@ const rejectApplicationsBulk = async (req, res) => {
   session.startTransaction();
 
   try {
-    const { applicationIds, admin, rejectionReason = 'other', reviewNotes = '' } = req.body;
-
+    const { applicationIds, rejectionReason = 'other', reviewNotes = '' } = req.body;
+    const admin = req.admin;
     if (!admin || !admin.userId) throw new ValidationError('Admin information is required');
 
     if (!Array.isArray(applicationIds) || applicationIds.length === 0) {
@@ -1567,6 +1567,153 @@ const rejectApplicationsBulk = async (req, res) => {
     });
   }
 };
+// Admin function: Bulk approve annotation project applications
+const bulkApproveAnnotationProjectApplications = async (req, res) => {
+  try {
+    const { applicationIds, reviewNotes } = req.body;
+
+    if (!Array.isArray(applicationIds) || applicationIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "applicationIds must be a non-empty array"
+      });
+    }
+
+    // Fetch applications
+    const applications = await ProjectApplication.find({
+      _id: { $in: applicationIds }
+    })
+      .populate({
+        path: "projectId",
+        select: "projectName projectCategory payRate approvedAnnotators maxAnnotators projectGuidelineLink projectGuidelineVideo projectCommunityLink projectTrackerLink"
+      })
+      .populate("applicantId", "fullName email");
+
+    if (!applications.length) {
+      return res.status(404).json({
+        success: false,
+        message: "No applications found"
+      });
+    }
+
+    const results = {
+      approved: [],
+      skipped: [],
+      failed: []
+    };
+
+    // Group applications by project to manage capacity correctly
+    const appsByProject = new Map();
+
+    for (const app of applications) {
+      if (!appsByProject.has(app.projectId._id.toString())) {
+        appsByProject.set(app.projectId._id.toString(), []);
+      }
+      appsByProject.get(app.projectId._id.toString()).push(app);
+    }
+
+    for (const [projectId, projectApps] of appsByProject.entries()) {
+      const project = projectApps[0].projectId;
+
+      let availableSlots = project.maxAnnotators
+        ? project.maxAnnotators - project.approvedAnnotators
+        : Infinity;
+
+      for (const application of projectApps) {
+        if (application.status !== "pending") {
+          results.skipped.push({
+            applicationId: application._id,
+            reason: `Already ${application.status}`
+          });
+          continue;
+        }
+
+        if (availableSlots <= 0) {
+          results.skipped.push({
+            applicationId: application._id,
+            reason: "Project has reached maximum annotators"
+          });
+          continue;
+        }
+
+        try {
+          application.status = "approved";
+          application.reviewedBy = req.admin.userId;
+          application.reviewedAt = new Date();
+          application.reviewNotes = reviewNotes || "";
+          application.workStartedAt = new Date();
+
+          await application.save();
+
+          // Update project counter
+          await AnnotationProject.findByIdAndUpdate(project._id, {
+            $inc: { approvedAnnotators: 1 }
+          });
+
+          availableSlots -= 1;
+
+          // Send approval email
+          try {
+            const { sendProjectApprovalNotification } = require("../utils/projectMailer");
+
+            const projectData = {
+              projectName: project.projectName,
+              projectCategory: project.projectCategory,
+              payRate: project.payRate,
+              adminName: req.admin.fullName,
+              reviewNotes: reviewNotes || "",
+              projectGuidelineLink: project.projectGuidelineLink,
+              projectGuidelineVideo: project.projectGuidelineVideo,
+              projectCommunityLink: project.projectCommunityLink,
+              projectTrackerLink: project.projectTrackerLink
+            };
+
+            await sendProjectApprovalNotification(
+              application.applicantId.email,
+              application.applicantId.fullName,
+              projectData
+            );
+          } catch (emailError) {
+            console.error("⚠️ Email failed:", emailError.message);
+          }
+
+          results.approved.push({
+            applicationId: application._id,
+            applicantName: application.applicantId.fullName,
+            projectName: project.projectName
+          });
+        } catch (err) {
+          console.error("❌ Failed to approve application:", err);
+
+          results.failed.push({
+            applicationId: application._id,
+            reason: err.message
+          });
+        }
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Bulk approval completed",
+      summary: {
+        totalRequested: applicationIds.length,
+        approved: results.approved.length,
+        skipped: results.skipped.length,
+        failed: results.failed.length
+      },
+      results
+    });
+  } catch (error) {
+    console.error("❌ Bulk approval error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error during bulk approval",
+      error: error.message
+    });
+  }
+};
+
 
 module.exports = {
   createAnnotationProject,
@@ -1586,5 +1733,6 @@ module.exports = {
   removeAssessmentFromProject,
   getAvailableAssessments,
   rejectApplicationsBulk,
-  getApprovedApplicants
+  getApprovedApplicants,
+  bulkApproveAnnotationProjectApplications
 };
