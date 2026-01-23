@@ -825,7 +825,66 @@ const getAllAssessments = async (req, res) => {
 
     assessments.push(englishAssessment);
 
-    // 2. Multimedia Assessments (project-specific)
+    // 2. Akan (Twi) Proficiency Assessment
+    const akanAssessment = {
+      id: 'akan-proficiency',
+      type: 'akan_proficiency',
+      title: 'Akan (Twi) Proficiency Assessment',
+      description: 'Comprehensive assessment covering Akan grammar, vocabulary, translation, writing, and reading skills',
+      category: 'language',
+      difficulty: 'intermediate',
+      estimatedDuration: 35, // minutes
+      totalQuestions: 50,
+      sections: [
+        { name: 'Grammar', questions: 15 },
+        { name: 'Vocabulary', questions: 13 },
+        { name: 'Translation', questions: 10 },
+        { name: 'Writing', questions: 5 },
+        { name: 'Reading', questions: 7 }
+      ],
+      passingScore: 60,
+      maxAttempts: null, // Unlimited with 24h cooldown
+      cooldownHours: 24,
+      isActive: true,
+      requirements: [
+        'Basic Akan (Twi) language skills',
+        'Stable internet connection',
+        'Quiet environment for 35 minutes'
+      ],
+      instructions: 'This assessment evaluates your Akan (Twi) language proficiency across five key areas: Grammar, Vocabulary, Translation, Writing, and Reading. You have 35 minutes to complete 50 questions with a minimum score of 60% required to pass.',
+      benefits: [
+        'Qualify as Akan Language Annotator',
+        'Access to Akan language projects',
+        'Specialized language project priority'
+      ]
+    };
+
+    // Check user's latest Akan assessment attempt
+    const latestAkanAttempt = await Assessment.findOne({
+      userId: userId,
+      assessmentType: 'annotator_qualification',
+      // We'll identify Akan assessments by having 50 total questions
+      $expr: { $eq: [{ $size: '$questions' }, 50] }
+    }).sort({ createdAt: -1 });
+
+    akanAssessment.userStatus = {
+      hasAttempted: !!latestAkanAttempt,
+      latestScore: latestAkanAttempt?.scorePercentage || null,
+      passed: latestAkanAttempt?.passed || false,
+      lastAttemptDate: latestAkanAttempt?.createdAt || null,
+      canRetake: true, // Will be validated on attempt
+      nextRetakeAvailable: null
+    };
+
+    if (latestAkanAttempt) {
+      const cooldownEnd = new Date(latestAkanAttempt.createdAt.getTime() + 24 * 60 * 60 * 1000);
+      akanAssessment.userStatus.canRetake = new Date() >= cooldownEnd;
+      akanAssessment.userStatus.nextRetakeAvailable = cooldownEnd;
+    }
+
+    assessments.push(akanAssessment);
+
+    // 3. Multimedia Assessments (project-specific)
     try {
       const MultimediaAssessmentConfig = require('../models/multimediaAssessmentConfig.model');
       
@@ -1094,6 +1153,36 @@ const startAssessmentById = async (req, res) => {
       }
 
       // Get English assessment questions
+      return getAssessmentQuestions(req, res);
+    }
+
+    // Handle Akan Proficiency Assessment
+    if (assessmentId === 'akan-proficiency') {
+      // Check retake eligibility for Akan assessment
+      const latestAkanAttempt = await Assessment.findOne({
+        userId: userId,
+        assessmentType: 'annotator_qualification',
+        // Identify Akan assessments by having 50 total questions
+        $expr: { $eq: [{ $size: '$questions' }, 50] }
+      }).sort({ createdAt: -1 });
+
+      if (latestAkanAttempt) {
+        const cooldownEnd = new Date(latestAkanAttempt.createdAt.getTime() + 24 * 60 * 60 * 1000);
+        if (new Date() < cooldownEnd) {
+          return res.status(400).json({
+            success: false,
+            message: "Assessment cooldown active. Please wait before retaking.",
+            data: {
+              nextRetakeAvailable: cooldownEnd,
+              hoursRemaining: Math.ceil((cooldownEnd - new Date()) / (60 * 60 * 1000))
+            }
+          });
+        }
+      }
+
+      // Get Akan assessment questions
+      req.query.language = 'akan';
+      req.query.questionsPerSection = 10; // 50 total questions / 5 sections = 10 per section
       return getAssessmentQuestions(req, res);
     }
 
