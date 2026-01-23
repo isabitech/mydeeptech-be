@@ -1,6 +1,6 @@
 const express = require('express');
 const { getAllDTUsers, getAllAdminUsers, getAdminDashboard, approveAnnotator, approveUserForQA, rejectUserForQA, getAllQAUsers, rejectAnnotator, getDTUserAdmin, createAdmin, requestAdminVerification, confirmAdminVerification, verifyAdminOTP, adminLogin } = require('../controller/dtUser.controller.js');
-const { createAnnotationProject, getAllAnnotationProjects, getAnnotationProjectDetails, updateAnnotationProject, deleteAnnotationProject, requestProjectDeletionOTP, verifyOTPAndDeleteProject, getAnnotationProjectApplications, approveAnnotationProjectApplication, rejectAnnotationProjectApplication, removeApprovedApplicant, getRemovableApplicants, exportApprovedAnnotatorsCSV, attachAssessmentToProject, removeAssessmentFromProject, getAvailableAssessments, rejectApplicationsBulk, getApprovedApplicants } = require('../controller/annotationProject.controller.js');
+const { createAnnotationProject, getAllAnnotationProjects, getAnnotationProjectDetails, updateAnnotationProject, deleteAnnotationProject, requestProjectDeletionOTP, verifyOTPAndDeleteProject, getAnnotationProjectApplications, approveAnnotationProjectApplication, rejectAnnotationProjectApplication, removeApprovedApplicant, getRemovableApplicants, exportApprovedAnnotatorsCSV, attachAssessmentToProject, removeAssessmentFromProject, getAvailableAssessments, rejectApplicationsBulk, getApprovedApplicants, bulkApproveApplications, bulkRejectApplications } = require('../controller/annotationProject.controller.js');
 const { createInvoice, getAllInvoices, getInvoiceDetails, updatePaymentStatus, sendInvoiceReminder, deleteInvoice, bulkAuthorizePayment, generatePaystackCSV, generateMPESACSV } = require('../controller/invoice.controller.js');
 const { getAdminNotifications, createAnnouncement, getNotificationStats, cleanupNotifications, broadcastNotification } = require('../controller/notification.controller.js');
 const { getAdminAssessments, getAdminAssessmentsOverview } = require('../controller/assessment.controller.js');
@@ -56,6 +56,10 @@ router.get('/applications', authenticateAdmin, getAnnotationProjectApplications)
 router.patch('/applications/:applicationId/approve', authenticateAdmin, approveAnnotationProjectApplication);
 router.patch('/applications/:applicationId/reject', authenticateAdmin, rejectAnnotationProjectApplication);
 router.delete('/applications/:applicationId/remove', authenticateAdmin, removeApprovedApplicant);
+
+// Bulk Application Management Routes
+router.post('/applications/bulk/approve', authenticateAdmin, bulkApproveApplications);
+router.post('/applications/bulk/reject', authenticateAdmin, bulkRejectApplications);
 
 // Project Applicant Management Routes
 router.get('/projects/:projectId/removable-applicants', authenticateAdmin, getRemovableApplicants);

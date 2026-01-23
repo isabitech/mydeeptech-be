@@ -87,11 +87,36 @@ const submitAssessment = async (req, res) => {
       microTaskerStatus: user.microTaskerStatus
     };
 
-    // Check for previous attempts
-    const previousAttempts = await Assessment.find({
+    // Detect language early from answers for filtering previous attempts
+    let detectedLanguage = null;
+    const hasAkanSections = answers.some(a => ['Grammar', 'Vocabulary', 'Translation', 'Writing', 'Reading'].includes(a.section));
+    const hasEnglishSections = answers.some(a => ['Comprehension', 'Vocabulary', 'Grammar', 'Writing'].includes(a.section) && !['Translation', 'Reading'].includes(a.section));
+    
+    if (hasAkanSections && answers.length >= 20) {
+      detectedLanguage = 'akan';
+    } else if (hasEnglishSections) {
+      detectedLanguage = 'en';
+    }
+
+    // Check for previous attempts with language filtering
+    const previousAttemptsFilter = {
       userId: userId,
       assessmentType: assessmentType
-    }).select('createdAt scorePercentage passed').sort({ createdAt: -1 });
+    };
+    
+    // Add language filter if detected
+    if (detectedLanguage) {
+      previousAttemptsFilter.language = detectedLanguage;
+    } else {
+      // For legacy assessments without language field
+      previousAttemptsFilter.$or = [
+        { language: { $exists: false } },
+        { language: null }
+      ];
+    }
+    
+    const previousAttempts = await Assessment.find(previousAttemptsFilter)
+      .select('createdAt scorePercentage passed').sort({ createdAt: -1 });
 
     const attemptNumber = previousAttempts.length + 1;
 
@@ -215,6 +240,7 @@ const submitAssessment = async (req, res) => {
     const assessmentData = {
       userId: userId,
       assessmentType,
+      language: detectedLanguage, // Use the already detected language
       totalQuestions,
       correctAnswers,
       scorePercentage,
@@ -598,13 +624,18 @@ const getAssessmentQuestions = async (req, res) => {
     
     // Define sections based on language
     let sections;
+    let actualQuestionsPerSection;
+    
     if (language === 'akan') {
       sections = ['Grammar', 'Vocabulary', 'Translation', 'Writing', 'Reading'];
+      // For Akan, ensure exactly 5 questions per section for total of 25
+      actualQuestionsPerSection = 5;
     } else {
       sections = ['Comprehension', 'Vocabulary', 'Grammar', 'Writing'];
+      actualQuestionsPerSection = parseInt(questionsPerSection);
     }
     
-    console.log(`🌐 Fetching ${language} assessment questions, ${questionsPerSection} per section`);
+    console.log(`🌐 Fetching ${language} assessment questions, ${actualQuestionsPerSection} per section, total expected: ${sections.length * actualQuestionsPerSection}`);
     
     // Get random questions from each section
     const allQuestions = [];
@@ -627,7 +658,7 @@ const getAssessmentQuestions = async (req, res) => {
 
       const sectionQuestions = await AssessmentQuestion.aggregate([
         { $match: matchQuery },
-        { $sample: { size: parseInt(questionsPerSection) } },
+        { $sample: { size: actualQuestionsPerSection } },
         { 
           $project: { 
             id: 1,
@@ -675,7 +706,7 @@ const getAssessmentQuestions = async (req, res) => {
         questions: shuffledQuestions,
         assessmentInfo: {
           totalQuestions,
-          questionsPerSection: parseInt(questionsPerSection),
+          questionsPerSection: actualQuestionsPerSection,
           sections: sections,
           language: language,
           passingScore: 60,
@@ -805,7 +836,12 @@ const getAllAssessments = async (req, res) => {
     // Check user's latest English assessment attempt
     const latestEnglishAttempt = await Assessment.findOne({
       userId: userId,
-      assessmentType: 'annotator_qualification'
+      assessmentType: 'annotator_qualification',
+      $or: [
+        { language: 'en' },
+        { language: { $exists: false } },
+        { language: null }
+      ]
     }).sort({ createdAt: -1 });
 
     englishAssessment.userStatus = {
@@ -817,10 +853,27 @@ const getAllAssessments = async (req, res) => {
       nextRetakeAvailable: null
     };
 
+    // Add lastAttempt object for frontend compatibility
+    if (latestEnglishAttempt) {
+      englishAssessment.lastAttempt = {
+        id: latestEnglishAttempt._id.toString(),
+        score: latestEnglishAttempt.scorePercentage,
+        completedAt: latestEnglishAttempt.createdAt,
+        status: latestEnglishAttempt.passed ? 'passed' : 'failed',
+        canRetake: true
+      };
+    }
+
     if (latestEnglishAttempt) {
       const cooldownEnd = new Date(latestEnglishAttempt.createdAt.getTime() + 24 * 60 * 60 * 1000);
-      englishAssessment.userStatus.canRetake = new Date() >= cooldownEnd;
+      const canRetakeNow = new Date() >= cooldownEnd;
+      englishAssessment.userStatus.canRetake = canRetakeNow;
       englishAssessment.userStatus.nextRetakeAvailable = cooldownEnd;
+      
+      // Update lastAttempt canRetake status
+      if (englishAssessment.lastAttempt) {
+        englishAssessment.lastAttempt.canRetake = canRetakeNow;
+      }
     }
 
     assessments.push(englishAssessment);
@@ -834,13 +887,13 @@ const getAllAssessments = async (req, res) => {
       category: 'language',
       difficulty: 'intermediate',
       estimatedDuration: 35, // minutes
-      totalQuestions: 50,
+      totalQuestions: 25,
       sections: [
-        { name: 'Grammar', questions: 15 },
-        { name: 'Vocabulary', questions: 13 },
-        { name: 'Translation', questions: 10 },
-        { name: 'Writing', questions: 5 },
-        { name: 'Reading', questions: 7 }
+        { name: 'Grammar', questions: 8 },
+        { name: 'Vocabulary', questions: 7 },
+        { name: 'Translation', questions: 5 },
+        { name: 'Writing', questions: 3 },
+        { name: 'Reading', questions: 2 }
       ],
       passingScore: 60,
       maxAttempts: null, // Unlimited with 24h cooldown
@@ -863,8 +916,7 @@ const getAllAssessments = async (req, res) => {
     const latestAkanAttempt = await Assessment.findOne({
       userId: userId,
       assessmentType: 'annotator_qualification',
-      // We'll identify Akan assessments by having 50 total questions
-      $expr: { $eq: [{ $size: '$questions' }, 50] }
+      language: 'akan'
     }).sort({ createdAt: -1 });
 
     akanAssessment.userStatus = {
@@ -876,10 +928,27 @@ const getAllAssessments = async (req, res) => {
       nextRetakeAvailable: null
     };
 
+    // Add lastAttempt object for frontend compatibility
+    if (latestAkanAttempt) {
+      akanAssessment.lastAttempt = {
+        id: latestAkanAttempt._id.toString(),
+        score: latestAkanAttempt.scorePercentage,
+        completedAt: latestAkanAttempt.createdAt,
+        status: latestAkanAttempt.passed ? 'passed' : 'failed',
+        canRetake: true
+      };
+    }
+
     if (latestAkanAttempt) {
       const cooldownEnd = new Date(latestAkanAttempt.createdAt.getTime() + 24 * 60 * 60 * 1000);
-      akanAssessment.userStatus.canRetake = new Date() >= cooldownEnd;
+      const canRetakeNow = new Date() >= cooldownEnd;
+      akanAssessment.userStatus.canRetake = canRetakeNow;
       akanAssessment.userStatus.nextRetakeAvailable = cooldownEnd;
+      
+      // Update lastAttempt canRetake status
+      if (akanAssessment.lastAttempt) {
+        akanAssessment.lastAttempt.canRetake = canRetakeNow;
+      }
     }
 
     assessments.push(akanAssessment);
@@ -1135,7 +1204,12 @@ const startAssessmentById = async (req, res) => {
       // Check retake eligibility
       const latestAttempt = await Assessment.findOne({
         userId: userId,
-        assessmentType: 'annotator_qualification'
+        assessmentType: 'annotator_qualification',
+        $or: [
+          { language: 'en' },
+          { language: { $exists: false } },
+          { language: null }
+        ]
       }).sort({ createdAt: -1 });
 
       if (latestAttempt) {
@@ -1162,8 +1236,7 @@ const startAssessmentById = async (req, res) => {
       const latestAkanAttempt = await Assessment.findOne({
         userId: userId,
         assessmentType: 'annotator_qualification',
-        // Identify Akan assessments by having 50 total questions
-        $expr: { $eq: [{ $size: '$questions' }, 50] }
+        language: 'akan'
       }).sort({ createdAt: -1 });
 
       if (latestAkanAttempt) {
@@ -1182,7 +1255,7 @@ const startAssessmentById = async (req, res) => {
 
       // Get Akan assessment questions
       req.query.language = 'akan';
-      req.query.questionsPerSection = 10; // 50 total questions / 5 sections = 10 per section
+      req.query.questionsPerSection = 5; // 25 total questions / 5 sections = 5 per section
       return getAssessmentQuestions(req, res);
     }
 
