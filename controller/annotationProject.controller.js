@@ -17,18 +17,17 @@ const createProjectSchema = Joi.object({
   payRateCurrency: Joi.string().valid("USD", "EUR", "GBP", "NGN", "KES", "GHS").default("USD"),
   payRateType: Joi.string().valid("per_task", "per_hour", "per_project", "per_annotation").default("per_task"),
   maxAnnotators: Joi.number().min(1).allow(null).optional(),
-  deadline: Joi.date().greater('now').allow(null).optional(),
-  estimatedDuration: Joi.string().max(100).allow('').optional(),
-  difficultyLevel: Joi.string().valid("beginner", "intermediate", "advanced", "expert").default("intermediate"),
+  deadline: Joi.date().greater('now').required(),
+  estimatedDuration: Joi.string().max(100).required(),
+  difficultyLevel: Joi.string().valid("beginner", "intermediate", "advanced", "expert").required(),
   requiredSkills: Joi.array().items(Joi.string()).default([]),
-  minimumExperience: Joi.string().valid("none", "beginner", "intermediate", "advanced").default("none"),
+  minimumExperience: Joi.string().valid("none", "beginner", "intermediate", "advanced").required(),
   languageRequirements: Joi.array().items(Joi.string()).default([]),
   tags: Joi.array().items(Joi.string()).default([]),
-  applicationDeadline: Joi.date().greater('now').allow(null).optional(),
+  applicationDeadline: Joi.date().greater('now').required(),
   // Project guidelines
-  projectGuidelineLink: Joi.string().uri().required().messages({
-    'string.uri': 'Project guideline link must be a valid URL',
-    'any.required': 'Project guideline link is required'
+  projectGuidelineLink: Joi.string().uri().allow('').optional().messages({
+    'string.uri': 'Project guideline link must be a valid URL'
   }),
   projectGuidelineVideo: Joi.string().uri().allow('').optional().messages({
     'string.uri': 'Project guideline video must be a valid URL'
@@ -38,7 +37,10 @@ const createProjectSchema = Joi.object({
   }),
   projectTrackerLink: Joi.string().uri().allow('').optional().messages({
     'string.uri': 'Project tracker link must be a valid URL'
-  })
+  }),
+  
+  // Project status
+  isActive: Joi.boolean().default(true)
 });
 
 // Validation schema for removing approved applicants
@@ -120,11 +122,21 @@ const getAllAnnotationProjects = async (req, res) => {
     const status = req.query.status;
     const category = req.query.category;
     const search = req.query.search;
+    const isActive = req.query.isActive; // "true", "false", or undefined (all)
 
     // Build filter
     const filter = {};
     if (status) filter.status = status;
     if (category) filter.projectCategory = category;
+    
+    // Add isActive filter
+    if (isActive === 'true') {
+      filter.isActive = true;
+    } else if (isActive === 'false') {
+      filter.isActive = false;
+    }
+    // If isActive is undefined, show all projects
+    
     if (search) {
       const searchRegex = new RegExp(search, 'i');
       filter.$or = [
@@ -404,6 +416,46 @@ const updateAnnotationProject = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error updating annotation project",
+      error: error.message
+    });
+  }
+};
+
+// Admin function: Toggle project active status
+const toggleProjectActiveStatus = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+
+    const project = await AnnotationProject.findById(projectId);
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Annotation project not found"
+      });
+    }
+
+    // Toggle the isActive status
+    project.isActive = !project.isActive;
+    await project.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Project ${project.isActive ? 'activated' : 'deactivated'} successfully`,
+      data: {
+        project: {
+          _id: project._id,
+          projectName: project.projectName,
+          isActive: project.isActive,
+          status: project.status
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error toggling project active status:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error toggling project active status",
       error: error.message
     });
   }
@@ -1752,6 +1804,7 @@ module.exports = {
   getAllAnnotationProjects,
   getAnnotationProjectDetails,
   updateAnnotationProject,
+  toggleProjectActiveStatus,
   deleteAnnotationProject,
   requestProjectDeletionOTP,
   verifyOTPAndDeleteProject,
