@@ -1,5 +1,6 @@
 const express = require('express');
 const { authenticateToken } = require('../middleware/auth.js');
+const Notification = require('../models/notification.model');
 
 const router = express.Router();
 
@@ -74,13 +75,14 @@ router.get('/summary', authenticateToken, async (req, res) => {
  * Get user's notifications
  * GET /api/notifications
  */
-const Notification = require('../models/notification.model');
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const userId = req.userId || req.user?.userId;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
+
+    console.log(`📥 User ${userId} requesting notifications - page ${page}, limit ${limit}`);
 
     // Fetch notifications for this user
     const [notifications, totalNotifications, unreadCount, readCount] = await Promise.all([
@@ -89,6 +91,8 @@ router.get('/', authenticateToken, async (req, res) => {
       Notification.countDocuments({ userId, isRead: false }),
       Notification.countDocuments({ userId, isRead: true })
     ]);
+
+    console.log(`📥 Found ${totalNotifications} total, ${unreadCount} unread, ${readCount} read notifications for user ${userId}`);
 
     res.status(200).json({
       success: true,
@@ -105,8 +109,8 @@ router.get('/', authenticateToken, async (req, res) => {
         },
         summary: {
           totalNotifications,
-          unreadNotifications: unreadCount,
-          readNotifications: readCount
+          unreadCount: unreadCount,  // Changed from unreadNotifications to unreadCount
+          readCount: readCount       // Changed from readNotifications to readCount
         }
       }
     });
@@ -131,14 +135,39 @@ router.patch('/:notificationId/read', authenticateToken, async (req, res) => {
     
     console.log(`📖 User ${userId} marking notification ${notificationId} as read`);
 
-    // For now, just return success until notification model is implemented
+    // Update the notification in the database
+    const updatedNotification = await Notification.findOneAndUpdate(
+      { 
+        _id: notificationId,
+        userId: userId 
+      },
+      { 
+        $set: { 
+          isRead: true, 
+          readAt: new Date() 
+        } 
+      },
+      { 
+        new: true,
+        runValidators: true 
+      }
+    );
+
+    if (!updatedNotification) {
+      return res.status(404).json({
+        success: false,
+        message: "Notification not found or access denied"
+      });
+    }
+
     res.status(200).json({
       success: true,
       message: "Notification marked as read successfully",
       data: {
-        notificationId: notificationId,
+        notificationId: updatedNotification._id,
         userId: userId,
-        markedReadAt: new Date()
+        isRead: updatedNotification.isRead,
+        readAt: updatedNotification.readAt
       }
     });
 
@@ -159,16 +188,54 @@ router.patch('/:notificationId/read', authenticateToken, async (req, res) => {
 router.patch('/read-all', authenticateToken, async (req, res) => {
   try {
     const userId = req.userId || req.user?.userId;
-    
-    console.log(`📖 User ${userId} marking all notifications as read`);
+    console.log(`📚 User ${userId} marking ALL notifications as read`);
+    console.log(`📚 User ID type: ${typeof userId}`);
 
-    // For now, just return success until notification model is implemented
+    // First, let's see what notifications exist for this user
+    const existingNotifications = await Notification.find({ userId });
+    console.log(`📚 Found ${existingNotifications.length} total notifications for user ${userId}`);
+    
+    const unreadNotifications = await Notification.find({ userId, isRead: false });
+    console.log(`📚 Found ${unreadNotifications.length} unread notifications for user ${userId}`);
+
+    // If no unread notifications found, let's check with string conversion
+    if (unreadNotifications.length === 0) {
+      console.log(`📚 Trying with string conversion of userId...`);
+      const userIdString = String(userId);
+      const unreadWithString = await Notification.find({ userId: userIdString, isRead: false });
+      console.log(`📚 Found ${unreadWithString.length} unread notifications with string userId`);
+      
+      // Also try with ObjectId conversion
+      const mongoose = require('mongoose');
+      if (mongoose.Types.ObjectId.isValid(userId)) {
+        const userIdObj = new mongoose.Types.ObjectId(userId);
+        const unreadWithObj = await Notification.find({ userId: userIdObj, isRead: false });
+        console.log(`📚 Found ${unreadWithObj.length} unread notifications with ObjectId conversion`);
+      }
+    }
+
+    // Update all unread notifications for this user
+    const updateResult = await Notification.updateMany(
+      { 
+        userId: userId, 
+        isRead: false 
+      },
+      { 
+        $set: { 
+          isRead: true, 
+          readAt: new Date() 
+        } 
+      }
+    );
+
+    console.log(`📚 Update result: ${updateResult.modifiedCount} documents modified out of ${updateResult.matchedCount} matched`);
+
     res.status(200).json({
       success: true,
       message: "All notifications marked as read successfully",
       data: {
         userId: userId,
-        markedReadCount: 0,
+        markedReadCount: updateResult.modifiedCount,
         markedReadAt: new Date()
       }
     });
@@ -194,12 +261,24 @@ router.delete('/:notificationId', authenticateToken, async (req, res) => {
     
     console.log(`🗑️ User ${userId} deleting notification ${notificationId}`);
 
-    // For now, just return success until notification model is implemented
+    // Delete the notification from the database
+    const deletedNotification = await Notification.findOneAndDelete({
+      _id: notificationId,
+      userId: userId
+    });
+
+    if (!deletedNotification) {
+      return res.status(404).json({
+        success: false,
+        message: "Notification not found or access denied"
+      });
+    }
+
     res.status(200).json({
       success: true,
       message: "Notification deleted successfully",
       data: {
-        notificationId: notificationId,
+        notificationId: deletedNotification._id,
         userId: userId,
         deletedAt: new Date()
       }
