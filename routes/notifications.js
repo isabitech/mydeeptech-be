@@ -1,5 +1,6 @@
 const express = require('express');
 const { authenticateToken } = require('../middleware/auth.js');
+const Notification = require('../models/notification.model');
 
 const router = express.Router();
 
@@ -74,7 +75,6 @@ router.get('/summary', authenticateToken, async (req, res) => {
  * Get user's notifications
  * GET /api/notifications
  */
-const Notification = require('../models/notification.model');
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const userId = req.userId || req.user?.userId;
@@ -159,16 +159,27 @@ router.patch('/:notificationId/read', authenticateToken, async (req, res) => {
 router.patch('/read-all', authenticateToken, async (req, res) => {
   try {
     const userId = req.userId || req.user?.userId;
-    
-    console.log(`📖 User ${userId} marking all notifications as read`);
 
-    // For now, just return success until notification model is implemented
+    // Update all unread notifications for this user
+    const updateResult = await Notification.updateMany(
+      { 
+        userId: userId, 
+        isRead: false 
+      },
+      { 
+        $set: { 
+          isRead: true, 
+          readAt: new Date() 
+        } 
+      }
+    );
+
     res.status(200).json({
       success: true,
       message: "All notifications marked as read successfully",
       data: {
         userId: userId,
-        markedReadCount: 0,
+        markedReadCount: updateResult.modifiedCount,
         markedReadAt: new Date()
       }
     });
