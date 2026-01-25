@@ -8,6 +8,8 @@ const mongoose = require('mongoose');
 // Validation schema for submitting assessment (updated for section-based structure)
 const submitAssessmentSchema = Joi.object({
   assessmentType: Joi.string().valid('annotator_qualification', 'skill_assessment', 'project_specific').default('annotator_qualification'),
+  // Optional explicit language hint from client
+  language: Joi.string().valid('en', 'akan').optional(),
   startedAt: Joi.date().required(),
   completedAt: Joi.date().min(Joi.ref('startedAt')).required(),
   answers: Joi.array().items(
@@ -57,6 +59,7 @@ const submitAssessment = async (req, res) => {
 
     const { 
       assessmentType, 
+      language: languageHint,
       startedAt, 
       completedAt, 
       answers,
@@ -88,14 +91,22 @@ const submitAssessment = async (req, res) => {
     };
 
     // Detect language early from answers for filtering previous attempts
-    let detectedLanguage = null;
-    const hasAkanSections = answers.some(a => ['Grammar', 'Vocabulary', 'Translation', 'Writing', 'Reading'].includes(a.section));
-    const hasEnglishSections = answers.some(a => ['Comprehension', 'Vocabulary', 'Grammar', 'Writing'].includes(a.section) && !['Translation', 'Reading'].includes(a.section));
-    
-    if (hasAkanSections && answers.length >= 20) {
-      detectedLanguage = 'akan';
-    } else if (hasEnglishSections) {
-      detectedLanguage = 'en';
+    // Prefer explicit language hint if provided by client
+    let detectedLanguage = languageHint || null;
+    const hasComprehension = answers.some(a => a.section === 'Comprehension');
+    const hasTranslation = answers.some(a => a.section === 'Translation');
+    const hasReading = answers.some(a => a.section === 'Reading');
+
+    if (!detectedLanguage) {
+      if (hasTranslation || hasReading) {
+        detectedLanguage = 'akan';
+      } else if (hasComprehension) {
+        detectedLanguage = 'en';
+      } else {
+        // Fallback heuristic: lower ID ranges (≤ 50) are typically Akan
+        const anyLikelyAkanId = answers.some(a => Number(a.questionId) <= 50);
+        detectedLanguage = anyLikelyAkanId ? 'akan' : 'en';
+      }
     }
 
     // Check for previous attempts with language filtering
@@ -127,17 +138,43 @@ const submitAssessment = async (req, res) => {
 
     // Validate answers against database
     for (const userAnswer of answers) {
-      // Try to detect language from question IDs (Akan: 1-50, English: typically higher)
-      const isLikelyAkan = userAnswer.questionId <= 50;
-      
-      // Get the correct answer from database with language awareness
-      let dbQuestion = await AssessmentQuestion.findOne({ 
+      // Use detected language to lookup the correct question, preferring exact id+section match
+      const isAkan = detectedLanguage === 'akan';
+
+      // First try: id + section + language (or English/no-language)
+      const primaryQuery = {
         id: userAnswer.questionId,
+        section: userAnswer.section,
         isActive: true,
-        ...(isLikelyAkan && { language: 'akan' }) // Add language filter for Akan questions
-      });
-      
-      // Fallback: try without language filter if not found
+        ...(isAkan ? { language: 'akan' } : {})
+      };
+      if (!isAkan) {
+        primaryQuery.$or = [
+          { language: { $exists: false } },
+          { language: null },
+          { language: 'en' }
+        ];
+      }
+      let dbQuestion = await AssessmentQuestion.findOne(primaryQuery);
+
+      // Second try: id + language only
+      if (!dbQuestion) {
+        const languageQuery = {
+          id: userAnswer.questionId,
+          isActive: true,
+          ...(isAkan ? { language: 'akan' } : {})
+        };
+        if (!isAkan) {
+          languageQuery.$or = [
+            { language: { $exists: false } },
+            { language: null },
+            { language: 'en' }
+          ];
+        }
+        dbQuestion = await AssessmentQuestion.findOne(languageQuery);
+      }
+
+      // Final fallback: id only
       if (!dbQuestion) {
         dbQuestion = await AssessmentQuestion.findOne({ 
           id: userAnswer.questionId,
@@ -154,12 +191,10 @@ const submitAssessment = async (req, res) => {
 
       console.log(`🔍 Validating Q${userAnswer.questionId}: expected '${dbQuestion.section}', got '${userAnswer.section}'`);
 
-      // Validate the section matches
+      // If section differs, trust DB and override instead of failing
       if (dbQuestion.section !== userAnswer.section) {
-        return res.status(400).json({
-          success: false,
-          message: `Section mismatch for question ${userAnswer.questionId}: expected '${dbQuestion.section}', got '${userAnswer.section}'`
-        });
+        console.warn(`Section mismatch for Q${userAnswer.questionId}. Overriding '${userAnswer.section}' -> '${dbQuestion.section}'.`);
+        userAnswer.section = dbQuestion.section;
       }
 
       // Check if answer is correct (case-insensitive comparison)
