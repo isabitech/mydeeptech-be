@@ -1,4 +1,6 @@
 node_modules/
 .env
+.env.development
 .env.*
 debug/
+.DS_Store

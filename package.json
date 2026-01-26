@@ -2,6 +2,7 @@
   "name": "deep-tech-backend",
   "version": "1.0.0",
   "main": "index.js",
+  "type": "commonjs",
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",

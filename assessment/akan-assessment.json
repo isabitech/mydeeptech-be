@@ -1,0 +1,402 @@
+[
+  { 
+    "section": "Grammar",
+    "id": 1,
+    "question": "Wɔkaa sɛ me ___ kɔ dwumadie no so.",
+    "options": ["bɛ", "rɛ", "nna", "baa"],
+    "answer": "bɛ",
+    "language": "akan"
+  },
+  {
+    "section": "Grammar",
+    "id": 2,
+    "question": "Sɛ wo ___ aduan no a, momma yɛnhunu.",
+    "options": ["di", "dii", "bɛdi", "redi"],
+    "answer": "dii",
+    "language": "akan"
+  },
+  {
+    "section": "Grammar",
+    "id": 3,
+    "question": "Ɔde akwadaa no ___ sukuu mu.",
+    "options": ["kɔe", "kɔɔ", "rɛkɔ", "bekɔ"],
+    "answer": "kɔɔ",
+    "language": "akan"
+  },
+  {
+    "section": "Grammar",
+    "id": 4,
+    "question": "Yɛn ___ reba fie.",
+    "options": ["nyinaa", "biara", "mu biara", "pii"],
+    "answer": "nyinaa",
+    "language": "akan"
+  },
+  {
+    "section": "Grammar",
+    "id": 5,
+    "question": "Me ___ wo dɛn na ɛte saa?",
+    "options": ["ka kyerɛ", "kyerɛ", "kyerɛɛ", "reka kyerɛ"],
+    "answer": "ka kyerɛ",
+    "language": "akan"
+  },
+  {
+    "section": "Grammar",
+    "id": 6,
+    "question": "Sɛ wo ___ a, bra ha.",
+    "options": ["wie", "wiee", "bewii", "rewii"],
+    "answer": "wie",
+    "language": "akan"
+  },
+  {
+    "section": "Grammar",
+    "id": 7,
+    "question": "Ɔno na ___ me saa nsɛm yi.",
+    "options": ["kaa", "ka", "reka", "bɛka"],
+    "answer": "kaa",
+    "language": "akan"
+  },
+  {
+    "section": "Grammar",
+    "id": 8,
+    "question": "Yɛ ___ yɛn adwuma no yiye.",
+    "options": ["bɛ", "rɛ", "yɛɛ", "ayɛ"],
+    "answer": "bɛ",
+    "language": "akan"
+  },
+  {
+    "section": "Grammar",
+    "id": 9,
+    "question": "___ wo ara na woyɛ saa.",
+    "options": ["Ɛne", "Ɛyɛ", "Sɛ", "Na"],
+    "answer": "Ɛyɛ",
+    "language": "akan"
+  },
+  {
+    "section": "Grammar",
+    "id": 10,
+    "question": "Me papa ___ me sika.",
+    "options": ["maa", "ma", "rema", "bɛma"],
+    "answer": "maa",
+    "language": "akan"
+  },
+  {
+    "section": "Vocabulary",
+    "id": 11,
+    "question": "Dɛn ne 'aboa' ase wɔ Borɔfo kasa mu?",
+    "options": ["Animal", "Plant", "Water", "Food"],
+    "answer": "Animal",
+    "language": "akan"
+  },
+  {
+    "section": "Vocabulary",
+    "id": 12,
+    "question": "Wɔfrɛ 'teacher' sɛn wɔ Akan mu?",
+    "options": ["Ɔkyerɛkyerɛfoɔ", "Ɔsuafoɔ", "Ɔkenkanfoɔ", "Ɔkyerɛwfoɔ"],
+    "answer": "Ɔkyerɛkyerɛfoɔ",
+    "language": "akan"
+  },
+  {
+    "section": "Vocabulary",
+    "id": 13,
+    "question": "'Nsuo' kyerɛ dɛn?",
+    "options": ["Fire", "Water", "Air", "Earth"],
+    "answer": "Water",
+    "language": "akan"
+  },
+  {
+    "section": "Vocabulary",
+    "id": 14,
+    "question": "Sɛ wo pɛ 'akɔnnɔ' a, ɛyɛ dɛn?",
+    "options": ["Sadness", "Joy", "Anger", "Fear"],
+    "answer": "Joy",
+    "language": "akan"
+  },
+  {
+    "section": "Vocabulary",
+    "id": 15,
+    "question": "'Fie' ne 'efie' - nsonsonoe ne dɛn?",
+    "options": ["Ɛyɛ pɛ", "Efie yɛ kɛseɛ", "Efie yɛ obi dea", "Nsonsonoe biara nni hɔ"],
+    "answer": "Nsonsonoe biara nni hɔ",
+    "language": "akan"
+  },
+  {
+    "section": "Vocabulary",
+    "id": 16,
+    "question": "Wɔfrɛ 'money' sɛn wɔ Akan mu?",
+    "options": ["Sika", "Dwetɛ", "Sikakɔkɔɔ", "Adetɔn"],
+    "answer": "Sika",
+    "language": "akan"
+  },
+  {
+    "section": "Vocabulary",
+    "id": 17,
+    "question": "'Aduan' kyerɛ dɛn wɔ Borɔfo kasa mu?",
+    "options": ["Drink", "Food", "Medicine", "Cloth"],
+    "answer": "Food",
+    "language": "akan"
+  },
+  {
+    "section": "Vocabulary",
+    "id": 18,
+    "question": "Dɛn na ɛkyerɛ 'adesua'?",
+    "options": ["Learning", "Teaching", "Playing", "Working"],
+    "answer": "Learning",
+    "language": "akan"
+  },
+  {
+    "section": "Vocabulary",
+    "id": 19,
+    "question": "Wɔfrɛ 'book' sɛn wɔ Akan mu?",
+    "options": ["Nwoma", "Kraates", "Pepa", "Nkyerɛwee"],
+    "answer": "Nwoma",
+    "language": "akan"
+  },
+  {
+    "section": "Vocabulary",
+    "id": 20,
+    "question": "'Abusuabɔ' kyerɛ dɛn?",
+    "options": ["Friendship", "Marriage", "Family meeting", "Business"],
+    "answer": "Family meeting",
+    "language": "akan"
+  },
+  {
+    "section": "Translation",
+    "id": 21,
+    "question": "Kyerɛ saa kasamu yi ase wɔ Borɔfo kasa mu: 'Me dɔ wo.'",
+    "options": ["I like you", "I love you", "I see you", "I know you"],
+    "answer": "I love you",
+    "language": "akan"
+  },
+  {
+    "section": "Translation",
+    "id": 22,
+    "question": "Dan saa nsɛm yi kɔ Akan mu: 'Good morning'",
+    "options": ["Mema wo akye", "Mema wo aha", "Mema wo adwo", "Mema wo awia"],
+    "answer": "Mema wo akye",
+    "language": "akan"
+  },
+  {
+    "section": "Translation",
+    "id": 23,
+    "question": "'Ɛte sɛn?' kyerɛ dɛn wɔ Borɔfo kasa mu?",
+    "options": ["What is it?", "How is it?", "Where is it?", "Who is it?"],
+    "answer": "How is it?",
+    "language": "akan"
+  },
+  {
+    "section": "Translation",
+    "id": 24,
+    "question": "Dan 'Thank you' kɔ Akan mu:",
+    "options": ["Meda wo ase", "Me pa wo kyɛw", "Yɛn ara", "Ɛyɛ nokore"],
+    "answer": "Meda wo ase",
+    "language": "akan"
+  },
+  {
+    "section": "Translation",
+    "id": 25,
+    "question": "'Me kɔm dɛ me' kyerɛ dɛn?",
+    "options": ["I am tired", "I am hungry", "I am thirsty", "I am sick"],
+    "answer": "I am hungry",
+    "language": "akan"
+  },
+  {
+    "section": "Translation",
+    "id": 26,
+    "question": "Dan 'Where are you going?' kɔ Akan mu:",
+    "options": ["Wo wɔ he?", "Wo fi he?", "Wo rekɔ he?", "Wo yɛ dɛn?"],
+    "answer": "Wo rekɔ he?",
+    "language": "akan"
+  },
+  {
+    "section": "Translation",
+    "id": 27,
+    "question": "'Bra ha' kyerɛ dɛn wɔ Borɔfo kasa mu?",
+    "options": ["Go there", "Come here", "Stay there", "Look here"],
+    "answer": "Come here",
+    "language": "akan"
+  },
+  {
+    "section": "Translation",
+    "id": 28,
+    "question": "Dan 'I am fine' kɔ Akan mu:",
+    "options": ["Me ho yɛ", "Me yɛ fɛɛfɛ", "Me wɔ ha", "Me nim"],
+    "answer": "Me ho yɛ",
+    "language": "akan"
+  },
+  {
+    "section": "Translation",
+    "id": 29,
+    "question": "'Hwɛ yiye' ase ne dɛn?",
+    "options": ["Listen well", "Look carefully", "Think well", "Speak well"],
+    "answer": "Look carefully",
+    "language": "akan"
+  },
+  {
+    "section": "Translation",
+    "id": 30,
+    "question": "Dan 'What is your name?' kɔ Akan mu:",
+    "options": ["Wo din de dɛn?", "Wo yɛ hwan?", "Wo wɔ he?", "Wo nni dɛn?"],
+    "answer": "Wo din de dɛn?",
+    "language": "akan"
+  },
+  {
+    "section": "Writing",
+    "id": 31,
+    "question": "Kyerɛw kasamu yi yiye: 'Kofi rekɔ sukuu' - dɛn na ɛnteɛ?",
+    "options": ["Kofi rekɔ skuul", "Kofi rekɔ sukuw", "Kofi rekɔ sukuu", "Kofi rɛkɔ sukuu"],
+    "answer": "Kofi rekɔ sukuu",
+    "language": "akan"
+  },
+  {
+    "section": "Writing",
+    "id": 32,
+    "question": "Nkyerɛwee a ɛteɛ ne dɛn?",
+    "options": ["Me papa kɔɔ kurom", "Me papa kɔɔ kurow", "Me papa kɔɔ kurom", "Me papa kɔɔ kuro"],
+    "answer": "Me papa kɔɔ kurom",
+    "language": "akan"
+  },
+  {
+    "section": "Writing",
+    "id": 33,
+    "question": "Kasamu yi mu dɛn na ɛnyɛ yiye? 'Yɛn kɔɔ akatua no so'",
+    "options": ["'Yɛn' ntease", "'kɔɔ' ntease", "'so' ntease", "Biribiara nyɛ yiye"],
+    "answer": "Biribiara nyɛ yiye",
+    "language": "akan"
+  },
+  {
+    "section": "Writing",
+    "id": 34,
+    "question": "Twerɛ 'abɔfra' ɔkwan foforɔ so:",
+    "options": ["abuofra", "abɔfrɔ", "abɔfera", "abɔfra"],
+    "answer": "abɔfra",
+    "language": "akan"
+  },
+  {
+    "section": "Writing",
+    "id": 35,
+    "question": "Nsɛmmisa gyinaesie a ɛteɛ ne dɛn?",
+    "options": ["Wo ho te sɛn.", "Wo ho te sɛn?", "Wo ho te sɛn!", "Wo ho te sɛn,"],
+    "answer": "Wo ho te sɛn?",
+    "language": "akan"
+  },
+  {
+    "section": "Grammar",
+    "id": 36,
+    "question": "Nkyerɛase a ɛyɛ nokore ne dɛn? 'Sɛ woba a, mɛka akyerɛ wo.'",
+    "options": ["Mprempren", "Daakye", "Nnansa", "Bere biara"],
+    "answer": "Daakye",
+    "language": "akan"
+  },
+  {
+    "section": "Grammar",
+    "id": 37,
+    "question": "Nsɛm a ɛka ho ne dɛn? 'Ɔbaa no ___ aduan.'",
+    "options": ["dii", "di", "bɛdi", "nni"],
+    "answer": "dii",
+    "language": "akan"
+  },
+  {
+    "section": "Grammar",
+    "id": 38,
+    "question": "'Nsɛm' ne 'asɛm' - nsonsonoe ne dɛn?",
+    "options": ["Nsɛm yɛ pii", "Asɛm yɛ pii", "Ɛyɛ pɛ ara", "Nsɛm ntease"],
+    "answer": "Nsɛm yɛ pii",
+    "language": "akan"
+  },
+  {
+    "section": "Grammar",
+    "id": 39,
+    "question": "Kasamu yi mu dɛn na ɛnteɛ? 'Me ne wo bɛkɔ'",
+    "options": ["Me ne wo", "bɛkɔ", "Biribiara teɛ", "Me dwene sɛ"],
+    "answer": "Biribiara teɛ",
+    "language": "akan"
+  },
+  {
+    "section": "Grammar",
+    "id": 40,
+    "question": "Gyinaesie a ɛka bɔ nsɛm no ho ne dɛn? 'Yɛkɔɔ akatua no so ___'",
+    "options": ["nnɛra", "nnera", "nnɛ", "nnɛyi"],
+    "answer": "nnɛra",
+    "language": "akan"
+  },
+  {
+    "section": "Reading",
+    "id": 41,
+    "question": "Kenkan saa nsɛm yi: 'Kofi yɛ ɔsuani.' Nsɛm a ɛka Kofi ho ne dɛn?",
+    "options": ["Ɔyɛ ɔkyerɛkyerɛfoɔ", "Ɔyɛ ɔsuafoɔ", "Ɔyɛ odwumayɛfoɔ", "Ɔyɛ okuafoɔ"],
+    "answer": "Ɔyɛ ɔsuafoɔ",
+    "language": "akan"
+  },
+  {
+    "section": "Reading",
+    "id": 42,
+    "question": "Kenkan: 'Ama kɔɔ dwa mu kɔtɔɔ banku.' Ama kɔɔ he?",
+    "options": ["Fie", "Dwa", "Sukuu", "Tuo"],
+    "answer": "Dwa",
+    "language": "akan"
+  },
+  {
+    "section": "Reading",
+    "id": 43,
+    "question": "'Yɛn papa yɛ kuafoɔ' - nsɛm yi kyerɛ sɛ ɔyɛ dɛn adwuma?",
+    "options": ["Ɔyɛ nnɔbae", "Ɔyɛ aboa hwɛ", "Ɔtɔn nneɛma", "Ɔkyerɛkyerɛ"],
+    "answer": "Ɔyɛ nnɔbae",
+    "language": "akan"
+  },
+  {
+    "section": "Reading",
+    "id": 44,
+    "question": "Kenkan: 'Nsuo no yɛ hyew' - asekyerɛ ne dɛn?",
+    "options": ["Nsuo no yɛ nwini", "Nsuo no yɛ awa", "Nsuo no yɛ amono", "Nsuo no yɛ hare"],
+    "answer": "Nsuo no yɛ awa",
+    "language": "akan"
+  },
+  {
+    "section": "Reading",
+    "id": 45,
+    "question": "'Abɔfra no su' - nea ɛreyɛ ne dɛn?",
+    "options": ["Ɔrehwere", "Ɔretu ampa", "Ɔre nwen", "Ɔresu"],
+    "answer": "Ɔresu",
+    "language": "akan"
+  },
+  {
+    "section": "Reading",
+    "id": 46,
+    "question": "Kenkan: 'Ɔkra no kɔm dee no' - asɛm a ɛreba ne dɛn?",
+    "options": ["Ɔbɛdidi", "Ɔbɛnom nsuo", "Ɔbɛda", "Ɔbɛgua"],
+    "answer": "Ɔbɛdidi",
+    "language": "akan"
+  },
+  {
+    "section": "Reading",
+    "id": 47,
+    "question": "'Adwo yi, ɔsrane ahyerɛn' - bere bɛn na ɛne?",
+    "options": ["Adekyee", "Awiabere", "Anwummere", "Anadwo"],
+    "answer": "Anadwo",
+    "language": "akan"
+  },
+  {
+    "section": "Vocabulary",
+    "id": 48,
+    "question": "'Nhoma' ne 'krataa' - nsonsonoe ne dɛn?",
+    "options": ["Ɛyɛ pɛ", "Nhoma yɛ nwoma", "Krataa yɛ pepa", "Nhoma yɛ kɛseɛ"],
+    "answer": "Nhoma yɛ nwoma",
+    "language": "akan"
+  },
+  {
+    "section": "Vocabulary",
+    "id": 49,
+    "question": "Wɔfrɛ 'time' sɛn wɔ Akan mu?",
+    "options": ["Mmere", "Bere", "Ahwehwɛ", "Nkyekyɛmu"],
+    "answer": "Bere",
+    "language": "akan"
+  },
+  {
+    "section": "Vocabulary",
+    "id": 50,
+    "question": "'Ayɛyɛde' kyerɛ dɛn wɔ Borɔfo kasa mu?",
+    "options": ["Celebration", "Sadness", "Work", "Problem"],
+    "answer": "Celebration",
+    "language": "akan"
+  }
+]

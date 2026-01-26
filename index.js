@@ -31,6 +31,7 @@ const assessmentRoute = require('./routes/assessment');
 const supportRoute = require('./routes/support');
 const chatRoute = require('./routes/chat');
 const qaRoute = require('./routes/qa');
+const envConfig = require('./config/envConfig');
 
 const app = express();
 const server = createServer(app);
@@ -41,9 +42,9 @@ initializeSocketIO(server);
 // CORS Configuration - Development and Production
 const corsOptions = {
     origin: [
-        'http://localhost:5173', 
-        'http://127.0.0.1:5173', 
-        'https://mydeeptech.ng', 
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+        'https://mydeeptech.ng',
         'https://www.mydeeptech.ng',
         'https://mydeeptech-be.onrender.com',
         'https://mydeeptech-frontend.onrender.com'
@@ -54,7 +55,7 @@ const corsOptions = {
 };
 
 app.get("/", (req, res) => {
-    res.send('Welcome to My Deep Tech')
+    res.send('Welcome to My Deep Tech');
 });
 
 // Enhanced health check endpoint with database ping
@@ -161,7 +162,7 @@ const connectDB = async () => {
         try {
             console.log(`🔄 Attempting MongoDB connection (attempt ${retries + 1}/${maxRetries})...`);
             
-            const conn = await mongoose.connect(process.env.MONGO_URI, {
+            const conn = await mongoose.connect(envConfig.mongo.MONGO_URI, {
                 // Production-optimized timeouts
                 serverSelectionTimeoutMS: 60000, // 60 seconds
                 socketTimeoutMS: 60000,          // 60 seconds  
@@ -230,7 +231,7 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Start Server
-const PORT = process.env.PORT || 5000;
+const PORT = envConfig.PORT || 5000;
 server.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`💬 Socket.IO chat server active`);

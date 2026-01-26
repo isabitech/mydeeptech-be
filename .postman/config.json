@@ -1,0 +1,14 @@
+{
+  "workspace": {
+    "id": "7163b585-7d07-458b-8d5b-5bba0feb981e"
+  },
+  "entities": {
+    "collections": [],
+    "environments": [],
+    "specs": [
+      "..\\docs\\openapi-spec.json"
+    ],
+    "flows": [],
+    "globals": []
+  }
+}

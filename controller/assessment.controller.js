@@ -8,17 +8,19 @@ const mongoose = require('mongoose');
 // Validation schema for submitting assessment (updated for section-based structure)
 const submitAssessmentSchema = Joi.object({
   assessmentType: Joi.string().valid('annotator_qualification', 'skill_assessment', 'project_specific').default('annotator_qualification'),
+  // Optional explicit language hint from client
+  language: Joi.string().valid('en', 'akan').optional(),
   startedAt: Joi.date().required(),
   completedAt: Joi.date().min(Joi.ref('startedAt')).required(),
   answers: Joi.array().items(
     Joi.object({
       questionId: Joi.number().required(),
-      section: Joi.string().valid('Comprehension', 'Vocabulary', 'Grammar', 'Writing').required(),
+      section: Joi.string().valid('Comprehension', 'Vocabulary', 'Grammar', 'Writing', 'Translation', 'Reading').required(),
       userAnswer: Joi.string().required(),
       question: Joi.string().required(),
       options: Joi.array().items(Joi.string())
     })
-  ).min(20).max(20).required(), // Exactly 20 questions (5 per section)
+  ).min(20).max(50).required(), // 20 questions for English, up to 50 for Akan
   passingScore: Joi.number().min(0).max(100).default(60)
 });
 
@@ -57,13 +59,12 @@ const submitAssessment = async (req, res) => {
 
     const { 
       assessmentType, 
+      language: languageHint,
       startedAt, 
       completedAt, 
       answers,
       passingScore 
     } = value;
-
-    console.log(`📝 User ${userId} submitting ${assessmentType} assessment with ${answers.length} questions`);
 
     // Get user's current status
     const user = await DTUser.findById(userId);
@@ -89,11 +90,44 @@ const submitAssessment = async (req, res) => {
       microTaskerStatus: user.microTaskerStatus
     };
 
-    // Check for previous attempts
-    const previousAttempts = await Assessment.find({
+    // Detect language early from answers for filtering previous attempts
+    // Prefer explicit language hint if provided by client
+    let detectedLanguage = languageHint || null;
+    const hasComprehension = answers.some(a => a.section === 'Comprehension');
+    const hasTranslation = answers.some(a => a.section === 'Translation');
+    const hasReading = answers.some(a => a.section === 'Reading');
+
+    if (!detectedLanguage) {
+      if (hasTranslation || hasReading) {
+        detectedLanguage = 'akan';
+      } else if (hasComprehension) {
+        detectedLanguage = 'en';
+      } else {
+        // Fallback heuristic: lower ID ranges (≤ 50) are typically Akan
+        const anyLikelyAkanId = answers.some(a => Number(a.questionId) <= 50);
+        detectedLanguage = anyLikelyAkanId ? 'akan' : 'en';
+      }
+    }
+
+    // Check for previous attempts with language filtering
+    const previousAttemptsFilter = {
       userId: userId,
       assessmentType: assessmentType
-    }).select('createdAt scorePercentage passed').sort({ createdAt: -1 });
+    };
+    
+    // Add language filter if detected
+    if (detectedLanguage) {
+      previousAttemptsFilter.language = detectedLanguage;
+    } else {
+      // For legacy assessments without language field
+      previousAttemptsFilter.$or = [
+        { language: { $exists: false } },
+        { language: null }
+      ];
+    }
+    
+    const previousAttempts = await Assessment.find(previousAttemptsFilter)
+      .select('createdAt scorePercentage passed').sort({ createdAt: -1 });
 
     const attemptNumber = previousAttempts.length + 1;
 
@@ -104,11 +138,49 @@ const submitAssessment = async (req, res) => {
 
     // Validate answers against database
     for (const userAnswer of answers) {
-      // Get the correct answer from database
-      const dbQuestion = await AssessmentQuestion.findOne({ 
+      // Use detected language to lookup the correct question, preferring exact id+section match
+      const isAkan = detectedLanguage === 'akan';
+
+      // First try: id + section + language (or English/no-language)
+      const primaryQuery = {
         id: userAnswer.questionId,
-        isActive: true 
-      });
+        section: userAnswer.section,
+        isActive: true,
+        ...(isAkan ? { language: 'akan' } : {})
+      };
+      if (!isAkan) {
+        primaryQuery.$or = [
+          { language: { $exists: false } },
+          { language: null },
+          { language: 'en' }
+        ];
+      }
+      let dbQuestion = await AssessmentQuestion.findOne(primaryQuery);
+
+      // Second try: id + language only
+      if (!dbQuestion) {
+        const languageQuery = {
+          id: userAnswer.questionId,
+          isActive: true,
+          ...(isAkan ? { language: 'akan' } : {})
+        };
+        if (!isAkan) {
+          languageQuery.$or = [
+            { language: { $exists: false } },
+            { language: null },
+            { language: 'en' }
+          ];
+        }
+        dbQuestion = await AssessmentQuestion.findOne(languageQuery);
+      }
+
+      // Final fallback: id only
+      if (!dbQuestion) {
+        dbQuestion = await AssessmentQuestion.findOne({ 
+          id: userAnswer.questionId,
+          isActive: true 
+        });
+      }
 
       if (!dbQuestion) {
         return res.status(400).json({
@@ -117,12 +189,12 @@ const submitAssessment = async (req, res) => {
         });
       }
 
-      // Validate the section matches
+      console.log(`🔍 Validating Q${userAnswer.questionId}: expected '${dbQuestion.section}', got '${userAnswer.section}'`);
+
+      // If section differs, trust DB and override instead of failing
       if (dbQuestion.section !== userAnswer.section) {
-        return res.status(400).json({
-          success: false,
-          message: `Section mismatch for question ${userAnswer.questionId}`
-        });
+        console.warn(`Section mismatch for Q${userAnswer.questionId}. Overriding '${userAnswer.section}' -> '${dbQuestion.section}'.`);
+        userAnswer.section = dbQuestion.section;
       }
 
       // Check if answer is correct (case-insensitive comparison)
@@ -157,7 +229,6 @@ const submitAssessment = async (req, res) => {
     const scorePercentage = Math.round((correctAnswers / totalQuestions) * 100);
     const passed = scorePercentage >= passingScore;
 
-    console.log(`📊 Assessment Results: ${correctAnswers}/${totalQuestions} correct (${scorePercentage}%) - ${passed ? 'PASSED' : 'FAILED'}`);
 
     // Calculate section-wise performance
     const sectionPerformance = {};
@@ -204,6 +275,7 @@ const submitAssessment = async (req, res) => {
     const assessmentData = {
       userId: userId,
       assessmentType,
+      language: detectedLanguage, // Use the already detected language
       totalQuestions,
       correctAnswers,
       scorePercentage,
@@ -244,7 +316,6 @@ const submitAssessment = async (req, res) => {
       user.microTaskerStatus = newMicroTaskerStatus;
       await user.save();
 
-      console.log(`✅ User status updated: annotator: ${user.annotatorStatus}, microTasker: ${user.microTaskerStatus}`);
 
       // Create notification for status change
       try {
@@ -294,7 +365,6 @@ const submitAssessment = async (req, res) => {
           const { sendAnnotatorRejectionEmail } = require('../utils/annotatorMailer');
           await sendAnnotatorRejectionEmail(user.email, user.fullName);
         }
-        console.log(`✅ Email notification sent to user: ${user.email}`);
       } catch (emailError) {
         console.error('⚠️ Failed to send email notification:', emailError);
       }
@@ -585,18 +655,45 @@ const getAssessmentQuestions = async (req, res) => {
       });
     }
 
-    const { questionsPerSection = 5 } = req.query;
-    const sections = ['Comprehension', 'Vocabulary', 'Grammar', 'Writing'];
+    const { questionsPerSection = 5, language = 'en' } = req.query;
     
-    console.log(`📝 Getting ${questionsPerSection} questions per section for user ${userId}`);
-
+    // Define sections based on language
+    let sections;
+    let actualQuestionsPerSection;
+    
+    if (language === 'akan') {
+      sections = ['Grammar', 'Vocabulary', 'Translation', 'Writing', 'Reading'];
+      // For Akan, ensure exactly 5 questions per section for total of 25
+      actualQuestionsPerSection = 5;
+    } else {
+      sections = ['Comprehension', 'Vocabulary', 'Grammar', 'Writing'];
+      actualQuestionsPerSection = parseInt(questionsPerSection);
+    }
+    
+    console.log(`🌐 Fetching ${language} assessment questions, ${actualQuestionsPerSection} per section, total expected: ${sections.length * actualQuestionsPerSection}`);
+    
     // Get random questions from each section
     const allQuestions = [];
     
     for (const section of sections) {
+      // Build query - prioritize language matching for Akan
+      let matchQuery = { section: section, isActive: true };
+      
+      if (language === 'akan') {
+        // For Akan, specifically filter by language
+        matchQuery.language = 'akan';
+      } else {
+        // For English, look for questions without language field or language: 'en'
+        matchQuery.$or = [
+          { language: { $exists: false } },
+          { language: 'en' },
+          { language: { $eq: null } }
+        ];
+      }
+
       const sectionQuestions = await AssessmentQuestion.aggregate([
-        { $match: { section: section, isActive: true } },
-        { $sample: { size: parseInt(questionsPerSection) } },
+        { $match: matchQuery },
+        { $sample: { size: actualQuestionsPerSection } },
         { 
           $project: { 
             id: 1,
@@ -604,10 +701,13 @@ const getAssessmentQuestions = async (req, res) => {
             question: 1,
             options: 1,
             points: 1,
+            language: 1,
             _id: 0
           }
         }
       ]);
+
+      console.log(`📝 Found ${sectionQuestions.length} questions for section: ${section} (${language})`);
 
       // Randomize options order for each question
       const randomizedQuestions = sectionQuestions.map(q => ({
@@ -621,21 +721,33 @@ const getAssessmentQuestions = async (req, res) => {
     // Shuffle the final question order so sections are mixed
     const shuffledQuestions = allQuestions.sort(() => Math.random() - 0.5);
 
-    console.log(`📝 Sent ${shuffledQuestions.length} questions across ${sections.length} sections`);
+    // Create language-specific response data
+    const totalQuestions = shuffledQuestions.length;
+    const timeLimit = language === 'akan' ? 35 : 30; // 35 min for Akan, 30 for English
+    const sectionList = language === 'akan' 
+      ? 'Grammar, Vocabulary, Translation, Writing, and Reading'
+      : 'Comprehension, Vocabulary, Grammar, and Writing';
+    
+    const instructions = language === 'akan'
+      ? `This assessment contains questions from 5 sections: ${sectionList}. You have ${timeLimit} minutes to complete all ${totalQuestions} questions. A passing score is 60%.`
+      : `This assessment contains questions from 4 sections: ${sectionList}. You have ${timeLimit} minutes to complete all ${totalQuestions} questions. A passing score is 60%.`;
+
+    console.log(`✅ Returning ${totalQuestions} ${language} questions across ${sections.length} sections`);
 
     res.status(200).json({
       success: true,
-      message: "Assessment questions retrieved successfully",
+      message: `Assessment questions retrieved successfully (${language})`,
       data: {
         questions: shuffledQuestions,
         assessmentInfo: {
-          totalQuestions: shuffledQuestions.length,
-          questionsPerSection: parseInt(questionsPerSection),
+          totalQuestions,
+          questionsPerSection: actualQuestionsPerSection,
           sections: sections,
+          language: language,
           passingScore: 60,
-          timeLimit: 30, // 30 minutes
+          timeLimit: timeLimit,
           assessmentType: 'annotator_qualification',
-          instructions: "This assessment contains questions from 4 sections: Comprehension, Vocabulary, Grammar, and Writing. You have 30 minutes to complete all 20 questions. A passing score is 60%."
+          instructions
         }
       }
     });
@@ -759,7 +871,12 @@ const getAllAssessments = async (req, res) => {
     // Check user's latest English assessment attempt
     const latestEnglishAttempt = await Assessment.findOne({
       userId: userId,
-      assessmentType: 'annotator_qualification'
+      assessmentType: 'annotator_qualification',
+      $or: [
+        { language: 'en' },
+        { language: { $exists: false } },
+        { language: null }
+      ]
     }).sort({ createdAt: -1 });
 
     englishAssessment.userStatus = {
@@ -771,15 +888,107 @@ const getAllAssessments = async (req, res) => {
       nextRetakeAvailable: null
     };
 
+    // Add lastAttempt object for frontend compatibility
+    if (latestEnglishAttempt) {
+      englishAssessment.lastAttempt = {
+        id: latestEnglishAttempt._id.toString(),
+        score: latestEnglishAttempt.scorePercentage,
+        completedAt: latestEnglishAttempt.createdAt,
+        status: latestEnglishAttempt.passed ? 'passed' : 'failed',
+        canRetake: true
+      };
+    }
+
     if (latestEnglishAttempt) {
       const cooldownEnd = new Date(latestEnglishAttempt.createdAt.getTime() + 24 * 60 * 60 * 1000);
-      englishAssessment.userStatus.canRetake = new Date() >= cooldownEnd;
+      const canRetakeNow = new Date() >= cooldownEnd;
+      englishAssessment.userStatus.canRetake = canRetakeNow;
       englishAssessment.userStatus.nextRetakeAvailable = cooldownEnd;
+      
+      // Update lastAttempt canRetake status
+      if (englishAssessment.lastAttempt) {
+        englishAssessment.lastAttempt.canRetake = canRetakeNow;
+      }
     }
 
     assessments.push(englishAssessment);
 
-    // 2. Multimedia Assessments (project-specific)
+    // 2. Akan (Twi) Proficiency Assessment
+    const akanAssessment = {
+      id: 'akan-proficiency',
+      type: 'akan_proficiency',
+      title: 'Akan (Twi) Proficiency Assessment',
+      description: 'Comprehensive assessment covering Akan grammar, vocabulary, translation, writing, and reading skills',
+      category: 'language',
+      difficulty: 'intermediate',
+      estimatedDuration: 35, // minutes
+      totalQuestions: 25,
+      sections: [
+        { name: 'Grammar', questions: 8 },
+        { name: 'Vocabulary', questions: 7 },
+        { name: 'Translation', questions: 5 },
+        { name: 'Writing', questions: 3 },
+        { name: 'Reading', questions: 2 }
+      ],
+      passingScore: 60,
+      maxAttempts: null, // Unlimited with 24h cooldown
+      cooldownHours: 24,
+      isActive: true,
+      requirements: [
+        'Basic Akan (Twi) language skills',
+        'Stable internet connection',
+        'Quiet environment for 35 minutes'
+      ],
+      instructions: 'This assessment evaluates your Akan (Twi) language proficiency across five key areas: Grammar, Vocabulary, Translation, Writing, and Reading. You have 35 minutes to complete 50 questions with a minimum score of 60% required to pass.',
+      benefits: [
+        'Qualify as Akan Language Annotator',
+        'Access to Akan language projects',
+        'Specialized language project priority'
+      ]
+    };
+
+    // Check user's latest Akan assessment attempt
+    const latestAkanAttempt = await Assessment.findOne({
+      userId: userId,
+      assessmentType: 'annotator_qualification',
+      language: 'akan'
+    }).sort({ createdAt: -1 });
+
+    akanAssessment.userStatus = {
+      hasAttempted: !!latestAkanAttempt,
+      latestScore: latestAkanAttempt?.scorePercentage || null,
+      passed: latestAkanAttempt?.passed || false,
+      lastAttemptDate: latestAkanAttempt?.createdAt || null,
+      canRetake: true, // Will be validated on attempt
+      nextRetakeAvailable: null
+    };
+
+    // Add lastAttempt object for frontend compatibility
+    if (latestAkanAttempt) {
+      akanAssessment.lastAttempt = {
+        id: latestAkanAttempt._id.toString(),
+        score: latestAkanAttempt.scorePercentage,
+        completedAt: latestAkanAttempt.createdAt,
+        status: latestAkanAttempt.passed ? 'passed' : 'failed',
+        canRetake: true
+      };
+    }
+
+    if (latestAkanAttempt) {
+      const cooldownEnd = new Date(latestAkanAttempt.createdAt.getTime() + 24 * 60 * 60 * 1000);
+      const canRetakeNow = new Date() >= cooldownEnd;
+      akanAssessment.userStatus.canRetake = canRetakeNow;
+      akanAssessment.userStatus.nextRetakeAvailable = cooldownEnd;
+      
+      // Update lastAttempt canRetake status
+      if (akanAssessment.lastAttempt) {
+        akanAssessment.lastAttempt.canRetake = canRetakeNow;
+      }
+    }
+
+    assessments.push(akanAssessment);
+
+    // 3. Multimedia Assessments (project-specific)
     try {
       const MultimediaAssessmentConfig = require('../models/multimediaAssessmentConfig.model');
       
@@ -978,8 +1187,6 @@ const getAllAssessments = async (req, res) => {
       return a.difficulty.localeCompare(b.difficulty);
     });
 
-    console.log(`✅ Retrieved ${assessments.length} available assessments for user`);
-
     res.status(200).json({
       success: true,
       message: `Found ${assessments.length} available assessments`,
@@ -1027,14 +1234,17 @@ const startAssessmentById = async (req, res) => {
       });
     }
 
-    console.log(`🚀 User ${userId} starting assessment: ${assessmentId}`);
-
     // Handle English Proficiency Assessment
     if (assessmentId === 'english-proficiency') {
       // Check retake eligibility
       const latestAttempt = await Assessment.findOne({
         userId: userId,
-        assessmentType: 'annotator_qualification'
+        assessmentType: 'annotator_qualification',
+        $or: [
+          { language: 'en' },
+          { language: { $exists: false } },
+          { language: null }
+        ]
       }).sort({ createdAt: -1 });
 
       if (latestAttempt) {
@@ -1052,6 +1262,35 @@ const startAssessmentById = async (req, res) => {
       }
 
       // Get English assessment questions
+      return getAssessmentQuestions(req, res);
+    }
+
+    // Handle Akan Proficiency Assessment
+    if (assessmentId === 'akan-proficiency') {
+      // Check retake eligibility for Akan assessment
+      const latestAkanAttempt = await Assessment.findOne({
+        userId: userId,
+        assessmentType: 'annotator_qualification',
+        language: 'akan'
+      }).sort({ createdAt: -1 });
+
+      if (latestAkanAttempt) {
+        const cooldownEnd = new Date(latestAkanAttempt.createdAt.getTime() + 24 * 60 * 60 * 1000);
+        if (new Date() < cooldownEnd) {
+          return res.status(400).json({
+            success: false,
+            message: "Assessment cooldown active. Please wait before retaking.",
+            data: {
+              nextRetakeAvailable: cooldownEnd,
+              hoursRemaining: Math.ceil((cooldownEnd - new Date()) / (60 * 60 * 1000))
+            }
+          });
+        }
+      }
+
+      // Get Akan assessment questions
+      req.query.language = 'akan';
+      req.query.questionsPerSection = 5; // 25 total questions / 5 sections = 5 per section
       return getAssessmentQuestions(req, res);
     }
 
@@ -1146,8 +1385,6 @@ const getAssessmentSubmissions = async (req, res) => {
         message: "Access denied. You can only view your own submissions unless you are an admin."
       });
     }
-
-    console.log(`📊 ${isAdmin ? 'Admin' : 'User'} requesting submissions for assessment: ${assessmentId}`);
 
     let submissions = [];
     let totalCount = 0;
@@ -1330,8 +1567,6 @@ const getAssessmentSubmissions = async (req, res) => {
     // Remove helper field
     delete statistics.processedCount;
 
-    console.log(`✅ Retrieved ${submissions.length} submissions for assessment ${assessmentId}`);
-
     res.status(200).json({
       success: true,
       message: `Assessment submissions retrieved successfully`,
@@ -1379,8 +1614,6 @@ const getAdminAssessmentsOverview = async (req, res) => {
         message: "Admin authentication required"
       });
     }
-
-    console.log(`📊 Admin ${req.admin.email} requesting assessments overview`);
 
     const assessments = [];
 
@@ -1574,8 +1807,6 @@ const getAdminAssessmentsOverview = async (req, res) => {
       ? Math.round((overallStats.averageCompletionRate / overallStats.activeAssessments) * 10) / 10 
       : 0;
 
-    console.log(`✅ Retrieved ${assessments.length} assessment types with statistics`);
-
     res.status(200).json({
       success: true,
       message: "Assessment overview retrieved successfully",
@@ -1608,8 +1839,6 @@ const getUserAssessmentsOverview = async (req, res) => {
         message: "User authentication required"
       });
     }
-
-    console.log(`👤 User ${req.user?.email} requesting personal assessment overview`);
 
     const assessments = [];
 
@@ -1877,8 +2106,6 @@ const getUserAssessmentsOverview = async (req, res) => {
         })()
       }
     };
-
-    console.log(`✅ Retrieved assessment overview for user with ${assessments.length} assessments`);
 
     res.status(200).json({
       success: true,
