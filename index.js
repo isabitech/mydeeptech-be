@@ -1,7 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const dotenv = require('dotenv');
 const bodyParser = require('body-parser');
 const { createServer } = require('http');
 const { initializeSocketIO } = require('./utils/chatSocketService');
@@ -18,8 +17,6 @@ try {
   swaggerUi = null;
   specs = null;
 }
-
-dotenv.config({ path: './.env' });
 
 //console.log("Loaded BREVO_API_KEY:", process.env.BREVO_API_KEY ? "✅ Yes" : "❌ No");
 
@@ -45,16 +42,21 @@ const corsOptions = {
         'http://localhost:5173',
         'http://127.0.0.1:5173',
         'https://mydeeptech.ng',
+        // Frontend URLs
         'https://www.mydeeptech.ng',
+        'https://mydeeptech.onrender.com',
+        'https://mydeeptech-frontend.onrender.com',
+
+        // Backend URLs
         'https://mydeeptech-be.onrender.com',
-        'https://mydeeptech-frontend.onrender.com'
+        'https://mydeeptech-be-lmrk.onrender.com',
     ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With', 'token']
 };
 
-app.get("/", (req, res) => {
+app.get("/", (_req, res) => {
     res.send('Welcome to My Deep Tech');
 });
 
