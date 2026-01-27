@@ -57,7 +57,7 @@ const annotationProjectSchema = new mongoose.Schema(
     // Project settings
     status: {
       type: String,
-      enum: ["draft", "active", "paused", "completed", "cancelled"],
+      enum: ["draft", "active", "paused", "completed", "cancelled", "inactive"],
       default: "active"
     },
     maxAnnotators: {
