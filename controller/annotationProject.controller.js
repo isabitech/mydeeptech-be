@@ -436,6 +436,7 @@ const toggleProjectActiveStatus = async (req, res) => {
 
     // Toggle the isActive status
     project.isActive = !project.isActive;
+    project.status = project.isActive ? 'active' : 'inactive';
     await project.save();
 
     res.status(200).json({
