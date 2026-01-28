@@ -1,6 +1,6 @@
 const express = require('express');
 const { getAllDTUsers, getAllAdminUsers, getAdminDashboard, approveAnnotator, approveUserForQA, rejectUserForQA, getAllQAUsers, rejectAnnotator, getDTUserAdmin, createAdmin, requestAdminVerification, confirmAdminVerification, verifyAdminOTP, adminLogin } = require('../controller/dtUser.controller.js');
-const { createAnnotationProject, getAllAnnotationProjects, getAnnotationProjectDetails, updateAnnotationProject, toggleProjectStatus, toggleProjectShowHide, deleteAnnotationProject, requestProjectDeletionOTP, verifyOTPAndDeleteProject, getAnnotationProjectApplications, approveAnnotationProjectApplication, rejectAnnotationProjectApplication, removeApprovedApplicant, getRemovableApplicants, exportApprovedAnnotatorsCSV, attachAssessmentToProject, removeAssessmentFromProject, getAvailableAssessments, rejectApplicationsBulk, getApprovedApplicants, bulkApproveApplications, bulkRejectApplications } = require('../controller/annotationProject.controller.js');
+const { createAnnotationProject, getAllAnnotationProjects, getAnnotationProjectDetails, updateAnnotationProject, toggleProjectStatus, toggleProjectVisibility, deleteAnnotationProject, requestProjectDeletionOTP, verifyOTPAndDeleteProject, getAnnotationProjectApplications, approveAnnotationProjectApplication, rejectAnnotationProjectApplication, removeApprovedApplicant, getRemovableApplicants, exportApprovedAnnotatorsCSV, attachAssessmentToProject, removeAssessmentFromProject, getAvailableAssessments, rejectApplicationsBulk, getApprovedApplicants, bulkApproveApplications, bulkRejectApplications } = require('../controller/annotationProject.controller.js');
 const { createInvoice, getAllInvoices, getInvoiceDetails, updatePaymentStatus, sendInvoiceReminder, deleteInvoice, bulkAuthorizePayment, generatePaystackCSV, generateMPESACSV } = require('../controller/invoice.controller.js');
 const { getAdminNotifications, createAnnouncement, getNotificationStats, cleanupNotifications, broadcastNotification } = require('../controller/notification.controller.js');
 const { getAdminAssessments, getAdminAssessmentsOverview } = require('../controller/assessment.controller.js');
@@ -41,7 +41,7 @@ router.get('/projects', authenticateAdmin, getAllAnnotationProjects);
 router.get('/projects/:projectId', authenticateAdmin, getAnnotationProjectDetails);
 router.patch('/projects/:projectId', authenticateAdmin, updateAnnotationProject);
 router.patch('/projects/:projectId/toggle-status', authenticateAdmin, toggleProjectStatus);
-router.patch('/projects/:projectId/show-hide', authenticateAdmin, toggleProjectShowHide);
+router.patch('/projects/:projectId/toggle-visibility', authenticateAdmin, toggleProjectVisibility);
 router.delete('/projects/:projectId', authenticateAdmin, deleteAnnotationProject);
 router.get('/projects/getApprovedApplicants/:projectId', authenticateAdmin, getApprovedApplicants);
 router.put('/projects/reject-applications-bulk',authenticateAdmin, rejectApplicationsBulk);
