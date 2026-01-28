@@ -63,7 +63,7 @@ const annotationProjectSchema = new mongoose.Schema(
     openCloseStatus: {
       type: String,
       enum: ["open", "close"],
-      default: "active"
+      default: "open"
     },
     maxAnnotators: {
       type: Number,
