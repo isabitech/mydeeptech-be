@@ -422,7 +422,48 @@ const updateAnnotationProject = async (req, res) => {
 };
 
 // Admin function: Toggle project active status
-const toggleProjectActiveStatus = async (req, res) => {
+const toggleProjectStatus = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+
+    const project = await AnnotationProject.findById(projectId);
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Annotation project not found"
+      });
+    }
+
+    // Toggle the isActive status
+    project.isActive = !project.isActive;
+    project.status = project.isActive ? 'active' : 'inactive';
+    await project.save();
+
+    res.status(200).json({
+      success: true,
+      message: `Project ${project.isActive ? 'activated' : 'deactivated'} successfully`,
+      data: {
+        project: {
+          _id: project._id,
+          projectName: project.projectName,
+          isActive: project.isActive,
+          status: project.status
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Error toggling project active status:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error toggling project active status",
+      error: error.message
+    });
+  }
+};
+
+// Admin function: Toggle project active status
+const toggleProjectShowHide = async (req, res) => {
   try {
     const { projectId } = req.params;
 
@@ -1805,7 +1846,6 @@ module.exports = {
   getAllAnnotationProjects,
   getAnnotationProjectDetails,
   updateAnnotationProject,
-  toggleProjectActiveStatus,
   deleteAnnotationProject,
   requestProjectDeletionOTP,
   verifyOTPAndDeleteProject,
@@ -1821,5 +1861,7 @@ module.exports = {
   rejectApplicationsBulk,
   getApprovedApplicants,
   bulkApproveApplications,
-  bulkRejectApplications
+  bulkRejectApplications,
+  toggleProjectShowHide,
+  toggleProjectStatus,
 };
