@@ -427,10 +427,6 @@ const toggleProjectStatus = async (req, res) => {
     const { projectId } = req.params;
 
     const project = await AnnotationProject.findById(projectId);
-
-   const response =  await AnnotationProject.updateMany({ openCloseStatus: 'active' }, { $set: { openCloseStatus: 'close' } });
-
-    console.log("RESPONSE", response);
     if (!project) {
       return res.status(404).json({
         success: false,
@@ -451,7 +447,8 @@ const toggleProjectStatus = async (req, res) => {
           _id: project._id,
           projectName: project.projectName,
           isActive: project.isActive,
-          status: project.status
+          status: project.status,
+          openCloseStatus: project.openCloseStatus,
         }
       }
     });
@@ -479,20 +476,22 @@ const toggleProjectShowHide = async (req, res) => {
       });
     }
 
-    // Toggle the isActive status
-    project.isActive = !project.isActive;
-    project.status = project.isActive ? 'active' : 'inactive';
+    // Toggle the openCloseStatus
+
+    project.openCloseStatus = project.openCloseStatus === "open" ? 'close' : 'open';
+
     await project.save();
 
     res.status(200).json({
       success: true,
-      message: `Project ${project.isActive ? 'activated' : 'deactivated'} successfully`,
+      message: `Project ${project.openCloseStatus === "open" ? 'opened' : 'closed'} successfully`,
       data: {
         project: {
-          _id: project._id,
+            _id: project._id,
           projectName: project.projectName,
           isActive: project.isActive,
-          status: project.status
+          status: project.status,
+          openCloseStatus: project.openCloseStatus,
         }
       }
     });
