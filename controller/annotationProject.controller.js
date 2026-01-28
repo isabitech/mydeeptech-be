@@ -123,11 +123,13 @@ const getAllAnnotationProjects = async (req, res) => {
     const category = req.query.category;
     const search = req.query.search;
     const isActive = req.query.isActive; // "true", "false", or undefined (all)
+    const openCloseStatus = req.query.openCloseStatus; // "open", "close", or undefined (all)
 
     // Build filter
     const filter = {};
     if (status) filter.status = status;
     if (category) filter.projectCategory = category;
+    if (openCloseStatus) filter.openCloseStatus = openCloseStatus;
     
     // Add isActive filter
     if (isActive === 'true') {
@@ -464,7 +466,7 @@ const toggleProjectStatus = async (req, res) => {
 };
 
 // Admin function: Toggle project active status
-const toggleProjectShowHide = async (req, res) => {
+const toggleProjectVisibility = async (req, res) => {
   try {
     const { projectId } = req.params;
 
@@ -477,7 +479,6 @@ const toggleProjectShowHide = async (req, res) => {
     }
 
     // Toggle the openCloseStatus
-
     project.openCloseStatus = project.openCloseStatus === "open" ? 'close' : 'open';
 
     await project.save();
@@ -1865,6 +1866,6 @@ module.exports = {
   getApprovedApplicants,
   bulkApproveApplications,
   bulkRejectApplications,
-  toggleProjectShowHide,
+  toggleProjectVisibility,
   toggleProjectStatus,
 };
