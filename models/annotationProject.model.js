@@ -60,6 +60,11 @@ const annotationProjectSchema = new mongoose.Schema(
       enum: ["draft", "active", "paused", "completed", "cancelled", "inactive"],
       default: "active"
     },
+    openCloseStatus: {
+      type: String,
+      enum: ["open", "close"],
+      default: "active"
+    },
     maxAnnotators: {
       type: Number,
       default: null // null means unlimited
