@@ -427,6 +427,10 @@ const toggleProjectStatus = async (req, res) => {
     const { projectId } = req.params;
 
     const project = await AnnotationProject.findById(projectId);
+
+   const response =  await AnnotationProject.updateMany({ openCloseStatus: 'active' }, { $set: { openCloseStatus: 'close' } });
+
+    console.log("RESPONSE", response);
     if (!project) {
       return res.status(404).json({
         success: false,
