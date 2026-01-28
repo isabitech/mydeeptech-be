@@ -5,15 +5,12 @@ const { createNotification } = require('../utils/notificationService');
 class AdminNotificationService {
     static async createAdminNotification(payload) {
         const { recipientId, recipientType, title, message, type, priority, actionUrl, actionText, relatedData, scheduleFor, targetUsers } = payload;
-
         if (!title || !message || !type) {
             const error = new Error('Title, message, and type are required');
             error.statusCode = 400;
             throw error;
         }
-
         let recipients = [];
-
         if (
             recipientType === 'all' &&
             (!targetUsers ||
@@ -31,7 +28,6 @@ class AdminNotificationService {
             error.statusCode = 400;
             throw error;
         }
-
         const notifications = await Promise.all(
             recipients.map(userId =>
                 createNotification({
@@ -47,7 +43,6 @@ class AdminNotificationService {
                 })
             )
         );
-
         return {
             notificationIds: notifications.map(n => n.id),
             recipientCount: recipients.length,
