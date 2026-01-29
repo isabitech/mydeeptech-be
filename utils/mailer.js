@@ -1,17 +1,19 @@
 const nodemailer = require("nodemailer");
 const { sendVerificationEmailBrevo } = require('./brevoMailer');
 const { sendVerificationEmailBrevoSMTP } = require('./brevoSMTP');
+const envConfig = require("../config/envConfig");
+
 
 // Validate email configuration
-if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+if (!envConfig.email.legacy.EMAIL_USER || !envConfig.email.legacy.EMAIL_PASS) {
   console.warn("⚠️ Gmail SMTP configuration missing. Brevo will be used as primary email service.");
 }
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
+    user: envConfig.email.legacy.EMAIL_USER,
+    pass: envConfig.email.legacy.EMAIL_PASS,
   },
   // Add timeout and connection settings
   connectionTimeout: 10000, // 10 seconds
@@ -22,7 +24,7 @@ const transporter = nodemailer.createTransport({
 // Gmail SMTP fallback function
 const sendVerificationEmailGmail = async (email, name, userId) => {
   const mailOptions = {
-    from: `"MyDeepTech Team" <${process.env.EMAIL_USER}>`,
+    from: `"MyDeepTech Team" <${envConfig.email.legacy.EMAIL_USER}>`,
     to: email,
     subject: "Verify Your Email Address",
     html: `
@@ -47,7 +49,7 @@ const sendVerificationEmail = async (email, name, userId) => {
   console.log(`📧 Sending verification email to ${email}...`);
   
   // 1st Priority: Try Brevo SMTP (fastest and most reliable)
-  if (process.env.SMTP_LOGIN && process.env.SMTP_KEY) {
+  if (envConfig.email.brevo.SMTP_LOGIN && envConfig.email.brevo.SMTP_KEY) {
     try {
       console.log("� Attempting to send email via Brevo SMTP...");
       const result = await sendVerificationEmailBrevoSMTP(email, name, userId);
@@ -59,7 +61,7 @@ const sendVerificationEmail = async (email, name, userId) => {
   }
   
   // 2nd Priority: Try Brevo API
-  if (process.env.BREVO_API_KEY && process.env.BREVO_API_KEY !== 'your-brevo-api-key-here') {
+  if (envConfig.email.brevo.BREVO_API_KEY && envConfig.email.brevo.BREVO_API_KEY !== 'your-brevo-api-key-here') {
     try {
       console.log("📨 Attempting to send email via Brevo API...");
       const result = await sendVerificationEmailBrevo(email, name, userId);
@@ -71,7 +73,7 @@ const sendVerificationEmail = async (email, name, userId) => {
   }
   
   // 3rd Priority: Gmail fallback
-  if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+  if (envConfig.email.legacy.EMAIL_USER && envConfig.email.legacy.EMAIL_PASS) {
     try {
       console.log("� Attempting to send email via Gmail...");
       const result = await sendVerificationEmailGmail(email, name, userId);

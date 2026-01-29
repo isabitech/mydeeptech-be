@@ -1,4 +1,5 @@
 const axios = require('axios');
+const envConfig = require('../config/envConfig');
 
 // In-memory cache for exchange rates
 let rateCache = {
@@ -22,9 +23,9 @@ const getUSDToNGNRate = async () => {
     }
 
     console.log('📊 Fetching fresh USD/NGN exchange rate...');
-    
+  
     // Check if API key is available
-    const apiKey = process.env.EXCHANGE_RATES_API_KEY;
+    const apiKey = envConfig.EXCHANGE_RATES_API_KEY;
     if (!apiKey) {
       throw new Error('EXCHANGE_RATES_API_KEY environment variable is not set');
     }

@@ -1,9 +1,11 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
+const envConfig = require('./config/envConfig');
+
 
 async function migrateAssessments() {
   try {
-    await mongoose.connect(process.env.MONGO_URI);
+    await mongoose.connect(envConfig.mongo.MONGO_URI);
     console.log('🔄 Connected to MongoDB');
 
     const Assessment = require('./models/assessment.model');

@@ -64,6 +64,7 @@ app.get("/", (_req, res) => {
 
 // Enhanced health check endpoint with database ping
 app.get("/health", async (req, res) => {
+    
     try {
         const redisStatus = await redisHealthCheck();
         
