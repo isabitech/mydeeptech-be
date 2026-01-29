@@ -1,73 +1,97 @@
-const AnnotationProject = require('../models/annotationProject.model');
-const ProjectApplication = require('../models/projectApplication.model');
-const DTUser = require('../models/dtUser.model');
-const Joi = require('joi');
+const AnnotationProject = require("../models/annotationProject.model");
+const ProjectApplication = require("../models/projectApplication.model");
+const DTUser = require("../models/dtUser.model");
+const Joi = require("joi");
 
 // Validation schema for creating projects
 const createProjectSchema = Joi.object({
   projectName: Joi.string().trim().max(200).required(),
   projectDescription: Joi.string().trim().max(2000).required(),
-  projectCategory: Joi.string().valid(
-    "Text Annotation", "Image Annotation", "Audio Annotation", "Video Annotation",
-    "Data Labeling", "Content Moderation", "Transcription", "Translation",
-    "Sentiment Analysis", "Entity Recognition", "Classification", "Object Detection",
-    "Semantic Segmentation", "Survey Research", "Data Entry", "Quality Assurance", "Other"
-  ).required(),
+  projectCategory: Joi.string()
+    .valid(
+      "Text Annotation",
+      "Image Annotation",
+      "Audio Annotation",
+      "Video Annotation",
+      "Data Labeling",
+      "Content Moderation",
+      "Transcription",
+      "Translation",
+      "Sentiment Analysis",
+      "Entity Recognition",
+      "Classification",
+      "Object Detection",
+      "Semantic Segmentation",
+      "Survey Research",
+      "Data Entry",
+      "Quality Assurance",
+      "Other",
+    )
+    .required(),
   payRate: Joi.number().min(0).required(),
-  payRateCurrency: Joi.string().valid("USD", "EUR", "GBP", "NGN", "KES", "GHS").default("USD"),
-  payRateType: Joi.string().valid("per_task", "per_hour", "per_project", "per_annotation").default("per_task"),
+  payRateCurrency: Joi.string()
+    .valid("USD", "EUR", "GBP", "NGN", "KES", "GHS")
+    .default("USD"),
+  payRateType: Joi.string()
+    .valid("per_task", "per_hour", "per_project", "per_annotation")
+    .default("per_task"),
   maxAnnotators: Joi.number().min(1).allow(null).optional(),
-  deadline: Joi.date().greater('now').required(),
+  deadline: Joi.date().greater("now").required(),
   estimatedDuration: Joi.string().max(100).required(),
-  difficultyLevel: Joi.string().valid("beginner", "intermediate", "advanced", "expert").required(),
+  difficultyLevel: Joi.string()
+    .valid("beginner", "intermediate", "advanced", "expert")
+    .required(),
   requiredSkills: Joi.array().items(Joi.string()).default([]),
-  minimumExperience: Joi.string().valid("none", "beginner", "intermediate", "advanced").required(),
+  minimumExperience: Joi.string()
+    .valid("none", "beginner", "intermediate", "advanced")
+    .required(),
   languageRequirements: Joi.array().items(Joi.string()).default([]),
   tags: Joi.array().items(Joi.string()).default([]),
-  applicationDeadline: Joi.date().greater('now').required(),
+  applicationDeadline: Joi.date().greater("now").required(),
   // Project guidelines
-  projectGuidelineLink: Joi.string().uri().allow('').optional().messages({
-    'string.uri': 'Project guideline link must be a valid URL'
+  projectGuidelineLink: Joi.string().uri().allow("").optional().messages({
+    "string.uri": "Project guideline link must be a valid URL",
   }),
-  projectGuidelineVideo: Joi.string().uri().allow('').optional().messages({
-    'string.uri': 'Project guideline video must be a valid URL'
+  projectGuidelineVideo: Joi.string().uri().allow("").optional().messages({
+    "string.uri": "Project guideline video must be a valid URL",
   }),
-  projectCommunityLink: Joi.string().uri().allow('').optional().messages({
-    'string.uri': 'Project community link must be a valid URL'
+  projectCommunityLink: Joi.string().uri().allow("").optional().messages({
+    "string.uri": "Project community link must be a valid URL",
   }),
-  projectTrackerLink: Joi.string().uri().allow('').optional().messages({
-    'string.uri': 'Project tracker link must be a valid URL'
+  projectTrackerLink: Joi.string().uri().allow("").optional().messages({
+    "string.uri": "Project tracker link must be a valid URL",
   }),
-  
+
   // Project status
-  isActive: Joi.boolean().default(true)
+  isActive: Joi.boolean().default(true),
 });
 
 // Validation schema for removing approved applicants
 const removeApplicantSchema = Joi.object({
-  removalReason: Joi.string().valid(
-    "performance_issues",
-    "project_cancelled",
-    "violates_guidelines",
-    "unavailable",
-    "quality_concerns",
-    "admin_decision",
-    "other"
-  ).optional(),
-  removalNotes: Joi.string().max(500).allow('').optional()
+  removalReason: Joi.string()
+    .valid(
+      "performance_issues",
+      "project_cancelled",
+      "violates_guidelines",
+      "unavailable",
+      "quality_concerns",
+      "admin_decision",
+      "other",
+    )
+    .optional(),
+  removalNotes: Joi.string().max(500).allow("").optional(),
 });
 
 // Admin function: Create a new annotation project
 const createAnnotationProject = async (req, res) => {
   try {
-
     // Validate request body
     const { error, value } = createProjectSchema.validate(req.body);
     if (error) {
       return res.status(400).json({
         success: false,
         message: "Validation error",
-        errors: error.details.map(detail => detail.message)
+        errors: error.details.map((detail) => detail.message),
       });
     }
 
@@ -77,37 +101,36 @@ const createAnnotationProject = async (req, res) => {
     if (!adminId) {
       return res.status(400).json({
         success: false,
-        message: "Admin identification required to create project"
+        message: "Admin identification required to create project",
       });
     }
 
     const projectData = {
       ...value,
       createdBy: adminId,
-      assignedAdmins: [adminId]
+      assignedAdmins: [adminId],
     };
 
     const project = new AnnotationProject(projectData);
     await project.save();
 
     // Populate creator information
-    await project.populate('createdBy', 'fullName email');
-    await project.populate('assignedAdmins', 'fullName email');
+    await project.populate("createdBy", "fullName email");
+    await project.populate("assignedAdmins", "fullName email");
 
     res.status(201).json({
       success: true,
       message: "Annotation project created successfully",
       data: {
-        project: project
-      }
+        project: project,
+      },
     });
-
   } catch (error) {
     console.error("❌ Error creating annotation project:", error);
     res.status(500).json({
       success: false,
       message: "Server error creating annotation project",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -130,28 +153,28 @@ const getAllAnnotationProjects = async (req, res) => {
     if (status) filter.status = status;
     if (category) filter.projectCategory = category;
     if (openCloseStatus) filter.openCloseStatus = openCloseStatus;
-    
+
     // Add isActive filter
-    if (isActive === 'true') {
+    if (isActive === "true") {
       filter.isActive = true;
-    } else if (isActive === 'false') {
+    } else if (isActive === "false") {
       filter.isActive = false;
     }
     // If isActive is undefined, show all projects
-    
+
     if (search) {
-      const searchRegex = new RegExp(search, 'i');
+      const searchRegex = new RegExp(search, "i");
       filter.$or = [
         { projectName: searchRegex },
         { projectDescription: searchRegex },
-        { tags: { $in: [searchRegex] } }
+        { tags: { $in: [searchRegex] } },
       ];
     }
 
     // Get projects with pagination
     const projects = await AnnotationProject.find(filter)
-      .populate('createdBy', 'fullName email')
-      .populate('assignedAdmins', 'fullName email')
+      .populate("createdBy", "fullName email")
+      .populate("assignedAdmins", "fullName email")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -162,12 +185,21 @@ const getAllAnnotationProjects = async (req, res) => {
 
     // Get projects summary
     const statusSummary = await AnnotationProject.aggregate([
-      { $group: { _id: '$status', count: { $sum: 1 } } }
+      { $group: { _id: "$status", count: { $sum: 1 } } },
     ]);
 
     const categorySummary = await AnnotationProject.aggregate([
-      { $group: { _id: '$projectCategory', count: { $sum: 1 } } }
+      { $group: { _id: "$projectCategory", count: { $sum: 1 } } },
     ]);
+
+    // Get specific project status counts for summary
+
+    const [totalActiveProjects, totalCompletedProjects, totalPausedProjects] =
+      await Promise.all([
+        AnnotationProject.countDocuments({ status: "active" }),
+        AnnotationProject.countDocuments({ status: "completed" }),
+        AnnotationProject.countDocuments({ status: "paused" }),
+      ]);
 
     // Calculate pagination info
     const totalPages = Math.ceil(totalProjects / limit);
@@ -183,10 +215,13 @@ const getAllAnnotationProjects = async (req, res) => {
           totalProjects: totalProjects,
           hasNextPage: page < totalPages,
           hasPrevPage: page > 1,
-          limit: limit
+          limit: limit,
         },
         summary: {
-          totalProjects: totalProjects,
+          totalProjects: totalProjects  ?? 0,
+          activeProjects: totalActiveProjects ?? 0,
+          completedProjects: totalCompletedProjects ?? 0,
+          pausedProjects: totalPausedProjects ?? 0,
           statusBreakdown: statusSummary.reduce((acc, item) => {
             acc[item._id] = item.count;
             return acc;
@@ -195,17 +230,16 @@ const getAllAnnotationProjects = async (req, res) => {
             acc[item._id] = item.count;
             return acc;
           }, {}),
-          filters: filter
-        }
-      }
+          filters: filter,
+        },
+      },
     });
-
   } catch (error) {
     console.error("❌ Error fetching annotation projects:", error);
     res.status(500).json({
       success: false,
       message: "Server error fetching annotation projects",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -216,66 +250,71 @@ const getAnnotationProjectDetails = async (req, res) => {
     const { projectId } = req.params;
 
     const project = await AnnotationProject.findById(projectId)
-      .populate('createdBy', 'fullName email phone')
-      .populate('assignedAdmins', 'fullName email phone');
+      .populate("createdBy", "fullName email phone")
+      .populate("assignedAdmins", "fullName email phone");
 
     if (!project) {
       return res.status(404).json({
         success: false,
-        message: "Annotation project not found"
+        message: "Annotation project not found",
       });
     }
 
     // Get application statistics
     const applicationStats = await ProjectApplication.aggregate([
       { $match: { projectId: project._id } },
-      { $group: { _id: '$status', count: { $sum: 1 } } }
+      { $group: { _id: "$status", count: { $sum: 1 } } },
     ]);
 
     // Get recent applications
-    const recentApplications = await ProjectApplication.find({ projectId: project._id })
-      .populate('applicantId', 'fullName email annotatorStatus')
+    const recentApplications = await ProjectApplication.find({
+      projectId: project._id,
+    })
+      .populate("applicantId", "fullName email annotatorStatus")
       .sort({ appliedAt: -1 })
       .limit(5);
 
     // Get approved annotators (approved applications with detailed info)
     const approvedAnnotators = await ProjectApplication.find({
       projectId: project._id,
-      status: 'approved'
+      status: "approved",
     })
       .populate({
-        path: 'applicantId',
-        select: 'fullName email phone annotatorStatus microTaskerStatus personal_info professional_background payment_info attachments profilePicture createdAt'
+        path: "applicantId",
+        select:
+          "fullName email phone annotatorStatus microTaskerStatus personal_info professional_background payment_info attachments profilePicture createdAt",
       })
-      .populate('reviewedBy', 'fullName email')
+      .populate("reviewedBy", "fullName email")
       .sort({ reviewedAt: -1 });
 
     // Get rejected annotators (rejected applications with detailed info)
     const rejectedAnnotators = await ProjectApplication.find({
       projectId: project._id,
-      status: 'rejected'
+      status: "rejected",
     })
       .populate({
-        path: 'applicantId',
-        select: 'fullName email phone annotatorStatus microTaskerStatus personal_info professional_background attachments profilePicture createdAt'
+        path: "applicantId",
+        select:
+          "fullName email phone annotatorStatus microTaskerStatus personal_info professional_background attachments profilePicture createdAt",
       })
-      .populate('reviewedBy', 'fullName email')
+      .populate("reviewedBy", "fullName email")
       .sort({ reviewedAt: -1 });
 
     // Get pending annotators for completeness
     const pendingAnnotators = await ProjectApplication.find({
       projectId: project._id,
-      status: 'pending'
+      status: "pending",
     })
       .populate({
-        path: 'applicantId',
-        select: 'fullName email phone annotatorStatus microTaskerStatus personal_info professional_background attachments profilePicture createdAt'
+        path: "applicantId",
+        select:
+          "fullName email phone annotatorStatus microTaskerStatus personal_info professional_background attachments profilePicture createdAt",
       })
       .sort({ appliedAt: -1 });
 
     // Format annotators data with application details
     const formatAnnotatorData = (applications) => {
-      return applications.map(app => ({
+      return applications.map((app) => ({
         applicationId: app._id,
         applicationStatus: app.status,
         appliedAt: app.appliedAt,
@@ -297,52 +336,71 @@ const getAnnotationProjectDetails = async (req, res) => {
           personalInfo: {
             country: app.applicantId.personal_info?.country || null,
             timeZone: app.applicantId.personal_info?.time_zone || null,
-            availableHours: app.applicantId.personal_info?.available_hours_per_week || null,
-            languages: app.applicantId.personal_info?.languages || []
+            availableHours:
+              app.applicantId.personal_info?.available_hours_per_week || null,
+            languages: app.applicantId.personal_info?.languages || [],
           },
           professionalBackground: {
-            educationField: app.applicantId.professional_background?.education_field || null,
-            yearsOfExperience: app.applicantId.professional_background?.years_of_experience || null,
-            previousProjects: app.applicantId.professional_background?.previous_annotation_projects || [],
-            skills: app.applicantId.professional_background?.skills || []
+            educationField:
+              app.applicantId.professional_background?.education_field || null,
+            yearsOfExperience:
+              app.applicantId.professional_background?.years_of_experience ||
+              null,
+            previousProjects:
+              app.applicantId.professional_background
+                ?.previous_annotation_projects || [],
+            skills: app.applicantId.professional_background?.skills || [],
           },
           paymentInfo: {
-            hasPaymentInfo: !!(app.applicantId.payment_info?.account_name && app.applicantId.payment_info?.account_number),
+            hasPaymentInfo: !!(
+              app.applicantId.payment_info?.account_name &&
+              app.applicantId.payment_info?.account_number
+            ),
             accountName: app.applicantId.payment_info?.account_name || null,
-            bankName: app.applicantId.payment_info?.bank_name || null
+            bankName: app.applicantId.payment_info?.bank_name || null,
           },
           attachments: {
-            hasResume: !!(app.applicantId.attachments?.resume_url),
-            hasIdDocument: !!(app.applicantId.attachments?.id_document_url),
+            hasResume: !!app.applicantId.attachments?.resume_url,
+            hasIdDocument: !!app.applicantId.attachments?.id_document_url,
             resumeUrl: app.applicantId.attachments?.resume_url || null,
-            idDocumentUrl: app.applicantId.attachments?.id_document_url || null
-          }
-        }
+            idDocumentUrl: app.applicantId.attachments?.id_document_url || null,
+          },
+        },
       }));
     };
 
     // Calculate annotator statistics
     const annotatorStats = {
-      total: approvedAnnotators.length + rejectedAnnotators.length + pendingAnnotators.length,
+      total:
+        approvedAnnotators.length +
+        rejectedAnnotators.length +
+        pendingAnnotators.length,
       approved: approvedAnnotators.length,
       rejected: rejectedAnnotators.length,
       pending: pendingAnnotators.length,
-      approvalRate: (approvedAnnotators.length + rejectedAnnotators.length) > 0 ?
-        Math.round((approvedAnnotators.length / (approvedAnnotators.length + rejectedAnnotators.length)) * 100) : 0
+      approvalRate:
+        approvedAnnotators.length + rejectedAnnotators.length > 0
+          ? Math.round(
+              (approvedAnnotators.length /
+                (approvedAnnotators.length + rejectedAnnotators.length)) *
+                100,
+            )
+          : 0,
     };
 
     // Get annotator activity summary (recent reviews)
     const recentReviewActivity = await ProjectApplication.find({
       projectId: project._id,
-      status: { $in: ['approved', 'rejected'] },
-      reviewedAt: { $exists: true }
+      status: { $in: ["approved", "rejected"] },
+      reviewedAt: { $exists: true },
     })
-      .populate('applicantId', 'fullName email')
-      .populate('reviewedBy', 'fullName email')
+      .populate("applicantId", "fullName email")
+      .populate("reviewedBy", "fullName email")
       .sort({ reviewedAt: -1 })
       .limit(10)
-      .select('status reviewedAt reviewedBy applicantId reviewNotes rejectionReason');
-
+      .select(
+        "status reviewedAt reviewedBy applicantId reviewNotes rejectionReason",
+      );
 
     res.status(200).json({
       success: true,
@@ -358,18 +416,17 @@ const getAnnotationProjectDetails = async (req, res) => {
         annotators: {
           approved: formatAnnotatorData(approvedAnnotators),
           rejected: formatAnnotatorData(rejectedAnnotators),
-          pending: formatAnnotatorData(pendingAnnotators)
+          pending: formatAnnotatorData(pendingAnnotators),
         },
-        recentReviewActivity: recentReviewActivity
-      }
+        recentReviewActivity: recentReviewActivity,
+      },
     });
-
   } catch (error) {
     console.error("❌ Error fetching annotation project details:", error);
     res.status(500).json({
       success: false,
       message: "Server error fetching annotation project details",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -380,28 +437,32 @@ const updateAnnotationProject = async (req, res) => {
     const { projectId } = req.params;
 
     // Validate request body (allow partial updates)
-    const updateSchema = createProjectSchema.fork(Object.keys(createProjectSchema.describe().keys), (schema) => schema.optional());
+    const updateSchema = createProjectSchema.fork(
+      Object.keys(createProjectSchema.describe().keys),
+      (schema) => schema.optional(),
+    );
     const { error, value } = updateSchema.validate(req.body);
 
     if (error) {
       return res.status(400).json({
         success: false,
         message: "Validation error",
-        errors: error.details.map(detail => detail.message)
+        errors: error.details.map((detail) => detail.message),
       });
     }
 
     const project = await AnnotationProject.findByIdAndUpdate(
       projectId,
       { ...value, updatedAt: new Date() },
-      { new: true }
-    ).populate('createdBy', 'fullName email')
-      .populate('assignedAdmins', 'fullName email');
+      { new: true },
+    )
+      .populate("createdBy", "fullName email")
+      .populate("assignedAdmins", "fullName email");
 
     if (!project) {
       return res.status(404).json({
         success: false,
-        message: "Annotation project not found"
+        message: "Annotation project not found",
       });
     }
 
@@ -409,16 +470,15 @@ const updateAnnotationProject = async (req, res) => {
       success: true,
       message: "Annotation project updated successfully",
       data: {
-        project: project
-      }
+        project: project,
+      },
     });
-
   } catch (error) {
     console.error("❌ Error updating annotation project:", error);
     res.status(500).json({
       success: false,
       message: "Server error updating annotation project",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -432,18 +492,18 @@ const toggleProjectStatus = async (req, res) => {
     if (!project) {
       return res.status(404).json({
         success: false,
-        message: "Annotation project not found"
+        message: "Annotation project not found",
       });
     }
 
     // Toggle the isActive status
     project.isActive = !project.isActive;
-    project.status = project.isActive ? 'active' : 'inactive';
+    project.status = project.isActive ? "active" : "inactive";
     await project.save();
 
     res.status(200).json({
       success: true,
-      message: `Project ${project.isActive ? 'activated' : 'deactivated'} successfully`,
+      message: `Project ${project.isActive ? "activated" : "deactivated"} successfully`,
       data: {
         project: {
           _id: project._id,
@@ -451,16 +511,15 @@ const toggleProjectStatus = async (req, res) => {
           isActive: project.isActive,
           status: project.status,
           openCloseStatus: project.openCloseStatus,
-        }
-      }
+        },
+      },
     });
-
   } catch (error) {
     console.error("❌ Error toggling project active status:", error);
     res.status(500).json({
       success: false,
       message: "Server error toggling project active status",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -474,35 +533,35 @@ const toggleProjectVisibility = async (req, res) => {
     if (!project) {
       return res.status(404).json({
         success: false,
-        message: "Annotation project not found"
+        message: "Annotation project not found",
       });
     }
 
     // Toggle the openCloseStatus
-    project.openCloseStatus = project.openCloseStatus === "open" ? 'close' : 'open';
+    project.openCloseStatus =
+      project.openCloseStatus === "open" ? "close" : "open";
 
     await project.save();
 
     res.status(200).json({
       success: true,
-      message: `Project ${project.openCloseStatus === "open" ? 'opened' : 'closed'} successfully`,
+      message: `Project ${project.openCloseStatus === "open" ? "opened" : "closed"} successfully`,
       data: {
         project: {
-            _id: project._id,
+          _id: project._id,
           projectName: project.projectName,
           isActive: project.isActive,
           status: project.status,
           openCloseStatus: project.openCloseStatus,
-        }
-      }
+        },
+      },
     });
-
   } catch (error) {
     console.error("❌ Error toggling project active status:", error);
     res.status(500).json({
       success: false,
       message: "Server error toggling project active status",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -516,14 +575,14 @@ const deleteAnnotationProject = async (req, res) => {
     if (!project) {
       return res.status(404).json({
         success: false,
-        message: "Annotation project not found"
+        message: "Annotation project not found",
       });
     }
 
     // Check if project has active applications
     const activeApplications = await ProjectApplication.countDocuments({
       projectId: projectId,
-      status: { $in: ['pending', 'approved'] }
+      status: { $in: ["pending", "approved"] },
     });
 
     if (activeApplications > 0) {
@@ -534,8 +593,8 @@ const deleteAnnotationProject = async (req, res) => {
           activeApplications: activeApplications,
           requiresOTP: true,
           projectName: project.projectName,
-          projectId: projectId
-        }
+          projectId: projectId,
+        },
       });
     }
 
@@ -545,15 +604,14 @@ const deleteAnnotationProject = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: "Annotation project deleted successfully"
+      message: "Annotation project deleted successfully",
     });
-
   } catch (error) {
     console.error("❌ Error deleting annotation project:", error);
     res.status(500).json({
       success: false,
       message: "Server error deleting annotation project",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -567,17 +625,19 @@ const requestProjectDeletionOTP = async (req, res) => {
     if (!project) {
       return res.status(404).json({
         success: false,
-        message: "Annotation project not found"
+        message: "Annotation project not found",
       });
     }
 
     // Check if project has active applications
     const activeApplications = await ProjectApplication.countDocuments({
       projectId: projectId,
-      status: { $in: ['pending', 'approved'] }
+      status: { $in: ["pending", "approved"] },
     });
 
-    const allApplications = await ProjectApplication.countDocuments({ projectId: projectId });
+    const allApplications = await ProjectApplication.countDocuments({
+      projectId: projectId,
+    });
 
     // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -589,16 +649,16 @@ const requestProjectDeletionOTP = async (req, res) => {
       expiresAt: otpExpiry,
       requestedBy: req.admin.userId,
       requestedAt: new Date(),
-      verified: false
+      verified: false,
     };
 
     await project.save();
 
     // Send OTP to Projects Officer email
-    const projectsOfficerEmail = 'projects@mydeeptech.ng';
+    const projectsOfficerEmail = "projects@mydeeptech.ng";
 
     try {
-      const { sendProjectDeletionOTP } = require('../utils/projectMailer');
+      const { sendProjectDeletionOTP } = require("../utils/projectMailer");
 
       const deletionData = {
         projectName: project.projectName,
@@ -610,7 +670,7 @@ const requestProjectDeletionOTP = async (req, res) => {
         totalApplications: allApplications,
         otp: otp,
         expiryTime: otpExpiry.toLocaleString(),
-        reason: req.body.reason || 'Administrative deletion'
+        reason: req.body.reason || "Administrative deletion",
       };
 
       await sendProjectDeletionOTP(projectsOfficerEmail, deletionData);
@@ -626,10 +686,9 @@ const requestProjectDeletionOTP = async (req, res) => {
           otpSentTo: projectsOfficerEmail,
           expiresAt: otpExpiry,
           requestedBy: req.admin.email,
-          otpExpiryMinutes: 15
-        }
+          otpExpiryMinutes: 15,
+        },
       });
-
     } catch (emailError) {
       console.error(`❌ Failed to send deletion OTP:`, emailError.message);
 
@@ -640,16 +699,15 @@ const requestProjectDeletionOTP = async (req, res) => {
       return res.status(500).json({
         success: false,
         message: "Failed to send deletion OTP to Projects Officer",
-        error: emailError.message
+        error: emailError.message,
       });
     }
-
   } catch (error) {
     console.error("❌ Error requesting deletion OTP:", error);
     res.status(500).json({
       success: false,
       message: "Server error requesting deletion OTP",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -664,7 +722,7 @@ const verifyOTPAndDeleteProject = async (req, res) => {
     if (!otp) {
       return res.status(400).json({
         success: false,
-        message: "OTP code is required"
+        message: "OTP code is required",
       });
     }
 
@@ -672,7 +730,7 @@ const verifyOTPAndDeleteProject = async (req, res) => {
     if (!project) {
       return res.status(404).json({
         success: false,
-        message: "Annotation project not found"
+        message: "Annotation project not found",
       });
     }
 
@@ -680,7 +738,7 @@ const verifyOTPAndDeleteProject = async (req, res) => {
     if (!project.deletionOTP || !project.deletionOTP.code) {
       return res.status(400).json({
         success: false,
-        message: "No deletion OTP found. Please request a new OTP first."
+        message: "No deletion OTP found. Please request a new OTP first.",
       });
     }
 
@@ -692,7 +750,7 @@ const verifyOTPAndDeleteProject = async (req, res) => {
 
       return res.status(400).json({
         success: false,
-        message: "OTP has expired. Please request a new OTP."
+        message: "OTP has expired. Please request a new OTP.",
       });
     }
 
@@ -700,7 +758,7 @@ const verifyOTPAndDeleteProject = async (req, res) => {
     if (project.deletionOTP.code !== otp.toString()) {
       return res.status(400).json({
         success: false,
-        message: "Invalid OTP code. Please check and try again."
+        message: "Invalid OTP code. Please check and try again.",
       });
     }
 
@@ -708,19 +766,21 @@ const verifyOTPAndDeleteProject = async (req, res) => {
     if (project.deletionOTP.verified) {
       return res.status(400).json({
         success: false,
-        message: "OTP has already been used. Please request a new OTP."
+        message: "OTP has already been used. Please request a new OTP.",
       });
     }
 
     // Get application data before deletion for logging
     const activeApplications = await ProjectApplication.countDocuments({
       projectId: projectId,
-      status: { $in: ['pending', 'approved'] }
+      status: { $in: ["pending", "approved"] },
     });
 
-    const allApplications = await ProjectApplication.find({ projectId: projectId })
-      .populate('applicantId', 'fullName email')
-      .select('status applicantId appliedAt');
+    const allApplications = await ProjectApplication.find({
+      projectId: projectId,
+    })
+      .populate("applicantId", "fullName email")
+      .select("status applicantId appliedAt");
 
     // Mark OTP as verified
     project.deletionOTP.verified = true;
@@ -734,7 +794,9 @@ const verifyOTPAndDeleteProject = async (req, res) => {
 
     // Send notification to Projects Officer about successful deletion
     try {
-      const { sendProjectDeletionConfirmation } = require('../utils/projectMailer');
+      const {
+        sendProjectDeletionConfirmation,
+      } = require("../utils/projectMailer");
 
       const confirmationData = {
         projectName: project.projectName,
@@ -744,19 +806,25 @@ const verifyOTPAndDeleteProject = async (req, res) => {
         deletedAt: new Date(),
         applicationsDeleted: allApplications.length,
         activeApplicationsDeleted: activeApplications,
-        confirmationMessage: confirmationMessage || 'Project deleted with all applications',
-        deletedApplications: allApplications.map(app => ({
-          applicantName: app.applicantId?.fullName || 'Unknown',
-          applicantEmail: app.applicantId?.email || 'Unknown',
+        confirmationMessage:
+          confirmationMessage || "Project deleted with all applications",
+        deletedApplications: allApplications.map((app) => ({
+          applicantName: app.applicantId?.fullName || "Unknown",
+          applicantEmail: app.applicantId?.email || "Unknown",
           status: app.status,
-          appliedAt: app.appliedAt
-        }))
+          appliedAt: app.appliedAt,
+        })),
       };
 
-      await sendProjectDeletionConfirmation('projects@mydeeptech.ng', confirmationData);
-
+      await sendProjectDeletionConfirmation(
+        "projects@mydeeptech.ng",
+        confirmationData,
+      );
     } catch (emailError) {
-      console.warn(`⚠️ Failed to send deletion confirmation:`, emailError.message);
+      console.warn(
+        `⚠️ Failed to send deletion confirmation:`,
+        emailError.message,
+      );
     }
 
     res.status(200).json({
@@ -766,30 +834,29 @@ const verifyOTPAndDeleteProject = async (req, res) => {
         deletedProject: {
           id: projectId,
           name: project.projectName,
-          category: project.projectCategory
+          category: project.projectCategory,
         },
         deletedApplications: {
           total: allApplications.length,
           active: activeApplications,
-          applications: allApplications.map(app => ({
-            applicantName: app.applicantId?.fullName || 'Unknown',
+          applications: allApplications.map((app) => ({
+            applicantName: app.applicantId?.fullName || "Unknown",
             status: app.status,
-            appliedAt: app.appliedAt
-          }))
+            appliedAt: app.appliedAt,
+          })),
         },
         deletedBy: req.admin.email,
         deletedAt: new Date(),
         otpVerified: true,
-        confirmationSent: true
-      }
+        confirmationSent: true,
+      },
     });
-
   } catch (error) {
     console.error("❌ Error verifying OTP and deleting project:", error);
     res.status(500).json({
       success: false,
       message: "Server error verifying OTP and deleting project",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -811,15 +878,15 @@ const getAnnotationProjectApplications = async (req, res) => {
     // Get applications with populated data
     const applications = await ProjectApplication.find(filter)
       .populate({
-        path: 'projectId',
-        select: 'projectName projectCategory payRate status createdBy',
+        path: "projectId",
+        select: "projectName projectCategory payRate status createdBy",
         populate: {
-          path: 'createdBy',
-          select: 'fullName email'
-        }
+          path: "createdBy",
+          select: "fullName email",
+        },
       })
-      .populate('applicantId', 'fullName email phone annotatorStatus')
-      .populate('reviewedBy', 'fullName email')
+      .populate("applicantId", "fullName email phone annotatorStatus")
+      .populate("reviewedBy", "fullName email")
       .sort({ appliedAt: -1 })
       .skip(skip)
       .limit(limit)
@@ -831,7 +898,7 @@ const getAnnotationProjectApplications = async (req, res) => {
     // Get applications summary
     const statusSummary = await ProjectApplication.aggregate([
       { $match: filter },
-      { $group: { _id: '$status', count: { $sum: 1 } } }
+      { $group: { _id: "$status", count: { $sum: 1 } } },
     ]);
 
     // Calculate pagination info
@@ -848,7 +915,7 @@ const getAnnotationProjectApplications = async (req, res) => {
           totalApplications: totalApplications,
           hasNextPage: page < totalPages,
           hasPrevPage: page > 1,
-          limit: limit
+          limit: limit,
         },
         summary: {
           totalApplications: totalApplications,
@@ -856,17 +923,16 @@ const getAnnotationProjectApplications = async (req, res) => {
             acc[item._id] = item.count;
             return acc;
           }, {}),
-          filters: filter
-        }
-      }
+          filters: filter,
+        },
+      },
     });
-
   } catch (error) {
     console.error("❌ Error fetching annotation project applications:", error);
     res.status(500).json({
       success: false,
       message: "Server error fetching applications",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -880,72 +946,80 @@ const approveAnnotationProjectApplication = async (req, res) => {
     // Find and update application
     const application = await ProjectApplication.findById(applicationId)
       .populate({
-        path: 'projectId',
-        select: 'projectName projectCategory payRate approvedAnnotators maxAnnotators'
+        path: "projectId",
+        select:
+          "projectName projectCategory payRate approvedAnnotators maxAnnotators",
       })
-      .populate('applicantId', 'fullName email');
+      .populate("applicantId", "fullName email");
 
     if (!application) {
       return res.status(404).json({
         success: false,
-        message: "Application not found"
+        message: "Application not found",
       });
     }
 
-    if (application.status !== 'pending') {
+    if (application.status !== "pending") {
       return res.status(400).json({
         success: false,
-        message: `Application is already ${application.status}`
+        message: `Application is already ${application.status}`,
       });
     }
 
     // Check if project is full
     const project = application.projectId;
-    if (project.maxAnnotators && project.approvedAnnotators >= project.maxAnnotators) {
+    if (
+      project.maxAnnotators &&
+      project.approvedAnnotators >= project.maxAnnotators
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Project has reached maximum number of annotators"
+        message: "Project has reached maximum number of annotators",
       });
     }
 
     // Update application status
-    application.status = 'approved';
+    application.status = "approved";
     application.reviewedBy = req.admin.userId;
     application.reviewedAt = new Date();
-    application.reviewNotes = reviewNotes || '';
+    application.reviewNotes = reviewNotes || "";
     application.workStartedAt = new Date();
 
     await application.save();
 
     // Update project approved annotators count
     await AnnotationProject.findByIdAndUpdate(project._id, {
-      $inc: { approvedAnnotators: 1 }
+      $inc: { approvedAnnotators: 1 },
     });
 
     // Send approval email to applicant
     try {
-      const { sendProjectApprovalNotification } = require('../utils/projectMailer');
+      const {
+        sendProjectApprovalNotification,
+      } = require("../utils/projectMailer");
 
       const projectData = {
         projectName: project.projectName,
         projectCategory: project.projectCategory,
         payRate: project.payRate,
         adminName: req.admin.fullName,
-        reviewNotes: reviewNotes || '',
+        reviewNotes: reviewNotes || "",
         projectGuidelineLink: project.projectGuidelineLink,
         projectGuidelineVideo: project.projectGuidelineVideo,
         projectCommunityLink: project.projectCommunityLink,
-        projectTrackerLink: project.projectTrackerLink
+        projectTrackerLink: project.projectTrackerLink,
       };
 
       await sendProjectApprovalNotification(
         application.applicantId.email,
         application.applicantId.fullName,
-        projectData
+        projectData,
       );
-
     } catch (emailError) {
-      console.error(`⚠️ Failed to send approval notification:`, emailError.message);
+      console.error(
+        `⚠️ Failed to send approval notification:`,
+        emailError.message,
+      );
     }
 
     res.status(200).json({
@@ -955,16 +1029,15 @@ const approveAnnotationProjectApplication = async (req, res) => {
         application: application,
         projectName: project.projectName,
         applicantName: application.applicantId.fullName,
-        emailNotificationSent: true
-      }
+        emailNotificationSent: true,
+      },
     });
-
   } catch (error) {
     console.error("❌ Error approving application:", error);
     res.status(500).json({
       success: false,
       message: "Server error approving application",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -978,72 +1051,79 @@ const rejectAnnotationProjectApplication = async (req, res) => {
     // Find and update application
     const application = await ProjectApplication.findById(applicationId)
       .populate({
-        path: 'projectId',
-        select: 'projectName projectCategory'
+        path: "projectId",
+        select: "projectName projectCategory",
       })
-      .populate('applicantId', 'fullName email');
+      .populate("applicantId", "fullName email");
 
     if (!application) {
       return res.status(404).json({
         success: false,
-        message: "Application not found"
+        message: "Application not found",
       });
     }
 
-    if (application.status !== 'pending') {
+    if (application.status !== "pending") {
       return res.status(400).json({
         success: false,
-        message: `Application is already ${application.status}`
+        message: `Application is already ${application.status}`,
       });
     }
 
     // Update application status
-    application.status = 'rejected';
+    application.status = "rejected";
     application.reviewedBy = req.admin.userId;
     application.reviewedAt = new Date();
-    application.rejectionReason = rejectionReason || 'other';
-    application.reviewNotes = reviewNotes || '';
+    application.rejectionReason = rejectionReason || "other";
+    application.reviewNotes = reviewNotes || "";
 
     await application.save();
 
     // Send rejection email to applicant
     try {
-      const { sendProjectRejectionNotification } = require('../utils/projectMailer');
+      const {
+        sendProjectRejectionNotification,
+      } = require("../utils/projectMailer");
 
       const projectData = {
         projectName: application.projectId.projectName,
         projectCategory: application.projectId.projectCategory,
         adminName: req.admin.fullName,
-        rejectionReason: rejectionReason || 'other',
-        reviewNotes: reviewNotes || ''
+        rejectionReason: rejectionReason || "other",
+        reviewNotes: reviewNotes || "",
       };
 
       await sendProjectRejectionNotification(
         application.applicantId.email,
         application.applicantId.fullName,
-        projectData
+        projectData,
       );
-
     } catch (emailError) {
-      console.error(`⚠️ Failed to send rejection notification:`, emailError.message);
+      console.error(
+        `⚠️ Failed to send rejection notification:`,
+        emailError.message,
+      );
     }
 
     // Create in-app notification for the rejected applicant
     try {
       await NotificationService.createApplicationStatusNotification(
         application.applicantId._id,
-        'rejected',
+        "rejected",
         {
           _id: application.projectId._id,
           projectName: application.projectId.projectName,
-          projectCategory: application.projectId.projectCategory
+          projectCategory: application.projectId.projectCategory,
         },
         {
-          _id: application._id
-        }
+          _id: application._id,
+        },
       );
     } catch (notificationError) {
-      console.error(`⚠️ Failed to create rejection notification:`, notificationError.message);
+      console.error(
+        `⚠️ Failed to create rejection notification:`,
+        notificationError.message,
+      );
     }
 
     res.status(200).json({
@@ -1053,16 +1133,15 @@ const rejectAnnotationProjectApplication = async (req, res) => {
         application: application,
         projectName: application.projectId.projectName,
         applicantName: application.applicantId.fullName,
-        emailNotificationSent: true
-      }
+        emailNotificationSent: true,
+      },
     });
-
   } catch (error) {
     console.error("❌ Error rejecting application:", error);
     res.status(500).json({
       success: false,
       message: "Server error rejecting application",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -1079,30 +1158,30 @@ const removeApprovedApplicant = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Validation error",
-        errors: error.details.map(detail => detail.message)
+        errors: error.details.map((detail) => detail.message),
       });
     }
 
     // Find the application
     const application = await ProjectApplication.findById(applicationId)
       .populate({
-        path: 'projectId',
-        select: 'projectName projectCategory approvedAnnotators'
+        path: "projectId",
+        select: "projectName projectCategory approvedAnnotators",
       })
-      .populate('applicantId', 'fullName email phone');
+      .populate("applicantId", "fullName email phone");
 
     if (!application) {
       return res.status(404).json({
         success: false,
-        message: "Application not found"
+        message: "Application not found",
       });
     }
 
     // Check if application is approved
-    if (application.status !== 'approved') {
+    if (application.status !== "approved") {
       return res.status(400).json({
         success: false,
-        message: `Cannot remove applicant. Application status is "${application.status}". Only approved applicants can be removed.`
+        message: `Cannot remove applicant. Application status is "${application.status}". Only approved applicants can be removed.`,
       });
     }
 
@@ -1114,28 +1193,29 @@ const removeApprovedApplicant = async (req, res) => {
       projectId: application.projectId._id,
       applicationId: application._id,
       approvedAt: application.reviewedAt,
-      workStartedAt: application.workStartedAt
+      workStartedAt: application.workStartedAt,
     };
 
     // Update application status to 'removed' with removal details
-    application.status = 'removed';
+    application.status = "removed";
     application.removedAt = new Date();
     application.removedBy = req.admin.userId;
-    application.removalReason = removalReason || 'admin_decision';
-    application.removalNotes = removalNotes || '';
+    application.removalReason = removalReason || "admin_decision";
+    application.removalNotes = removalNotes || "";
     application.workEndedAt = new Date(); // Mark end of work period
 
     await application.save();
 
     // Update project's approved annotator count
-    await AnnotationProject.findByIdAndUpdate(
-      application.projectId._id,
-      { $inc: { approvedAnnotators: -1 } }
-    );
+    await AnnotationProject.findByIdAndUpdate(application.projectId._id, {
+      $inc: { approvedAnnotators: -1 },
+    });
 
     // Send notification email to the removed applicant
     try {
-      const { sendApplicantRemovalNotification } = require('../utils/projectMailer');
+      const {
+        sendApplicantRemovalNotification,
+      } = require("../utils/projectMailer");
       await sendApplicantRemovalNotification(
         originalData.applicantEmail,
         originalData.applicantName,
@@ -1147,35 +1227,43 @@ const removeApprovedApplicant = async (req, res) => {
           removedAt: application.removedAt,
           workPeriod: {
             startedAt: originalData.workStartedAt,
-            endedAt: application.workEndedAt
-          }
-        }
+            endedAt: application.workEndedAt,
+          },
+        },
       );
     } catch (emailError) {
-      console.error('❌ Failed to send removal notification email:', emailError);
+      console.error(
+        "❌ Failed to send removal notification email:",
+        emailError,
+      );
       // Don't fail the request if email fails
     }
 
     // Send notification to project owner/admin
     try {
-      const { sendProjectAnnotatorRemovedNotification } = require('../utils/projectMailer');
+      const {
+        sendProjectAnnotatorRemovedNotification,
+      } = require("../utils/projectMailer");
       await sendProjectAnnotatorRemovedNotification(
         req.admin.email,
-        req.admin.fullName || 'Administrator',
+        req.admin.fullName || "Administrator",
         {
           projectName: originalData.projectName,
           projectId: originalData.projectId,
           removedApplicant: {
             name: originalData.applicantName,
-            email: originalData.applicantEmail
+            email: originalData.applicantEmail,
           },
           removalReason: application.removalReason,
           removedAt: application.removedAt,
-          workDuration: application.workEndedAt - originalData.workStartedAt
-        }
+          workDuration: application.workEndedAt - originalData.workStartedAt,
+        },
       );
     } catch (emailError) {
-      console.error('❌ Failed to send project notification email:', emailError);
+      console.error(
+        "❌ Failed to send project notification email:",
+        emailError,
+      );
     }
 
     // Prepare response with detailed information
@@ -1186,35 +1274,34 @@ const removeApprovedApplicant = async (req, res) => {
         applicationId: application._id,
         applicant: {
           name: originalData.applicantName,
-          email: originalData.applicantEmail
+          email: originalData.applicantEmail,
         },
         project: {
           id: originalData.projectId,
-          name: originalData.projectName
+          name: originalData.projectName,
         },
         removal: {
           removedAt: application.removedAt,
           removedBy: req.admin.email,
-          reason: application.removalReason
+          reason: application.removalReason,
         },
         workPeriod: {
           startedAt: originalData.workStartedAt,
           endedAt: application.workEndedAt,
-          duration: application.workEndedAt - originalData.workStartedAt
+          duration: application.workEndedAt - originalData.workStartedAt,
         },
-        previousStatus: 'approved',
-        newStatus: 'removed'
-      }
+        previousStatus: "approved",
+        newStatus: "removed",
+      },
     };
 
     res.status(200).json(response);
-
   } catch (error) {
-    console.error('❌ Error removing approved applicant:', error);
+    console.error("❌ Error removing approved applicant:", error);
     res.status(500).json({
       success: false,
       message: "Server error removing approved applicant",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -1229,35 +1316,37 @@ const getRemovableApplicants = async (req, res) => {
     if (!project) {
       return res.status(404).json({
         success: false,
-        message: "Project not found"
+        message: "Project not found",
       });
     }
 
     // Find all approved applications for this project
     const approvedApplications = await ProjectApplication.find({
       projectId: projectId,
-      status: 'approved'
+      status: "approved",
     })
-      .populate('applicantId', 'fullName email phone')
+      .populate("applicantId", "fullName email phone")
       .sort({ reviewedAt: -1 });
 
     // Format the data for easy removal management
-    const removableApplicants = approvedApplications.map(app => ({
+    const removableApplicants = approvedApplications.map((app) => ({
       applicationId: app._id,
       applicant: {
         id: app.applicantId._id,
         name: app.applicantId.fullName,
         email: app.applicantId.email,
-        phone: app.applicantId.phone
+        phone: app.applicantId.phone,
       },
       applicationDetails: {
         appliedAt: app.appliedAt,
         approvedAt: app.reviewedAt,
         workStartedAt: app.workStartedAt,
         reviewedBy: app.reviewedBy,
-        reviewNotes: app.reviewNotes
+        reviewNotes: app.reviewNotes,
       },
-      workDuration: app.workStartedAt ? Date.now() - app.workStartedAt.getTime() : 0
+      workDuration: app.workStartedAt
+        ? Date.now() - app.workStartedAt.getTime()
+        : 0,
     }));
 
     res.status(200).json({
@@ -1268,23 +1357,22 @@ const getRemovableApplicants = async (req, res) => {
           id: project._id,
           name: project.projectName,
           totalApprovedAnnotators: project.approvedAnnotators || 0,
-          maxAnnotators: project.maxAnnotators
+          maxAnnotators: project.maxAnnotators,
         },
         removableApplicants: removableApplicants,
         summary: {
           totalRemovableApplicants: removableApplicants.length,
           canRemoveAll: true, // Admins can remove any approved applicant
-          projectStatus: project.status
-        }
-      }
+          projectStatus: project.status,
+        },
+      },
     });
-
   } catch (error) {
-    console.error('❌ Error fetching removable applicants:', error);
+    console.error("❌ Error fetching removable applicants:", error);
     res.status(500).json({
       success: false,
       message: "Server error fetching removable applicants",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -1299,71 +1387,70 @@ const exportApprovedAnnotatorsCSV = async (req, res) => {
     if (!project) {
       return res.status(404).json({
         success: false,
-        message: "Project not found"
+        message: "Project not found",
       });
     }
 
     // Get all approved applications for this project
     const approvedApplications = await ProjectApplication.find({
       projectId: projectId,
-      status: 'approved'
+      status: "approved",
     })
       .populate({
-        path: 'applicantId',
-        select: 'fullName email phone personal_info'
+        path: "applicantId",
+        select: "fullName email phone personal_info",
       })
       .sort({ reviewedAt: -1 });
 
     if (approvedApplications.length === 0) {
       return res.status(404).json({
         success: false,
-        message: "No approved annotators found for this project"
+        message: "No approved annotators found for this project",
       });
     }
 
     // Prepare CSV data
-    const csvHeaders = ['Full Name', 'Country', 'Email'];
-    const csvRows = [csvHeaders.join(',')];
+    const csvHeaders = ["Full Name", "Country", "Email"];
+    const csvRows = [csvHeaders.join(",")];
 
     // Process each approved application
-    approvedApplications.forEach(app => {
+    approvedApplications.forEach((app) => {
       const applicant = app.applicantId;
       const personalInfo = applicant.personal_info || {};
 
       const row = [
-        `"${applicant.fullName || 'N/A'}"`,
-        `"${personalInfo.country || 'N/A'}"`,
-        `"${applicant.email || 'N/A'}"`
+        `"${applicant.fullName || "N/A"}"`,
+        `"${personalInfo.country || "N/A"}"`,
+        `"${applicant.email || "N/A"}"`,
       ];
 
-      csvRows.push(row.join(','));
+      csvRows.push(row.join(","));
     });
 
     // Generate CSV content
-    const csvContent = csvRows.join('\n');
+    const csvContent = csvRows.join("\n");
 
     // Create filename with project name and timestamp
-    const timestamp = new Date().toISOString().split('T')[0];
+    const timestamp = new Date().toISOString().split("T")[0];
     const sanitizedProjectName = project.projectName
-      .replace(/[^a-zA-Z0-9\s]/g, '')
-      .replace(/\s+/g, '_')
+      .replace(/[^a-zA-Z0-9\s]/g, "")
+      .replace(/\s+/g, "_")
       .toLowerCase();
     const filename = `${sanitizedProjectName}_approved_annotators_${timestamp}.csv`;
 
     // Set response headers for CSV download
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
 
     // Send CSV content
     res.status(200).send(csvContent);
-
   } catch (error) {
-    console.error('❌ Error exporting approved annotators:', error);
+    console.error("❌ Error exporting approved annotators:", error);
     res.status(500).json({
       success: false,
       message: "Server error exporting annotators",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -1374,13 +1461,17 @@ const exportApprovedAnnotatorsCSV = async (req, res) => {
 const attachAssessmentToProject = async (req, res) => {
   try {
     const { projectId } = req.params;
-    const { assessmentId, isRequired = true, assessmentInstructions = '' } = req.body;
+    const {
+      assessmentId,
+      isRequired = true,
+      assessmentInstructions = "",
+    } = req.body;
 
     // Validate inputs
     if (!assessmentId) {
       return res.status(400).json({
         success: false,
-        message: "Assessment ID is required"
+        message: "Assessment ID is required",
       });
     }
 
@@ -1389,17 +1480,18 @@ const attachAssessmentToProject = async (req, res) => {
     if (!project) {
       return res.status(404).json({
         success: false,
-        message: "Project not found"
+        message: "Project not found",
       });
     }
 
     // Check if assessment configuration exists
-    const MultimediaAssessmentConfig = require('../models/multimediaAssessmentConfig.model');
-    const assessmentConfig = await MultimediaAssessmentConfig.findById(assessmentId);
+    const MultimediaAssessmentConfig = require("../models/multimediaAssessmentConfig.model");
+    const assessmentConfig =
+      await MultimediaAssessmentConfig.findById(assessmentId);
     if (!assessmentConfig) {
       return res.status(404).json({
         success: false,
-        message: "Assessment configuration not found"
+        message: "Assessment configuration not found",
       });
     }
 
@@ -1411,13 +1503,16 @@ const attachAssessmentToProject = async (req, res) => {
       assessmentId,
       assessmentInstructions,
       attachedAt: new Date(),
-      attachedBy: adminId
+      attachedBy: adminId,
     };
 
     await project.save();
 
     // Populate the assessment config for response
-    await project.populate('assessment.assessmentId', 'title description numberOfTasks estimatedDuration');
+    await project.populate(
+      "assessment.assessmentId",
+      "title description numberOfTasks estimatedDuration",
+    );
 
     res.json({
       success: true,
@@ -1426,16 +1521,16 @@ const attachAssessmentToProject = async (req, res) => {
         project: {
           id: project._id,
           name: project.projectName,
-          assessment: project.assessment
-        }
-      }
+          assessment: project.assessment,
+        },
+      },
     });
   } catch (error) {
-    console.error('Error attaching assessment to project:', error);
+    console.error("Error attaching assessment to project:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to attach assessment to project',
-      error: error.message
+      message: "Failed to attach assessment to project",
+      error: error.message,
     });
   }
 };
@@ -1452,7 +1547,7 @@ const removeAssessmentFromProject = async (req, res) => {
     if (!project) {
       return res.status(404).json({
         success: false,
-        message: "Project not found"
+        message: "Project not found",
       });
     }
 
@@ -1462,9 +1557,9 @@ const removeAssessmentFromProject = async (req, res) => {
     project.assessment = {
       isRequired: false,
       assessmentId: null,
-      assessmentInstructions: '',
+      assessmentInstructions: "",
       attachedAt: null,
-      attachedBy: null
+      attachedBy: null,
     };
 
     await project.save();
@@ -1476,16 +1571,16 @@ const removeAssessmentFromProject = async (req, res) => {
         project: {
           id: project._id,
           name: project.projectName,
-          hadAssessment: wasRequired
-        }
-      }
+          hadAssessment: wasRequired,
+        },
+      },
     });
   } catch (error) {
-    console.error('Error removing assessment from project:', error);
+    console.error("Error removing assessment from project:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to remove assessment from project',
-      error: error.message
+      message: "Failed to remove assessment from project",
+      error: error.message,
     });
   }
 };
@@ -1495,14 +1590,16 @@ const removeAssessmentFromProject = async (req, res) => {
  */
 const getAvailableAssessments = async (req, res) => {
   try {
-    const MultimediaAssessmentConfig = require('../models/multimediaAssessmentConfig.model');
+    const MultimediaAssessmentConfig = require("../models/multimediaAssessmentConfig.model");
 
-    const assessments = await MultimediaAssessmentConfig.find({ isActive: true })
-      .populate('projectId', 'projectName')
+    const assessments = await MultimediaAssessmentConfig.find({
+      isActive: true,
+    })
+      .populate("projectId", "projectName")
       .sort({ createdAt: -1 })
       .lean();
 
-    const formattedAssessments = assessments.map(assessment => ({
+    const formattedAssessments = assessments.map((assessment) => ({
       id: assessment._id,
       title: assessment.title,
       description: assessment.description,
@@ -1513,23 +1610,29 @@ const getAvailableAssessments = async (req, res) => {
       createdAt: assessment.createdAt,
       // Usage statistics
       usageCount: assessment.statistics?.totalSubmissions || 0,
-      approvalRate: assessment.statistics?.totalSubmissions > 0 ?
-        (assessment.statistics.approvedSubmissions / assessment.statistics.totalSubmissions * 100).toFixed(1) : 0
+      approvalRate:
+        assessment.statistics?.totalSubmissions > 0
+          ? (
+              (assessment.statistics.approvedSubmissions /
+                assessment.statistics.totalSubmissions) *
+              100
+            ).toFixed(1)
+          : 0,
     }));
 
     res.json({
       success: true,
       message: `Found ${formattedAssessments.length} available assessments`,
       data: {
-        assessments: formattedAssessments
-      }
+        assessments: formattedAssessments,
+      },
     });
   } catch (error) {
-    console.error('Error fetching available assessments:', error);
+    console.error("Error fetching available assessments:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch available assessments',
-      error: error.message
+      message: "Failed to fetch available assessments",
+      error: error.message,
     });
   }
 };
@@ -1538,29 +1641,29 @@ const getApprovedApplicants = async (req, res) => {
     const { projectId } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(projectId)) {
-      throw new ValidationError('Invalid project ID');
+      throw new ValidationError("Invalid project ID");
     }
 
     const project = await AnnotationProject.findById(projectId);
-    if (!project) throw new NotFoundError('Project not found');
+    if (!project) throw new NotFoundError("Project not found");
 
     const approvedApplications = await ProjectApplication.find({
       projectId,
-      status: 'approved'
+      status: "approved",
     })
-      .populate('applicantId', 'fullName email phone')
+      .populate("applicantId", "fullName email phone")
       .sort({ reviewedAt: -1 });
 
     return res.json({
       success: true,
       total: approvedApplications.length,
-      data: approvedApplications
+      data: approvedApplications,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: 'Failed to get approved applicants',
-      error: error.message
+      message: "Failed to get approved applicants",
+      error: error.message,
     });
   }
 };
@@ -1571,43 +1674,54 @@ const rejectApplicationsBulk = async (req, res) => {
   session.startTransaction();
 
   try {
-    const { applicationIds, admin, rejectionReason = 'other', reviewNotes = '' } = req.body;
+    const {
+      applicationIds,
+      admin,
+      rejectionReason = "other",
+      reviewNotes = "",
+    } = req.body;
 
-    if (!admin || !admin.userId) throw new ValidationError('Admin information is required');
+    if (!admin || !admin.userId)
+      throw new ValidationError("Admin information is required");
 
     if (!Array.isArray(applicationIds) || applicationIds.length === 0) {
-      throw new ValidationError('No application IDs provided');
+      throw new ValidationError("No application IDs provided");
     }
 
-    const validIds = applicationIds.filter(id => mongoose.Types.ObjectId.isValid(id));
-    if (!validIds.length) throw new ValidationError('No valid application IDs provided');
+    const validIds = applicationIds.filter((id) =>
+      mongoose.Types.ObjectId.isValid(id),
+    );
+    if (!validIds.length)
+      throw new ValidationError("No valid application IDs provided");
 
     // Fetch pending applications
     const applications = await ProjectApplication.find({
       _id: { $in: validIds },
-      status: 'pending'
+      status: "pending",
     })
-      .populate('projectId', 'projectName projectCategory')
-      .populate('applicantId', 'fullName email')
+      .populate("projectId", "projectName projectCategory")
+      .populate("applicantId", "fullName email")
       .session(session);
 
     if (!applications.length) {
-      throw new NotFoundError('No pending applications found with the provided IDs');
+      throw new NotFoundError(
+        "No pending applications found with the provided IDs",
+      );
     }
 
     // Bulk update
     await ProjectApplication.updateMany(
-      { _id: { $in: applications.map(app => app._id) } },
+      { _id: { $in: applications.map((app) => app._id) } },
       {
         $set: {
-          status: 'rejected',
+          status: "rejected",
           reviewedBy: admin.userId,
           reviewedAt: new Date(),
           rejectionReason,
-          reviewNotes
-        }
+          reviewNotes,
+        },
       },
-      { session }
+      { session },
     );
 
     await session.commitTransaction();
@@ -1615,7 +1729,7 @@ const rejectApplicationsBulk = async (req, res) => {
 
     // Send notifications asynchronously (fault-tolerant)
     const notificationResults = await Promise.allSettled(
-      applications.map(async application => {
+      applications.map(async (application) => {
         try {
           await sendProjectRejectionNotification(
             application.applicantId.email,
@@ -1625,27 +1739,34 @@ const rejectApplicationsBulk = async (req, res) => {
               projectCategory: application.projectId.projectCategory,
               adminName: admin.fullName,
               rejectionReason,
-              reviewNotes
-            }
+              reviewNotes,
+            },
           );
 
           await notificationService.createApplicationStatusNotification(
             application.applicantId._id,
-            'rejected',
+            "rejected",
             application.projectId,
-            application
+            application,
           );
 
-          return { id: application._id, status: 'success' };
+          return { id: application._id, status: "success" };
         } catch (error) {
-          console.error(`Notification failed for application ${application._id}:`, error.message);
-          return { id: application._id, status: 'notification_failed', message: error.message };
+          console.error(
+            `Notification failed for application ${application._id}:`,
+            error.message,
+          );
+          return {
+            id: application._id,
+            status: "notification_failed",
+            message: error.message,
+          };
         }
-      })
+      }),
     );
 
     const successCount = notificationResults.filter(
-      r => r.status === 'fulfilled' && r.value.status === 'success'
+      (r) => r.status === "fulfilled" && r.value.status === "success",
     ).length;
 
     return res.status(200).json({
@@ -1653,15 +1774,15 @@ const rejectApplicationsBulk = async (req, res) => {
       processed: applications.length,
       rejected: applications.length,
       notificationSuccess: successCount,
-      notificationFailed: applications.length - successCount
+      notificationFailed: applications.length - successCount,
     });
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
     res.status(500).json({
       success: false,
-      message: 'Bulk rejection failed',
-      error: error.message
+      message: "Bulk rejection failed",
+      error: error.message,
     });
   }
 };
@@ -1671,10 +1792,14 @@ const bulkApproveApplications = async (req, res) => {
   try {
     const { applicationIds } = req.body;
 
-    if (!applicationIds || !Array.isArray(applicationIds) || applicationIds.length === 0) {
+    if (
+      !applicationIds ||
+      !Array.isArray(applicationIds) ||
+      applicationIds.length === 0
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Application IDs are required and must be a non-empty array"
+        message: "Application IDs are required and must be a non-empty array",
       });
     }
 
@@ -1686,52 +1811,64 @@ const bulkApproveApplications = async (req, res) => {
         // Find and update application
         const application = await ProjectApplication.findById(applicationId)
           .populate({
-            path: 'projectId',
-            select: 'projectName projectCategory payRate approvedAnnotators maxAnnotators'
+            path: "projectId",
+            select:
+              "projectName projectCategory payRate approvedAnnotators maxAnnotators",
           })
-          .populate('applicantId', 'fullName email');
+          .populate("applicantId", "fullName email");
 
         if (!application) {
           errors.push({ applicationId, error: "Application not found" });
           continue;
         }
 
-        if (application.status !== 'pending') {
-          errors.push({ applicationId, error: `Application is already ${application.status}` });
+        if (application.status !== "pending") {
+          errors.push({
+            applicationId,
+            error: `Application is already ${application.status}`,
+          });
           continue;
         }
 
         // Check if project has reached max annotators
-        if (application.projectId.maxAnnotators && 
-            application.projectId.approvedAnnotators && 
-            application.projectId.approvedAnnotators.length >= application.projectId.maxAnnotators) {
-          errors.push({ applicationId, error: "Project has reached maximum annotators" });
+        if (
+          application.projectId.maxAnnotators &&
+          application.projectId.approvedAnnotators &&
+          application.projectId.approvedAnnotators.length >=
+            application.projectId.maxAnnotators
+        ) {
+          errors.push({
+            applicationId,
+            error: "Project has reached maximum annotators",
+          });
           continue;
         }
 
         // Update application status
-        application.status = 'approved';
+        application.status = "approved";
         application.reviewedAt = new Date();
         application.reviewedBy = req.admin._id;
-        application.reviewNotes = 'Bulk approved by admin';
+        application.reviewNotes = "Bulk approved by admin";
 
         await application.save();
 
         // Add annotator to project's approved list
-        if (!application.projectId.approvedAnnotators.includes(application.applicantId._id)) {
-          await AnnotationProject.findByIdAndUpdate(
-            application.projectId._id,
-            { $push: { approvedAnnotators: application.applicantId._id } }
-          );
+        if (
+          !application.projectId.approvedAnnotators.includes(
+            application.applicantId._id,
+          )
+        ) {
+          await AnnotationProject.findByIdAndUpdate(application.projectId._id, {
+            $push: { approvedAnnotators: application.applicantId._id },
+          });
         }
 
         results.push({
           applicationId,
-          applicantName: application.applicantId?.fullName || 'Unknown',
-          projectName: application.projectId?.projectName || 'Unknown',
-          status: 'approved'
+          applicantName: application.applicantId?.fullName || "Unknown",
+          projectName: application.projectId?.projectName || "Unknown",
+          status: "approved",
         });
-
       } catch (error) {
         errors.push({ applicationId, error: error.message });
       }
@@ -1749,16 +1886,15 @@ const bulkApproveApplications = async (req, res) => {
         successCount,
         errorCount,
         approvedApplications: results,
-        errors: errors
-      }
+        errors: errors,
+      },
     });
-
   } catch (error) {
     console.error("❌ Error bulk approving applications:", error);
     res.status(500).json({
       success: false,
       message: "Server error bulk approving applications",
-      error: error.message
+      error: error.message,
     });
   }
 };
@@ -1766,12 +1902,20 @@ const bulkApproveApplications = async (req, res) => {
 // Bulk reject applications
 const bulkRejectApplications = async (req, res) => {
   try {
-    const { applicationIds, rejectionReason = 'other', reviewNotes = 'Bulk rejected by admin' } = req.body;
+    const {
+      applicationIds,
+      rejectionReason = "other",
+      reviewNotes = "Bulk rejected by admin",
+    } = req.body;
 
-    if (!applicationIds || !Array.isArray(applicationIds) || applicationIds.length === 0) {
+    if (
+      !applicationIds ||
+      !Array.isArray(applicationIds) ||
+      applicationIds.length === 0
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Application IDs are required and must be a non-empty array"
+        message: "Application IDs are required and must be a non-empty array",
       });
     }
 
@@ -1783,23 +1927,26 @@ const bulkRejectApplications = async (req, res) => {
         // Find and update application
         const application = await ProjectApplication.findById(applicationId)
           .populate({
-            path: 'projectId',
-            select: 'projectName projectCategory'
+            path: "projectId",
+            select: "projectName projectCategory",
           })
-          .populate('applicantId', 'fullName email');
+          .populate("applicantId", "fullName email");
 
         if (!application) {
           errors.push({ applicationId, error: "Application not found" });
           continue;
         }
 
-        if (application.status !== 'pending') {
-          errors.push({ applicationId, error: `Application is already ${application.status}` });
+        if (application.status !== "pending") {
+          errors.push({
+            applicationId,
+            error: `Application is already ${application.status}`,
+          });
           continue;
         }
 
         // Update application status
-        application.status = 'rejected';
+        application.status = "rejected";
         application.reviewedAt = new Date();
         application.reviewedBy = req.admin._id;
         application.rejectionReason = rejectionReason;
@@ -1809,11 +1956,10 @@ const bulkRejectApplications = async (req, res) => {
 
         results.push({
           applicationId,
-          applicantName: application.applicantId?.fullName || 'Unknown',
-          projectName: application.projectId?.projectName || 'Unknown',
-          status: 'rejected'
+          applicantName: application.applicantId?.fullName || "Unknown",
+          projectName: application.projectId?.projectName || "Unknown",
+          status: "rejected",
         });
-
       } catch (error) {
         errors.push({ applicationId, error: error.message });
       }
@@ -1831,16 +1977,15 @@ const bulkRejectApplications = async (req, res) => {
         successCount,
         errorCount,
         rejectedApplications: results,
-        errors: errors
-      }
+        errors: errors,
+      },
     });
-
   } catch (error) {
     console.error("❌ Error bulk rejecting applications:", error);
     res.status(500).json({
       success: false,
       message: "Server error bulk rejecting applications",
-      error: error.message
+      error: error.message,
     });
   }
 };
