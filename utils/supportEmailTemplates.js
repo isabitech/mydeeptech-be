@@ -609,10 +609,126 @@ const getWaitingTime = (startTime) => {
   return `${seconds} second${seconds !== 1 ? 's' : ''}`;
 };
 
+/**
+ * Send email notification to user when admin replies to chat
+ * @param {string} userEmail - User's email address
+ * @param {Object} ticket - Support ticket details
+ * @param {Object} adminReply - Admin reply details
+ */
+const sendAdminReplyNotificationEmail = async (userEmail, ticket, adminReply) => {
+  try {
+    const subject = `💬 Support Reply - ${ticket.ticketNumber}`;
+    
+    const htmlContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Support Team Reply</title>
+        <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
+            .container { max-width: 600px; margin: 20px auto; background: white; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden; }
+            .header { background: linear-gradient(135deg, #28a745, #20c997); color: white; padding: 30px; text-align: center; }
+            .content { padding: 30px; }
+            .reply-box { background: #e8f5e8; border-left: 4px solid #28a745; padding: 20px; margin: 20px 0; border-radius: 5px; }
+            .footer { background: #f8f9fa; padding: 20px; text-align: center; color: #6c757d; }
+            .btn { display: inline-block; padding: 12px 24px; background: #28a745; color: white; text-decoration: none; border-radius: 5px; margin: 10px 0; }
+            .admin-name { color: #28a745; font-weight: bold; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1 style="margin: 0; font-size: 28px;">💬 Support Team Reply</h1>
+                <p style="margin: 10px 0 0 0; opacity: 0.9;">Your chat has a new response</p>
+            </div>
+            
+            <div class="content">
+                <p style="font-size: 16px; margin-bottom: 25px;">
+                    Good news! Our support team has replied to your chat for ticket <strong>${ticket.ticketNumber}</strong>.
+                </p>
+                
+                <div class="reply-box">
+                    <h4 style="margin-top: 0; color: #155724;">📩 Latest Response</h4>
+                    <p><strong>From:</strong> <span class="admin-name">${adminReply.senderName || 'Support Team'}</span></p>
+                    <p><strong>Time:</strong> ${new Date(adminReply.timestamp).toLocaleString()}</p>
+                    <div style="background: white; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                        <p style="margin: 0; font-style: italic; color: #333;">"${adminReply.message}"</p>
+                    </div>
+                </div>
+                
+                <h3 style="color: #333;">💭 Continue the Conversation</h3>
+                <p style="color: #555; font-size: 16px;">
+                    You can continue chatting with our support team in real-time. Click the button below to access your chat.
+                </p>
+                
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/dashboard/support/chat/${ticket._id}" class="btn">
+                        💬 Continue Chat
+                    </a>
+                </div>
+                
+                <div style="background: #e3f2fd; padding: 20px; border-radius: 8px; margin: 25px 0;">
+                    <h4 style="margin-top: 0; color: #1976d2;">📱 Quick Access</h4>
+                    <p style="color: #1976d2; margin-bottom: 0; font-size: 14px;">
+                        💡 <strong>Tip:</strong> You'll receive email updates when you receive new messages, but only once per day to avoid spam. For real-time chat, use the live chat feature on our website.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="footer">
+                <p style="margin: 0 0 10px 0; color: #333;"><strong>📞 Need More Help?</strong></p>
+                <p style="margin: 5px 0;">
+                    💬 Continue chatting: <a href="${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/dashboard/support/chat/${ticket._id}" style="color: #28a745;">Live Chat</a><br>
+                    📧 Email: <a href="mailto:support@mydeeptech.ng" style="color: #28a745;">support@mydeeptech.ng</a>
+                </p>
+                
+                <hr style="border: none; height: 1px; background: #dee2e6; margin: 20px 0;">
+                <p style="margin: 0; font-size: 12px; color: #6c757d;">
+                    This email was sent regarding your chat ticket ${ticket.ticketNumber}.<br>
+                    You'll receive at most one email notification per day for chat replies.<br>
+                    MyDeepTech Support Team | <a href="https://mydeeptech.ng" style="color: #28a745;">mydeeptech.ng</a>
+                </p>
+            </div>
+        </div>
+    </body>
+    </html>
+    `;
+
+    const textContent = `
+💬 Support Team Reply - ${ticket.ticketNumber}
+
+Good news! Our support team has replied to your chat.
+
+Latest Response:
+From: ${adminReply.senderName || 'Support Team'}
+Time: ${new Date(adminReply.timestamp).toLocaleString()}
+Message: "${adminReply.message}"
+
+Continue the conversation: ${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/dashboard/support/chat/${ticket._id}
+
+Note: You'll receive at most one email notification per day for chat replies.
+For real-time chat, use the live chat feature on our website.
+
+MyDeepTech Support Team
+support@mydeeptech.ng
+    `;
+
+    await sendEmail(userEmail, subject, textContent, htmlContent);
+    console.log(`📧 Admin reply notification sent to ${userEmail} for ticket ${ticket.ticketNumber}`);
+    return { success: true };
+
+  } catch (error) {
+    console.error('❌ Error sending admin reply notification:', error);
+    return { success: false, error: error.message };
+  }
+};
+
 module.exports = {
   sendTicketCreationEmail,
   sendTicketStatusUpdateEmail,
   sendNewTicketNotificationToAdmin,
   sendTicketAssignmentEmail,
-  sendOfflineAgentNotification
+  sendOfflineAgentNotification,
+  sendAdminReplyNotificationEmail
 };

@@ -4,7 +4,8 @@ const SupportTicket = require('../models/supportTicket.model');
 const DTUser = require('../models/dtUser.model');
 const User = require('../models/user');
 const { createNotification } = require('./notificationService');
-const { sendNewTicketNotificationToAdmin, sendTicketStatusUpdateEmail } = require('./supportEmailTemplates');
+const { sendNewTicketNotificationToAdmin, sendTicketStatusUpdateEmail, sendAdminReplyNotificationEmail } = require('./supportEmailTemplates');
+const { canSendDailyEmail, markDailyEmailSent, getDailyEmailStatus } = require('./dailyEmailTracker');
 
 let io;
 const connectedUsers = new Map(); // Track online users: { userId: socketId }
@@ -17,7 +18,14 @@ const connectedAdmins = new Map(); // Track online admins: { adminId: socketId }
 const initializeSocketIO = (server) => {
   io = new Server(server, {
     cors: {
-      origin: ['http://localhost:5173', 'http://127.0.0.1:5173', 'https://mydeeptech.ng', 'https://www.mydeeptech.ng'],
+      origin: [
+        'http://localhost:5173', 
+        'http://127.0.0.1:5173', 
+        'https://mydeeptech.ng', 
+        'https://www.mydeeptech.ng', 
+        'https://mydeeptech.onrender.com', 
+        'https://mydeeptech-frontend.onrender.com',
+      ],
       credentials: true,
       methods: ['GET', 'POST']
     }
@@ -290,6 +298,7 @@ const initializeSocketIO = (server) => {
     // Handle sending chat messages
     socket.on('send_message', async (data) => {
       try {
+
         const { ticketId, message, attachments = [] } = data;
 
         const ticket = await SupportTicket.findById(ticketId);
@@ -342,6 +351,9 @@ const initializeSocketIO = (server) => {
 
         // If admin replied, notify user
         if (isAdminReply) {
+          console.log(`🔔 Admin ${socket.userName} replied to ticket ${ticket.ticketNumber} for user ${ticket.userId}`);
+          
+          // Create in-app notification
           await createNotification({
             userId: ticket.userId,
             type: 'support_reply',
@@ -354,6 +366,69 @@ const initializeSocketIO = (server) => {
               isChat: true
             }
           });
+
+          // Check if we can send daily email notification
+          console.log(`📧 Checking daily email eligibility for user ${ticket.userId}...`);
+          const canSendEmail = await canSendDailyEmail(ticket.userId.toString(), 'admin_reply');
+          console.log(`📧 Can send email today: ${canSendEmail}`);
+          
+          if (canSendEmail) {
+            try {
+              console.log(`👤 Fetching user details for userId: ${ticket.userId}, userModel: ${ticket.userModel}`);
+              
+              // Get user details for email
+              let user;
+              if (ticket.userModel === 'DTUser') {
+                user = await DTUser.findById(ticket.userId).select('fullName email');
+              } else {
+                user = await User.findById(ticket.userId).select('fullName email username');
+              }
+
+              console.log(`👤 User found: ${!!user}, Email: ${user?.email ? 'Yes' : 'No'}`);
+
+              if (user && user.email) {
+                console.log(`📧 Attempting to send admin reply email to ${user.email}...`);
+                
+                // Send admin reply email notification
+                const emailResult = await sendAdminReplyNotificationEmail(
+                  user.email,
+                  ticket,
+                  {
+                    senderName: socket.userName,
+                    message: message,
+                    timestamp: new Date()
+                  }
+                );
+
+                console.log(`📧 Email service result:`, emailResult);
+
+                if (emailResult.success) {
+                  // Mark that we've sent the daily email
+                  console.log(`📧 Marking daily email as sent for user ${ticket.userId.toString()}...`);
+                  const markResult = await markDailyEmailSent(ticket.userId.toString(), 'admin_reply');
+                  console.log(`📧 Daily email marked as sent: ${markResult}`);
+                  console.log(`📧 ✅ Daily admin reply email sent to ${user.email} for ticket ${ticket.ticketNumber}`);
+                } else {
+                  console.error(`📧 ❌ Failed to send admin reply email: ${emailResult.error}`);
+                }
+              } else {
+                console.log(`📧 ⚠️ User email not found for userId: ${ticket.userId} - User: ${JSON.stringify(user)}`);
+              }
+            } catch (emailError) {
+              console.error('📧 ❌ Error in email sending process:', emailError);
+              console.error('📧 ❌ Stack trace:', emailError.stack);
+            }
+          } else {
+            // Log that email was skipped due to daily limit
+            console.log(`📧 ⏭️ Daily email limit reached for user ${ticket.userId}, checking status...`);
+            try {
+              const emailStatus = await getDailyEmailStatus(ticket.userId.toString(), 'admin_reply');
+              console.log(`📧 Email status:`, emailStatus);
+              console.log(`📧 Daily email limit reached for user ${ticket.userId}. Last sent: ${emailStatus.lastSent}, expires in: ${emailStatus.expiresIn}s`);
+            } catch (statusError) {
+              console.error('📧 ❌ Error getting email status:', statusError);
+            }
+          }
         } else {
           // User message - notify online admins
           socket.to('admins').emit('user_message', {

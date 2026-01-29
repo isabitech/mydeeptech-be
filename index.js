@@ -22,6 +22,8 @@ try {
 
 const route = require('./routes/auth');
 const adminRoute = require('./routes/admin');
+const adminEmailTrackingRoute = require('./routes/adminEmailTracking.routes');
+const debugEmailRoute = require('./routes/debugEmail.routes');
 const mediaRoute = require('./routes/media');
 const notificationRoute = require('./routes/notifications');
 const assessmentRoute = require('./routes/assessment');
@@ -134,6 +136,8 @@ if (swaggerUi && specs) {
 // Routes
 app.use('/api/auth', route);
 app.use('/api/admin', adminRoute);
+app.use('/api/admin/email-tracking', adminEmailTrackingRoute);
+app.use('/api/debug/email', debugEmailRoute);
 app.use('/api/media', mediaRoute);
 app.use('/api/notifications', notificationRoute);
 app.use('/api/assessments', assessmentRoute);
