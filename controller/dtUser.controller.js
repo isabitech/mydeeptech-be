@@ -11,6 +11,9 @@ const jwt = require('jsonwebtoken');
 const { sendAdminVerificationEmail } = require("../utils/adminMailer");
 const { sendAnnotatorApprovalEmail, sendAnnotatorRejectionEmail } = require("../utils/annotatorMailer");
 const adminVerificationStore = require("../utils/adminVerificationStore");
+const envConfig = require("../config/envConfig");
+
+
 
 // Option 1: Send email with timeout (current implementation)
 const createDTUser = async (req, res) => {
@@ -372,7 +375,7 @@ const dtUserLogin = async (req, res) => {
         email: user.email,
         fullName: user.fullName
       },
-      process.env.JWT_SECRET || 'your-secret-key', // Use environment variable for production
+      envConfig.jwt.JWT_SECRET || 'your-secret-key', // Use environment variable for production
       { expiresIn: '7d' } // Token expires in 7 days
     );
 
@@ -1952,7 +1955,7 @@ const requestAdminVerification = async (req, res) => {
     console.log(`📧 Admin verification request for: ${email}`);
 
     // Verify admin creation key
-    const validAdminKey = process.env.ADMIN_CREATION_KEY || 'super-secret-admin-key-2024';
+    const validAdminKey = envConfig.admin.ADMIN_CREATION_KEY || 'super-secret-admin-key-2024';
     if (adminKey !== validAdminKey) {
       console.log(`❌ Invalid admin creation key provided`);
       return res.status(403).json({
@@ -1963,7 +1966,7 @@ const requestAdminVerification = async (req, res) => {
     }
 
     // Check if admin email is valid
-    const adminEmails = process.env.ADMIN_EMAILS ? process.env.ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase()) : [];
+    const adminEmails = envConfig.admin.ADMIN_EMAILS ? envConfig.admin.ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase()) : [];
     const isValidAdminEmail = email.toLowerCase().endsWith('@mydeeptech.ng') || adminEmails.includes(email.toLowerCase());
     
     if (!isValidAdminEmail) {
@@ -2049,7 +2052,7 @@ const confirmAdminVerification = async (req, res) => {
     console.log(`✅ Admin verification confirmation for: ${email}`);
 
     // Verify admin creation key again
-    const validAdminKey = process.env.ADMIN_CREATION_KEY || 'super-secret-admin-key-2024';
+    const validAdminKey = envConfig.admin.ADMIN_CREATION_KEY || 'super-secret-admin-key-2024';
     if (adminKey !== validAdminKey) {
       console.log(`❌ Invalid admin creation key provided`);
       return res.status(403).json({
@@ -2058,6 +2061,7 @@ const confirmAdminVerification = async (req, res) => {
         code: 'INVALID_ADMIN_KEY'
       });
     }
+
 
     // Get verification data
     const verificationData = adminVerificationStore.getVerificationData(email);
@@ -2201,7 +2205,7 @@ const createAdmin = async (req, res) => {
     console.log(`👑 Direct admin creation request for: ${email} (legacy method)`);
 
     // Verify admin creation key
-    const validAdminKey = process.env.ADMIN_CREATION_KEY || 'super-secret-admin-key-2024';
+    const validAdminKey = envConfig.admin.ADMIN_CREATION_KEY || 'super-secret-admin-key-2024';
     if (adminKey !== validAdminKey) {
       console.log(`❌ Invalid admin creation key provided`);
       return res.status(403).json({
@@ -2212,7 +2216,7 @@ const createAdmin = async (req, res) => {
     }
 
     // Check if admin email is valid (must end with @mydeeptech.ng or be in admin emails)
-    const adminEmails = process.env.ADMIN_EMAILS ? process.env.ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase()) : [];
+    const adminEmails = envConfig.admin.ADMIN_EMAILS ? envConfig.admin.ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase()) : [];
     const isValidAdminEmail = email.toLowerCase().endsWith('@mydeeptech.ng') || adminEmails.includes(email.toLowerCase());
     
     if (!isValidAdminEmail) {
@@ -2327,7 +2331,7 @@ const verifyAdminOTP = async (req, res) => {
     const { email, verificationCode, adminKey } = req.body;
 
     // Verify admin creation key
-    const validAdminKey = process.env.ADMIN_CREATION_KEY || 'super-secret-admin-key-2024';
+    const validAdminKey = envConfig.admin.ADMIN_CREATION_KEY || 'super-secret-admin-key-2024';
     if (adminKey !== validAdminKey) {
       return res.status(403).json({
         success: false,
@@ -2392,7 +2396,7 @@ const verifyAdminOTP = async (req, res) => {
         isAdmin: true,
         role: admin.role || 'admin'
       },
-      process.env.JWT_SECRET || 'your-secret-key',
+      envConfig.jwt.JWT_SECRET || 'your-secret-key',
       { expiresIn: '7d' }
     );
 
@@ -2486,7 +2490,7 @@ const adminLogin = async (req, res) => {
         isAdmin: true,
         role: admin.role || 'admin'
       },
-      process.env.JWT_SECRET || 'your-secret-key',
+      envConfig.jwt.JWT_SECRET || 'your-secret-key',
       { expiresIn: '7d' }
     );
 

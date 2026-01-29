@@ -6,6 +6,7 @@ const User = require('../models/user');
 const { createNotification } = require('./notificationService');
 const { sendNewTicketNotificationToAdmin, sendTicketStatusUpdateEmail, sendAdminReplyNotificationEmail } = require('./supportEmailTemplates');
 const { canSendDailyEmail, markDailyEmailSent, getDailyEmailStatus } = require('./dailyEmailTracker');
+const envConfig = require('../config/envConfig');
 
 let io;
 const connectedUsers = new Map(); // Track online users: { userId: socketId }
@@ -39,7 +40,7 @@ const initializeSocketIO = (server) => {
         return next(new Error('Authentication error'));
       }
 
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const decoded = jwt.verify(token, envConfig.jwt.JWT_SECRET);
       
       // Check if it's a user or admin
       let user = await DTUser.findById(decoded.userId);

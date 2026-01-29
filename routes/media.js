@@ -144,7 +144,7 @@ router.get('/health', (req, res) => {
     success: true,
     message: 'Media service is running',
     timestamp: new Date(),
-    cloudinaryConfigured: !!(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY),
+    cloudinaryConfigured: !!(envConfig.cloudinary.CLOUDINARY_CLOUD_NAME && envConfig.cloudinary.CLOUDINARY_API_KEY),
     supportedTypes: {
       images: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff'],
       documents: ['pdf', 'doc', 'docx', 'txt', 'rtf'],

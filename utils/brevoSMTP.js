@@ -1,24 +1,25 @@
 const brevo = require('@getbrevo/brevo');
+// Fallback nodemailer for backward compatibility (if needed)
+const nodemailer = require("nodemailer");
+const envConfig = require('../config/envConfig');
 
 // Initialize Brevo API client (more reliable than SMTP on cloud platforms)
 const apiInstance = new brevo.TransactionalEmailsApi();
-apiInstance.setApiKey(brevo.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY);
+apiInstance.setApiKey(brevo.TransactionalEmailsApiApiKeys.apiKey, envConfig.email.brevo.BREVO_API_KEY);
 
-// Fallback nodemailer for backward compatibility (if needed)
-const nodemailer = require("nodemailer");
 
 const createBrevoSMTPTransporter = () => {
-  if (!process.env.SMTP_LOGIN || !process.env.SMTP_KEY) {
+  if (!envConfig.email.brevo.SMTP_LOGIN || !envConfig.email.brevo.SMTP_KEY) {
     throw new Error("Brevo SMTP credentials missing. Please set SMTP_LOGIN and SMTP_KEY");
   }
 
   return nodemailer.createTransport({
-    host: process.env.SMTP_SERVER || 'smtp-relay.brevo.com',
-    port: parseInt(process.env.SMTP_PORT) || 587,
+    host: envConfig.email.brevo.SMTP_SERVER || 'smtp-relay.brevo.com',
+    port: parseInt(envConfig.email.brevo.SMTP_PORT) || 587,
     secure: false,
     auth: {
-      user: process.env.SMTP_LOGIN,
-      pass: process.env.SMTP_KEY,
+      user: envConfig.email.brevo.SMTP_LOGIN,
+      pass: envConfig.email.brevo.SMTP_KEY,
     },
     // Extended timeout settings for cloud platforms
     connectionTimeout: 30000, // 30 seconds
@@ -30,11 +31,11 @@ const createBrevoSMTPTransporter = () => {
 // Send email via Brevo API (more reliable than SMTP on cloud platforms)
 const sendVerificationEmailBrevoAPI = async (email, name, userId) => {
   // Validate API key before attempting to send
-  if (!process.env.BREVO_API_KEY || process.env.BREVO_API_KEY.length < 10) {
+  if (!envConfig.email.brevo.BREVO_API_KEY || envConfig.email.brevo.BREVO_API_KEY.length < 10) {
     throw new Error("Invalid or missing BREVO_API_KEY");
   }
 
-  console.log(`🔑 Using Brevo API Key: ${process.env.BREVO_API_KEY.substring(0, 10)}...`);
+  console.log(`🔑 Using Brevo API Key: ${envConfig.email.brevo.BREVO_API_KEY.substring(0, 10)}...`);
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -104,8 +105,8 @@ const sendVerificationEmailBrevoAPI = async (email, name, userId) => {
   sendSmtpEmail.htmlContent = htmlContent;
   sendSmtpEmail.textContent = textContent;
   sendSmtpEmail.sender = {
-    name: process.env.BREVO_SENDER_NAME || 'MyDeepTech Team',
-    email: process.env.BREVO_SENDER_EMAIL
+    name: envConfig.email.brevo.BREVO_SENDER_NAME || 'MyDeepTech Team',
+    email: envConfig.email.brevo.BREVO_SENDER_EMAIL
   };
   sendSmtpEmail.to = [{ email: email, name: name }];
 
@@ -128,7 +129,7 @@ const sendVerificationEmailBrevoSMTP = async (email, name, userId) => {
   const transporter = createBrevoSMTPTransporter();
   
   const mailOptions = {
-    from: `"${process.env.BREVO_SENDER_NAME || 'MyDeepTech Team'}" <${process.env.BREVO_SENDER_EMAIL}>`,
+    from: `"${envConfig.email.brevo.BREVO_SENDER_NAME || 'MyDeepTech Team'}" <${envConfig.email.brevo.BREVO_SENDER_EMAIL}>`,
     to: email,
     subject: "Verify Your Email Address - MyDeepTech",
     html: `
@@ -218,7 +219,7 @@ const testBrevoAPIConnection = async () => {
     testEmail.htmlContent = "<p>Test</p>";
     testEmail.sender = { 
       name: 'Test', 
-      email: process.env.BREVO_SENDER_EMAIL || 'test@example.com' 
+      email: envConfig.email.brevo.BREVO_SENDER_EMAIL || 'test@example.com' 
     };
     testEmail.to = [{ email: 'test@example.com', name: 'Test' }];
     
@@ -247,15 +248,15 @@ const testBrevoSMTPConnection = async () => {
 // Generic send email function using Brevo API (primary) with SMTP fallback
 const sendEmail = async ({ to, subject, html, text }) => {
   console.log(`📧 Attempting to send email to: ${to}`);
-  console.log(`🔑 API Key available: ${process.env.BREVO_API_KEY ? 'YES' : 'NO'}`);
-  console.log(`📬 Sender email: ${process.env.BREVO_SENDER_EMAIL}`);
+  console.log(`🔑 API Key available: ${envConfig.email.brevo.BREVO_API_KEY ? 'YES' : 'NO'}`);
+  console.log(`📬 Sender email: ${envConfig.email.brevo.BREVO_SENDER_EMAIL}`);
   
   try {
     // Validate required environment variables
-    if (!process.env.BREVO_API_KEY) {
+    if (!envConfig.email.brevo.BREVO_API_KEY) {
       throw new Error('BREVO_API_KEY is not set in environment variables');
     }
-    if (!process.env.BREVO_SENDER_EMAIL) {
+    if (!envConfig.email.brevo.BREVO_SENDER_EMAIL) {
       throw new Error('BREVO_SENDER_EMAIL is not set in environment variables');
     }
 
@@ -265,8 +266,8 @@ const sendEmail = async ({ to, subject, html, text }) => {
     sendSmtpEmail.htmlContent = html;
     sendSmtpEmail.textContent = text;
     sendSmtpEmail.sender = {
-      name: process.env.BREVO_SENDER_NAME || 'MyDeepTech Team',
-      email: process.env.BREVO_SENDER_EMAIL
+      name: envConfig.email.brevo.BREVO_SENDER_NAME || 'MyDeepTech Team',
+      email: envConfig.email.brevo.BREVO_SENDER_EMAIL
     };
     sendSmtpEmail.to = [{ email: to }];
 
@@ -290,14 +291,14 @@ const sendEmail = async ({ to, subject, html, text }) => {
     try {
       console.log(`🔄 Trying SMTP fallback...`);
       
-      if (!process.env.SMTP_LOGIN || !process.env.SMTP_KEY) {
+      if (!envConfig.email.brevo.SMTP_LOGIN || !envConfig.email.brevo.SMTP_KEY) {
         throw new Error('SMTP credentials missing. Please set SMTP_LOGIN and SMTP_KEY');
       }
 
       const transporter = createBrevoSMTPTransporter();
       
       const mailOptions = {
-        from: `"${process.env.BREVO_SENDER_NAME || 'MyDeepTech Team'}" <${process.env.BREVO_SENDER_EMAIL}>`,
+        from: `"${envConfig.email.brevo.BREVO_SENDER_NAME || 'MyDeepTech Team'}" <${envConfig.email.brevo.BREVO_SENDER_EMAIL}>`,
         to: to,
         subject: subject,
         html: html,
@@ -330,18 +331,18 @@ const sendProjectEmail = async ({ to, subject, html, text }) => {
     sendSmtpEmail.htmlContent = html;
     sendSmtpEmail.textContent = text;
     sendSmtpEmail.sender = {
-      name: process.env.BREVO_PROJECT_SENDER_NAME || 'MyDeepTech Projects',
-      email: process.env.BREVO_PROJECT_SENDER_EMAIL || 'projects@mydeeptech.ng'
+      name: envConfig.email.brevo.BREVO_PROJECT_SENDER_NAME || 'MyDeepTech Projects',
+      email: envConfig.email.brevo.BREVO_PROJECT_SENDER_EMAIL || 'projects@mydeeptech.ng'
     };
     sendSmtpEmail.to = [{ email: to }];
 
     const result = await apiInstance.sendTransacEmail(sendSmtpEmail);
-    console.log(`✅ Brevo API project email sent to ${to} from ${process.env.BREVO_PROJECT_SENDER_EMAIL}`, result.messageId);
+    console.log(`✅ Brevo API project email sent to ${to} from ${envConfig.email.brevo.BREVO_PROJECT_SENDER_EMAIL}`, result.messageId);
     return { 
       success: true, 
       messageId: result.messageId,
       provider: 'brevo-api',
-      sender: process.env.BREVO_PROJECT_SENDER_EMAIL
+      sender: envConfig.email.brevo.BREVO_PROJECT_SENDER_EMAIL
     };
   } catch (apiError) {
     console.warn(`⚠️ Brevo API failed for project email (${apiError.message}), trying SMTP fallback...`);
@@ -351,7 +352,7 @@ const sendProjectEmail = async ({ to, subject, html, text }) => {
       const transporter = createBrevoSMTPTransporter();
       
       const mailOptions = {
-        from: `"${process.env.BREVO_PROJECT_SENDER_NAME || 'MyDeepTech Projects'}" <${process.env.BREVO_PROJECT_SENDER_EMAIL || 'projects@mydeeptech.ng'}>`,
+        from: `"${envConfig.email.brevo.BREVO_PROJECT_SENDER_NAME || 'MyDeepTech Projects'}" <${envConfig.email.brevo.BREVO_PROJECT_SENDER_EMAIL || 'projects@mydeeptech.ng'}>`,
         to: to,
         subject: subject,
         html: html,
@@ -359,12 +360,12 @@ const sendProjectEmail = async ({ to, subject, html, text }) => {
       };
 
       const info = await transporter.sendMail(mailOptions);
-      console.log(`✅ Brevo SMTP project email sent to ${to} from ${process.env.BREVO_PROJECT_SENDER_EMAIL} (fallback)`, info.messageId);
+      console.log(`✅ Brevo SMTP project email sent to ${to} from ${envConfig.email.brevo.BREVO_PROJECT_SENDER_EMAIL} (fallback)`, info.messageId);
       return { 
         success: true, 
         messageId: info.messageId,
         provider: 'brevo-smtp-fallback',
-        sender: process.env.BREVO_PROJECT_SENDER_EMAIL
+        sender: envConfig.email.brevo.BREVO_PROJECT_SENDER_EMAIL
       };
     } catch (smtpError) {
       console.error("❌ Both Brevo API and SMTP failed for project email:", { apiError: apiError.message, smtpError: smtpError.message });

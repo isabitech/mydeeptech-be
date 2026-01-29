@@ -986,7 +986,7 @@ const getAllAssessments = async (req, res) => {
       }
     }
 
-    assessments.push(akanAssessment);
+    // assessments.push(akanAssessment);
 
     // 3. Multimedia Assessments (project-specific)
     try {
@@ -1057,7 +1057,7 @@ const getAllAssessments = async (req, res) => {
           multimediaAssessment.userStatus.nextRetakeAvailable = cooldownEnd;
         }
 
-        assessments.push(multimediaAssessment);
+        // assessments.push(multimediaAssessment);
       }
     } catch (multimediaError) {
       console.error('⚠️ Error fetching multimedia assessments:', multimediaError);
@@ -1172,7 +1172,7 @@ const getAllAssessments = async (req, res) => {
           spideyAssessment.userStatus.nextRetakeAvailable = 'No retakes allowed for Spidey assessment';
         }
 
-        assessments.push(spideyAssessment);
+        // assessments.push(spideyAssessment);
       }
     } catch (spideyError) {
       console.error('⚠️ Error fetching Spidey assessments:', spideyError);
@@ -1731,28 +1731,28 @@ const getAdminAssessmentsOverview = async (req, res) => {
           ? ((submissionData.passed + submissionData.failed) / submissionData.totalSubmissions * 100) 
           : 0;
 
-        assessments.push({
-          id: config._id.toString(),
-          title: config.title,
-          description: config.description,
-          type: 'multimedia',
-          totalSubmissions: submissionData.totalSubmissions,
-          pendingReview: submissionData.pendingReview + submissionData.inProgress,
-          approvedSubmissions: submissionData.passed,
-          rejectedSubmissions: submissionData.failed,
-          averageScore: Math.round((submissionData.averageScore || 0) * 10) / 10,
-          passingScore: config.scoring?.passingScore || 70,
-          completionRate: Math.round(completionRate * 10) / 10,
-          averageCompletionTime: (submissionData.averageCompletionTime * 1000) || (config.requirements?.timeLimit * 60 * 1000) || 3600000,
-          createdAt: config.createdAt,
-          isActive: config.isActive,
-          lastSubmissionAt: submissionData.lastSubmissionAt,
-          projectInfo: config.projectId ? {
-            id: config.projectId._id,
-            name: config.projectId.projectName,
-            category: config.projectId.projectCategory
-          } : null
-        });
+        // assessments.push({
+        //   id: config._id.toString(),
+        //   title: config.title,
+        //   description: config.description,
+        //   type: 'multimedia',
+        //   totalSubmissions: submissionData.totalSubmissions,
+        //   pendingReview: submissionData.pendingReview + submissionData.inProgress,
+        //   approvedSubmissions: submissionData.passed,
+        //   rejectedSubmissions: submissionData.failed,
+        //   averageScore: Math.round((submissionData.averageScore || 0) * 10) / 10,
+        //   passingScore: config.scoring?.passingScore || 70,
+        //   completionRate: Math.round(completionRate * 10) / 10,
+        //   averageCompletionTime: (submissionData.averageCompletionTime * 1000) || (config.requirements?.timeLimit * 60 * 1000) || 3600000,
+        //   createdAt: config.createdAt,
+        //   isActive: config.isActive,
+        //   lastSubmissionAt: submissionData.lastSubmissionAt,
+        //   projectInfo: config.projectId ? {
+        //     id: config.projectId._id,
+        //     name: config.projectId.projectName,
+        //     category: config.projectId.projectCategory
+        //   } : null
+        // });
       }
     } catch (multimediaError) {
       console.error('Error fetching multimedia assessment stats:', multimediaError);
@@ -1963,67 +1963,67 @@ const getUserAssessmentsOverview = async (req, res) => {
           passed: true
         });
 
-        assessments.push({
-          id: config._id.toString(),
-          title: config.title,
-          description: config.description,
-          type: 'multimedia',
-          numberOfTasks: config.requirements?.tasksPerAssessment || 5,
-          estimatedDuration: config.requirements?.timeLimit || 60,
-          timeLimit: config.requirements?.timeLimit || 60,
-          passingScore: (config.scoring?.passingScore || 70) / 10, // Convert to 10-point scale
-          difficulty: 'Intermediate',
-          isActive: config.isActive,
-          userStatus: passedAttempts.length > 0 ? 'completed' :
-                     latestAttempt?.status === 'in_progress' ? 'in_progress' :
-                     userAttempts.length > 0 ? 'attempted' : 'not_started',
+        // assessments.push({
+        //   id: config._id.toString(),
+        //   title: config.title,
+        //   description: config.description,
+        //   type: 'multimedia',
+        //   numberOfTasks: config.requirements?.tasksPerAssessment || 5,
+        //   estimatedDuration: config.requirements?.timeLimit || 60,
+        //   timeLimit: config.requirements?.timeLimit || 60,
+        //   passingScore: (config.scoring?.passingScore || 70) / 10, // Convert to 10-point scale
+        //   difficulty: 'Intermediate',
+        //   isActive: config.isActive,
+        //   userStatus: passedAttempts.length > 0 ? 'completed' :
+        //              latestAttempt?.status === 'in_progress' ? 'in_progress' :
+        //              userAttempts.length > 0 ? 'attempted' : 'not_started',
           
-          // Include last attempt data if available
-          ...(latestAttempt && latestAttempt.status !== 'in_progress' && {
-            lastAttempt: {
-              score: latestAttempt.finalScore || 0,
-              completedAt: latestAttempt.createdAt,
-              status: latestAttempt.status === 'passed' ? 'passed' : 'failed'
-            }
-          }),
+        //   // Include last attempt data if available
+        //   ...(latestAttempt && latestAttempt.status !== 'in_progress' && {
+        //     lastAttempt: {
+        //       score: latestAttempt.finalScore || 0,
+        //       completedAt: latestAttempt.createdAt,
+        //       status: latestAttempt.status === 'passed' ? 'passed' : 'failed'
+        //     }
+        //   }),
           
-          // Additional metadata for internal use
-          _internal: {
-            userProgress: {
-              hasAttempted: userAttempts.length > 0,
-              totalAttempts: userAttempts.length,
-              isPassed: passedAttempts.length > 0,
-              canRetake: canRetake, // Unlimited retakes enabled
-              nextRetakeAvailable: canRetake ? null : 
-                new Date(new Date(latestAttempt?.createdAt).getTime() + cooldownHours * 60 * 60 * 1000),
+        //   // Additional metadata for internal use
+        //   _internal: {
+        //     userProgress: {
+        //       hasAttempted: userAttempts.length > 0,
+        //       totalAttempts: userAttempts.length,
+        //       isPassed: passedAttempts.length > 0,
+        //       canRetake: canRetake, // Unlimited retakes enabled
+        //       nextRetakeAvailable: canRetake ? null : 
+        //         new Date(new Date(latestAttempt?.createdAt).getTime() + cooldownHours * 60 * 60 * 1000),
               
-              currentSession: latestAttempt?.status === 'in_progress' ? {
-                sessionId: latestAttempt._id,
-                completionPercentage: latestAttempt.completionPercentage || 0,
-                timeSpent: latestAttempt.totalTimeSpent || 0,
-                lastActivity: latestAttempt.lastAutoSave || latestAttempt.createdAt
-              } : null
-            },
+        //       currentSession: latestAttempt?.status === 'in_progress' ? {
+        //         sessionId: latestAttempt._id,
+        //         completionPercentage: latestAttempt.completionPercentage || 0,
+        //         timeSpent: latestAttempt.totalTimeSpent || 0,
+        //         lastActivity: latestAttempt.lastAutoSave || latestAttempt.createdAt
+        //       } : null
+        //     },
             
-            project: config.projectId ? {
-              id: config.projectId._id,
-              name: config.projectId.projectName,
-              category: config.projectId.projectCategory
-            } : null,
+        //     project: config.projectId ? {
+        //       id: config.projectId._id,
+        //       name: config.projectId.projectName,
+        //       category: config.projectId.projectCategory
+        //     } : null,
             
-            requirements: {
-              maxAttempts: config.maxAttempts || 3,
-              cooldownHours: config.cooldownHours || 24,
-              prerequisites: hasEnglishQualification ? [] : ['English Proficiency Assessment']
-            },
+        //     requirements: {
+        //       maxAttempts: config.maxAttempts || 3,
+        //       cooldownHours: config.cooldownHours || 24,
+        //       prerequisites: hasEnglishQualification ? [] : ['English Proficiency Assessment']
+        //     },
             
-            benefits: [
-              'Access to specialized video annotation projects',
-              'Higher pay rates for multimedia tasks',
-              'Priority access to premium projects'
-            ]
-          }
-        });
+        //     benefits: [
+        //       'Access to specialized video annotation projects',
+        //       'Higher pay rates for multimedia tasks',
+        //       'Priority access to premium projects'
+        //     ]
+        //   }
+        // });
       }
     } catch (multimediaError) {
       console.error('Error fetching user multimedia assessment data:', multimediaError);
@@ -2031,37 +2031,37 @@ const getUserAssessmentsOverview = async (req, res) => {
 
     // 3. Add General Assessment (placeholder for future expansion)
     // This matches the frontend expectation for a general assessment type
-    assessments.push({
-      id: 'general_1',
-      title: 'General Annotation Skills',
-      description: 'Basic assessment covering general annotation guidelines and best practices.',
-      type: 'general',
-      numberOfTasks: 8,
-      estimatedDuration: 25,
-      timeLimit: 35,
-      passingScore: 6.5,
-      difficulty: 'Beginner',
-      isActive: true,
-      userStatus: 'not_started',
+    // assessments.push({
+    //   id: 'general_1',
+    //   title: 'General Annotation Skills',
+    //   description: 'Basic assessment covering general annotation guidelines and best practices.',
+    //   type: 'general',
+    //   numberOfTasks: 8,
+    //   estimatedDuration: 25,
+    //   timeLimit: 35,
+    //   passingScore: 6.5,
+    //   difficulty: 'Beginner',
+    //   isActive: true,
+    //   userStatus: 'not_started',
       
-      _internal: {
-        userProgress: {
-          hasAttempted: false,
-          totalAttempts: 0,
-          isPassed: false,
-          canRetake: true,
-          status: 'not_started'
-        },
-        requirements: {
-          prerequisites: []
-        },
-        benefits: [
-          'Basic annotation qualification',
-          'Foundation for advanced assessments',
-          'General project access'
-        ]
-      }
-    });
+    //   _internal: {
+    //     userProgress: {
+    //       hasAttempted: false,
+    //       totalAttempts: 0,
+    //       isPassed: false,
+    //       canRetake: true,
+    //       status: 'not_started'
+    //     },
+    //     requirements: {
+    //       prerequisites: []
+    //     },
+    //     benefits: [
+    //       'Basic annotation qualification',
+    //       'Foundation for advanced assessments',
+    //       'General project access'
+    //     ]
+    //   }
+    // });
 
     // Sort assessments by priority (qualification first, then by user progress)
     assessments.sort((a, b) => {

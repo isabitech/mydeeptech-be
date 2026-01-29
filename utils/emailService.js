@@ -2,12 +2,13 @@ const brevo = require('@sendinblue/client');
 const fs = require('fs').promises;
 const path = require('path');
 const { promisify } = require('util');
+const envConfig = require('../config/envConfig');
 
 // Initialize Brevo API
 const apiInstance = new brevo.TransactionalEmailsApi();
 apiInstance.setApiKey(
     brevo.TransactionalEmailsApiApiKeys.apiKey,
-    process.env.BREVO_API_KEY
+    envConfig.email.brevo.BREVO_API_KEY
 );
 
 /**
@@ -391,7 +392,7 @@ const sendAssessmentInvitation = async ({
         const emailData = {
             sender: {
                 name: 'Deep Tech Platform',
-                email: process.env.SENDER_EMAIL || 'noreply@deeptech.com'
+                email: envConfig.email.brevo.BREVO_SENDER_EMAIL || 'noreply@deeptech.com'
             },
             to: [{
                 email: userEmail,
@@ -448,7 +449,7 @@ const sendAssessmentStarted = async ({
         const emailData = {
             sender: {
                 name: 'Deep Tech Platform',
-                email: process.env.SENDER_EMAIL || 'noreply@deeptech.com'
+                email: envConfig.email.brevo.BREVO_SENDER_EMAIL || 'noreply@deeptech.com'
             },
             to: [{
                 email: userEmail,
@@ -511,7 +512,7 @@ const sendAssessmentSubmitted = async ({
         const emailData = {
             sender: {
                 name: 'Deep Tech Platform',
-                email: process.env.SENDER_EMAIL || 'noreply@deeptech.com'
+                email: envConfig.email.brevo.BREVO_SENDER_EMAIL || 'noreply@deeptech.com'
             },
             to: [{
                 email: userEmail,
@@ -588,7 +589,7 @@ const sendAssessmentResult = async ({
         const emailData = {
             sender: {
                 name: 'Deep Tech Platform',
-                email: process.env.SENDER_EMAIL || 'noreply@deeptech.com'
+                email: envConfig.email.brevo.BREVO_SENDER_EMAIL || 'noreply@deeptech.com'
             },
             to: [{
                 email: userEmail,
@@ -653,7 +654,7 @@ const sendAssessmentReminder = async ({
         const emailData = {
             sender: {
                 name: 'Deep Tech Platform',
-                email: process.env.SENDER_EMAIL || 'noreply@deeptech.com'
+                email: envConfig.email.brevo.BREVO_SENDER_EMAIL || 'noreply@deeptech.com'
             },
             to: [{
                 email: userEmail,

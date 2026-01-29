@@ -1,4 +1,7 @@
 const { sendEmail } = require('./brevoSMTP');
+const dotenv = require('dotenv');
+dotenv.config();
+
 
 /**
  * Send password reset email using Brevo SMTP
