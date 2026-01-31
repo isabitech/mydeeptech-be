@@ -43,6 +43,7 @@ router.patch('/projects/:projectId', authenticateAdmin, updateAnnotationProject)
 router.patch('/projects/:projectId/toggle-status', authenticateAdmin, toggleProjectStatus);
 router.patch('/projects/:projectId/toggle-visibility', authenticateAdmin, toggleProjectVisibility);
 router.delete('/projects/:projectId', authenticateAdmin, deleteAnnotationProject);
+router.delete('/projects/:projectId/applicants/:applicantId', authenticateAdmin, deleteAnnotationProject);
 router.get('/projects/getApprovedApplicants/:projectId', authenticateAdmin, getApprovedApplicants);
 router.put('/projects/reject-applications-bulk',authenticateAdmin, rejectApplicationsBulk);
 // Project Deletion with OTP Routes (Projects Officer Authorization)

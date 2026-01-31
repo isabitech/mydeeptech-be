@@ -212,6 +212,7 @@ const getAllAnnotationProjects = async (req, res) => {
 
 // Admin function: Get specific annotation project details
 const getAnnotationProjectDetails = async (req, res) => {
+
   try {
     const { projectId } = req.params;
 
@@ -235,8 +236,9 @@ const getAnnotationProjectDetails = async (req, res) => {
     // Get recent applications
     const recentApplications = await ProjectApplication.find({ projectId: project._id })
       .populate('applicantId', 'fullName email annotatorStatus')
+      .populate('reviewedBy', 'fullName email')
       .sort({ appliedAt: -1 })
-      .limit(5);
+      .limit(50);
 
     // Get approved annotators (approved applications with detailed info)
     const approvedAnnotators = await ProjectApplication.find({
@@ -276,7 +278,13 @@ const getAnnotationProjectDetails = async (req, res) => {
     // Format annotators data with application details
     const formatAnnotatorData = (applications) => {
       return applications.map(app => ({
-        applicationId: app._id,
+        // applicationId: app._id,
+          applicantId: {
+        _id: app._id,
+        fullName: app.applicantId.fullName,
+        email: app.applicantId.email,
+        annotatorStatus: app.applicantId.annotatorStatus
+      },
         applicationStatus: app.status,
         appliedAt: app.appliedAt,
         reviewedAt: app.reviewedAt,
@@ -285,6 +293,11 @@ const getAnnotationProjectDetails = async (req, res) => {
         rejectionReason: app.rejectionReason,
         coverLetter: app.coverLetter,
         workStartedAt: app.workStartedAt,
+        availability: app.availability,
+        status: app.status,
+        tasksCompleted: app.tasksCompleted || 0,
+        estimatedCompletionTime: app.estimatedCompletionTime,
+        proposedRate: app.proposedRate,
         annotator: {
           id: app.applicantId._id,
           fullName: app.applicantId.fullName,
@@ -321,6 +334,8 @@ const getAnnotationProjectDetails = async (req, res) => {
       }));
     };
 
+    
+
     // Calculate annotator statistics
     const annotatorStats = {
       total: approvedAnnotators.length + rejectedAnnotators.length + pendingAnnotators.length,
@@ -343,6 +358,41 @@ const getAnnotationProjectDetails = async (req, res) => {
       .limit(10)
       .select('status reviewedAt reviewedBy applicantId reviewNotes rejectionReason');
 
+    // Format recentApplications to match RecentApplication interface
+    const formattedRecentApplications = recentApplications.map(app => ({
+      _id: app._id,
+      projectId: app.projectId,
+      applicantId: {
+        _id: app.applicantId._id,
+        fullName: app.applicantId.fullName,
+        email: app.applicantId.email,
+        annotatorStatus: app.applicantId.annotatorStatus
+      },
+      status: app.status,
+      reviewedAt: app.reviewedAt,
+      reviewedBy: app.reviewedBy ? {
+        _id: app.reviewedBy._id,
+        fullName: app.reviewedBy.fullName,
+        email: app.reviewedBy.email
+      } : null,
+      coverLetter: app.coverLetter,
+      proposedRate: app.proposedRate,
+      availability: app.availability,
+      estimatedCompletionTime: app.estimatedCompletionTime,
+      reviewNotes: app.reviewNotes,
+      rejectionReason: app.rejectionReason,
+      applicantNotified: app.applicantNotified || false,
+      adminNotified: app.adminNotified || false,
+      workStartedAt: app.workStartedAt,
+      workCompletedAt: app.workCompletedAt,
+      tasksCompleted: app.tasksCompleted || 0,
+      qualityScore: app.qualityScore,
+      appliedAt: app.appliedAt,
+      createdAt: app.createdAt,
+      updatedAt: app.updatedAt,
+      __v: app.__v || 0,
+      id: app._id
+    }));
 
     res.status(200).json({
       success: true,
@@ -354,7 +404,7 @@ const getAnnotationProjectDetails = async (req, res) => {
           return acc;
         }, {}),
         annotatorStats: annotatorStats,
-        recentApplications: recentApplications,
+        recentApplications: formattedRecentApplications,
         annotators: {
           approved: formatAnnotatorData(approvedAnnotators),
           rejected: formatAnnotatorData(rejectedAnnotators),
@@ -507,10 +557,14 @@ const toggleProjectVisibility = async (req, res) => {
   }
 };
 
+
 // Admin function: Delete annotation project
 const deleteAnnotationProject = async (req, res) => {
   try {
+  
     const { projectId } = req.params;
+
+      // const deleteAnnotator = await ProjectApplication.find({ projectId: project._id, status: 'approved', applicantId });
 
     const project = await AnnotationProject.findById(projectId);
     if (!project) {
@@ -540,8 +594,10 @@ const deleteAnnotationProject = async (req, res) => {
     }
 
     // Delete the project and all its applications
-    await AnnotationProject.findByIdAndDelete(projectId);
-    await ProjectApplication.deleteMany({ projectId: projectId });
+    await Promise.all([
+      AnnotationProject.findByIdAndDelete(projectId),
+      ProjectApplication.deleteMany({ projectId: projectId })
+    ]);
 
     res.status(200).json({
       success: true,
@@ -1119,6 +1175,10 @@ const removeApprovedApplicant = async (req, res) => {
 
     // Update application status to 'removed' with removal details
     application.status = 'removed';
+    // Ensure resumeUrl has a value to satisfy validation (keep existing or set default)
+    if (!application.resumeUrl) {
+      application.resumeUrl = "No resume provided";
+    }
     application.removedAt = new Date();
     application.removedBy = req.admin.userId;
     application.removalReason = removalReason || 'admin_decision';
