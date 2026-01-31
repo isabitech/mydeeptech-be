@@ -1,4 +1,4 @@
-const AdminNotificationService = require('../services/adminNotification.service');
+const AdminNotificationService = require('../service/notification.service.js');
 
 const createAdminNotification = async (req, res) => {
   try {

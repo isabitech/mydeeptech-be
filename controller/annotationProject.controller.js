@@ -38,7 +38,7 @@ const createProjectSchema = Joi.object({
   projectTrackerLink: Joi.string().uri().allow('').optional().messages({
     'string.uri': 'Project tracker link must be a valid URL'
   }),
-  
+
   // Project status
   isActive: Joi.boolean().default(true)
 });
@@ -130,7 +130,7 @@ const getAllAnnotationProjects = async (req, res) => {
     if (status) filter.status = status;
     if (category) filter.projectCategory = category;
     if (openCloseStatus) filter.openCloseStatus = openCloseStatus;
-    
+
     // Add isActive filter
     if (isActive === 'true') {
       filter.isActive = true;
@@ -138,7 +138,7 @@ const getAllAnnotationProjects = async (req, res) => {
       filter.isActive = false;
     }
     // If isActive is undefined, show all projects
-    
+
     if (search) {
       const searchRegex = new RegExp(search, 'i');
       filter.$or = [
@@ -488,7 +488,7 @@ const toggleProjectVisibility = async (req, res) => {
       message: `Project ${project.openCloseStatus === "open" ? 'opened' : 'closed'} successfully`,
       data: {
         project: {
-            _id: project._id,
+          _id: project._id,
           projectName: project.projectName,
           isActive: project.isActive,
           status: project.status,
@@ -1667,120 +1667,330 @@ const rejectApplicationsBulk = async (req, res) => {
 };
 
 // Bulk approve applications
+// const bulkApproveApplications = async (req, res) => {
+//   try {
+//     const { applicationIds } = req.body;
+
+//     if (!applicationIds || !Array.isArray(applicationIds) || applicationIds.length === 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Application IDs are required and must be a non-empty array"
+//       });
+//     }
+
+//     const results = [];
+//     const errors = [];
+
+//     for (const applicationId of applicationIds) {
+//       try {
+//         // Find and update application
+//         const application = await ProjectApplication.findById(applicationId)
+//           .populate({
+//             path: 'projectId',
+//             select: 'projectName projectCategory payRate approvedAnnotators maxAnnotators'
+//           })
+//           .populate('applicantId', 'fullName email');
+
+//         if (!application) {
+//           errors.push({ applicationId, error: "Application not found" });
+//           continue;
+//         }
+
+//         if (application.status !== 'pending') {
+//           errors.push({ applicationId, error: `Application is already ${application.status}` });
+//           continue;
+//         }
+
+//         // Check if project has reached max annotators
+//         if (application.projectId.maxAnnotators && 
+//             application.projectId.approvedAnnotators && 
+//             application.projectId.approvedAnnotators.length >= application.projectId.maxAnnotators) {
+//           errors.push({ applicationId, error: "Project has reached maximum annotators" });
+//           continue;
+//         }
+
+//         // Update application status
+//         application.status = 'approved';
+//         application.reviewedAt = new Date();
+//         application.reviewedBy = req.admin._id;
+//         application.reviewNotes = 'Bulk approved by admin';
+
+//         await application.save();
+
+//         // Add annotator to project's approved list
+//         if (!application.projectId.approvedAnnotators.includes(application.applicantId._id)) {
+//           await AnnotationProject.findByIdAndUpdate(
+//             application.projectId._id,
+//             { $push: { approvedAnnotators: application.applicantId._id } }
+//           );
+//         }
+
+//         results.push({
+//           applicationId,
+//           applicantName: application.applicantId?.fullName || 'Unknown',
+//           projectName: application.projectId?.projectName || 'Unknown',
+//           status: 'approved'
+//         });
+
+//       } catch (error) {
+//         errors.push({ applicationId, error: error.message });
+//       }
+//     }
+
+//     const totalProcessed = results.length + errors.length;
+//     const successCount = results.length;
+//     const errorCount = errors.length;
+
+//     res.status(200).json({
+//       success: true,
+//       message: `Bulk approval completed: ${successCount} approved, ${errorCount} failed`,
+//       data: {
+//         totalProcessed,
+//         successCount,
+//         errorCount,
+//         approvedApplications: results,
+//         errors: errors
+//       }
+//     });
+
+//   } catch (error) {
+//     console.error("❌ Error bulk approving applications:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Server error bulk approving applications",
+//       error: error.message
+//     });
+//   }
+// };
+
+// Admin function: Bulk approve annotation project applications
 const bulkApproveApplications = async (req, res) => {
+
+  const { applicationIds, reviewNotes } = req.body;
+
+  if (!Array.isArray(applicationIds) || applicationIds.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'applicationIds must be a non-empty array'
+    });
+  }
+
+  const approved = [];
+  const failed = [];
   try {
-    const { applicationIds } = req.body;
-
-    if (!applicationIds || !Array.isArray(applicationIds) || applicationIds.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Application IDs are required and must be a non-empty array"
-      });
-    }
-
-    const results = [];
-    const errors = [];
-
     for (const applicationId of applicationIds) {
       try {
-        // Find and update application
         const application = await ProjectApplication.findById(applicationId)
           .populate({
             path: 'projectId',
-            select: 'projectName projectCategory payRate approvedAnnotators maxAnnotators'
+            select: 'projectName projectCategory payRate approvedAnnotators maxAnnotators projectGuidelineLink projectGuidelineVideo projectCommunityLink projectTrackerLink'
           })
           .populate('applicantId', 'fullName email');
 
         if (!application) {
-          errors.push({ applicationId, error: "Application not found" });
+          failed.push({ applicationId, reason: 'Application not found' });
           continue;
         }
 
         if (application.status !== 'pending') {
-          errors.push({ applicationId, error: `Application is already ${application.status}` });
+          failed.push({
+            applicationId,
+            reason: `Application already ${application.status}`
+          });
           continue;
         }
 
-        // Check if project has reached max annotators
-        if (application.projectId.maxAnnotators && 
-            application.projectId.approvedAnnotators && 
-            application.projectId.approvedAnnotators.length >= application.projectId.maxAnnotators) {
-          errors.push({ applicationId, error: "Project has reached maximum annotators" });
+        const project = application.projectId;
+
+        // Atomic capacity check + increment
+        const updatedProject = await AnnotationProject.findOneAndUpdate(
+          {
+            _id: project._id,
+            ...(project.maxAnnotators && {
+              approvedAnnotators: { $lt: project.maxAnnotators }
+            })
+          },
+          { $inc: { approvedAnnotators: 1 } },
+          { new: true }
+        );
+
+        if (!updatedProject) {
+          failed.push({
+            applicationId,
+            reason: 'Project has reached maximum number of annotators'
+          });
           continue;
         }
 
-        // Update application status
+        // Approve application
         application.status = 'approved';
+        application.reviewedBy = req.admin.userId;
         application.reviewedAt = new Date();
-        application.reviewedBy = req.admin._id;
-        application.reviewNotes = 'Bulk approved by admin';
+        application.reviewNotes = reviewNotes || '';
+        application.workStartedAt = new Date();
 
         await application.save();
 
-        // Add annotator to project's approved list
-        if (!application.projectId.approvedAnnotators.includes(application.applicantId._id)) {
-          await AnnotationProject.findByIdAndUpdate(
-            application.projectId._id,
-            { $push: { approvedAnnotators: application.applicantId._id } }
+        // Send approval email (best-effort)
+        try {
+          const { sendProjectApprovalNotification } = require('../utils/projectMailer');
+
+          await sendProjectApprovalNotification(
+            application.applicantId.email,
+            application.applicantId.fullName,
+            {
+              projectName: project.projectName,
+              projectCategory: project.projectCategory,
+              payRate: project.payRate,
+              adminName: req.admin.fullName,
+              reviewNotes: reviewNotes || '',
+              projectGuidelineLink: project.projectGuidelineLink,
+              projectGuidelineVideo: project.projectGuidelineVideo,
+              projectCommunityLink: project.projectCommunityLink,
+              projectTrackerLink: project.projectTrackerLink
+            }
+          );
+        } catch (emailError) {
+          console.error(
+            `⚠️ Failed to send email for application ${applicationId}:`,
+            emailError.message
           );
         }
 
-        results.push({
+        approved.push({
           applicationId,
-          applicantName: application.applicantId?.fullName || 'Unknown',
-          projectName: application.projectId?.projectName || 'Unknown',
-          status: 'approved'
+          applicantName: application.applicantId.fullName,
+          projectName: project.projectName
         });
 
-      } catch (error) {
-        errors.push({ applicationId, error: error.message });
+      } catch (innerError) {
+        failed.push({
+          applicationId,
+          reason: innerError.message
+        });
       }
     }
 
-    const totalProcessed = results.length + errors.length;
-    const successCount = results.length;
-    const errorCount = errors.length;
-
     res.status(200).json({
       success: true,
-      message: `Bulk approval completed: ${successCount} approved, ${errorCount} failed`,
+      message: 'Bulk approval completed',
       data: {
-        totalProcessed,
-        successCount,
-        errorCount,
-        approvedApplications: results,
-        errors: errors
+        totalRequested: applicationIds.length,
+        approvedCount: approved.length,
+        failedCount: failed.length,
+        approved,
+        failed
       }
     });
 
   } catch (error) {
-    console.error("❌ Error bulk approving applications:", error);
+    console.error('❌ Error during bulk approval:', error);
     res.status(500).json({
       success: false,
-      message: "Server error bulk approving applications",
+      message: 'Server error during bulk approval',
       error: error.message
     });
   }
 };
 
 // Bulk reject applications
+// const bulkRejectApplications = async (req, res) => {
+//   try {
+//     const { applicationIds, rejectionReason = 'other', reviewNotes = 'Bulk rejected by admin' } = req.body;
+
+//     if (!applicationIds || !Array.isArray(applicationIds) || applicationIds.length === 0) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Application IDs are required and must be a non-empty array"
+//       });
+//     }
+
+//     const results = [];
+//     const errors = [];
+
+//     for (const applicationId of applicationIds) {
+//       try {
+//         // Find and update application
+//         const application = await ProjectApplication.findById(applicationId)
+//           .populate({
+//             path: 'projectId',
+//             select: 'projectName projectCategory'
+//           })
+//           .populate('applicantId', 'fullName email');
+
+//         if (!application) {
+//           errors.push({ applicationId, error: "Application not found" });
+//           continue;
+//         }
+
+//         if (application.status !== 'pending') {
+//           errors.push({ applicationId, error: `Application is already ${application.status}` });
+//           continue;
+//         }
+
+//         // Update application status
+//         application.status = 'rejected';
+//         application.reviewedAt = new Date();
+//         application.reviewedBy = req.admin._id;
+//         application.rejectionReason = rejectionReason;
+//         application.reviewNotes = reviewNotes;
+
+//         await application.save();
+
+//         results.push({
+//           applicationId,
+//           applicantName: application.applicantId?.fullName || 'Unknown',
+//           projectName: application.projectId?.projectName || 'Unknown',
+//           status: 'rejected'
+//         });
+
+//       } catch (error) {
+//         errors.push({ applicationId, error: error.message });
+//       }
+//     }
+
+//     const totalProcessed = results.length + errors.length;
+//     const successCount = results.length;
+//     const errorCount = errors.length;
+
+//     res.status(200).json({
+//       success: true,
+//       message: `Bulk rejection completed: ${successCount} rejected, ${errorCount} failed`,
+//       data: {
+//         totalProcessed,
+//         successCount,
+//         errorCount,
+//         rejectedApplications: results,
+//         errors: errors
+//       }
+//     });
+
+//   } catch (error) {
+//     console.error("❌ Error bulk rejecting applications:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Server error bulk rejecting applications",
+//       error: error.message
+//     });
+//   }
+// };
+// Admin function: Bulk reject annotation project applications
 const bulkRejectApplications = async (req, res) => {
   try {
-    const { applicationIds, rejectionReason = 'other', reviewNotes = 'Bulk rejected by admin' } = req.body;
+    const { applicationIds, rejectionReason, reviewNotes } = req.body;
 
-    if (!applicationIds || !Array.isArray(applicationIds) || applicationIds.length === 0) {
+    if (!Array.isArray(applicationIds) || applicationIds.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Application IDs are required and must be a non-empty array"
+        message: 'applicationIds must be a non-empty array'
       });
     }
 
-    const results = [];
-    const errors = [];
+    const rejected = [];
+    const failed = [];
 
     for (const applicationId of applicationIds) {
       try {
-        // Find and update application
         const application = await ProjectApplication.findById(applicationId)
           .populate({
             path: 'projectId',
@@ -1789,61 +1999,106 @@ const bulkRejectApplications = async (req, res) => {
           .populate('applicantId', 'fullName email');
 
         if (!application) {
-          errors.push({ applicationId, error: "Application not found" });
+          failed.push({ applicationId, reason: 'Application not found' });
           continue;
         }
 
         if (application.status !== 'pending') {
-          errors.push({ applicationId, error: `Application is already ${application.status}` });
+          failed.push({
+            applicationId,
+            reason: `Application already ${application.status}`
+          });
           continue;
         }
 
-        // Update application status
+        // Reject application
         application.status = 'rejected';
+        application.reviewedBy = req.admin.userId;
         application.reviewedAt = new Date();
-        application.reviewedBy = req.admin._id;
-        application.rejectionReason = rejectionReason;
-        application.reviewNotes = reviewNotes;
+        application.rejectionReason = rejectionReason || 'other';
+        application.reviewNotes = reviewNotes || '';
 
         await application.save();
 
-        results.push({
+        // Send rejection email (best-effort)
+        try {
+          const { sendProjectRejectionNotification } = require('../utils/projectMailer');
+
+          await sendProjectRejectionNotification(
+            application.applicantId.email,
+            application.applicantId.fullName,
+            {
+              projectName: application.projectId.projectName,
+              projectCategory: application.projectId.projectCategory,
+              adminName: req.admin.fullName,
+              rejectionReason: rejectionReason || 'other',
+              reviewNotes: reviewNotes || ''
+            }
+          );
+        } catch (emailError) {
+          console.error(
+            `⚠️ Failed to send rejection email for application ${applicationId}:`,
+            emailError.message
+          );
+        }
+
+        // Create in-app notification (best-effort)
+        try {
+          await NotificationService.createApplicationStatusNotification(
+            application.applicantId._id,
+            'rejected',
+            {
+              _id: application.projectId._id,
+              projectName: application.projectId.projectName,
+              projectCategory: application.projectId.projectCategory
+            },
+            {
+              _id: application._id
+            }
+          );
+        } catch (notificationError) {
+          console.error(
+            `⚠️ Failed to create rejection notification for application ${applicationId}:`,
+            notificationError.message
+          );
+        }
+
+        rejected.push({
           applicationId,
-          applicantName: application.applicantId?.fullName || 'Unknown',
-          projectName: application.projectId?.projectName || 'Unknown',
-          status: 'rejected'
+          applicantName: application.applicantId.fullName,
+          projectName: application.projectId.projectName
         });
 
-      } catch (error) {
-        errors.push({ applicationId, error: error.message });
+      } catch (innerError) {
+        failed.push({
+          applicationId,
+          reason: innerError.message
+        });
       }
     }
 
-    const totalProcessed = results.length + errors.length;
-    const successCount = results.length;
-    const errorCount = errors.length;
-
     res.status(200).json({
       success: true,
-      message: `Bulk rejection completed: ${successCount} rejected, ${errorCount} failed`,
+      message: 'Bulk rejection completed',
       data: {
-        totalProcessed,
-        successCount,
-        errorCount,
-        rejectedApplications: results,
-        errors: errors
+        totalRequested: applicationIds.length,
+        rejectedCount: rejected.length,
+        failedCount: failed.length,
+        rejected,
+        failed
       }
     });
 
   } catch (error) {
-    console.error("❌ Error bulk rejecting applications:", error);
+    console.error('❌ Error during bulk rejection:', error);
     res.status(500).json({
       success: false,
-      message: "Server error bulk rejecting applications",
+      message: 'Server error during bulk rejection',
       error: error.message
     });
   }
 };
+
 
 module.exports = {
   createAnnotationProject,
