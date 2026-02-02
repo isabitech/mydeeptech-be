@@ -127,6 +127,8 @@ const sendVerificationEmailBrevoAPI = async (email, name, userId) => {
 // Send email via Brevo SMTP (fallback method)
 const sendVerificationEmailBrevoSMTP = async (email, name, userId) => {
   const transporter = createBrevoSMTPTransporter();
+    const FRONTEND_URL = envConfig.NODE_ENV === 'production' ? 'https://mydeeptech.ng' : 'http://localhost:5173';
+    const href = `${FRONTEND_URL}/verify-email/${userId}?email=${encodeURIComponent(email)}`;
   
   const mailOptions = {
     from: `"${envConfig.email.brevo.BREVO_SENDER_NAME || 'MyDeepTech Team'}" <${envConfig.email.brevo.BREVO_SENDER_EMAIL}>`,
@@ -165,10 +167,10 @@ const sendVerificationEmailBrevoSMTP = async (email, name, userId) => {
             <p>Thank you for signing up with MyDeepTech! We're excited to have you on board.</p>
             <p>To complete your registration and verify your email address, please click the button below:</p>
             <div style="text-align: center;">
-              <a href="https://mydeeptech.ng/verify-email/${userId}?email=${encodeURIComponent(email)}" class="button">Verify Email Address</a>
+              <a href="${href}" class="button">Verify Email Address</a>
             </div>
             <p>If the button doesn't work, you can copy and paste this link into your browser:</p>
-            <p class="link">https://mydeeptech.ng/verify-email/${userId}?email=${encodeURIComponent(email)}</p>
+            <p class="link">${href}</p>
             <p>If you didn't create an account with us, please ignore this email.</p>
             <p>Best regards,<br>The MyDeepTech Team</p>
           </div>

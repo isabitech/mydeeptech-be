@@ -23,7 +23,7 @@ if (error) {
 }
 
 const envConfig = {
-  PORT: env.PORT,
+  PORT: Number(env.PORT),
 
   mongo: {
     OLD_MONGO_URI: env.OLD_MONGO_URI,

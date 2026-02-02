@@ -17,14 +17,22 @@ const createProjectSchema = Joi.object({
   payRateCurrency: Joi.string().valid("USD", "EUR", "GBP", "NGN", "KES", "GHS").default("USD"),
   payRateType: Joi.string().valid("per_task", "per_hour", "per_project", "per_annotation").default("per_task"),
   maxAnnotators: Joi.number().min(1).allow(null).optional(),
-  deadline: Joi.date().greater('now').required(),
+  deadline: Joi.date().greater('now').default(() => {
+    const today = new Date();
+    today.setDate(today.getDate() + 7); // Set deadline to 7 days from now
+    return today;
+  }),
   estimatedDuration: Joi.string().max(100).required(),
   difficultyLevel: Joi.string().valid("beginner", "intermediate", "advanced", "expert").required(),
   requiredSkills: Joi.array().items(Joi.string()).default([]),
   minimumExperience: Joi.string().valid("none", "beginner", "intermediate", "advanced").required(),
   languageRequirements: Joi.array().items(Joi.string()).default([]),
   tags: Joi.array().items(Joi.string()).default([]),
-  applicationDeadline: Joi.date().greater('now').required(),
+  applicationDeadline: Joi.date().greater('now').default(() => {
+    const today = new Date();
+    today.setDate(today.getDate() + 7); // Set deadline to 7 days from now
+    return today;
+  }),
   // Project guidelines
   projectGuidelineLink: Joi.string().uri().allow('').optional().messages({
     'string.uri': 'Project guideline link must be a valid URL'
@@ -159,6 +167,10 @@ const getAllAnnotationProjects = async (req, res) => {
 
     // Get total count
     const totalProjects = await AnnotationProject.countDocuments(filter);
+    const activeProjects = await AnnotationProject.countDocuments({ ...filter, isActive: true });
+    const completedProjects = await AnnotationProject.countDocuments({ ...filter, status: 'completed' });
+    const pausedProjects = await AnnotationProject.countDocuments({ ...filter, status: 'paused' });
+
 
     // Get projects summary
     const statusSummary = await AnnotationProject.aggregate([
@@ -187,6 +199,9 @@ const getAllAnnotationProjects = async (req, res) => {
         },
         summary: {
           totalProjects: totalProjects,
+          activeProjects: activeProjects,
+          completedProjects: completedProjects,
+          pausedProjects: pausedProjects,
           statusBreakdown: statusSummary.reduce((acc, item) => {
             acc[item._id] = item.count;
             return acc;
@@ -427,6 +442,7 @@ const getAnnotationProjectDetails = async (req, res) => {
 // Admin function: Update annotation project
 const updateAnnotationProject = async (req, res) => {
   try {
+
     const { projectId } = req.params;
 
     // Validate request body (allow partial updates)
@@ -509,8 +525,8 @@ const toggleProjectStatus = async (req, res) => {
     console.error("❌ Error toggling project active status:", error);
     res.status(500).json({
       success: false,
-      message: "Server error toggling project active status",
-      error: error.message
+      message: `Server error toggling project active status: ${error?.message}`,
+      error: error?.message
     });
   }
 };
