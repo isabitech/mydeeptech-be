@@ -23,6 +23,12 @@ const transporter = nodemailer.createTransport({
 
 // Gmail SMTP fallback function
 const sendVerificationEmailGmail = async (email, name, userId) => {
+
+  // href="https://mydeeptech.ng/api/auth/verifyDTusermail/${userId}?email=${encodeURIComponent(email)}";
+
+  const BACKEND_URL = envConfig.NODE_ENV === 'production' ? 'https://mydeeptech.ng' : 'http://localhost:4000';
+  const href = `${BACKEND_URL}/api/auth/verifyDTusermail/${userId}?email=${encodeURIComponent(email)}`;
+
   const mailOptions = {
     from: `"MyDeepTech Team" <${envConfig.email.legacy.EMAIL_USER}>`,
     to: email,
@@ -30,7 +36,7 @@ const sendVerificationEmailGmail = async (email, name, userId) => {
     html: `
       <h2>Hello ${name},</h2>
       <p>Thank you for signing up. Please click the link below to verify your email:</p>
-      <a href="https://mydeeptech.ng/api/auth/verifyDTusermail/${userId}?email=${encodeURIComponent(email)}">Verify Email</a>
+      <a href="${href}">Verify Email</a>
     `,
   };
 

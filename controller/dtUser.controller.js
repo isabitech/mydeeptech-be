@@ -128,6 +128,8 @@ const verifyEmail = async (req, res) => {
 
     // Find user by ID and email for extra security
     const user = await DTUser.findById(id);
+
+    console.log(`🔍 User lookup result:`, user);
     
     if (!user) {
       console.log(`❌ User not found with ID: ${id}`);
@@ -2606,40 +2608,22 @@ const resendVerificationEmail = async (req, res) => {
 const getAvailableProjects = async (req, res) => {
   try {
     const userId = req.user.userId;
-    console.log(`🔍 User ${req.user.email} requesting available projects`);
-    console.log(`📋 User data from middleware:`, {
-      userId: req.user.userId,
-      email: req.user.email,
-      fullName: req.user.fullName,
-      userDocStatus: req.user.userDoc?.annotatorStatus
-    });
 
     // Get fresh user data to ensure we have the latest status
     const user = await DTUser.findById(userId);
     if (!user) {
-      console.log(`❌ User ${req.user.email} not found in database`);
       return res.status(404).json({
         success: false,
         message: "User not found."
       });
     }
 
-    console.log(`📋 Fresh user data from DB:`, {
-      userId: user._id,
-      email: user.email,
-      annotatorStatus: user.annotatorStatus,
-      isEmailVerified: user.isEmailVerified
-    });
-
     if (user.annotatorStatus !== 'approved') {
-      console.log(`❌ User ${req.user.email} access denied - Status: ${user.annotatorStatus}`);
       return res.status(403).json({
         success: false,
         message: "Access denied. Only approved annotators can view projects."
       });
     }
-
-    console.log(`✅ User ${req.user.email} approved - Status: ${user.annotatorStatus}`);
 
     // Get query parameters
     const page = parseInt(req.query.page) || 1;
@@ -2653,7 +2637,6 @@ const getAvailableProjects = async (req, res) => {
     const view = req.query.view || 'available'; // 'available', 'applied', 'all'
     const applicationStatus = req.query.status; // 'pending', 'approved', 'rejected'
 
-    console.log(`🔍 Projects view requested: ${view}, status filter: ${applicationStatus || 'none'}`);
 
     // Build base filter for projects
     const filter = {
@@ -2662,16 +2645,16 @@ const getAvailableProjects = async (req, res) => {
     };
 
     // Only apply application deadline filter for available projects
-    if (view === 'available') {
-      filter.$or = [
-        { applicationDeadline: { $gt: new Date() } },
-        { applicationDeadline: null }
-      ];
-    }
+    // if (view === 'available') {
+    //   filter.$or = [
+    //     { applicationDeadline: { $gt: new Date() } },
+    //     { applicationDeadline: null }
+    //   ];
+    // }
 
     if (category) filter.projectCategory = category;
     if (difficultyLevel) filter.difficultyLevel = difficultyLevel;
-    
+
     if (minPayRate || maxPayRate) {
       filter.payRate = {};
       if (minPayRate) filter.payRate.$gte = parseFloat(minPayRate);
@@ -2690,11 +2673,11 @@ const getAvailableProjects = async (req, res) => {
       });
     }
 
-    console.log('🔍 Projects filter:', JSON.stringify(filter, null, 2));
+    // console.log('🔍 Projects filter:', JSON.stringify(filter, null, 2));
 
     // Get user's existing applications with details
     let userApplicationsQuery = { applicantId: userId };
-    
+
     // If viewing applied projects with specific status, filter applications first
     if (view === 'applied' && applicationStatus) {
       userApplicationsQuery.status = applicationStatus;
@@ -2702,8 +2685,9 @@ const getAvailableProjects = async (req, res) => {
 
     const userApplications = await ProjectApplication.find(userApplicationsQuery)
       .populate('projectId').lean();
-    
+
     const appliedProjectIds = userApplications.map(app => app.projectId._id);
+
     const applicationMap = new Map();
     userApplications.forEach(app => {
       if (app.projectId) {
@@ -2731,12 +2715,13 @@ const getAvailableProjects = async (req, res) => {
     if (view === 'available') {
       // Show only projects user hasn't applied to (need all applications for this)
       const allUserApps = await ProjectApplication.find({ applicantId: userId }).select('projectId').lean();
-      const allAppliedProjectIds = allUserApps.map(app => app.projectId);
-      
-      if (allAppliedProjectIds.length > 0) {
-        finalFilter._id = { $nin: allAppliedProjectIds };
-      }
-      
+    
+      // This filter is filters out projects the user has applied to
+      // const allAppliedProjectIds = allUserApps.map(app => app.projectId);
+      // if (allAppliedProjectIds.length > 0) {
+      //   finalFilter._id = { $nin: allAppliedProjectIds };
+      // }
+ 
       projects = await AnnotationProject.find(finalFilter)
         .populate('createdBy', 'fullName email')
         .select('-assignedAdmins')
@@ -2749,13 +2734,27 @@ const getAvailableProjects = async (req, res) => {
 
     } else if (view === 'applied') {
       // Show only projects user has applied to (filtered by status if specified)
-      if (appliedProjectIds.length === 0) {
-        projects = [];
-        totalProjects = 0;
-      } else {
-        finalFilter._id = { $in: appliedProjectIds };
+      // if (appliedProjectIds.length === 0) {
+      //   projects = [];
+      //   totalProjects = 0;
+      // } else {
 
-        projects = await AnnotationProject.find(finalFilter)
+      //   finalFilter._id = { $in: appliedProjectIds };
+
+      //   projects = await AnnotationProject.find(finalFilter)
+      //     .populate('createdBy', 'fullName email')
+      //     .select('-assignedAdmins')
+      //     .sort({ createdAt: -1 })
+      //     .skip(skip)
+      //     .limit(limit)
+      //     .lean();
+
+      //   console.log("PROJECTS FOUND:", projects);
+
+      //   totalProjects = await AnnotationProject.countDocuments(finalFilter);
+      // }
+
+       projects = await AnnotationProject.find({ openCloseStatus: "open" })
           .populate('createdBy', 'fullName email')
           .select('-assignedAdmins')
           .sort({ createdAt: -1 })
@@ -2763,8 +2762,8 @@ const getAvailableProjects = async (req, res) => {
           .limit(limit)
           .lean();
 
-        totalProjects = await AnnotationProject.countDocuments(finalFilter);
-      }
+      // console.log("PROJECTS FOUND:", projects);
+      totalProjects = await AnnotationProject.countDocuments({ openCloseStatus: "open" });
 
     } else if (view === 'all') {
       // Show all active projects with application status
@@ -2775,8 +2774,8 @@ const getAvailableProjects = async (req, res) => {
         .skip(skip)
         .limit(limit)
         .lean();
-
-      totalProjects = await AnnotationProject.countDocuments(finalFilter);
+  
+        totalProjects = await AnnotationProject.countDocuments(finalFilter);
     }
 
     // Add application and project metadata
@@ -2786,6 +2785,7 @@ const getAvailableProjects = async (req, res) => {
         projectId: project._id,
         status: { $in: ['pending', 'approved'] }
       });
+
       project.currentApplications = appCount;
       project.availableSlots = project.maxAnnotators ? Math.max(0, project.maxAnnotators - appCount) : null;
       project.canApply = !project.maxAnnotators || appCount < project.maxAnnotators;
@@ -2812,8 +2812,6 @@ const getAvailableProjects = async (req, res) => {
         project.daysUntilDeadline = null;
       }
     }
-
-    console.log(`✅ Found ${projects.length} projects for view: ${view}`);
 
     // Calculate pagination info
     const totalPages = Math.ceil(totalProjects / limit);
