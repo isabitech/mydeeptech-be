@@ -147,6 +147,8 @@ const getAllAnnotationProjects = async (req, res) => {
     }
     // If isActive is undefined, show all projects
 
+
+
     if (search) {
       const searchRegex = new RegExp(search, 'i');
       filter.$or = [
