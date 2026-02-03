@@ -2607,6 +2607,7 @@ const resendVerificationEmail = async (req, res) => {
 // DTUser function: Get available projects (only for approved annotators)
 const getAvailableProjects = async (req, res) => {
   try {
+
     const userId = req.user.userId;
 
     // Get fresh user data to ensure we have the latest status
@@ -2644,7 +2645,6 @@ const getAvailableProjects = async (req, res) => {
     };
 
     // Only apply application deadline filter for available projects
-
 
     // if (view === 'available') {
     //   filter.$or = [
@@ -2750,6 +2750,7 @@ const getAvailableProjects = async (req, res) => {
         totalProjects = await AnnotationProject.countDocuments(finalFilter);
       }
 
+      //NEW FILTER
       //  projects = await AnnotationProject.find({ openCloseStatus: "open" })
       //     .populate('createdBy', 'fullName email')
       //     .select('-assignedAdmins')
@@ -2910,12 +2911,12 @@ const applyToProject = async (req, res) => {
     }
 
     // Check application deadline
-    if (project.applicationDeadline && project.applicationDeadline < new Date()) {
-      return res.status(400).json({
-        success: false,
-        message: "Application deadline has passed"
-      });
-    }
+    // if (project.applicationDeadline && project.applicationDeadline < new Date()) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: "Application deadline has passed"
+    //   });
+    // }
 
     // Check if user has already applied
     const ProjectApplication = require('../models/projectApplication.model');
