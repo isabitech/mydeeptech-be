@@ -2637,7 +2637,6 @@ const getAvailableProjects = async (req, res) => {
     const view = req.query.view || 'available'; // 'available', 'applied', 'all'
     const applicationStatus = req.query.status; // 'pending', 'approved', 'rejected'
 
-
     // Build base filter for projects
     const filter = {
       status: 'active',
@@ -2645,6 +2644,8 @@ const getAvailableProjects = async (req, res) => {
     };
 
     // Only apply application deadline filter for available projects
+
+
     // if (view === 'available') {
     //   filter.$or = [
     //     { applicationDeadline: { $gt: new Date() } },
@@ -2672,8 +2673,6 @@ const getAvailableProjects = async (req, res) => {
         ]
       });
     }
-
-    // console.log('🔍 Projects filter:', JSON.stringify(filter, null, 2));
 
     // Get user's existing applications with details
     let userApplicationsQuery = { applicantId: userId };
@@ -2717,10 +2716,11 @@ const getAvailableProjects = async (req, res) => {
       const allUserApps = await ProjectApplication.find({ applicantId: userId }).select('projectId').lean();
     
       // This filter is filters out projects the user has applied to
-      // const allAppliedProjectIds = allUserApps.map(app => app.projectId);
-      // if (allAppliedProjectIds.length > 0) {
-      //   finalFilter._id = { $nin: allAppliedProjectIds };
-      // }
+
+      const allAppliedProjectIds = allUserApps.map(app => app.projectId);
+      if (allAppliedProjectIds.length > 0) {
+        finalFilter._id = { $nin: allAppliedProjectIds };
+      }
  
       projects = await AnnotationProject.find(finalFilter)
         .populate('createdBy', 'fullName email')
@@ -2734,36 +2734,30 @@ const getAvailableProjects = async (req, res) => {
 
     } else if (view === 'applied') {
       // Show only projects user has applied to (filtered by status if specified)
-      // if (appliedProjectIds.length === 0) {
-      //   projects = [];
-      //   totalProjects = 0;
-      // } else {
+      if (appliedProjectIds.length === 0) {
+        projects = [];
+        totalProjects = 0;
+      } else {
 
-      //   finalFilter._id = { $in: appliedProjectIds };
-
-      //   projects = await AnnotationProject.find(finalFilter)
-      //     .populate('createdBy', 'fullName email')
-      //     .select('-assignedAdmins')
-      //     .sort({ createdAt: -1 })
-      //     .skip(skip)
-      //     .limit(limit)
-      //     .lean();
-
-      //   console.log("PROJECTS FOUND:", projects);
-
-      //   totalProjects = await AnnotationProject.countDocuments(finalFilter);
-      // }
-
-       projects = await AnnotationProject.find({ openCloseStatus: "open" })
+        finalFilter._id = { $in: appliedProjectIds };
+        projects = await AnnotationProject.find(finalFilter)
           .populate('createdBy', 'fullName email')
           .select('-assignedAdmins')
           .sort({ createdAt: -1 })
           .skip(skip)
           .limit(limit)
           .lean();
+        totalProjects = await AnnotationProject.countDocuments(finalFilter);
+      }
 
-      // console.log("PROJECTS FOUND:", projects);
-      totalProjects = await AnnotationProject.countDocuments({ openCloseStatus: "open" });
+      //  projects = await AnnotationProject.find({ openCloseStatus: "open" })
+      //     .populate('createdBy', 'fullName email')
+      //     .select('-assignedAdmins')
+      //     .sort({ createdAt: -1 })
+      //     .skip(skip)
+      //     .limit(limit)
+      //     .lean();
+      // totalProjects = await AnnotationProject.countDocuments({ openCloseStatus: "open" });
 
     } else if (view === 'all') {
       // Show all active projects with application status
@@ -2774,7 +2768,6 @@ const getAvailableProjects = async (req, res) => {
         .skip(skip)
         .limit(limit)
         .lean();
-  
         totalProjects = await AnnotationProject.countDocuments(finalFilter);
     }
 
