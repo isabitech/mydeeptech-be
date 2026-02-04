@@ -3,6 +3,8 @@ const subCategorySchema = new mongoose.Schema({
     name: { type: String, required: true },
     slug: { type: String, required: true, unique: true },
     category: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', required: true }
+},{
+  timestamps: true // Enable automatic timestamps
 });
 
 module.exports = mongoose.model('SubCategory', subCategorySchema);
