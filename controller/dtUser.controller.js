@@ -12,8 +12,7 @@ const { sendAdminVerificationEmail } = require("../utils/adminMailer");
 const { sendAnnotatorApprovalEmail, sendAnnotatorRejectionEmail } = require("../utils/annotatorMailer");
 const adminVerificationStore = require("../utils/adminVerificationStore");
 const envConfig = require("../config/envConfig");
-
-
+const { RoleType } = require("../utils/role");
 
 // Option 1: Send email with timeout (current implementation)
 const createDTUser = async (req, res) => {
@@ -4426,6 +4425,177 @@ const getProjectGuidelines = async (req, res) => {
   }
 };
 
+
+// Get all users for role management
+const getAllUsersForRoleManagement = async (req, res) => {
+  try {
+    // Extract pagination and search parameters with validation
+    const requestedPage = req.query.page;
+    const requestedLimit = req.query.limit;
+    const searchTerm = req.query.search?.trim() || '';
+    
+    const page = Math.max(1, parseInt(requestedPage) || 1);
+    // const limit = Math.min(100, Math.max(1, parseInt(requestedLimit) || 20)); // Default to 20, cap at 100
+
+    const parsedLimit = parseInt(requestedLimit);
+    const limit = Number.isNaN(parsedLimit)
+      ? 20
+      : Math.min(Math.max(parsedLimit, 1), 20);
+    const skip = (page - 1) * limit;
+
+    // Build search query
+    let searchQuery = {};
+    if (searchTerm) {
+      const searchRegex = new RegExp(searchTerm, 'i'); // Case-insensitive search
+      searchQuery = {
+        $or: [
+          { fullName: { $regex: searchRegex } },
+          { email: { $regex: searchRegex } },
+          { phone: { $regex: searchRegex } },
+          { role: { $regex: searchRegex } }
+        ]
+      };
+    }
+   
+    // Get total count of users for pagination metadata (with search filter)
+    const totalUsers = await DTUser.countDocuments(searchQuery);
+
+    // Get paginated DTUsers including admins (exclude passwords) with search filter
+    const dtUsers = await DTUser.find(searchQuery)
+      .select('-password')
+      .sort({ createdAt: -1 }) // Sort by creation date, newest first
+      .skip(skip)
+      .limit(limit);
+
+    // Transform DTUsers to match User schema format
+    const transformedDTUsers = dtUsers.map(dtUser => ({
+      _id: dtUser._id,
+      firstname: dtUser.fullName ? dtUser.fullName.split(' ')[0] : '',
+      lastname: dtUser.fullName ? dtUser.fullName.split(' ').slice(1).join(' ') : '',
+      username: dtUser.email.split('@')[0], // Use email prefix as username
+      email: dtUser.email,
+      phone: dtUser.phone,
+      role: dtUser.role ?? "user", // Admin if mydeeptech email
+      createdAt: dtUser.createdAt,
+      updatedAt: dtUser.updatedAt,
+    }));
+
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(totalUsers / limit);
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
+
+    if (!transformedDTUsers || transformedDTUsers.length === 0) {
+      return res.status(200).json({
+        responseCode: "200",
+        message: searchTerm ? `No users found matching "${searchTerm}"` : "No users found",
+        data: [],
+        pagination: {
+          currentPage: page,
+          totalPages: 0,
+          totalUsers: 0,
+          usersPerPage: limit,
+          hasNextPage: false,
+          hasPrevPage: false,
+          usersOnCurrentPage: 0
+        }
+      });
+    }
+
+    res.status(200).json({
+      responseCode: "200",
+      responseMessage: searchTerm 
+        ? `Users matching "${searchTerm}" retrieved successfully` 
+        : "All users retrieved successfully",
+      data: transformedDTUsers,
+      pagination: {
+        currentPage: page,
+        totalPages: totalPages,
+        totalUsers: totalUsers,
+        usersPerPage: limit,
+        hasNextPage: hasNextPage,
+        hasPrevPage: hasPrevPage,
+        usersOnCurrentPage: transformedDTUsers.length
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching all users for role management:', error);
+    res.status(500).json({
+      responseCode: "500",
+      responseMessage: "Internal server error",
+      data: error.message
+    });
+  }
+};
+
+// Update user role controller
+const updateUserRole = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { role, reason } = req.body;
+
+    // Validate role
+    if (!Object.values(RoleType).includes(role.toLowerCase())) {
+      return res.status(400).json({
+        responseCode: "400",
+        responseMessage: "Invalid role specified",
+        data: null
+      });
+    }
+
+    // Find and update user
+    const user = await DTUser.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        responseCode: "404",
+        responseMessage: "User not found",
+        data: null
+      });
+    }
+
+    const previousRole = user.role;
+    user.role = role ? role.toLowerCase() : user.role;
+    await user.save();
+
+
+    // Remove password from response
+    const updatedUser = user.toObject();
+    delete updatedUser.password;
+
+    const userResponse = {
+        _id: user._id,
+      firstname: user.fullName ? user.fullName.split(' ')[0] : '',
+      lastname: user.fullName ? user.fullName.split(' ').slice(1).join(' ') : '',
+      username: user.email.split('@')[0], // Use email prefix as username
+      email: user.email,
+      phone: user.phone,
+      role: user.role ?? "user", // Admin if mydeeptech email
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    }
+
+    res.status(200).json({
+      responseCode: "200",
+      responseMessage: `User role updated successfully from ${previousRole} to ${role}`,
+      data: {
+        user: userResponse,
+        previousRole,
+        newRole: role,
+        reason: reason || null
+      }
+    });
+
+  } catch (error) {
+    console.error('Error updating user role:', error);
+    res.status(500).json({
+      responseCode: "500",
+      responseMessage: "Internal server error",
+      data: error.message
+    });
+  }
+};
+
 module.exports = { 
   createDTUser, 
   createDTUserWithBackgroundEmail, 
@@ -4464,5 +4634,7 @@ module.exports = {
   getUserResultSubmissions,
   uploadIdDocument,
   uploadResume,
-  getProjectGuidelines
+  getProjectGuidelines,
+  getAllUsersForRoleManagement,
+  updateUserRole,
 };

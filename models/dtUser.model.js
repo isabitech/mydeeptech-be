@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { RoleType } = require("../utils/role");
 
 const dtUserSchema = new mongoose.Schema(
   {
@@ -15,6 +16,12 @@ const dtUserSchema = new mongoose.Schema(
         type: String, 
         required: true, 
         unique: true 
+    },
+       role: {
+        type: String,
+        required: "Role name is required",
+        enum: [RoleType.USER, RoleType.ADMIN, RoleType.ANNOTATOR, RoleType.MODERATOR, RoleType.QA_REVIEWER],
+        default: RoleType.USER
     },
     domains: { 
         type: [String], 

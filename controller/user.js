@@ -1,7 +1,7 @@
 const { response } = require('express');
 const User = require('../models/user');
 const { signupSchema, loginSchema } = require('../utils/authValidator');
-const { RoleType } = require('../utils/role')
+const { RoleType, RolePermissions, getRolePermissionsWithDetails } = require('../utils/role')
 const bcrypt = require('bcrypt');
 
 // Signup controller
@@ -120,4 +120,112 @@ const getUsers = async (req, res) => {
   }
 };
 
-module.exports = { signup, login, getAllUsers, getUsers };
+
+// Get user by ID controller
+const getUserById = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const user = await User.findById(userId).select('-password');
+    if (!user) {
+      return res.status(404).json({
+        responseCode: "99",
+        responseMessage: "User not found",
+        data: null
+      });
+    }
+
+    res.status(200).json({
+      responseCode: "90",
+      responseMessage: "User retrieved successfully",
+      data: user
+    });
+
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    res.status(500).json({
+      responseCode: "99",
+      responseMessage: "Internal server error",
+      data: error.message
+    });
+  }
+};
+
+// Get all roles with permissions
+const getRoles = async (req, res) => {
+  try {
+    const roles = Object.keys(RoleType).map(key => ({
+      id: key.toLowerCase(),
+      name: RoleType[key].toLowerCase(),
+      displayName: key.charAt(0).toUpperCase() + key.slice(1).toLowerCase().replace('_', ' '),
+      permissions: getRolePermissionsWithDetails(key),
+      isEditable: RoleType[key] !== RoleType.ADMIN
+    }));
+
+    res.status(200).json({
+      responseCode: "90",
+      responseMessage: "Roles retrieved successfully",
+      data: roles
+    });
+
+  } catch (error) {
+    console.error('Error fetching roles:', error);
+    res.status(500).json({
+      responseCode: "99",
+      responseMessage: "Internal server error",
+      data: error.message
+    });
+  }
+};
+
+// Get role statistics
+const getRoleStatistics = async (req, res) => {
+  try {
+    const pipeline = [
+      {
+        $group: {
+          _id: "$role",
+          count: { $sum: 1 }
+        }
+      }
+    ];
+
+    const stats = await User.aggregate(pipeline);
+    
+    // Format the statistics
+    const roleStats = {};
+    Object.values(RoleType).forEach(role => {
+      roleStats[role.toLowerCase()] = 0;
+    });
+
+    stats.forEach(stat => {
+      roleStats[stat._id.toLowerCase()] = stat.count;
+    });
+
+    res.status(200).json({
+      responseCode: "90",
+      responseMessage: "Role statistics retrieved successfully",
+      data: roleStats
+    });
+
+  } catch (error) {
+    console.error('Error fetching role statistics:', error);
+    res.status(500).json({
+      responseCode: "99",
+      responseMessage: "Internal server error",
+      data: error.message
+    });
+  }
+};
+
+
+
+module.exports = { 
+  signup, 
+  login, 
+  getAllUsers, 
+  getUsers,
+  getUserById, 
+  getRoles, 
+  getRoleStatistics 
+};

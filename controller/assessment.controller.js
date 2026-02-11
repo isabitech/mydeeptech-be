@@ -37,6 +37,7 @@ const getAssessmentsSchema = Joi.object({
  * Submit assessment and update user status automatically
  * POST /api/assessments/submit
  */
+
 const submitAssessment = async (req, res) => {
   try {
     const userId = req.user?.userId || req.userId;

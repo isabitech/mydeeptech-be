@@ -1571,8 +1571,11 @@ const removeAssessmentFromProject = async (req, res) => {
 /**
  * Admin function: Get available assessment configurations
  */
+
 const getAvailableAssessments = async (req, res) => {
+
   try {
+
     const MultimediaAssessmentConfig = require('../models/multimediaAssessmentConfig.model');
 
     const assessments = await MultimediaAssessmentConfig.find({ isActive: true })
@@ -1842,6 +1845,8 @@ const rejectApplicationsBulk = async (req, res) => {
 // };
 
 // Admin function: Bulk approve annotation project applications
+
+
 const bulkApproveApplications = async (req, res) => {
 
   const { applicationIds, reviewNotes } = req.body;

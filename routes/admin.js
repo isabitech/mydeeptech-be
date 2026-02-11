@@ -1,5 +1,6 @@
 const express = require('express');
-const { getAllDTUsers, getAllAdminUsers, getAdminDashboard, approveAnnotator, approveUserForQA, rejectUserForQA, getAllQAUsers, rejectAnnotator, getDTUserAdmin, createAdmin, requestAdminVerification, confirmAdminVerification, verifyAdminOTP, adminLogin } = require('../controller/dtUser.controller.js');
+const { getAllDTUsers, getAllAdminUsers, getAdminDashboard, approveAnnotator, approveUserForQA, rejectUserForQA, getAllQAUsers, rejectAnnotator, getDTUserAdmin, createAdmin, requestAdminVerification, confirmAdminVerification, verifyAdminOTP, adminLogin, getAllUsersForRoleManagement, updateUserRole } = require('../controller/dtUser.controller.js');
+const { getRoles } = require('../controller/user.js');
 const { createAnnotationProject, getAllAnnotationProjects, getAnnotationProjectDetails, updateAnnotationProject, toggleProjectStatus, toggleProjectVisibility, deleteAnnotationProject, requestProjectDeletionOTP, verifyOTPAndDeleteProject, getAnnotationProjectApplications, approveAnnotationProjectApplication, rejectAnnotationProjectApplication, removeApprovedApplicant, getRemovableApplicants, exportApprovedAnnotatorsCSV, attachAssessmentToProject, removeAssessmentFromProject, getAvailableAssessments, rejectApplicationsBulk, getApprovedApplicants, bulkApproveApplications, bulkRejectApplications } = require('../controller/annotationProject.controller.js');
 const { createInvoice, getAllInvoices, getInvoiceDetails, updatePaymentStatus, sendInvoiceReminder, deleteInvoice, bulkAuthorizePayment, generatePaystackCSV, generateMPESACSV } = require('../controller/invoice.controller.js');
 const { getAdminNotifications, createAnnouncement, getNotificationStats, cleanupNotifications, broadcastNotification } = require('../controller/notification.controller.js');
@@ -35,6 +36,11 @@ router.patch('/dtusers/:userId/qa-reject', authenticateAdmin, rejectUserForQA);
 router.get('/qa-users', authenticateAdmin, getAllQAUsers);
 router.patch('/dtusers/:userId/reject', authenticateAdmin, rejectAnnotator);
 
+// User Role Management Routes
+router.put('/users/:userId/role', authenticateAdmin, updateUserRole);
+router.get('/users/all', authenticateAdmin, getAllUsersForRoleManagement);
+router.get('/roles', authenticateAdmin, getRoles);
+
 // Project Management Routes
 router.post('/projects', authenticateAdmin, createAnnotationProject);
 router.get('/projects', authenticateAdmin, getAllAnnotationProjects);
@@ -45,7 +51,7 @@ router.patch('/projects/:projectId/toggle-visibility', authenticateAdmin, toggle
 router.delete('/projects/:projectId', authenticateAdmin, deleteAnnotationProject);
 router.delete('/projects/:projectId/applicants/:applicantId', authenticateAdmin, deleteAnnotationProject);
 router.get('/projects/getApprovedApplicants/:projectId', authenticateAdmin, getApprovedApplicants);
-router.put('/projects/reject-applications-bulk',authenticateAdmin, rejectApplicationsBulk);
+router.put('/projects/reject-applications-bulk', authenticateAdmin, rejectApplicationsBulk);
 // Project Deletion with OTP Routes (Projects Officer Authorization)
 router.post('/projects/:projectId/request-deletion-otp', authenticateAdmin, requestProjectDeletionOTP);
 router.post('/projects/:projectId/verify-deletion-otp', authenticateAdmin, verifyOTPAndDeleteProject);
