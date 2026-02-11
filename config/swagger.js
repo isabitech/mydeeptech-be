@@ -3,6 +3,8 @@ const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 const envConfig = require('./envConfig');
 
+const description = envConfig.NODE_ENV === 'production' ? 'Production server' : 'Development server';
+
 const options = {
   definition: {
     openapi: '3.0.0',
@@ -19,7 +21,7 @@ const options = {
     servers: [
       {
         url: envConfig.SWAGGER_URL,
-        description: envConfig.NODE_ENV === 'production' ? 'Production server' : 'Development server',
+        description,
       },
     ],
     components: {
