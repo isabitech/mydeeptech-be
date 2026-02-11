@@ -79,7 +79,10 @@ const envConfig = {
   EXCHANGE_RATE_API_KEY: env.EXCHANGE_RATE_API_KEY,
   EXCHANGE_RATES_API_KEY: env.EXCHANGE_RATES_API_KEY,
 
- NODE_ENV: env.NODE_ENV || nodeEnv
+ NODE_ENV: env.NODE_ENV || nodeEnv,
+
+ SWAGGER_URL: env.NODE_ENV === 'production' ? 'https://mydeeptech-be.onrender.com' : 'http://localhost:4000',
+
 };
 
 

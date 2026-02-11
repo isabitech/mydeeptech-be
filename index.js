@@ -129,7 +129,7 @@ if (swaggerUi && specs) {
     customfavIcon: "/favicon.ico",
     customCss: '.swagger-ui .topbar { display: none }'
   }));
-  console.log('📚 API Documentation available at: http://localhost:5000/api-docs');
+  console.log(`📚 API Documentation available at: ${envConfig.SWAGGER_URL}/api-docs`);
 } else {
   console.log('📚 API Documentation not available (Swagger dependencies missing)');
 }
