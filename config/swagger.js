@@ -21,7 +21,6 @@ const options = {
         url: envConfig.SWAGGER_URL,
         description: envConfig.NODE_ENV === 'production' ? 'Production server' : 'Development server',
       },
-     
     ],
     components: {
       securitySchemes: {
