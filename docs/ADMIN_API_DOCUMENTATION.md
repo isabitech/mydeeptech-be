@@ -600,20 +600,20 @@ Use the provided test files:
 
 ```bash
 # Login as admin
-curl -X POST http://localhost:5000/api/admin/login \
+curl -X POST http://localhost:4000/api/admin/login \
   -H "Content-Type: application/json" \
   -d '{"email":"admin@mydeeptech.ng","password":"password"}'
 
 # Get dashboard data
-curl -X GET http://localhost:5000/api/admin/dashboard \
+curl -X GET http://localhost:4000/api/admin/dashboard \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 
 # Get DTUsers
-curl -X GET "http://localhost:5000/api/admin/dtusers?page=1&limit=10" \
+curl -X GET "http://localhost:4000/api/admin/dtusers?page=1&limit=10" \
   -H "Authorization: Bearer YOUR_JWT_TOKEN"
 
 # Approve annotator
-curl -X PATCH http://localhost:5000/api/admin/dtusers/USER_ID/approve \
+curl -X PATCH http://localhost:4000/api/admin/dtusers/USER_ID/approve \
   -H "Authorization: Bearer YOUR_JWT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"newStatus":"approved"}'

@@ -245,10 +245,10 @@ await canSendHourlyEmail(userId, 'urgent_alerts');
 ### API Testing
 ```bash
 # Test admin endpoints
-curl -X GET "http://localhost:5000/api/admin/email-tracking/status/user123" \
+curl -X GET "http://localhost:4000/api/admin/email-tracking/status/user123" \
   -H "Authorization: Bearer admin_token"
 
-curl -X POST "http://localhost:5000/api/admin/email-tracking/reset/user123" \
+curl -X POST "http://localhost:4000/api/admin/email-tracking/reset/user123" \
   -H "Authorization: Bearer admin_token" \
   -H "Content-Type: application/json" \
   -d '{"emailType": "admin_reply"}'
