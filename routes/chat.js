@@ -10,7 +10,7 @@ const {
   joinChatAsAdmin,
   closeChatSession,
   getChatTicketById
-} = require('../controller/chatSupport.controller.js');
+} = require('../controllers/chatSupport.controller.js');
 
 const router = express.Router();
 

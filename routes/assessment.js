@@ -13,7 +13,7 @@ const {
   getAssessmentSubmissions,
   getAdminAssessmentsOverview,
   getUserAssessmentsOverview
-} = require('../controller/assessment.controller');
+} = require('../controllers/assessment.controller');
 
 const {
   startAssessmentSession,
@@ -23,7 +23,7 @@ const {
   controlTimer,
   submitAssessment: submitMultimediaAssessment,
   getAvailableReels
-} = require('../controller/multimediaAssessmentSession.controller');
+} = require('../controllers/multimediaAssessmentSession.controller');
 
 // Import Spidey Assessment Controller (integrates with existing system)
 const {
@@ -33,7 +33,7 @@ const {
   submitStage3,
   submitStage4,
   getSpideyAssessmentStatus
-} = require('../controller/spideyAssessment.controller');
+} = require('../controllers/spideyAssessment.controller');
 
 // Import middleware
 const { authenticateToken } = require('../middleware/auth');

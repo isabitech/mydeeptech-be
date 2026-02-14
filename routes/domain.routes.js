@@ -210,7 +210,7 @@ router.get(
 /**
  * @swagger
  * paths:
- *   /domains:
+ *   /domain:
  *     post:
  *       summary: Create a domain
  *       tags: [Domain]
@@ -234,12 +234,12 @@ router.get(
  *         201:
  *           description: Domain created
  */
-router.post('/domains', domainController.create);
+router.post('/', domainController.create);
 
 /**
  * @swagger
  * paths:
- *   /domains/{id}:
+ *   /domain/{id}:
  *     put:
  *       summary: Update a domain
  *       tags: [Domain]
@@ -264,12 +264,12 @@ router.post('/domains', domainController.create);
  *         200:
  *           description: Domain updated
  */
-router.put('/domains/:id', domainController.update);
+router.put('/:id', domainController.update);
 
 /**
  * @swagger
  * paths:
- *   /domains/{id}:
+ *   /domain/{id}:
  *     delete:
  *       summary: Delete a domain
  *       tags: [Domain]
@@ -283,12 +283,12 @@ router.put('/domains/:id', domainController.update);
  *         200:
  *           description: Domain deleted
  */
-router.delete('/domains/:id', domainController.remove);
+router.delete('/:id', domainController.remove);
 
 /**
  * @swagger
  * paths:
- *   /domains/by-parent:
+ *   /domain/by-parent:
  *     get:
  *       summary: Get domains by parentId and parentModel
  *       tags: [Domain]
@@ -308,6 +308,7 @@ router.delete('/domains/:id', domainController.remove);
  *         200:
  *           description: List of domains
  */
-router.get('/domains/by-parent', domainController.fetchByParent);
+router.get('/by-parent', domainController.fetchByParent);
+
 
 module.exports = router;

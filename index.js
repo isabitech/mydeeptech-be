@@ -30,6 +30,7 @@ const assessmentRoute = require('./routes/assessment');
 const supportRoute = require('./routes/support');
 const chatRoute = require('./routes/chat');
 const qaRoute = require('./routes/qa');
+const domainsRoute = require('./routes/domain.routes');
 const envConfig = require('./config/envConfig');
 
 const app = express();
@@ -131,9 +132,7 @@ if (swaggerUi && specs && envConfig.SWAGGER_ENABLED) {
   }));
   console.log(`📚 API Documentation available at: ${envConfig.SWAGGER_URL}/api-docs`);
 } else {
-  const reason = !swaggerUi ? 'Swagger dependencies missing' : 
-                !envConfig.SWAGGER_ENABLED ? 'Swagger disabled via environment' : 
-                'Swagger specs not available';
+  const reason = !swaggerUi ? 'Swagger dependencies missing' : (!envConfig.SWAGGER_ENABLED ? 'Swagger disabled via environment' : 'Swagger specs not available');
   console.log(`📚 API Documentation not available (${reason})`);
 }
 
@@ -148,6 +147,7 @@ app.use('/api/assessments', assessmentRoute);
 app.use('/api/support', supportRoute);
 app.use('/api/chat', chatRoute);
 app.use('/api/qa', qaRoute);
+app.use('/api/domain', domainsRoute);
 
 // Initialize Redis connection
 const initializeRedis = async () => {
