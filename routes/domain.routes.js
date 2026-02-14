@@ -21,7 +21,7 @@ const domainController = require('../controllers/domain.controller');
 /**
  * @swagger
  * paths:
- *   /categories:
+ *   /api/domain/categories:
  *     post:
  *       summary: Create a category
  *       tags: [Category]
@@ -45,7 +45,7 @@ router.post('/categories', categoryController.create);
 /**
  * @swagger
  * paths:
- *   /categories/{id}:
+ *   /api/domain/categories/{id}:
  *     put:
  *       summary: Update a category
  *       tags: [Category]
@@ -75,7 +75,7 @@ router.put('/categories/:id', categoryController.update);
 /**
  * @swagger
  * paths:
- *   /categories/{id}:
+ *    /api/domain/categories/{id}:
  *     delete:
  *       summary: Delete a category
  *       tags: [Category]
@@ -94,7 +94,7 @@ router.delete('/categories/:id', categoryController.remove);
 /**
  * @swagger
  * paths:
- *   /categories/tree:
+ *   /api/domain/categories/tree:
  *     get:
  *       summary: Get category tree with subcategories and domains
  *       tags: [Category]
@@ -109,7 +109,7 @@ router.get('/categories/tree', categoryController.fetchTree);
 /**
  * @swagger
  * paths:
- *   /subcategories:
+ *   /api/domain/subcategories:
  *     post:
  *       summary: Create a subcategory
  *       tags: [SubCategory]
@@ -135,7 +135,7 @@ router.post('/subcategories', subCategoryController.create);
 /**
  * @swagger
  * paths:
- *   /subcategories/{id}:
+ *   /api/domain/subcategories/{id}:
  *     put:
  *       summary: Update a subcategory
  *       tags: [SubCategory]
@@ -167,7 +167,7 @@ router.put('/subcategories/:id', subCategoryController.update);
 /**
  * @swagger
  * paths:
- *   /subcategories/{id}:
+ *   /api/domain/subcategories/{id}:
  *     delete:
  *       summary: Delete a subcategory
  *       tags: [SubCategory]
@@ -186,7 +186,7 @@ router.delete('/subcategories/:id', subCategoryController.remove);
 /**
  * @swagger
  * paths:
- *   /subcategories/by-category/{categoryId}:
+ *   /api/domain/subcategories/by-category/{categoryId}:
  *     get:
  *       summary: Get subcategories by category ID
  *       tags: [SubCategory]
@@ -210,7 +210,7 @@ router.get(
 /**
  * @swagger
  * paths:
- *   /domain:
+ *   /api/domain:
  *     post:
  *       summary: Create a domain
  *       tags: [Domain]
@@ -239,7 +239,7 @@ router.post('/', domainController.create);
 /**
  * @swagger
  * paths:
- *   /domain/{id}:
+ *   /api/domain/{id}:
  *     put:
  *       summary: Update a domain
  *       tags: [Domain]
@@ -269,7 +269,7 @@ router.put('/:id', domainController.update);
 /**
  * @swagger
  * paths:
- *   /domain/{id}:
+ *   /api/domain/{id}:
  *     delete:
  *       summary: Delete a domain
  *       tags: [Domain]
@@ -288,7 +288,7 @@ router.delete('/:id', domainController.remove);
 /**
  * @swagger
  * paths:
- *   /domain/by-parent:
+ *   /api/domain/by-parent:
  *     get:
  *       summary: Get domains by parentId and parentModel
  *       tags: [Domain]
