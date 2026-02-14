@@ -124,6 +124,12 @@ app.use(bodyParser.json());
 
 // API Documentation (only if Swagger is available and enabled)
 if (swaggerUi && specs && envConfig.SWAGGER_ENABLED) {
+  // Debug logging for Swagger configuration
+  console.log('🔧 Swagger Configuration Debug:');
+  console.log(`   NODE_ENV: ${envConfig.NODE_ENV}`);
+  console.log(`   SWAGGER_URL: ${envConfig.SWAGGER_URL}`);
+  console.log(`   SWAGGER_BASE_URL env var: ${process.env.SWAGGER_BASE_URL || 'not set'}`);
+  
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
     explorer: true,
     customSiteTitle: "MyDeepTech API Documentation",
@@ -132,7 +138,9 @@ if (swaggerUi && specs && envConfig.SWAGGER_ENABLED) {
   }));
   console.log(`📚 API Documentation available at: ${envConfig.SWAGGER_URL}/api-docs`);
 } else {
-  const reason = !swaggerUi ? 'Swagger dependencies missing' : (!envConfig.SWAGGER_ENABLED ? 'Swagger disabled via environment' : 'Swagger specs not available');
+  const reason = !swaggerUi ? 'Swagger dependencies missing' : 
+                !envConfig.SWAGGER_ENABLED ? 'Swagger disabled via environment' : 
+                'Swagger specs not available';
   console.log(`📚 API Documentation not available (${reason})`);
 }
 

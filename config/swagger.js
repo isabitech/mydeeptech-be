@@ -21,9 +21,14 @@ const options = {
     servers: [
       {
         url: envConfig.SWAGGER_URL,
-        description,
+        description: envConfig.NODE_ENV === 'production' ? 'Production server' : 'Development server',
       },
-      // Add a relative server for production environments
+      // Add additional server options for different environments
+      {
+        url: envConfig.NODE_ENV === 'production' ? 'https://mydeeptech-be.onrender.com' : 'http://localhost:4000',
+        description: envConfig.NODE_ENV === 'production' ? 'Primary Production Server' : 'Local Development Server',
+      },
+      // Add a relative server for reverse proxy setups
       {
         url: "/",
         description: "Relative server (for reverse proxy setups)"

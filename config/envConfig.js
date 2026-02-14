@@ -81,8 +81,18 @@ const envConfig = {
 
  NODE_ENV: env.NODE_ENV || nodeEnv,
 
+ // Helper function to clean up swagger URLs (remove /api suffix if present)
+ _cleanSwaggerUrl: (url) => {
+   if (!url) return url;
+   return url.replace(/\/api\/?$/, '');
+ },
+
  // Use environment variable if available, otherwise fallback to computed URL
- SWAGGER_URL: env.SWAGGER_BASE_URL || (env.NODE_ENV === 'production' ? 'https://mydeeptech-be.onrender.com' : 'http://localhost:4000'),
+ get SWAGGER_URL() {
+   const baseUrl = env.SWAGGER_BASE_URL || 
+     (env.NODE_ENV === 'production' ? 'https://mydeeptech-be.onrender.com' : 'http://localhost:4000');
+   return this._cleanSwaggerUrl(baseUrl);
+ },
 
  // Enable/disable Swagger documentation
  SWAGGER_ENABLED: env.SWAGGER_ENABLED !== 'false', // Defaults to true unless explicitly disabled
