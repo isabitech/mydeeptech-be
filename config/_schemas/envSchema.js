@@ -55,7 +55,7 @@ const Joi = require("joi");
   EXCHANGE_RATES_API_KEY: Joi.string().required(),
 
   // Swagger Configuration
-  SWAGGER_BASE_URL: Joi.string().uri().optional(),
+  SWAGGER_URL: Joi.string().uri().optional(),
   SWAGGER_ENABLED: Joi.string().valid('true', 'false').optional(),
 }).unknown(true); // allow other env vars like PATH, HOME, etc.
 
