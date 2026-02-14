@@ -23,6 +23,11 @@ const options = {
         url: envConfig.SWAGGER_URL,
         description,
       },
+      // Add a relative server for production environments
+      {
+        url: "/",
+        description: "Relative server (for reverse proxy setups)"
+      }
     ],
     components: {
       securitySchemes: {
