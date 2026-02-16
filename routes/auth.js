@@ -19,8 +19,6 @@ const {
 // Import Cloudinary upload middleware for result submissions
 const { resultFileUpload, idDocumentUpload, resumeUpload } = require('../config/cloudinary');
 
-
-
 const router = express.Router()
 
 router.post('/signup', signup);

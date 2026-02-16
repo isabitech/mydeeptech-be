@@ -24,6 +24,9 @@ if (error) {
 
 const envConfig = {
   PORT: Number(env.PORT),
+  FRONTEND_URL: env.FRONTEND_URL,
+  BACKEND_URL: env.BACKEND_URL,
+
 
   mongo: {
     OLD_MONGO_URI: env.OLD_MONGO_URI,

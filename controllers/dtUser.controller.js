@@ -5,7 +5,15 @@ const Invoice = require("../models/invoice.model");
 const mongoose = require("mongoose");
 const { sendVerificationEmail } = require("../utils/mailer");
 const { emailQueue } = require("../utils/emailQueue");
-const { dtUserPasswordSchema, dtUserLoginSchema, dtUserProfileUpdateSchema, adminCreateSchema, adminVerificationRequestSchema, adminVerificationConfirmSchema, dtUserPasswordResetSchema } = require("../utils/authValidator");
+const { 
+  dtUserPasswordSchema, 
+  dtUserLoginSchema, 
+  dtUserProfileUpdateSchema, 
+  adminCreateSchema, 
+  adminVerificationRequestSchema, 
+  adminVerificationConfirmSchema, 
+  dtUserPasswordResetSchema 
+} = require("../utils/authValidator");
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { sendAdminVerificationEmail } = require("../utils/adminMailer");
@@ -2919,6 +2927,7 @@ const applyToProject = async (req, res) => {
 
     // Check if user has already applied
     const ProjectApplication = require('../models/projectApplication.model');
+  
     const existingApplication = await ProjectApplication.findOne({
       projectId: projectId,
       applicantId: userId
@@ -3003,7 +3012,7 @@ const applyToProject = async (req, res) => {
 
           // Send assessment invitation email
           const { sendAssessmentInvitation } = require('../utils/emailService');
-          const assessmentLink = `${process.env.FRONTEND_URL || 'https://app.mydeeptech.ng'}/assessment/${assessmentConfig._id}`;
+          const assessmentLink = `${(envConfig.FRONTEND_URL || 'https://app.mydeeptech.ng')}/assessment/${assessmentConfig._id}`;
           
           await sendAssessmentInvitation({
             userEmail: user.email,
