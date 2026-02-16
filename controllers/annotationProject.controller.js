@@ -233,7 +233,7 @@ const getAnnotationProjectDetails = async (req, res) => {
 
   try {
     const { projectId } = req.params;
-    const search = req.query.search; // New search parameter
+    const search = req.query.search; // Extract search parameter
 
     const project = await AnnotationProject.findById(projectId)
       .populate('createdBy', 'fullName email phone')
@@ -246,57 +246,19 @@ const getAnnotationProjectDetails = async (req, res) => {
       });
     }
 
-    // Get application statistics
-    const applicationStats = await ProjectApplication.aggregate([
-      { $match: { projectId: project._id } },
-      { $group: { _id: '$status', count: { $sum: 1 } } }
-    ]);
-
-    // Get recent applications
-    const recentApplications = await ProjectApplication.find({ projectId: project._id })
-      .populate('applicantId', 'fullName email annotatorStatus')
-      .populate('reviewedBy', 'fullName email')
-      .sort({ appliedAt: -1 })
-      .limit(50);
-
-    // Get approved annotators (approved applications with detailed info)
-    const buildAnnotatorPipeline = (status) => {
-      let pipeline = [
+    // Helper function to build aggregation pipeline with search
+    const buildSearchPipeline = (status, sortField = 'appliedAt') => {
+      const pipeline = [
         { $match: { projectId: project._id, status: status } },
         {
           $lookup: {
             from: 'dtusers',
             localField: 'applicantId',
             foreignField: '_id',
-            as: 'applicantData',
-            pipeline: [{
-              $project: {
-                fullName: 1,
-                email: 1,
-                phone: 1,
-                annotatorStatus: 1,
-                microTaskerStatus: 1,
-                personal_info: 1,
-                professional_background: 1,
-                payment_info: 1,
-                attachments: 1,
-                profilePicture: 1,
-                createdAt: 1
-              }
-            }]
+            as: 'applicantId'
           }
         },
-        { $unwind: { path: '$applicantData', preserveNullAndEmptyArrays: true } },
-        {
-          $lookup: {
-            from: 'dtusers',
-            localField: 'reviewedBy',
-            foreignField: '_id',
-            as: 'reviewedByData',
-            pipeline: [{ $project: { fullName: 1, email: 1 } }]
-          }
-        },
-        { $unwind: { path: '$reviewedByData', preserveNullAndEmptyArrays: true } }
+        { $unwind: { path: '$applicantId', preserveNullAndEmptyArrays: true } }
       ];
 
       // Add search filter if search parameter exists
@@ -304,41 +266,105 @@ const getAnnotationProjectDetails = async (req, res) => {
         pipeline.push({
           $match: {
             $or: [
-              { 'applicantData.fullName': { $regex: search, $options: 'i' } },
-              { 'applicantData.email': { $regex: search, $options: 'i' } },
-              { 'status': { $regex: search, $options: 'i' } }
+              { 'applicantId.fullName': { $regex: search, $options: 'i' } },
+              { 'applicantId.email': { $regex: search, $options: 'i' } },
+              { 'status': { $regex: search, $options: 'i' } },
+              { 'applicantId.annotatorStatus': { $regex: search, $options: 'i' } }
             ]
           }
         });
       }
 
+      // Add lookup for reviewedBy
+      pipeline.push({
+        $lookup: {
+          from: 'dtusers',
+          localField: 'reviewedBy',
+          foreignField: '_id',
+          as: 'reviewedBy'
+        }
+      });
+
+      pipeline.push({ $unwind: { path: '$reviewedBy', preserveNullAndEmptyArrays: true } });
+
       // Add sorting
-      pipeline.push({ $sort: status === 'pending' ? { appliedAt: -1 } : { reviewedAt: -1 } });
+      const sortOrder = status === 'approved' || status === 'rejected' ? { reviewedAt: -1 } : { [sortField]: -1 };
+      pipeline.push({ $sort: sortOrder });
 
       return pipeline;
     };
 
-    // Get annotators with search applied
-    const [approvedAnnotatorsResult, rejectedAnnotatorsResult, pendingAnnotatorsResult] = await Promise.all([
-      ProjectApplication.aggregate(buildAnnotatorPipeline('approved')),
-      ProjectApplication.aggregate(buildAnnotatorPipeline('rejected')),
-      ProjectApplication.aggregate(buildAnnotatorPipeline('pending'))
+    // Get application statistics (without search filter for overall stats)
+    const applicationStats = await ProjectApplication.aggregate([
+      { $match: { projectId: project._id } },
+      { $group: { _id: '$status', count: { $sum: 1 } } }
     ]);
 
-   // Format annotators data with application details
+    // Get recent applications with search filter
+    let recentApplicationsPipeline = [
+      { $match: { projectId: project._id } },
+      {
+        $lookup: {
+          from: 'dtusers',
+          localField: 'applicantId',
+          foreignField: '_id',
+          as: 'applicantId'
+        }
+      },
+      { $unwind: { path: '$applicantId', preserveNullAndEmptyArrays: true } }
+    ];
+
+    if (search) {
+      recentApplicationsPipeline.push({
+        $match: {
+          $or: [
+            { 'applicantId.fullName': { $regex: search, $options: 'i' } },
+            { 'applicantId.email': { $regex: search, $options: 'i' } },
+            { 'status': { $regex: search, $options: 'i' } }
+          ]
+        }
+      });
+    }
+
+    recentApplicationsPipeline.push(
+      {
+        $lookup: {
+          from: 'dtusers',
+          localField: 'reviewedBy',
+          foreignField: '_id',
+          as: 'reviewedBy'
+        }
+      },
+      { $unwind: { path: '$reviewedBy', preserveNullAndEmptyArrays: true } },
+      { $sort: { appliedAt: -1 } },
+      { $limit: 50 }
+    );
+
+    const recentApplications = await ProjectApplication.aggregate(recentApplicationsPipeline);
+
+    // Get annotators with search filters
+    const approvedAnnotators = await ProjectApplication.aggregate(buildSearchPipeline('approved', 'reviewedAt'));
+    const rejectedAnnotators = await ProjectApplication.aggregate(buildSearchPipeline('rejected', 'reviewedAt'));
+    const pendingAnnotators = await ProjectApplication.aggregate(buildSearchPipeline('pending', 'appliedAt'));
+
+    // Format annotators data with application details - Updated for aggregation pipeline results
     const formatAnnotatorData = (applications) => {
       return applications.map(app => ({
         // applicationId: app._id,
           applicantId: {
         _id: app._id,
-        fullName: app.applicantId.fullName,
-        email: app.applicantId.email,
-        annotatorStatus: app.applicantId.annotatorStatus
+        fullName: app.applicantId?.fullName || 'N/A',
+        email: app.applicantId?.email || 'N/A',
+        annotatorStatus: app.applicantId?.annotatorStatus || 'pending'
       },
         applicationStatus: app.status,
         appliedAt: app.appliedAt,
         reviewedAt: app.reviewedAt,
-        reviewedBy: app.reviewedBy,
+        reviewedBy: app.reviewedBy ? {
+          _id: app.reviewedBy._id,
+          fullName: app.reviewedBy.fullName,
+          email: app.reviewedBy.email
+        } : null,
         reviewNotes: app.reviewNotes,
         rejectionReason: app.rejectionReason,
         coverLetter: app.coverLetter,
@@ -349,49 +375,42 @@ const getAnnotationProjectDetails = async (req, res) => {
         estimatedCompletionTime: app.estimatedCompletionTime,
         proposedRate: app.proposedRate,
         annotator: {
-          id: app.applicantId._id,
-          fullName: app.applicantId.fullName,
-          email: app.applicantId.email,
-          phone: app.applicantId.phone,
-          annotatorStatus: app.applicantId.annotatorStatus,
-          microTaskerStatus: app.applicantId.microTaskerStatus,
-          profilePicture: app.applicantId.profilePicture?.url || null,
-          joinedDate: app.applicantId.createdAt,
+          id: app.applicantId?._id,
+          fullName: app.applicantId?.fullName || 'N/A',
+          email: app.applicantId?.email || 'N/A',
+          phone: app.applicantId?.phone,
+          annotatorStatus: app.applicantId?.annotatorStatus,
+          microTaskerStatus: app.applicantId?.microTaskerStatus,
+          profilePicture: app.applicantId?.profilePicture?.url || null,
+          joinedDate: app.applicantId?.createdAt,
           personalInfo: {
-            country: app.applicantId.personal_info?.country || null,
-            timeZone: app.applicantId.personal_info?.time_zone || null,
-            availableHours: app.applicantId.personal_info?.available_hours_per_week || null,
-            languages: app.applicantId.personal_info?.languages || []
+            country: app.applicantId?.personal_info?.country || null,
+            timeZone: app.applicantId?.personal_info?.time_zone || null,
+            availableHours: app.applicantId?.personal_info?.available_hours_per_week || null,
+            languages: app.applicantId?.personal_info?.languages || []
           },
           professionalBackground: {
-            educationField: app.applicantId.professional_background?.education_field || null,
-            yearsOfExperience: app.applicantId.professional_background?.years_of_experience || null,
-            previousProjects: app.applicantId.professional_background?.previous_annotation_projects || [],
-            skills: app.applicantId.professional_background?.skills || []
+            educationField: app.applicantId?.professional_background?.education_field || null,
+            yearsOfExperience: app.applicantId?.professional_background?.years_of_experience || null,
+            previousProjects: app.applicantId?.professional_background?.previous_annotation_projects || [],
+            skills: app.applicantId?.professional_background?.skills || []
           },
           paymentInfo: {
-            hasPaymentInfo: !!(app.applicantId.payment_info?.account_name && app.applicantId.payment_info?.account_number),
-            accountName: app.applicantId.payment_info?.account_name || null,
-            bankName: app.applicantId.payment_info?.bank_name || null
+            hasPaymentInfo: !!(app.applicantId?.payment_info?.account_name && app.applicantId?.payment_info?.account_number),
+            accountName: app.applicantId?.payment_info?.account_name || null,
+            bankName: app.applicantId?.payment_info?.bank_name || null
           },
           attachments: {
-            hasResume: !!(app.applicantId.attachments?.resume_url),
-            hasIdDocument: !!(app.applicantId.attachments?.id_document_url),
-            resumeUrl: app.applicantId.attachments?.resume_url || null,
-            idDocumentUrl: app.applicantId.attachments?.id_document_url || null
+            hasResume: !!(app.applicantId?.attachments?.resume_url),
+            hasIdDocument: !!(app.applicantId?.attachments?.id_document_url),
+            resumeUrl: app.applicantId?.attachments?.resume_url || null,
+            idDocumentUrl: app.applicantId?.attachments?.id_document_url || null
           }
         }
       }));
     };
 
-
-    // Format the aggregation results
-    const approvedAnnotators = formatAnnotatorData(approvedAnnotatorsResult);
-    const rejectedAnnotators = formatAnnotatorData(rejectedAnnotatorsResult);
-    const pendingAnnotators = formatAnnotatorData(pendingAnnotatorsResult);
-
-
- 
+    
 
     // Calculate annotator statistics
     const annotatorStats = {
@@ -415,15 +434,15 @@ const getAnnotationProjectDetails = async (req, res) => {
       .limit(10)
       .select('status reviewedAt reviewedBy applicantId reviewNotes rejectionReason');
 
-    // Format recentApplications to match RecentApplication interface
+    // Format recentApplications to match RecentApplication interface - Updated for aggregation results
     const formattedRecentApplications = recentApplications.map(app => ({
       _id: app._id,
       projectId: app.projectId,
       applicantId: {
-        _id: app.applicantId._id,
-        fullName: app.applicantId.fullName,
-        email: app.applicantId.email,
-        annotatorStatus: app.applicantId.annotatorStatus
+        _id: app.applicantId?._id,
+        fullName: app.applicantId?.fullName || 'N/A',
+        email: app.applicantId?.email || 'N/A',
+        annotatorStatus: app.applicantId?.annotatorStatus || 'pending'
       },
       status: app.status,
       reviewedAt: app.reviewedAt,
@@ -451,15 +470,11 @@ const getAnnotationProjectDetails = async (req, res) => {
       id: app._id
     }));
 
-       console.log(`✅ Approved annotators: ${JSON.stringify({
-          approved: formatAnnotatorData(approvedAnnotators),
-          rejected: formatAnnotatorData(rejectedAnnotators),
-          pending: formatAnnotatorData(pendingAnnotators)
-        }, null, 2)}`);
-
     res.status(200).json({
       success: true,
-      message: "Annotation project details retrieved successfully",
+      message: search ? 
+        `Annotation project details retrieved successfully with search filter: "${search}"` :
+        "Annotation project details retrieved successfully",
       data: {
         project: project,
         applicationStats: applicationStats.reduce((acc, item) => {
@@ -473,7 +488,14 @@ const getAnnotationProjectDetails = async (req, res) => {
           rejected: formatAnnotatorData(rejectedAnnotators),
           pending: formatAnnotatorData(pendingAnnotators)
         },
-        recentReviewActivity: recentReviewActivity
+        recentReviewActivity: recentReviewActivity,
+        searchFilter: search || null, // Include the search filter used
+        filteredCounts: {
+          approved: approvedAnnotators.length,
+          rejected: rejectedAnnotators.length,
+          pending: pendingAnnotators.length,
+          total: approvedAnnotators.length + rejectedAnnotators.length + pendingAnnotators.length
+        }
       }
     });
 
