@@ -1,4 +1,6 @@
 const Domain = require('../models/domain.model.js');
+const Category = require('../models/category.model.js');
+const SubCategory = require('../models/SubCategory.model.js');
 
 const createDomain = async (data) => {
   return Domain.create(data);
@@ -24,9 +26,14 @@ const fetchByParent = async (parentId, parentModel) => {
   });
 };
 
+const findAll = async () => {
+  return Domain.find().populate('parent');
+};
+
 module.exports = {
   createDomain,
   updateDomain,
   deleteDomain,
-  fetchByParent
+  fetchByParent,
+  findAll
 };

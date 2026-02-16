@@ -3,17 +3,31 @@ const SubCategory = require('../models/SubCategory.model.js');
 const Domain = require('../models/domain.model.js');
 
 const createCategory = async (data) => {
-  return Category.create(data);
+  const category = Category.create(data);
+  if (!category) {
+    throw new Error('Category creation failed');
+  }
+  return category;
 };
 
 const updateCategory = async (id, data) => {
-  return Category.findByIdAndUpdate(id, data, { new: true });
+  const category = Category.findByIdAndUpdate(id, data, { new: true });
+  if (!category) {
+    throw new Error('Category update failed');
+  }
+  return category;
 };
 
 const deleteCategory = async (id) => {
-  await SubCategory.deleteMany({ category: id });
-  await Domain.deleteMany({ parent: id, parentModel: 'Category' });
-  return Category.findByIdAndDelete(id);
+  const category = Category.findByIdAndDelete(id);
+  if (!category) {
+    throw new Error('Category deletion failed');
+  }
+  await Promise.all([
+    SubCategory.deleteMany({ category: id }),
+    Domain.deleteMany({ parent: id, parentModel: 'Category' })
+  ]);
+  return category;
 };
 
 /**
@@ -53,9 +67,18 @@ const fetchCategoryTree = async () => {
   return result;
 };
 
+const findById = async (id) => {
+  const category = await Category.findById(id);
+  if (!category) {
+    throw new Error('Category not found');
+  }
+  return category;
+};
+
 module.exports = {
   createCategory,
   updateCategory,
   deleteCategory,
-  fetchCategoryTree
+  fetchCategoryTree,
+  findById
 };

@@ -1,6 +1,5 @@
 const AnnotationProject = require('../models/annotationProject.model');
 const ProjectApplication = require('../models/projectApplication.model');
-const DTUser = require('../models/dtUser.model');
 const Joi = require('joi');
 
 // Validation schema for creating projects
@@ -1821,7 +1820,6 @@ const bulkApproveApplications = async (req, res) => {
           });
           continue;
         }
-
         // Approve application
         application.status = 'approved';
         application.reviewedBy = req.admin.userId;
