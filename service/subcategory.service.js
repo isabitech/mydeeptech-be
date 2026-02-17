@@ -15,12 +15,18 @@ const deleteSubCategory = async (id) => {
 };
 
 const fetchByCategory = async (categoryId) => {
-  return SubCategory.find({ category: categoryId });
+  return SubCategory.find({ category: categoryId }).populate('category');
 };
+
+const fetchAllSubCategories = async () => {
+  return SubCategory.find().populate('category');
+};
+
 
 module.exports = {
   createSubCategory,
   updateSubCategory,
   deleteSubCategory,
-  fetchByCategory
+  fetchByCategory,
+  fetchAllSubCategories
 };
