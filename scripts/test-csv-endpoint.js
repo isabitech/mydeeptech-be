@@ -15,7 +15,7 @@ const testCSVEndpoint = async () => {
 
   // You'll need to get an admin token first - this is just for testing the structure
   const adminToken = 'your-admin-token-here';
-  const baseURL = 'http://localhost:5000';
+  const baseURL = 'http://localhost:4000';
 
   try {
     // Test 1: Generate CSV for all unpaid invoices

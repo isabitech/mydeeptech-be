@@ -4,7 +4,7 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const { createServer } = require('http');
 const { initializeSocketIO } = require('./utils/chatSocketService');
-const { initRedis, closeRedis, redisHealthCheck } = require('./config/redis');
+const { initRedis, closeRedis } = require('./config/redis');
 const dns = require('node:dns');
 
 // Conditionally load Swagger (optional dependency)
@@ -31,8 +31,10 @@ const assessmentRoute = require('./routes/assessment');
 const supportRoute = require('./routes/support');
 const chatRoute = require('./routes/chat');
 const qaRoute = require('./routes/qa');
+const domainsRoute = require('./routes/domains.routes');
 const envConfig = require('./config/envConfig');
-const domain = require('./routes/domains.routes')
+const { healthCheck } = require('./controllers/health-check.controller');
+const { corsOptions } = require('./utils/cors-options.utils');
 
 const app = express();
 const server = createServer(app);
@@ -40,82 +42,13 @@ const server = createServer(app);
 // Initialize Socket.IO for chat functionality
 initializeSocketIO(server);
 
-// CORS Configuration - Development and Production
-const corsOptions = {
-    origin: [
-        'http://localhost:5173',
-        'http://127.0.0.1:5173',
-        'https://mydeeptech.ng',
-        // Frontend URLs
-        'https://www.mydeeptech.ng',
-        'https://mydeeptech.onrender.com',
-        'https://mydeeptech-frontend.onrender.com',
-
-        // Backend URLs
-        'https://mydeeptech-be.onrender.com',
-        'https://mydeeptech-be-lmrk.onrender.com',
-    ],
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With', 'token']
-};
 
 app.get("/", (_req, res) => {
     res.send('Welcome to My Deep Tech');
 });
 
 // Enhanced health check endpoint with database ping
-app.get("/health", async (req, res) => {
-    
-    try {
-        const redisStatus = await redisHealthCheck();
-
-        // Test MongoDB connectivity with actual database operation
-        let mongoStatus = 'disconnected';
-        let mongoDetails = { status: 'disconnected' };
-
-        if (mongoose.connection.readyState === 1) {
-            try {
-                // Perform actual database ping
-                await mongoose.connection.db.admin().ping();
-                const collections = await mongoose.connection.db.listCollections().toArray();
-
-                mongoStatus = 'connected';
-                mongoDetails = {
-                    status: 'connected',
-                    host: mongoose.connection.host,
-                    database: mongoose.connection.name,
-                    collections: collections.length,
-                    readyState: mongoose.connection.readyState
-                };
-            } catch (dbError) {
-                mongoStatus = 'error';
-                mongoDetails = {
-                    status: 'error',
-                    error: dbError.message,
-                    readyState: mongoose.connection.readyState
-                };
-            }
-        }
-
-        const isHealthy = mongoStatus === 'connected' && redisStatus.status === 'connected';
-
-        res.status(isHealthy ? 200 : 503).json({
-            status: isHealthy ? 'ok' : 'degraded',
-            timestamp: new Date().toISOString(),
-            services: {
-                mongodb: mongoDetails,
-                redis: redisStatus
-            }
-        });
-    } catch (error) {
-        res.status(500).json({
-            status: 'error',
-            error: error.message,
-            timestamp: new Date().toISOString()
-        });
-    }
-});
+app.get("/health", healthCheck);
 
 // Middleware
 app.use(cors(corsOptions));
@@ -146,7 +79,10 @@ if (swaggerUi && specs) {
   }));
   console.log(`📚 API Documentation available at: ${envConfig.SWAGGER_URL}/api-docs`);
 } else {
-    console.log('📚 API Documentation not available (Swagger dependencies missing)');
+  const reason = !swaggerUi ? 'Swagger dependencies missing' : 
+                !envConfig.SWAGGER_ENABLED ? 'Swagger disabled via environment' : 
+                'Swagger specs not available';
+  console.log(`📚 API Documentation not available (${reason})`);
 }
 
 // Routes
@@ -160,7 +96,7 @@ app.use('/api/assessments', assessmentRoute);
 app.use('/api/support', supportRoute);
 app.use('/api/chat', chatRoute);
 app.use('/api/qa', qaRoute);
-app.use('/api/domains', domain);
+app.use('/api/domain', domainsRoute);
 
 // Initialize Redis connection
 const initializeRedis = async () => {
@@ -246,7 +182,6 @@ const gracefulShutdown = async (signal) => {
         // Close MongoDB connection
         await mongoose.connection.close();
         console.log('✅ MongoDB connection closed');
-
         // Close HTTP server
         process.exit(0);
     } catch (error) {

@@ -8,7 +8,7 @@
 const axios = require('axios');
 require('dotenv').config();
 
-const BASE_URL = 'http://localhost:5000/api/assessments';
+const BASE_URL = 'http://localhost:4000/api/assessments';
 
 const testAssessmentEndpoints = async () => {
   try {

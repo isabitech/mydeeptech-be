@@ -1,10 +1,10 @@
 const express = require('express');
-const { signup, login, getAllUsers, getUsers, updateUserRole, getUserById, getRoles, getRoleStatistics } = require('../controller/user.js'); // Ensure this path is correct
-const { createProject, getProject, updateProject, deleteProject } = require('../controller/project.js')
-const { createTask, getTask, getAllTasks, assignTask} = require('../controller/task.js')
-const {validateVisitor} = require('../controller/validateuser.js')
-const dtUserController = require("../controller/dtUser.controller.js");
-const { createDTUser, verifyEmail, submitResult, updateUserStatus, setupPassword, dtUserLogin, getDTUserProfile, updateDTUserProfile, resetDTUserPassword, resendVerificationEmail, getAvailableProjects, applyToProject, getUserActiveProjects, getUserInvoices, getUnpaidInvoices, getPaidInvoices, getInvoiceDetails, getInvoiceDashboard, getDTUserDashboard, submitResultWithCloudinary, getUserResultSubmissions, uploadIdDocument, uploadResume, getProjectGuidelines } = require("../controller/dtUser.controller.js");
+const { signup, login, getAllUsers, getUsers, updateUserRole, getUserById, getRoles, getRoleStatistics } = require('../controllers/user.js'); // Ensure this path is correct
+const { createProject, getProject, updateProject, deleteProject } = require('../controllers/project.js')
+const { createTask, getTask, getAllTasks, assignTask} = require('../controllers/task.js')
+const {validateVisitor} = require('../controllers/validateuser.js')
+const dtUserController = require("../controllers/dtUser.controller.js");
+const { createDTUser, verifyEmail, submitResult, updateUserStatus, setupPassword, dtUserLogin, getDTUserProfile, updateDTUserProfile, resetDTUserPassword, resendVerificationEmail, getAvailableProjects, applyToProject, getUserActiveProjects, getUserInvoices, getUnpaidInvoices, getPaidInvoices, getInvoiceDetails, getInvoiceDashboard, getDTUserDashboard, submitResultWithCloudinary, getUserResultSubmissions, uploadIdDocument, uploadResume, getProjectGuidelines } = require("../controllers/dtUser.controller.js");
 const { authenticateToken, authorizeProfileAccess } = require('../middleware/auth.js');
 
 // Import password reset controllers
@@ -14,12 +14,10 @@ const {
   dtUserForgotPassword, 
   dtUserResetPassword, 
   verifyResetToken 
-} = require('../controller/passwordReset.controller.js');
+} = require('../controllers/passwordReset.controller.js');
 
 // Import Cloudinary upload middleware for result submissions
 const { resultFileUpload, idDocumentUpload, resumeUpload } = require('../config/cloudinary');
-
-
 
 const router = express.Router()
 

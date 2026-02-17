@@ -1,5 +1,5 @@
-const { response } = require('express');
-const User = require('../models/user');
+
+const DTUser = require('../models/dtUser.model');
 const { signupSchema, loginSchema } = require('../utils/authValidator');
 const { RoleType, RolePermissions, getRolePermissionsWithDetails } = require('../utils/role')
 const bcrypt = require('bcrypt');
@@ -12,13 +12,13 @@ const signup = async (req, res) => {
 
     const { firstname, lastname, username, email, password, phone } = req.body;
 
-    const existingUser = await User.findOne({ email: req.body.email })
-    const admin = await User.findOne({ role: RoleType.ADMIN })
+    const existingUser = await DTUser.findOne({ email: req.body.email })
+    const admin = await DTUser.findOne({ role: RoleType.ADMIN })
     if (existingUser) return res.status(400).json({ message: 'Email already in use' });
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const newUser = new User({ firstname, lastname, username, email, password: hashedPassword, phone, role: RoleType.USER });
+    const newUser = new DTUser({ firstname, lastname, username, email, password: hashedPassword, phone, role: RoleType.USER });
     await newUser.save();
 
     res.status(200).send({
@@ -40,19 +40,21 @@ const login = async (req, res) => {
 
     const { email, password } = req.body;
 
-    const user = await User.findOne({ email });
+    const user = await DTUser.findOne({ email });
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) return res.status(400).json({ message: 'Invalid credentials' });
 
-    res.status(200).json({ message: 'Login successful', user });
+    const { password: _password, ...rest } = user.toObject(); // Convert Mongoose document to plain object
+
+    res.status(200).json({ message: 'Login successful', user: rest });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error });
   }
 };
 const getAllUsers = async (req, res) => {
-  const user = await User.find({ role: req.params.role });
+  const user = await DTUser.find({ role: req.params.role });
   try {
     if (!user) {
       return res.status(400).send({
@@ -86,8 +88,8 @@ const getUsers = async (req, res) => {
       query.role = req.query.role.toUpperCase();
     }
    
-    // const user = await User.find(query);
-    const user = await User.find(query).select('-password');
+    // const user = await DTUser.find(query);
+    const user = await DTUser.find(query).select('-password');
 
     if (!user || user.length === 0) {
       return res.status(400).send({
@@ -126,7 +128,7 @@ const getUserById = async (req, res) => {
   try {
     const { userId } = req.params;
     
-    const user = await User.findById(userId).select('-password');
+    const user = await DTUser.findById(userId).select('-password');
     if (!user) {
       return res.status(404).json({
         responseCode: "99",
@@ -190,7 +192,7 @@ const getRoleStatistics = async (req, res) => {
       }
     ];
 
-    const stats = await User.aggregate(pipeline);
+    const stats = await DTUser.aggregate(pipeline);
     
     // Format the statistics
     const roleStats = {};

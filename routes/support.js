@@ -15,7 +15,7 @@ const {
   addInternalNote,
   getTicketsByCategory,
   getTicketsByPriority
-} = require('../controller/supportTicket.controller.js');
+} = require('../controllers/supportTicket.controller.js');
 
 const router = express.Router();
 

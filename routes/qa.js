@@ -12,7 +12,7 @@ const {
   getReviewerDashboard,
   batchReviewSubmissions,
   getSubmissionAnalytics
-} = require('../controller/qaReview.controller');
+} = require('../controllers/qaReview.controller');
 
 // Import middleware
 const { authenticateToken } = require('../middleware/auth');

@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const domainService = require('../service/domain.service.js');
+const domainService = require('../services/domain.service.js');
 
 const create = async (req, res) => {
   const data = await domainService.createDomain(req.body);
