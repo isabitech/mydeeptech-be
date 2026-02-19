@@ -19,7 +19,7 @@ const {
   deleteFile,
   getFileInfo,
   updateProfilePicture
-} = require('../controller/media.controller');
+} = require('../controllers/media.controller');
 
 // All media routes require authentication
 router.use(authenticateToken);

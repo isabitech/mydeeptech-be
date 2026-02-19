@@ -53,6 +53,10 @@ const Joi = require("joi");
   ip: Joi.string().optional(),
   EXCHANGE_RATE_API_KEY: Joi.string().required(),
   EXCHANGE_RATES_API_KEY: Joi.string().required(),
+
+  // Swagger Configuration
+  SWAGGER_URL: Joi.string().uri().optional(),
+  SWAGGER_ENABLED: Joi.string().valid('true', 'false').optional(),
 }).unknown(true); // allow other env vars like PATH, HOME, etc.
 
 module.exports = envSchema;
