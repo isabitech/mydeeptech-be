@@ -2,7 +2,8 @@ const mongoose = require('mongoose');
 const categoryService = require('../service/category.service.js');
 
 const create = async (req, res) => {
-  const data = await categoryService.createCategory(req.body);
+  const { name} = req.body;
+  const data = await categoryService.createCategory({name});
   res.status(201).json({
     success: true,
     message: 'Category created',
@@ -20,7 +21,8 @@ const update = async (req, res) => {
       data: null
     });
   }
-  const data = await categoryService.updateCategory(req.params.id, req.body);
+  const { name } = req.body;
+  const data = await categoryService.updateCategory(req.params.id, {name});
   res.json({
     success: true,
     message: 'Category updated',

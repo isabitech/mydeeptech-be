@@ -2,7 +2,8 @@ const mongoose = require('mongoose');
 const domainService = require('../service/domain.service.js');
 
 const create = async (req, res) => {
-  const data = await domainService.createDomain(req.body);
+  const { name, parent, parentModel } = req.body;
+  const data = await domainService.createDomain({ name, parent, parentModel });
   res.status(201).json({
     success: true,
     message: 'Domain created',
@@ -20,7 +21,13 @@ const update = async (req, res) => {
       data: null
     });
   }
-  const data = await domainService.updateDomain(req.params.id, req.body);
+  const { name, parent, parentModel } = req.body;
+  const updateData = {
+    ...(name && { name }),
+    ...(parent && { parent }),
+    ...(parentModel && { parentModel })
+  };
+  const data = await domainService.updateDomain(req.params.id, updateData);
   res.status(200).json({ success: true, message: 'Domain updated', error: null, data });
 };
 

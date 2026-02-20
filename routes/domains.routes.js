@@ -49,7 +49,7 @@ const {
  *         201:
  *           description: Category created
  */
-router.post('/categories', authenticateAdmin, validateRequest(categorySchema), categoryController.create);
+router.post('/categories',  validateRequest(categorySchema), categoryController.create);
 
 /**
  * @swagger
@@ -79,7 +79,7 @@ router.post('/categories', authenticateAdmin, validateRequest(categorySchema), c
  *         200:
  *           description: Category updated
  */
-router.put('/categories/:id', authenticateAdmin, validateRequest(updateSchema), categoryController.update);
+router.put('/categories/:id',  validateRequest(updateSchema), categoryController.update);
 
 /**
  * @swagger
@@ -98,7 +98,7 @@ router.put('/categories/:id', authenticateAdmin, validateRequest(updateSchema), 
  *         200:
  *           description: Category deleted
  */
-router.delete('/categories/:id', authenticateAdmin, categoryController.remove);
+router.delete('/categories/:id',  categoryController.remove);
 
 /**
  * @swagger
@@ -111,7 +111,7 @@ router.delete('/categories/:id', authenticateAdmin, categoryController.remove);
  *         200:
  *           description: Category tree
  */
-router.get('/categories/tree', authenticateToken, categoryController.fetchTree);
+router.get('/categories/tree',  categoryController.fetchTree);
 
 /**
  * @swagger
@@ -130,7 +130,7 @@ router.get('/categories/tree', authenticateToken, categoryController.fetchTree);
  *         200:
  *           description: Category fetched
  */
-router.get('/categories/:id', authenticateToken, categoryController.fetchById);
+router.get('/categories/:id',  categoryController.fetchById);
 /* ================= SUBCATEGORY ================= */
 
 /**
@@ -157,7 +157,7 @@ router.get('/categories/:id', authenticateToken, categoryController.fetchById);
  *         201:
  *           description: Subcategory created
  */
-router.post('/subcategories', authenticateAdmin, validateRequest(subCategorySchema), subCategoryController.create);
+router.post('/subcategories',  validateRequest(subCategorySchema), subCategoryController.create);
 
 /**
  * @swagger
@@ -189,7 +189,7 @@ router.post('/subcategories', authenticateAdmin, validateRequest(subCategorySche
  *         200:
  *           description: Subcategory updated
  */
-router.put('/subcategories/:id', authenticateAdmin, validateRequest(updateSchema), subCategoryController.update);
+router.put('/subcategories/:id',  validateRequest(updateSchema), subCategoryController.update);
 
 /**
  * @swagger
@@ -202,7 +202,7 @@ router.put('/subcategories/:id', authenticateAdmin, validateRequest(updateSchema
  *         200:
  *           description: List of subcategories
  */
-router.get('/subcategories', authenticateToken, subCategoryController.fetchAllSubCategories);
+router.get('/subcategories',  subCategoryController.fetchAllSubCategories);
 
 
 
@@ -223,7 +223,7 @@ router.get('/subcategories', authenticateToken, subCategoryController.fetchAllSu
  *         200:
  *           description: Subcategory deleted
  */
-router.delete('/subcategories/:id', authenticateAdmin, subCategoryController.remove);
+router.delete('/subcategories/:id',  subCategoryController.remove);
 
 /**
  * @swagger
@@ -244,7 +244,7 @@ router.delete('/subcategories/:id', authenticateAdmin, subCategoryController.rem
  */
 router.get(
   '/subcategories/by-category/:categoryId',
-  authenticateToken,
+  
   subCategoryController.fetchByCategory
 );
 
@@ -277,7 +277,7 @@ router.get(
  *         201:
  *           description: Domain created
  */
-router.post('/domains', authenticateAdmin, validateRequest(domainSchema), domainController.create);
+router.post('/domains',  validateRequest(domainSchema), domainController.create);
 
 /**
  * @swagger
@@ -307,7 +307,7 @@ router.post('/domains', authenticateAdmin, validateRequest(domainSchema), domain
  *         200:
  *           description: Domain updated
  */
-router.put('/domains/:id', authenticateAdmin, validateRequest(updateSchema), domainController.update);
+router.put('/domains/:id',  validateRequest(updateSchema), domainController.update);
 
 /**
  * @swagger
@@ -326,7 +326,7 @@ router.put('/domains/:id', authenticateAdmin, validateRequest(updateSchema), dom
  *         200:
  *           description: Domain deleted
  */
-router.delete('/domains/:id', authenticateAdmin, domainController.remove);
+router.delete('/domains/:id',  domainController.remove);
 
 /**
  * @swagger
@@ -351,7 +351,7 @@ router.delete('/domains/:id', authenticateAdmin, domainController.remove);
  *         200:
  *           description: List of domains
  */
-router.get('/domains/by-parent', authenticateToken, domainController.fetchByParent);
+router.get('/domains/by-parent',  domainController.fetchByParent);
 
 /**
  * @swagger
@@ -364,6 +364,6 @@ router.get('/domains/by-parent', authenticateToken, domainController.fetchByPare
  *         200:
  *           description: List of domains
  */
-router.get('/domains', authenticateToken, domainController.findAll);
+router.get('/domains',  domainController.findAll);
 
 module.exports = router;
