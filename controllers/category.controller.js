@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const categoryService = require('../service/category.service.js');
+const categoryService = require('../services/category.service.js');
 
 const create = async (req, res) => {
   const { name} = req.body;

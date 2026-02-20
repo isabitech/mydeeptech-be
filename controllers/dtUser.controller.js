@@ -5,12 +5,22 @@ const Invoice = require("../models/invoice.model");
 const mongoose = require("mongoose");
 const { sendVerificationEmail } = require("../utils/mailer");
 const { emailQueue } = require("../utils/emailQueue");
-const { dtUserPasswordSchema, dtUserLoginSchema, dtUserProfileUpdateSchema, adminCreateSchema, adminVerificationRequestSchema, adminVerificationConfirmSchema, dtUserPasswordResetSchema } = require("../utils/authValidator");
+const { 
+  dtUserPasswordSchema, 
+  dtUserLoginSchema, 
+  dtUserProfileUpdateSchema, 
+  adminCreateSchema, 
+  adminVerificationRequestSchema, 
+  adminVerificationConfirmSchema, 
+  dtUserPasswordResetSchema 
+} = require("../utils/authValidator");
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { sendAdminVerificationEmail } = require("../utils/adminMailer");
 const { sendAnnotatorApprovalEmail, sendAnnotatorRejectionEmail } = require("../utils/annotatorMailer");
 const adminVerificationStore = require("../utils/adminVerificationStore");
+const envConfig = require("../config/envConfig");
+const { RoleType } = require("../utils/role");
 
 // Option 1: Send email with timeout (current implementation)
 const createDTUser = async (req, res) => {
@@ -125,6 +135,8 @@ const verifyEmail = async (req, res) => {
 
     // Find user by ID and email for extra security
     const user = await DTUser.findById(id);
+
+    console.log(`🔍 User lookup result:`, user);
     
     if (!user) {
       console.log(`❌ User not found with ID: ${id}`);
@@ -372,7 +384,7 @@ const dtUserLogin = async (req, res) => {
         email: user.email,
         fullName: user.fullName
       },
-      process.env.JWT_SECRET || 'your-secret-key', // Use environment variable for production
+      envConfig.jwt.JWT_SECRET || 'your-secret-key', // Use environment variable for production
       { expiresIn: '7d' } // Token expires in 7 days
     );
 
@@ -1952,7 +1964,7 @@ const requestAdminVerification = async (req, res) => {
     console.log(`📧 Admin verification request for: ${email}`);
 
     // Verify admin creation key
-    const validAdminKey = process.env.ADMIN_CREATION_KEY || 'super-secret-admin-key-2024';
+    const validAdminKey = envConfig.admin.ADMIN_CREATION_KEY || 'super-secret-admin-key-2024';
     if (adminKey !== validAdminKey) {
       console.log(`❌ Invalid admin creation key provided`);
       return res.status(403).json({
@@ -1963,7 +1975,7 @@ const requestAdminVerification = async (req, res) => {
     }
 
     // Check if admin email is valid
-    const adminEmails = process.env.ADMIN_EMAILS ? process.env.ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase()) : [];
+    const adminEmails = envConfig.admin.ADMIN_EMAILS ? envConfig.admin.ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase()) : [];
     const isValidAdminEmail = email.toLowerCase().endsWith('@mydeeptech.ng') || adminEmails.includes(email.toLowerCase());
     
     if (!isValidAdminEmail) {
@@ -2049,7 +2061,7 @@ const confirmAdminVerification = async (req, res) => {
     console.log(`✅ Admin verification confirmation for: ${email}`);
 
     // Verify admin creation key again
-    const validAdminKey = process.env.ADMIN_CREATION_KEY || 'super-secret-admin-key-2024';
+    const validAdminKey = envConfig.admin.ADMIN_CREATION_KEY || 'super-secret-admin-key-2024';
     if (adminKey !== validAdminKey) {
       console.log(`❌ Invalid admin creation key provided`);
       return res.status(403).json({
@@ -2058,6 +2070,7 @@ const confirmAdminVerification = async (req, res) => {
         code: 'INVALID_ADMIN_KEY'
       });
     }
+
 
     // Get verification data
     const verificationData = adminVerificationStore.getVerificationData(email);
@@ -2201,7 +2214,7 @@ const createAdmin = async (req, res) => {
     console.log(`👑 Direct admin creation request for: ${email} (legacy method)`);
 
     // Verify admin creation key
-    const validAdminKey = process.env.ADMIN_CREATION_KEY || 'super-secret-admin-key-2024';
+    const validAdminKey = envConfig.admin.ADMIN_CREATION_KEY || 'super-secret-admin-key-2024';
     if (adminKey !== validAdminKey) {
       console.log(`❌ Invalid admin creation key provided`);
       return res.status(403).json({
@@ -2212,7 +2225,7 @@ const createAdmin = async (req, res) => {
     }
 
     // Check if admin email is valid (must end with @mydeeptech.ng or be in admin emails)
-    const adminEmails = process.env.ADMIN_EMAILS ? process.env.ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase()) : [];
+    const adminEmails = envConfig.admin.ADMIN_EMAILS ? envConfig.admin.ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase()) : [];
     const isValidAdminEmail = email.toLowerCase().endsWith('@mydeeptech.ng') || adminEmails.includes(email.toLowerCase());
     
     if (!isValidAdminEmail) {
@@ -2327,7 +2340,7 @@ const verifyAdminOTP = async (req, res) => {
     const { email, verificationCode, adminKey } = req.body;
 
     // Verify admin creation key
-    const validAdminKey = process.env.ADMIN_CREATION_KEY || 'super-secret-admin-key-2024';
+    const validAdminKey = envConfig.admin.ADMIN_CREATION_KEY || 'super-secret-admin-key-2024';
     if (adminKey !== validAdminKey) {
       return res.status(403).json({
         success: false,
@@ -2392,7 +2405,7 @@ const verifyAdminOTP = async (req, res) => {
         isAdmin: true,
         role: admin.role || 'admin'
       },
-      process.env.JWT_SECRET || 'your-secret-key',
+      envConfig.jwt.JWT_SECRET || 'your-secret-key',
       { expiresIn: '7d' }
     );
 
@@ -2486,7 +2499,7 @@ const adminLogin = async (req, res) => {
         isAdmin: true,
         role: admin.role || 'admin'
       },
-      process.env.JWT_SECRET || 'your-secret-key',
+      envConfig.jwt.JWT_SECRET || 'your-secret-key',
       { expiresIn: '7d' }
     );
 
@@ -2601,41 +2614,24 @@ const resendVerificationEmail = async (req, res) => {
 // DTUser function: Get available projects (only for approved annotators)
 const getAvailableProjects = async (req, res) => {
   try {
+
     const userId = req.user.userId;
-    console.log(`🔍 User ${req.user.email} requesting available projects`);
-    console.log(`📋 User data from middleware:`, {
-      userId: req.user.userId,
-      email: req.user.email,
-      fullName: req.user.fullName,
-      userDocStatus: req.user.userDoc?.annotatorStatus
-    });
 
     // Get fresh user data to ensure we have the latest status
     const user = await DTUser.findById(userId);
     if (!user) {
-      console.log(`❌ User ${req.user.email} not found in database`);
       return res.status(404).json({
         success: false,
         message: "User not found."
       });
     }
 
-    console.log(`📋 Fresh user data from DB:`, {
-      userId: user._id,
-      email: user.email,
-      annotatorStatus: user.annotatorStatus,
-      isEmailVerified: user.isEmailVerified
-    });
-
     if (user.annotatorStatus !== 'approved') {
-      console.log(`❌ User ${req.user.email} access denied - Status: ${user.annotatorStatus}`);
       return res.status(403).json({
         success: false,
         message: "Access denied. Only approved annotators can view projects."
       });
     }
-
-    console.log(`✅ User ${req.user.email} approved - Status: ${user.annotatorStatus}`);
 
     // Get query parameters
     const page = parseInt(req.query.page) || 1;
@@ -2649,8 +2645,6 @@ const getAvailableProjects = async (req, res) => {
     const view = req.query.view || 'available'; // 'available', 'applied', 'all'
     const applicationStatus = req.query.status; // 'pending', 'approved', 'rejected'
 
-    console.log(`🔍 Projects view requested: ${view}, status filter: ${applicationStatus || 'none'}`);
-
     // Build base filter for projects
     const filter = {
       status: 'active',
@@ -2658,16 +2652,17 @@ const getAvailableProjects = async (req, res) => {
     };
 
     // Only apply application deadline filter for available projects
-    if (view === 'available') {
-      filter.$or = [
-        { applicationDeadline: { $gt: new Date() } },
-        { applicationDeadline: null }
-      ];
-    }
+
+    // if (view === 'available') {
+    //   filter.$or = [
+    //     { applicationDeadline: { $gt: new Date() } },
+    //     { applicationDeadline: null }
+    //   ];
+    // }
 
     if (category) filter.projectCategory = category;
     if (difficultyLevel) filter.difficultyLevel = difficultyLevel;
-    
+
     if (minPayRate || maxPayRate) {
       filter.payRate = {};
       if (minPayRate) filter.payRate.$gte = parseFloat(minPayRate);
@@ -2686,11 +2681,9 @@ const getAvailableProjects = async (req, res) => {
       });
     }
 
-    console.log('🔍 Projects filter:', JSON.stringify(filter, null, 2));
-
     // Get user's existing applications with details
     let userApplicationsQuery = { applicantId: userId };
-    
+
     // If viewing applied projects with specific status, filter applications first
     if (view === 'applied' && applicationStatus) {
       userApplicationsQuery.status = applicationStatus;
@@ -2698,8 +2691,9 @@ const getAvailableProjects = async (req, res) => {
 
     const userApplications = await ProjectApplication.find(userApplicationsQuery)
       .populate('projectId').lean();
-    
+
     const appliedProjectIds = userApplications.map(app => app.projectId._id);
+
     const applicationMap = new Map();
     userApplications.forEach(app => {
       if (app.projectId) {
@@ -2727,12 +2721,14 @@ const getAvailableProjects = async (req, res) => {
     if (view === 'available') {
       // Show only projects user hasn't applied to (need all applications for this)
       const allUserApps = await ProjectApplication.find({ applicantId: userId }).select('projectId').lean();
+    
+      // This filter is filters out projects the user has applied to
+
       const allAppliedProjectIds = allUserApps.map(app => app.projectId);
-      
       if (allAppliedProjectIds.length > 0) {
         finalFilter._id = { $nin: allAppliedProjectIds };
       }
-      
+ 
       projects = await AnnotationProject.find(finalFilter)
         .populate('createdBy', 'fullName email')
         .select('-assignedAdmins')
@@ -2749,8 +2745,8 @@ const getAvailableProjects = async (req, res) => {
         projects = [];
         totalProjects = 0;
       } else {
-        finalFilter._id = { $in: appliedProjectIds };
 
+        finalFilter._id = { $in: appliedProjectIds };
         projects = await AnnotationProject.find(finalFilter)
           .populate('createdBy', 'fullName email')
           .select('-assignedAdmins')
@@ -2758,9 +2754,18 @@ const getAvailableProjects = async (req, res) => {
           .skip(skip)
           .limit(limit)
           .lean();
-
         totalProjects = await AnnotationProject.countDocuments(finalFilter);
       }
+
+      //NEW FILTER
+      //  projects = await AnnotationProject.find({ openCloseStatus: "open" })
+      //     .populate('createdBy', 'fullName email')
+      //     .select('-assignedAdmins')
+      //     .sort({ createdAt: -1 })
+      //     .skip(skip)
+      //     .limit(limit)
+      //     .lean();
+      // totalProjects = await AnnotationProject.countDocuments({ openCloseStatus: "open" });
 
     } else if (view === 'all') {
       // Show all active projects with application status
@@ -2771,8 +2776,7 @@ const getAvailableProjects = async (req, res) => {
         .skip(skip)
         .limit(limit)
         .lean();
-
-      totalProjects = await AnnotationProject.countDocuments(finalFilter);
+        totalProjects = await AnnotationProject.countDocuments(finalFilter);
     }
 
     // Add application and project metadata
@@ -2782,6 +2786,7 @@ const getAvailableProjects = async (req, res) => {
         projectId: project._id,
         status: { $in: ['pending', 'approved'] }
       });
+
       project.currentApplications = appCount;
       project.availableSlots = project.maxAnnotators ? Math.max(0, project.maxAnnotators - appCount) : null;
       project.canApply = !project.maxAnnotators || appCount < project.maxAnnotators;
@@ -2808,8 +2813,6 @@ const getAvailableProjects = async (req, res) => {
         project.daysUntilDeadline = null;
       }
     }
-
-    console.log(`✅ Found ${projects.length} projects for view: ${view}`);
 
     // Calculate pagination info
     const totalPages = Math.ceil(totalProjects / limit);
@@ -2915,15 +2918,16 @@ const applyToProject = async (req, res) => {
     }
 
     // Check application deadline
-    if (project.applicationDeadline && project.applicationDeadline < new Date()) {
-      return res.status(400).json({
-        success: false,
-        message: "Application deadline has passed"
-      });
-    }
+    // if (project.applicationDeadline && project.applicationDeadline < new Date()) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: "Application deadline has passed"
+    //   });
+    // }
 
     // Check if user has already applied
     const ProjectApplication = require('../models/projectApplication.model');
+  
     const existingApplication = await ProjectApplication.findOne({
       projectId: projectId,
       applicantId: userId
@@ -3008,7 +3012,7 @@ const applyToProject = async (req, res) => {
 
           // Send assessment invitation email
           const { sendAssessmentInvitation } = require('../utils/emailService');
-          const assessmentLink = `${process.env.FRONTEND_URL || 'https://app.mydeeptech.ng'}/assessment/${assessmentConfig._id}`;
+          const assessmentLink = `${(envConfig.FRONTEND_URL || 'https://app.mydeeptech.ng')}/assessment/${assessmentConfig._id}`;
           
           await sendAssessmentInvitation({
             userEmail: user.email,
@@ -4430,6 +4434,177 @@ const getProjectGuidelines = async (req, res) => {
   }
 };
 
+
+// Get all users for role management
+const getAllUsersForRoleManagement = async (req, res) => {
+  try {
+    // Extract pagination and search parameters with validation
+    const requestedPage = req.query.page;
+    const requestedLimit = req.query.limit;
+    const searchTerm = req.query.search?.trim() || '';
+    
+    const page = Math.max(1, parseInt(requestedPage) || 1);
+    // const limit = Math.min(100, Math.max(1, parseInt(requestedLimit) || 20)); // Default to 20, cap at 100
+
+    const parsedLimit = parseInt(requestedLimit);
+    const limit = Number.isNaN(parsedLimit)
+      ? 20
+      : Math.min(Math.max(parsedLimit, 1), 20);
+    const skip = (page - 1) * limit;
+
+    // Build search query
+    let searchQuery = {};
+    if (searchTerm) {
+      const searchRegex = new RegExp(searchTerm, 'i'); // Case-insensitive search
+      searchQuery = {
+        $or: [
+          { fullName: { $regex: searchRegex } },
+          { email: { $regex: searchRegex } },
+          { phone: { $regex: searchRegex } },
+          { role: { $regex: searchRegex } }
+        ]
+      };
+    }
+   
+    // Get total count of users for pagination metadata (with search filter)
+    const totalUsers = await DTUser.countDocuments(searchQuery);
+
+    // Get paginated DTUsers including admins (exclude passwords) with search filter
+    const dtUsers = await DTUser.find(searchQuery)
+      .select('-password')
+      .sort({ createdAt: -1 }) // Sort by creation date, newest first
+      .skip(skip)
+      .limit(limit);
+
+    // Transform DTUsers to match User schema format
+    const transformedDTUsers = dtUsers.map(dtUser => ({
+      _id: dtUser._id,
+      firstname: dtUser.fullName ? dtUser.fullName.split(' ')[0] : '',
+      lastname: dtUser.fullName ? dtUser.fullName.split(' ').slice(1).join(' ') : '',
+      username: dtUser.email.split('@')[0], // Use email prefix as username
+      email: dtUser.email,
+      phone: dtUser.phone,
+      role: dtUser.role ?? "user", // Admin if mydeeptech email
+      createdAt: dtUser.createdAt,
+      updatedAt: dtUser.updatedAt,
+    }));
+
+    // Calculate pagination metadata
+    const totalPages = Math.ceil(totalUsers / limit);
+    const hasNextPage = page < totalPages;
+    const hasPrevPage = page > 1;
+
+    if (!transformedDTUsers || transformedDTUsers.length === 0) {
+      return res.status(200).json({
+        responseCode: "200",
+        message: searchTerm ? `No users found matching "${searchTerm}"` : "No users found",
+        data: [],
+        pagination: {
+          currentPage: page,
+          totalPages: 0,
+          totalUsers: 0,
+          usersPerPage: limit,
+          hasNextPage: false,
+          hasPrevPage: false,
+          usersOnCurrentPage: 0
+        }
+      });
+    }
+
+    res.status(200).json({
+      responseCode: "200",
+      responseMessage: searchTerm 
+        ? `Users matching "${searchTerm}" retrieved successfully` 
+        : "All users retrieved successfully",
+      data: transformedDTUsers,
+      pagination: {
+        currentPage: page,
+        totalPages: totalPages,
+        totalUsers: totalUsers,
+        usersPerPage: limit,
+        hasNextPage: hasNextPage,
+        hasPrevPage: hasPrevPage,
+        usersOnCurrentPage: transformedDTUsers.length
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching all users for role management:', error);
+    res.status(500).json({
+      responseCode: "500",
+      responseMessage: "Internal server error",
+      data: error.message
+    });
+  }
+};
+
+// Update user role controller
+const updateUserRole = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { role, reason } = req.body;
+
+    // Validate role
+    if (!Object.values(RoleType).includes(role.toLowerCase())) {
+      return res.status(400).json({
+        responseCode: "400",
+        responseMessage: "Invalid role specified",
+        data: null
+      });
+    }
+
+    // Find and update user
+    const user = await DTUser.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        responseCode: "404",
+        responseMessage: "User not found",
+        data: null
+      });
+    }
+
+    const previousRole = user.role;
+    user.role = role ? role.toLowerCase() : user.role;
+    await user.save();
+
+
+    // Remove password from response
+    const updatedUser = user.toObject();
+    delete updatedUser.password;
+
+    const userResponse = {
+        _id: user._id,
+      firstname: user.fullName ? user.fullName.split(' ')[0] : '',
+      lastname: user.fullName ? user.fullName.split(' ').slice(1).join(' ') : '',
+      username: user.email.split('@')[0], // Use email prefix as username
+      email: user.email,
+      phone: user.phone,
+      role: user.role ?? "user", // Admin if mydeeptech email
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    }
+
+    res.status(200).json({
+      responseCode: "200",
+      responseMessage: `User role updated successfully from ${previousRole} to ${role}`,
+      data: {
+        user: userResponse,
+        previousRole,
+        newRole: role,
+        reason: reason || null
+      }
+    });
+
+  } catch (error) {
+    console.error('Error updating user role:', error);
+    res.status(500).json({
+      responseCode: "500",
+      responseMessage: "Internal server error",
+      data: error.message
+    });
+  }
+};
+
 module.exports = { 
   createDTUser, 
   createDTUserWithBackgroundEmail, 
@@ -4468,5 +4643,7 @@ module.exports = {
   getUserResultSubmissions,
   uploadIdDocument,
   uploadResume,
-  getProjectGuidelines
+  getProjectGuidelines,
+  getAllUsersForRoleManagement,
+  updateUserRole,
 };

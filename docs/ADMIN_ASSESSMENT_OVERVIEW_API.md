@@ -168,14 +168,14 @@ useEffect(() => {
 
 ### Basic Request:
 ```bash
-curl -X GET "http://localhost:5000/api/assessments/admin/overview" \
+curl -X GET "http://localhost:4000/api/assessments/admin/overview" \
   -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
   -H "Content-Type: application/json"
 ```
 
 ### With Pretty JSON Output:
 ```bash
-curl -X GET "http://localhost:5000/api/assessments/admin/overview" \
+curl -X GET "http://localhost:4000/api/assessments/admin/overview" \
   -H "Authorization: Bearer YOUR_ADMIN_TOKEN" \
   -H "Content-Type: application/json" | jq
 ```
@@ -254,7 +254,7 @@ export default async function handler(
   }
 
   try {
-    const response = await fetch('http://localhost:5000/api/assessments/admin/overview', {
+    const response = await fetch('http://localhost:4000/api/assessments/admin/overview', {
       headers: {
         'Authorization': req.headers.authorization || '',
         'Content-Type': 'application/json'
@@ -274,7 +274,7 @@ export default async function handler(
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:5000/api',
+  baseURL: 'http://localhost:4000/api',
   headers: {
     'Content-Type': 'application/json'
   }

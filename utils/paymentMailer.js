@@ -1,8 +1,11 @@
 const brevo = require('@getbrevo/brevo');
+const dotenv = require('dotenv');
+dotenv.config();
+const envConfig = require('../config/envConfig');
 
 // Initialize Brevo API client
 const apiInstance = new brevo.TransactionalEmailsApi();
-apiInstance.setApiKey(brevo.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY);
+apiInstance.setApiKey(brevo.TransactionalEmailsApiApiKeys.apiKey, envConfig.email.brevo.BREVO_API_KEY);
 
 /**
  * Send new invoice notification to DTUser

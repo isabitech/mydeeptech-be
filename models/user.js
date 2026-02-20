@@ -36,7 +36,7 @@ const userSchema = new mongoose.Schema({
     role: {
         type: String,
         required: "Role name is required",
-        enum: [RoleType.USER, RoleType.ADMIN],
+        enum: [RoleType.USER, RoleType.ADMIN, RoleType.ANNOTATOR, RoleType.MODERATOR, RoleType.QA_REVIEWER],
         default: RoleType.USER
     },
     // Password reset fields

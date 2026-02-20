@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 
-const categoryController = require('../controller/category.controller.js');
-const subCategoryController = require('../controller/subcategory.controller.js');
-const domainController = require('../controller/domain.controller.js');
+const categoryController = require('../controllers/category.controller.js');
+const subCategoryController = require('../controllers/subcategory.controller.js');
+const domainController = require('../controllers/domain.controller.js');
 const { authenticateAdmin } = require('../middleware/adminAuth.js');
 const { authenticateToken } = require('../middleware/auth.js');
 const { validateRequest } = require('../middleware/validation.middleware.js');

@@ -23,7 +23,10 @@ if (error) {
 }
 
 const envConfig = {
-  PORT: env.PORT,
+  PORT: Number(env.PORT),
+  FRONTEND_URL: env.FRONTEND_URL,
+  BACKEND_URL: env.BACKEND_URL,
+
 
   mongo: {
     OLD_MONGO_URI: env.OLD_MONGO_URI,
@@ -79,7 +82,14 @@ const envConfig = {
   EXCHANGE_RATE_API_KEY: env.EXCHANGE_RATE_API_KEY,
   EXCHANGE_RATES_API_KEY: env.EXCHANGE_RATES_API_KEY,
 
- NODE_ENV: env.NODE_ENV || nodeEnv
+ NODE_ENV: env.NODE_ENV || nodeEnv,
+ SWAGGER_URL: env.SWAGGER_URL || (env.NODE_ENV === 'production' ? 'https://mydeeptech-be.onrender.com' : 'http://localhost:4000'),
+
+ // Enable/disable Swagger documentation
+ SWAGGER_ENABLED: env.SWAGGER_ENABLED !== 'false', // Defaults to true unless explicitly disabled
+
 };
+
+
 
 module.exports = envConfig;

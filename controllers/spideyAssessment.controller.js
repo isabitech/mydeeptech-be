@@ -1,3 +1,4 @@
+const envConfig = require('../config/envConfig');
 const SpideyAssessmentEngine = require('../utils/spideyAssessmentEngine');
 const SpideyFinalDecisionEngine = require('../utils/spideyFinalDecisionEngine');
 const Joi = require('joi');
@@ -331,7 +332,7 @@ class SpideyAssessmentController {
     return res.status(statusCode).json({
       success: false,
       message,
-      error: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      error: envConfig.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 }

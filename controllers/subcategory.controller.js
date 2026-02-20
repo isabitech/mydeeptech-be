@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const subCategoryService = require('../service/subcategory.service.js');
+const subCategoryService = require('../services/subcategory.service.js');
 
 const create = async (req, res) => {
     const data = await subCategoryService.createSubCategory(req.body);

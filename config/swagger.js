@@ -1,6 +1,9 @@
 // swagger.js - API Documentation Configuration
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
+const envConfig = require('./envConfig');
+
+const description = envConfig.NODE_ENV === 'production' ? 'Production server' : 'Development server';
 
 const options = {
   definition: {
@@ -17,13 +20,9 @@ const options = {
     },
     servers: [
       {
-        url: 'http://localhost:5000/api',
-        description: 'Development server',
-      },
-      {
-        url: 'https://api.mydeeptech.ng/api',
-        description: 'Production server',
-      },
+        url: envConfig.SWAGGER_URL,
+          description: envConfig.NODE_ENV === 'production' ? 'Primary Production Server' : 'Local Development Server',
+      }
     ],
     components: {
       securitySchemes: {
@@ -196,7 +195,7 @@ const options = {
       },
     ],
   },
-  apis: ['./routes/*.js', './controller/*.js'], // Path to the API docs
+  apis: ['./routes/*.js', './controllers/*.js'], // Path to the API docs
 };
 
 const specs = swaggerJsdoc(options);

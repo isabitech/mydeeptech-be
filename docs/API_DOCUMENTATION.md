@@ -4,7 +4,7 @@
 Complete API documentation for MyDeepTech annotation platform with resume requirements and project resource management.
 
 ## Base URL
-- Development: `http://localhost:5000/api`
+- Development: `http://localhost:4000/api`
 - Production: `https://api.mydeeptech.ng/api`
 
 ## Authentication

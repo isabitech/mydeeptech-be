@@ -1,11 +1,12 @@
 const express = require('express');
-const { getAllDTUsers, getAllAdminUsers, getAdminDashboard, approveAnnotator, approveUserForQA, rejectUserForQA, getAllQAUsers, rejectAnnotator, getDTUserAdmin, createAdmin, requestAdminVerification, confirmAdminVerification, verifyAdminOTP, adminLogin } = require('../controller/dtUser.controller.js');
-const { createAnnotationProject, getAllAnnotationProjects, getAnnotationProjectDetails, updateAnnotationProject, toggleProjectStatus, toggleProjectVisibility, deleteAnnotationProject, requestProjectDeletionOTP, verifyOTPAndDeleteProject, getAnnotationProjectApplications, approveAnnotationProjectApplication, rejectAnnotationProjectApplication, removeApprovedApplicant, getRemovableApplicants, exportApprovedAnnotatorsCSV, attachAssessmentToProject, removeAssessmentFromProject, getAvailableAssessments, rejectApplicationsBulk, getApprovedApplicants, bulkApproveApplications, bulkRejectApplications } = require('../controller/annotationProject.controller.js');
-const { createInvoice, getAllInvoices, getInvoiceDetails, updatePaymentStatus, sendInvoiceReminder, deleteInvoice, bulkAuthorizePayment, generatePaystackCSV, generateMPESACSV } = require('../controller/invoice.controller.js');
-const { getAdminNotifications, createAnnouncement, getNotificationStats, cleanupNotifications, broadcastNotification } = require('../controller/notification.controller.js');
-const { getAdminAssessments, getAdminAssessmentsOverview } = require('../controller/assessment.controller.js');
-const { addVideoReel, getAllVideoReels, getVideoReelById, updateVideoReel, deleteVideoReel, bulkAddVideoReels, getVideoReelAnalytics } = require('../controller/videoReel.controller.js');
-const { createAssessmentConfig, getAllAssessmentConfigs, getAssessmentConfigById, updateAssessmentConfig, deleteAssessmentConfig, getAssessmentConfigByProject } = require('../controller/multimediaAssessmentConfig.controller.js');
+const { getAllDTUsers, getAllAdminUsers, getAdminDashboard, approveAnnotator, approveUserForQA, rejectUserForQA, getAllQAUsers, rejectAnnotator, getDTUserAdmin, createAdmin, requestAdminVerification, confirmAdminVerification, verifyAdminOTP, adminLogin, getAllUsersForRoleManagement, updateUserRole } = require('../controllers/dtUser.controller.js');
+const { getRoles } = require('../controllers/user.js');
+const { createAnnotationProject, getAllAnnotationProjects, getAnnotationProjectDetails, updateAnnotationProject, toggleProjectStatus, toggleProjectVisibility, deleteAnnotationProject, requestProjectDeletionOTP, verifyOTPAndDeleteProject, getAnnotationProjectApplications, approveAnnotationProjectApplication, rejectAnnotationProjectApplication, removeApprovedApplicant, getRemovableApplicants, exportApprovedAnnotatorsCSV, attachAssessmentToProject, removeAssessmentFromProject, getAvailableAssessments, rejectApplicationsBulk, getApprovedApplicants, bulkApproveApplications, bulkRejectApplications } = require('../controllers/annotationProject.controller.js');
+const { createInvoice, getAllInvoices, getInvoiceDetails, updatePaymentStatus, sendInvoiceReminder, deleteInvoice, bulkAuthorizePayment, generatePaystackCSV, generateMPESACSV } = require('../controllers/invoice.controller.js');
+const { getAdminNotifications, createAnnouncement, getNotificationStats, cleanupNotifications, broadcastNotification } = require('../controllers/notification.controller.js');
+const { getAdminAssessments, getAdminAssessmentsOverview } = require('../controllers/assessment.controller.js');
+const { addVideoReel, getAllVideoReels, getVideoReelById, updateVideoReel, deleteVideoReel, bulkAddVideoReels, getVideoReelAnalytics } = require('../controllers/videoReel.controller.js');
+const { createAssessmentConfig, getAllAssessmentConfigs, getAssessmentConfigById, updateAssessmentConfig, deleteAssessmentConfig, getAssessmentConfigByProject } = require('../controllers/multimediaAssessmentConfig.controller.js');
 const { authenticateAdmin } = require('../middleware/adminAuth.js');
 
 const router = express.Router();
@@ -35,6 +36,11 @@ router.patch('/dtusers/:userId/qa-reject', authenticateAdmin, rejectUserForQA);
 router.get('/qa-users', authenticateAdmin, getAllQAUsers);
 router.patch('/dtusers/:userId/reject', authenticateAdmin, rejectAnnotator);
 
+// User Role Management Routes
+router.put('/users/:userId/role', authenticateAdmin, updateUserRole);
+router.get('/users/all', authenticateAdmin, getAllUsersForRoleManagement);
+router.get('/roles', authenticateAdmin, getRoles);
+
 // Project Management Routes
 router.post('/projects', authenticateAdmin, createAnnotationProject);
 router.get('/projects', authenticateAdmin, getAllAnnotationProjects);
@@ -43,8 +49,9 @@ router.patch('/projects/:projectId', authenticateAdmin, updateAnnotationProject)
 router.patch('/projects/:projectId/toggle-status', authenticateAdmin, toggleProjectStatus);
 router.patch('/projects/:projectId/toggle-visibility', authenticateAdmin, toggleProjectVisibility);
 router.delete('/projects/:projectId', authenticateAdmin, deleteAnnotationProject);
+router.delete('/projects/:projectId/applicants/:applicantId', authenticateAdmin, deleteAnnotationProject);
 router.get('/projects/getApprovedApplicants/:projectId', authenticateAdmin, getApprovedApplicants);
-router.put('/projects/reject-applications-bulk',authenticateAdmin, rejectApplicationsBulk);
+router.put('/projects/reject-applications-bulk', authenticateAdmin, rejectApplicationsBulk);
 // Project Deletion with OTP Routes (Projects Officer Authorization)
 router.post('/projects/:projectId/request-deletion-otp', authenticateAdmin, requestProjectDeletionOTP);
 router.post('/projects/:projectId/verify-deletion-otp', authenticateAdmin, verifyOTPAndDeleteProject);
@@ -82,13 +89,13 @@ router.delete('/invoices/:invoiceId', authenticateAdmin, deleteInvoice);
 
 // Notification Management Routes
 router.get('/notifications', authenticateAdmin, getAdminNotifications);
-router.post('/notifications', authenticateAdmin, require('../controller/notification.controller.js').createAdminNotification);
-router.put('/notifications/:notificationId', authenticateAdmin, require('../controller/notification.controller.js').updateAdminNotification);
-router.delete('/notifications/:notificationId', authenticateAdmin, require('../controller/notification.controller.js').deleteAdminNotification);
+router.post('/notifications', authenticateAdmin, require('../controllers/notification.controller.js').createAdminNotification);
+router.put('/notifications/:notificationId', authenticateAdmin, require('../controllers/notification.controller.js').updateAdminNotification);
+router.delete('/notifications/:notificationId', authenticateAdmin, require('../controllers/notification.controller.js').deleteAdminNotification);
 router.post('/notifications/announcement', authenticateAdmin, createAnnouncement);
 router.get('/notifications/stats', authenticateAdmin, getNotificationStats);
 router.delete('/notifications/cleanup', authenticateAdmin, cleanupNotifications);
-router.get('/notifications/analytics', authenticateAdmin, require('../controller/notification.controller.js').getAdminNotificationAnalytics);
+router.get('/notifications/analytics', authenticateAdmin, require('../controllers/notification.controller.js').getAdminNotificationAnalytics);
 
 // Admin Notification Broadcast Endpoint
 router.post('/notifications/broadcast', authenticateAdmin, broadcastNotification);
