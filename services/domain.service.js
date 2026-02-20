@@ -41,9 +41,7 @@ const createDomain = async (data) => {
   // If parent is SubCategory
   if (data.parentModel === 'SubCategory') {
     const subCategory = await SubCategory
-      .findById(data.parent)
-      .select('category')
-      .lean();
+      .findById(data.parent);
 
     if (!subCategory) {
       throw new Error('SubCategory not found');

@@ -60,8 +60,23 @@ const fetchByCategory = async (categoryId) => {
 };
 
 const fetchAllSubCategories = async () => {
-  const data = await SubCategory.find().populate('category');
-  return data;
+  // Get all subcategories with their category populated
+  const subCategories = await SubCategory.find().populate('category');
+
+  // Get all domains for SubCategories in one query
+  const subCategoryIds = subCategories.map(sc => sc._id);
+  const domains = await Domain.find({ subCategory: { $in: subCategoryIds } });
+
+  // Map domains to their respective subcategories
+  const result = subCategories.map(sc => {
+    const relatedDomains = domains.filter(d => d.subCategory.toString() === sc._id.toString());
+    return {
+      ...sc.toObject(),
+      domains: relatedDomains
+    };
+  });
+
+  return result;
 };
 
 

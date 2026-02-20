@@ -3,7 +3,10 @@ const SubCategory = require('../models/SubCategory.model.js');
 const Domain = require('../models/domain.model.js');
 const mongoose = require("mongoose");
 const createCategory = async (data) => {
-  const category = Category.create(data);
+  const baseSlug = generateSlug(data.name);
+  data.slug = await generateUniqueSlug(Category, baseSlug);
+
+  const category = await Category.create(data);
   if (!category) {
     throw new Error('Category creation failed');
   }
@@ -11,7 +14,7 @@ const createCategory = async (data) => {
 };
 
 const updateCategory = async (id, data) => {
-  const category = Category.findByIdAndUpdate(id, data, { new: true });
+  const category = await Category.findByIdAndUpdate(id, data, { new: true });
   if (!category) {
     throw new Error('Category update failed');
   }
@@ -19,7 +22,7 @@ const updateCategory = async (id, data) => {
 };
 
 const deleteCategory = async (id) => {
-  const category = Category.findByIdAndDelete(id);
+  const category = await Category.findByIdAndDelete(id);
   if (!category) {
     throw new Error('Category deletion failed');
   }
@@ -29,6 +32,38 @@ const deleteCategory = async (id) => {
   ]);
   return category;
 };
+
+
+/**
+ * UNIQUE SLUG GENERATOR
+ */
+async function generateUniqueSlug(Model, baseSlug) {
+  let slug = baseSlug;
+  let counter = 1;
+
+  while (await Model.exists({ slug })) {
+    slug = `${baseSlug}-${counter}`;
+    counter++;
+  }
+
+  return slug;
+}
+
+
+/**
+ * SLUG GENERATOR
+ */
+function generateSlug(text) {
+  return text
+    .toString()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+}
 
 /**
  * TREE FETCH RULE
