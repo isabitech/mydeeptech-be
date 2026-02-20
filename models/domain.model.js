@@ -2,8 +2,8 @@ const mongoose = require('mongoose');
 const domainSchema = new mongoose.Schema({
     name: { type: String, required: true },
     slug: { type: String, required: true, unique: true },
-    parent: { type: mongoose.Schema.Types.ObjectId, refPath: 'parentModel' },
-    parentModel: { type: String, enum: ['Category', 'SubCategory'] }
+    category: { type: mongoose.Schema.Types.ObjectId, ref: 'Category' },
+    subCategory: { type: mongoose.Schema.Types.ObjectId, ref: 'SubCategory' },
 },{
     timestamps: true // Enable automatic timestamps
 });

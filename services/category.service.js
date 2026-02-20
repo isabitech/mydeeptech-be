@@ -1,7 +1,7 @@
 const Category = require('../models/category.model.js');
 const SubCategory = require('../models/SubCategory.model.js');
 const Domain = require('../models/domain.model.js');
-
+const mongoose = require("mongoose");
 const createCategory = async (data) => {
   const category = Category.create(data);
   if (!category) {
@@ -25,7 +25,7 @@ const deleteCategory = async (id) => {
   }
   await Promise.all([
     SubCategory.deleteMany({ category: id }),
-    Domain.deleteMany({ parent: id, parentModel: 'Category' })
+    Domain.deleteMany({ category: id, subCategory: null })
   ]);
   return category;
 };
@@ -34,33 +34,38 @@ const deleteCategory = async (id) => {
  * TREE FETCH RULE
  * Category
  *  ├─ SubCategory
- *  │   ├─ Domain (if exists)
- *  └─ Domain (direct if no subcategory domain)
+ *  └─ Domain (direct if no subcategory domains or subcategory domains if exist)
  */
 const fetchCategoryTree = async () => {
   const categories = await Category.find().lean();
-
   const result = [];
 
   for (const category of categories) {
-    const subCategories = await SubCategory.find({ category: category._id }).lean();
-
-    for (const sub of subCategories) {
-      sub.domains = await Domain.find({
-        parent: sub._id,
-        parentModel: 'SubCategory'
-      }).lean();
-    }
-
-    const directDomains = await Domain.find({
-      parent: category._id,
-      parentModel: 'Category'
+    // 1. Get subcategories
+    const subCategories = await SubCategory.find({
+      category: category._id
     }).lean();
+
+    const subCategoryIds = subCategories.map(sub => sub._id);
+
+    // 2. Domains under subcategories
+    const subCategoryDomains = await Domain.find({
+      subCategory: { $in: subCategoryIds }
+    }).lean();
+
+    // 3. Domains directly under category
+    const categoryDomains = await Domain.find({
+      category: category._id,
+      subCategory: null
+    }).lean();
+
+    // 4. Merge both
+    const domains = [...categoryDomains, ...subCategoryDomains];
 
     result.push({
       ...category,
       subCategories,
-      domains: directDomains
+      domains
     });
   }
 
