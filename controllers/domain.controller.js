@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
 const domainService = require('../services/domain.service.js');
+const categoryService = require('../services/category.service.js');
+const subCategoryService = require('../services/subcategory.service.js');
 
 const create = async (req, res) => {
   const { name, parent, parentModel } = req.body;
@@ -61,10 +63,63 @@ const findAll = async (req, res) => {
   res.status(200).json({ success: true, message: 'Domains fetched', error: null, data });
 };
 
+
+const CreateALL = async (req, res) => {
+  try {
+    const { name, categoryname, subcategory } = req.body;
+
+    const categoryData = await categoryService.createCategory({ name: categoryname });
+    if (!categoryData) {
+      return res.status(400).json({
+        success: false,
+        message: 'Category creation failed',
+        error: 'CategoryCreationFailed',
+        data: null
+      });
+    }
+
+    let subCategoryData = null;
+    let domainData = null;
+
+    if (subcategory != null) {
+      subCategoryData = await subCategoryService.createSubCategory({ name: subcategory, category: categoryData._id });
+      if (!subCategoryData) {
+        return res.status(400).json({
+          success: false,
+          message: 'SubCategory creation failed',
+          error: 'SubCategoryCreationFailed',
+          data: null
+        });
+      }
+
+      domainData = await domainService.createDomain({ name, parent: subCategoryData._id, parentModel: 'SubCategory' });
+    } else {
+      domainData = await domainService.createDomain({ name, parent: categoryData._id, parentModel: 'Category' });
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Domain, Category and SubCategory created',
+      error: null,
+      data: { domain: domainData, category: categoryData, subCategory: subCategoryData }
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message,
+      data: null
+    });
+  }
+};
+
 module.exports = {
   create,
   update,
   remove,
   fetchByParent,
-  findAll
+  findAll,
+  CreateALL
 };

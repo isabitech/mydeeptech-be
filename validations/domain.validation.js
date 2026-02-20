@@ -27,9 +27,17 @@ const updateSchema = Joi.object({
     parentModel: Joi.string().valid('Category', 'SubCategory').optional()
 }).min(1);
 
+
+const CreateALLSchema = Joi.object({
+    categoryname: Joi.number().integer().min(1).max(100).required(),
+    subcategory: Joi.number().integer().min(1).max(100).nullable(),
+    name: Joi.string().trim().min(2).max(100).required()
+});
+
 module.exports = {
     categorySchema,
     subCategorySchema,
     domainSchema,
-    updateSchema
+    updateSchema,
+    CreateALLSchema
 };
