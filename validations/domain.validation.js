@@ -2,12 +2,10 @@ const Joi = require('joi');
 
 const categorySchema = Joi.object({
     name: Joi.string().trim().min(2).max(100).required(),
-    slug: Joi.string().trim().lowercase().optional()
 });
 
 const subCategorySchema = Joi.object({
     name: Joi.string().trim().min(2).max(100).required(),
-    slug: Joi.string().trim().lowercase().optional(),
     category: Joi.string().regex(/^[0-9a-fA-F]{24}$/).required().messages({
         'string.pattern.base': 'Category ID must be a valid MongoDB ObjectId'
     })
@@ -15,7 +13,6 @@ const subCategorySchema = Joi.object({
 
 const domainSchema = Joi.object({
     name: Joi.string().trim().min(2).max(100).required(),
-    slug: Joi.string().trim().lowercase().optional(),
     parent: Joi.string().regex(/^[0-9a-fA-F]{24}$/).required().messages({
         'string.pattern.base': 'Parent ID must be a valid MongoDB ObjectId'
     }),
