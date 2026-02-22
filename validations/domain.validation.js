@@ -30,7 +30,7 @@ const updateSchema = Joi.object({
 
 const CreateALLSchema = Joi.object({
     categoryname: Joi.number().integer().min(1).max(100).required(),
-    subcategory: Joi.number().integer().min(1).max(100).nullable(),
+    subcategory: Joi.number().integer().min(1).max(100).allow(null),
     name: Joi.string().trim().min(2).max(100).required()
 });
 

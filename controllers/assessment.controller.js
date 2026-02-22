@@ -323,6 +323,7 @@ const submitAssessment = async (req, res) => {
         if (passed && newAnnotatorStatus === 'approved') {
           await NotificationService.createNotification({
             recipientId: userId,
+            userId,
             recipientType: 'user',
             title: '🎉 Assessment Passed - Annotator Approved!',
             message: `Congratulations! You scored ${scorePercentage}% on your assessment and are now an approved annotator. You can start applying to annotation projects.`,
@@ -339,6 +340,7 @@ const submitAssessment = async (req, res) => {
         } else if (!passed && newAnnotatorStatus === 'rejected' && newMicroTaskerStatus === 'approved') {
           await NotificationService.createNotification({
             recipientId: userId,
+            userId,
             recipientType: 'user',
             title: '📋 Assessment Complete - Micro Tasker Approved',
             message: `You scored ${scorePercentage}% on your assessment. While you didn't qualify as an annotator, you're now approved as a micro tasker and can access survey opportunities.`,
