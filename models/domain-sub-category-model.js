@@ -24,7 +24,8 @@ const domainSubCategorySchema = new mongoose.Schema(
         lower: true,
         trim: true,
         strict: true,
-      }, "_");
+        replacement: "_",
+      });
     }
     next();
   });

@@ -14,16 +14,17 @@ const DomainCategorySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-  DomainCategorySchema.pre('validate', function (next) {
-    if (this.isModified('name')) {
-      this.slug = slugify(this.name, {
-        lower: true,
-        trim: true,
-        strict: true,
-      }, "_");
-    }
-    next();
-  });
+DomainCategorySchema.pre("validate", function (next) {
+  if (this.isModified("name")) {
+    this.slug = slugify(this.name, {
+      lower: true,
+      trim: true,
+      strict: true,
+      replacement: "_",
+    });
+  }
+  next();
+});
 
 /**
  * Cascade delete subcategories & sub-children
