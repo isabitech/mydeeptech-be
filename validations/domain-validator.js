@@ -1,8 +1,5 @@
 const Joi = require('joi');
 
-const categorySchema = Joi.object({
-    name: Joi.string().trim().min(2).max(100).required(),
-});
 
 const idSchema = Joi.object({
     id: Joi.string().regex(/^[0-9a-fA-F]{24}$/).required().messages({
@@ -10,27 +7,35 @@ const idSchema = Joi.object({
     })
 });
 
+const categorySchema = Joi.object({
+    name: Joi.string().trim().min(2).max(100).required(),
+    description: Joi.string().trim().optional(),
+});
+
 const subCategorySchema = Joi.object({
     name: Joi.string().trim().min(2).max(100).required(),
-    category: Joi.string().regex(/^[0-9a-fA-F]{24}$/).required().messages({
-        'string.pattern.base': 'Category ID must be a valid MongoDB ObjectId'
-    })
+    domain_category: Joi.string().regex(/^[0-9a-fA-F]{24}$/).required().messages({
+        'string.pattern.base': 'Sub-Category ID must be a valid MongoDB ObjectId'
+    }),
+    description: Joi.string().trim().optional(),
 });
 
 const domainSchema = Joi.object({
     name: Joi.string().trim().min(2).max(100).required(),
-    parent: Joi.string().regex(/^[0-9a-fA-F]{24}$/).required().messages({
+    domain_category: Joi.string().regex(/^[0-9a-fA-F]{24}$/).required().messages({
         'string.pattern.base': 'Parent ID must be a valid MongoDB ObjectId'
     }),
-    parentModel: Joi.string().valid('Category', 'SubCategory').required()
+    domain_sub_category: Joi.string().regex(/^[0-9a-fA-F]{24}$/).required().messages({
+        'string.pattern.base': 'Parent ID must be a valid MongoDB ObjectId'
+    }),
+     description: Joi.string().trim().optional(),
 });
 
 const updateSchema = Joi.object({
     name: Joi.string().trim().min(2).max(100).optional(),
-    slug: Joi.string().trim().lowercase().optional(),
-    category: Joi.string().regex(/^[0-9a-fA-F]{24}$/).optional(),
-    parent: Joi.string().regex(/^[0-9a-fA-F]{24}$/).optional(),
-    parentModel: Joi.string().valid('Category', 'SubCategory').optional()
+    domain_category: Joi.string().regex(/^[0-9a-fA-F]{24}$/).optional(),
+    domain_sub_category: Joi.string().regex(/^[0-9a-fA-F]{24}$/).optional(),
+    description: Joi.string().trim().optional(),
 }).min(1);
 
 
@@ -46,5 +51,5 @@ module.exports = {
     domainSchema,
     updateSchema,
     CreateALLSchema,
-    idSchema,
+    idSchema
 };

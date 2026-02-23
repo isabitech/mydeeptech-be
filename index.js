@@ -32,9 +32,11 @@ const supportRoute = require('./routes/support');
 const chatRoute = require('./routes/chat');
 const qaRoute = require('./routes/qa');
 const domainsRoute = require('./routes/domains.routes');
+const newDomainsRoute = require('./routes/domain.routes');
 const envConfig = require('./config/envConfig');
 const { healthCheck } = require('./controllers/health-check.controller');
 const { corsOptions } = require('./utils/cors-options.utils');
+const errorMiddleware = require('./middleware/error.middleware');
 
 const app = express();
 const server = createServer(app);
@@ -57,17 +59,17 @@ app.use(express.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
 // Global JSON parsing error handler
-app.use((err, req, res, next) => {
-    if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
-        console.error('❌ JSON Syntax Error:', err.message);
-        return res.status(400).json({
-            success: false,
-            message: 'Invalid JSON payload. Please check your syntax (ensure double quotes are used and no trailing commas).',
-            error: err.message
-        });
-    }
-    next(err);
-});
+// app.use((err, req, res, next) => {
+//     if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+//         console.error('❌ JSON Syntax Error:', err.message);
+//         return res.status(400).json({
+//             success: false,
+//             message: 'Invalid JSON payload. Please check your syntax (ensure double quotes are used and no trailing commas).',
+//             error: err.message
+//         });
+//     }
+//     next(err);
+// });
 
 // API Documentation (only if Swagger is available)
 if (swaggerUi && specs) {
@@ -97,6 +99,9 @@ app.use('/api/support', supportRoute);
 app.use('/api/chat', chatRoute);
 app.use('/api/qa', qaRoute);
 app.use('/api/domain', domainsRoute);
+app.use('/api/new-domain', newDomainsRoute);
+
+app.use(errorMiddleware);
 
 // Initialize Redis connection
 const initializeRedis = async () => {

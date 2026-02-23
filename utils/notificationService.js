@@ -47,7 +47,6 @@ const createNotification = async (notificationData) => {
 const createApplicationStatusNotification = async (userId, status, project, application) => {
   try {
     console.log(`📬 Creating application status notification for user ${userId}: ${status}`);
-    
     const titles = {
       approved: `Application Approved: ${project.projectName}`,
       rejected: `Application Update: ${project.projectName}`,
