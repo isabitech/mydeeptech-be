@@ -1,4 +1,4 @@
-const DomainSubCategoryService = require("../services/Domain-sub-category.service");
+const DomainSubCategoryService = require("../services/domain-sub-category.service");
 const ResponseClass = require("../utils/response-handler");
 
 const createDomainSubCategory = async (req, res, next) => {
