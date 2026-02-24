@@ -22,8 +22,18 @@ const createDomainChild = async (req, res, next) => {
 
 const fetchAllDomainChildren = async (req, res, next) => {
   try {
-    const domain = await DomainChildService.fetchAllDomainChildren();
-    return ResponseClass.Success(res, { message: "Domain sub-category fetched successfully", data: { domain } });
+    const { page = 1, limit = 10, search = '' } = req.query;
+    const paginationOptions = {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      search: search.trim()
+    };
+    
+    const result = await DomainChildService.fetchAllDomainChildren(paginationOptions);
+    return ResponseClass.Success(res, { 
+      message: "Domains fetched successfully", 
+      data: result 
+    });
   } catch (error) {
     next(error);
   }
@@ -71,12 +81,44 @@ const updateDomainChild = async (req, res, next) => {
   }
 };
 
+const getCategoryAndSubCategoryForADomainChild = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const domainWithCategorization = await DomainChildService.getCategoryAndSubCategoryForADomainChild(id);
+    return ResponseClass.Success(res, { 
+      message: "Domain categorization fetched successfully", 
+      data: { domainWithCategorization } 
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
+const getAllDomainsWithCategorization = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 50, search = '' } = req.query;
+    const paginationOptions = {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      search: search.trim()
+    };
+    
+    const result = await DomainChildService.getAllDomainsWithCategorization(paginationOptions);
+    return ResponseClass.Success(res, { 
+      message: "All domains with categorization fetched successfully", 
+      data: result 
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 module.exports = {
   createDomainChild,
   updateDomainChild,
   deleteDomainChild,
+  getCategoryAndSubCategoryForADomainChild, 
+  getAllDomainsWithCategorization,
   fetchAllDomainChildren,
   fetchDomainChildById,
 
