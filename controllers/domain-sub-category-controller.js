@@ -22,10 +22,19 @@ const createDomainSubCategory = async (req, res, next) => {
 
 
 const getAllDomainSubCategories = async (req, res, next) => {
-
   try {
-    const domainSubCategories = await DomainSubCategoryService.getAllDomainSubCategories();
-    return ResponseClass.Success(res, { message: "Domain sub-categories fetched successfully", data: { domainSubCategories } });
+    const { page = 1, limit = 10, search = '' } = req.query;
+    const paginationOptions = {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      search: search.trim()
+    };
+    
+    const result = await DomainSubCategoryService.getAllDomainSubCategories(paginationOptions);
+    return ResponseClass.Success(res, { 
+      message: "Domain sub-categories fetched successfully", 
+      data: result 
+    });
   } catch (err) {
       next(err);
     }

@@ -7,6 +7,19 @@ class DomainSubCategoryRepository {
    return DomainSubCategoryModel.find().populate("domain_category", "_id name slug");
   }
 
+  static countDocuments(query = {}) {
+    return DomainSubCategoryModel.countDocuments(query);
+  }
+
+  static findWithPagination(query = {}, options = {}) {
+    const { skip = 0, limit = 10 } = options;
+    return DomainSubCategoryModel.find(query)
+      .populate("domain_category", "_id name slug")
+      .skip(skip)
+      .limit(limit)
+      .sort({ createdAt: -1 });
+  }
+
   static getDomainSubCategoriesByCategory(domainCategoryId) {
     return DomainSubCategoryModel.find({ domain_category: domainCategoryId }).populate("domain_category", "_id name slug");
   }

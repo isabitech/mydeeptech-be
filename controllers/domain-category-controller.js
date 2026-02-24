@@ -19,8 +19,18 @@ const createDomainCategory = async (req, res, next) => {
 
 const fetchAllDomainCategories = async (req, res, next) => {
   try {
-    const categories = await DomainCategoryService.fetchAllDomainCategories();
-    return ResponseClass.Success(res, { message: "Domain categories retrieved successfully", data: { categories } });
+    const { page = 1, limit = 10, search = '' } = req.query;
+    const paginationOptions = {
+      page: parseInt(page),
+      limit: parseInt(limit),
+      search: search.trim()
+    };
+    
+    const result = await DomainCategoryService.fetchAllDomainCategories(paginationOptions);
+    return ResponseClass.Success(res, { 
+      message: "Domain categories retrieved successfully", 
+      data: result 
+    });
   } catch (err) {
     next(err);
   }
