@@ -98,7 +98,7 @@ app.use('/api/assessments', assessmentRoute);
 app.use('/api/support', supportRoute);
 app.use('/api/chat', chatRoute);
 app.use('/api/qa', qaRoute);
-// app.use('/api/domain', domainsRoute);
+app.use('/api/domain', domainsRoute);
 app.use('/api/new-domain', newDomainsRoute);
 
 app.use(errorMiddleware);
