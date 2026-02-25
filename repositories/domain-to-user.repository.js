@@ -43,4 +43,4 @@ class DomainTOUserRepository {
 
 }
 
-module.exports = DomainCategoryChildRepository;
+module.exports = DomainTOUserRepository;
