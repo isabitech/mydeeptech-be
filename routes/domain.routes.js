@@ -24,6 +24,7 @@ router.post('/subcategories/create', authenticateToken, authenticateAdmin, valid
 router.get('/subcategories/find', authenticateToken, subCategoryController.getAllDomainSubCategories);
 router.get('/subcategories/:id/find', authenticateToken, validateRequest({ params: idSchema }),  subCategoryController.getDomainSubCategoryById);
 router.delete('/subcategories/:id/delete', authenticateToken, authenticateAdmin, validateRequest({ params: idSchema }), subCategoryController.deleteDomainSubCategory);
+router.patch('/subcategories/:id/update', authenticateToken, authenticateAdmin, validateRequest({ params: idSchema, body: subCategorySchema }), subCategoryController.updateDomainSubCategory);
 
 /* ================= DOMAIN ================= */
 
