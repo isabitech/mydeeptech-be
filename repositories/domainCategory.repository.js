@@ -13,6 +13,15 @@ class DomainCategoryRepository {
     return DomainCategoryModel.find();
   }
 
+  static countDocuments(query = {}) {
+    return DomainCategoryModel.countDocuments(query);
+  }
+
+  static findWithPagination(query = {}, options = {}) {
+    const { skip = 0, limit = 10 } = options;
+    return DomainCategoryModel.find(query).skip(skip).limit(limit).sort({ createdAt: -1 });
+  }
+
   static getDomainSubCategoriesByCategory(domainCategoryId) {
     return DomainSubCategoryModel.find({ domain_category: domainCategoryId }).populate("domain_category", "name");
   }

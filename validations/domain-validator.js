@@ -25,7 +25,7 @@ const domainSchema = Joi.object({
     domain_category: Joi.string().regex(/^[0-9a-fA-F]{24}$/).required().messages({
         'string.pattern.base': 'Parent ID must be a valid MongoDB ObjectId'
     }),
-    domain_sub_category: Joi.string().regex(/^[0-9a-fA-F]{24}$/).required().messages({
+    domain_sub_category: Joi.string().regex(/^[0-9a-fA-F]{24}$/).optional().allow(null).messages({
         'string.pattern.base': 'Parent ID must be a valid MongoDB ObjectId'
     }),
      description: Joi.string().trim().optional(),

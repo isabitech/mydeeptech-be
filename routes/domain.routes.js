@@ -21,7 +21,7 @@ router.patch('/categories/:id/update', authenticateToken, authenticateAdmin, val
 /* ================= SUBCATEGORY ================= */
 
 router.post('/subcategories/create', authenticateToken, authenticateAdmin, validateRequest({ body: subCategorySchema }), subCategoryController.createDomainSubCategory);
-router.get('/subcategories/find', authenticateToken, subCategoryController.getAllDomainSubCategories);
+router.get('/subcategories/find', subCategoryController.getAllDomainSubCategories);
 router.get('/subcategories/:id/find', authenticateToken, validateRequest({ params: idSchema }),  subCategoryController.getDomainSubCategoryById);
 router.delete('/subcategories/:id/delete', authenticateToken, authenticateAdmin, validateRequest({ params: idSchema }), subCategoryController.deleteDomainSubCategory);
 router.patch('/subcategories/:id/update', authenticateToken, authenticateAdmin, validateRequest({ params: idSchema, body: subCategorySchema }), subCategoryController.updateDomainSubCategory);
@@ -29,8 +29,10 @@ router.patch('/subcategories/:id/update', authenticateToken, authenticateAdmin, 
 /* ================= DOMAIN ================= */
 
 router.post('/create', authenticateToken, authenticateAdmin, validateRequest({ body: domainSchema }), domainController.createDomainChild);
-router.get('/find', authenticateToken, domainController.fetchAllDomainChildren);
+router.get('/find', domainController.fetchAllDomainChildren);
+router.get('/all-with-categorization', domainController.getAllDomainsWithCategorization);
 router.get('/:id/find', authenticateToken, validateRequest({ params: idSchema }), domainController.fetchDomainChildById);
+router.get('/:id/categorization', authenticateToken, validateRequest({ params: idSchema }), domainController.getCategoryAndSubCategoryForADomainChild);
 router.patch('/:id/update', authenticateToken, authenticateAdmin, validateRequest({ params: idSchema, body: updateSchema }), domainController.updateDomainChild);
 router.delete('/:id/delete', authenticateToken, authenticateAdmin, validateRequest({ params: idSchema }), domainController.deleteDomainChild);       
 

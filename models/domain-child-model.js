@@ -11,7 +11,6 @@ const domainChildSchema = new mongoose.Schema(
     domain_sub_category: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "domain_sub_category",
-      required: true,
       index: true,
     },
     name: { type: String, required: true, trim: true },
