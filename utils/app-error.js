@@ -1,5 +1,3 @@
-
-
 class AppError extends Error {
   constructor(options = {}) {
     const { message, statusCode = 500, data = {} } = options || {};

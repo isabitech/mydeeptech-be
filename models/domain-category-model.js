@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const slugify = require("slugify");
 const DomainSubCategoryModel = require("./domain-sub-category-model");
 const DomainChildModel = require("./domain-child-model");
+const DomainToUser = require("./domain-to-user-model");
 
 
 const DomainCategorySchema = new mongoose.Schema(
@@ -34,6 +35,7 @@ DomainCategorySchema.pre("findOneAndDelete", async function (next) {
 
   await DomainSubCategoryModel.deleteMany({ domain_category: categoryId });
   await DomainChildModel.deleteMany({ domain_category: categoryId });
+  await DomainToUser.deleteMany({ domain_category: categoryId });
 
   next();
 });
