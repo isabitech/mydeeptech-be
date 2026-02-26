@@ -5,23 +5,38 @@ const DomainSubCategoryRepository = require("../repositories/domainSubCategory.r
 const DomainCategoryChildRepository = require("../repositories/domain-category-child.repository");
 class DomainToUserService {
 
+    static async assignMultipleDomainsToUser(userId, domainIds) {
+        if (!domainIds || !Array.isArray(domainIds)) {
+            throw new AppError({ message: "domainIds must be an array", statusCode: 400 });
+        }
+        if (!userId) {
+            throw new AppError({ message: "User ID is required", statusCode: 400 });
+        }
+
+        const createdMappings = [];
+        for (const domain_child of domainIds) {
+            const existing = await DomainToUserRepository.findByUserAndDomainChild(userId, domain_child);
+            if (!existing) {
+                const mapping = await this.createDomainToUser({ userId, domain_child });
+                createdMappings.push(mapping);
+            } else {
+                createdMappings.push(existing);
+            }
+        }
+        return createdMappings;
+    }
+
     static async createDomainToUser(payload) {
-        const { user, domain_child } = payload;
+        const { user, userId, domain_child } = payload;
+        const assignUser = user || userId;
         const domainChildExist = await DomainCategoryChildRepository.findById(domain_child);
         if (!domainChildExist) {
             throw new AppError({ message: "Domain child not found", statusCode: 404 });
         }
-        if (domainChildExist.domain_category.toString() !== domain_category) {
-            throw new AppError({ message: "Domain child does not belong to the specified domain category", statusCode: 400 });
-        }
-        const subCategoryExist = await DomainSubCategoryRepository.getDomainSubCategoriesByCategory(domain_category);
-        if (!subCategoryExist || !subCategoryExist.includes(domain_sub_category)) {
-            throw new AppError({ message: "Domain sub category does not belong to the specified domain category", statusCode: 400 });
-        }
-        const domain_category= domainChildExist.domain_category;
+        const domain_category = domainChildExist.domain_category;
         const domain_sub_category = domainChildExist.domain_sub_category;
         const domainToUserPayload = {
-            ...(user && { user }),
+            ...(assignUser && { user: assignUser }),
             ...(domain_category && { domain_category }),
             ...(domain_sub_category && { domain_sub_category }),
             ...(domain_child && { domain_child })
@@ -46,4 +61,13 @@ class DomainToUserService {
         }
         return deletedDomainToUser;
     }
+    static async fetchDomainToUserById(userId) {
+        if (!userId) {
+            throw new AppError({ message: "User ID is required", statusCode: 400 });
+        }
+        const domainToUser = await DomainToUserRepository.findByUserId(userId);
+        return domainToUser;
+    }
 }
+
+module.exports = DomainToUserService;
