@@ -33,6 +33,7 @@ const chatRoute = require('./routes/chat');
 const qaRoute = require('./routes/qa');
 const domainsRoute = require('./routes/domains.routes');
 const newDomainsRoute = require('./routes/domain.routes');
+const paymentRoutes = require('./routes/payment.routes');
 const envConfig = require('./config/envConfig');
 const { healthCheck } = require('./controllers/health-check.controller');
 const { corsOptions } = require('./utils/cors-options.utils');
@@ -100,6 +101,7 @@ app.use('/api/chat', chatRoute);
 app.use('/api/qa', qaRoute);
 app.use('/api/domain', domainsRoute);
 app.use('/api/new-domain', newDomainsRoute);
+app.use('/api/payments', paymentRoutes);
 
 app.use(errorMiddleware);
 

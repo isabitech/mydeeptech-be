@@ -29,8 +29,9 @@ return createdCategory;
 }
 
 static async fetchAllDomainCategories(paginationOptions = {}) {
+
     const { page = 1, limit = 10, search = '' } = paginationOptions;
-    
+ 
     // Build search query
     let query = {};
     if (search) {
@@ -41,19 +42,19 @@ static async fetchAllDomainCategories(paginationOptions = {}) {
             ]
         };
     }
-    
+
     // Calculate skip value
     const skip = (page - 1) * limit;
-    
+
     // Get total count for pagination metadata
     const totalCount = await DomainCategoryRepository.countDocuments(query);
-    
+
     // Get paginated results
     const categories = await DomainCategoryRepository.findWithPagination(query, { skip, limit });
-    
+
     // Calculate pagination metadata
     const totalPages = Math.ceil(totalCount / limit);
-    
+
     return {
         categories,
         pagination: {

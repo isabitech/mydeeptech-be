@@ -88,6 +88,13 @@ const envConfig = {
  // Enable/disable Swagger documentation
  SWAGGER_ENABLED: env.SWAGGER_ENABLED !== 'false', // Defaults to true unless explicitly disabled
 
+
+ paystack: {
+  PAYSTACK_SECRET_KEY: env.PAYSTACK_SECRET_KEY,
+  PAYSTACK_PUBLIC_KEY: env.PAYSTACK_PUBLIC_KEY,
+  PAYSTACK_BASE_URL: env.PAYSTACK_BASE_URL || 'https://api.paystack.co',
+},
+
 };
 
 
