@@ -1,5 +1,6 @@
 const AnnotationProject = require('../models/annotationProject.model');
 const ProjectApplication = require('../models/projectApplication.model');
+const mongoose = require('mongoose');
 const Joi = require('joi');
 
 // Validation schema for creating projects
@@ -941,15 +942,32 @@ const getAnnotationProjectApplications = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
-    const status = req.query.status;
+    const status = req.query.status
     const projectId = req.query.projectId;
     const search = req.query.search; // New search parameter
+
+      console.log(JSON.stringify({
+        page, limit, skip, status, projectId, search
+      }, null, 2));
 
 
     // Build filter
     const filter = {};
     if (status) filter.status = status;
-    if (projectId) filter.projectId = projectId;
+    if (projectId) {
+      // Convert projectId string to ObjectId for proper matching
+      if (mongoose.Types.ObjectId.isValid(projectId)) {
+        filter.projectId = new mongoose.Types.ObjectId(projectId);
+      } else {
+        console.error('❌ Invalid projectId format:', projectId);
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid project ID format'
+        });
+      }
+    }
+    
+    console.log('🔍 Final filter object:', filter);
 
     // Build aggregation pipeline for search functionality
     let pipeline = [
@@ -1057,6 +1075,9 @@ const getAnnotationProjectApplications = async (req, res) => {
 
     // Calculate pagination info
     const totalPages = Math.ceil(totalApplications / limit);
+
+
+    console.log(JSON.stringify({applications}, null, 2));
 
     res.status(200).json({
       success: true,
