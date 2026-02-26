@@ -5,7 +5,6 @@ const bodyParser = require('body-parser');
 const { createServer } = require('http');
 const { initializeSocketIO } = require('./utils/chatSocketService');
 const { initRedis, closeRedis } = require('./config/redis');
-const dns = require('node:dns');
 
 // Conditionally load Swagger (optional dependency)
 let swaggerUi, specs;
@@ -19,8 +18,6 @@ try {
     specs = null;
 }
 
-//console.log("Loaded BREVO_API_KEY:", process.env.BREVO_API_KEY ? "✅ Yes" : "❌ No");
-
 const route = require('./routes/auth');
 const adminRoute = require('./routes/admin');
 const adminEmailTrackingRoute = require('./routes/adminEmailTracking.routes');
@@ -33,7 +30,6 @@ const chatRoute = require('./routes/chat');
 const qaRoute = require('./routes/qa');
 const domainsRoute = require('./routes/domains.routes');
 const newDomainsRoute = require('./routes/domain.routes');
-const paymentRoutes = require('./routes/payment.routes');
 const envConfig = require('./config/envConfig');
 const partnerInvoiceRoute = require('./routes/partnerInvoice.routes');
 const { healthCheck } = require('./controllers/health-check.controller');
@@ -47,6 +43,7 @@ const server = createServer(app);
 initializeSocketIO(server);
 
 
+app.disable('x-powered-by'); // Security best practice: hide Express usage
 app.get("/", (_req, res) => {
     res.send('Welcome to My Deep Tech');
 });
@@ -59,19 +56,6 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(bodyParser.json());
-
-// Global JSON parsing error handler
-// app.use((err, req, res, next) => {
-//     if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
-//         console.error('❌ JSON Syntax Error:', err.message);
-//         return res.status(400).json({
-//             success: false,
-//             message: 'Invalid JSON payload. Please check your syntax (ensure double quotes are used and no trailing commas).',
-//             error: err.message
-//         });
-//     }
-//     next(err);
-// });
 
 // API Documentation (only if Swagger is available)
 if (swaggerUi && specs) {
@@ -102,7 +86,7 @@ app.use('/api/chat', chatRoute);
 app.use('/api/qa', qaRoute);
 app.use('/api/domain', domainsRoute);
 app.use('/api/new-domain', newDomainsRoute);
-app.use('/api/payments', paymentRoutes);
+app.use('/api/partner-invoice', partnerInvoiceRoute);
 
 app.use(errorMiddleware);
 
@@ -203,7 +187,7 @@ process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Start Server
-const PORT = envConfig.PORT || 5000;
+const PORT = envConfig.PORT || 4000;
 server.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`💬 Socket.IO chat server active`);
