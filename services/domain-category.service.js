@@ -1,4 +1,6 @@
 const DomainCategoryRepository = require("../repositories/domainCategory.repository");
+const DomainSubCategoryRepository = require("../repositories/domainSubCategory.repository");
+const DomainCategoryChildRepository = require("../repositories/domain-category-child.repository");
 const AppError = require("../utils/app-error");
 
 class DomainCategoryService {
@@ -130,6 +132,100 @@ class DomainCategoryService {
         return deletedCategory;
     }
 
+    static async getAllDomainsWithCategorization({ page = 1, limit = 50, search = '' } = {}) {
+        // Build search query for children
+        let childQuery = {};
+        if (search) {
+            childQuery = {
+                $or: [
+                    { name: { $regex: search, $options: 'i' } },
+                    { description: { $regex: search, $options: 'i' } }
+                ]
+            };
+        }
+        // Pagination
+        const skip = (page - 1) * limit;
+        // Fetch all categories
+        const categories = await DomainCategoryRepository.findAll();
+        // Fetch all subcategories
+        const subCategories = await DomainSubCategoryRepository.getAllDomainSubCategories();
+        // Fetch paginated domain children
+        const totalCount = await DomainCategoryChildRepository.countDocuments(childQuery);
+        const domainChildren = await DomainCategoryChildRepository.findWithPagination(childQuery, { skip, limit });
+
+        // Build a map for subcategories by category
+        const subCatByCat = {};
+        subCategories.forEach(sub => {
+            const catId = sub.domain_category._id.toString();
+            if (!subCatByCat[catId]) subCatByCat[catId] = [];
+            subCatByCat[catId].push({
+                _id: sub._id,
+                name: sub.name,
+                slug: sub.slug,
+                description: sub.description,
+                children: []
+            });
+        });
+
+        // Build a map for children by subcategory and by category
+        const childrenBySubCat = {};
+        const childrenByCat = {};
+        domainChildren.forEach(child => {
+            if (child.domain_sub_category) {
+                const subCatId = child.domain_sub_category._id.toString();
+                if (!childrenBySubCat[subCatId]) childrenBySubCat[subCatId] = [];
+                childrenBySubCat[subCatId].push({
+                    _id: child._id,
+                    name: child.name,
+                    slug: child.slug,
+                    description: child.description,
+                    hasSubCategory: true
+                });
+            } else {
+                const catId = child.domain_category._id.toString();
+                if (!childrenByCat[catId]) childrenByCat[catId] = [];
+                childrenByCat[catId].push({
+                    _id: child._id,
+                    name: child.name,
+                    slug: child.slug,
+                    description: child.description,
+                    hasSubCategory: false
+                });
+            }
+        });
+        // Build the tree
+        const tree = categories.map(cat => {
+            const catId = cat._id.toString();
+            const subCats = (subCatByCat[catId] || []).map(sub => {
+                const subCatId = sub._id.toString();
+                return {
+                    ...sub,
+                    SubdomainChild: childrenBySubCat[subCatId] || []
+                };
+            });
+            return {
+                _id: cat._id,
+                name: cat.name,
+                slug: cat.slug,
+                description: cat.description,
+                subCategories: subCats,
+                domainChild: childrenByCat[catId] || [] // children directly under category
+            };
+        });
+        const totalPages = Math.ceil(totalCount / limit);
+        const currentPage = Math.floor(skip / limit) + 1;
+        return {
+            tree,
+            pagination: {
+                currentPage,
+                totalPages,
+                totalCount,
+                limit,
+                hasNextPage: currentPage < totalPages,
+                hasPrevPage: currentPage > 1
+            }
+        };
+    }
 }
 
 module.exports = DomainCategoryService;

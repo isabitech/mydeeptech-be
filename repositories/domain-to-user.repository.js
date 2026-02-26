@@ -40,6 +40,16 @@ class DomainTOUserRepository {
     static deleteById(id) {
         return DomainToUser.findByIdAndDelete(id);
     }
+    static findByUserId(userId) {
+        return DomainToUser.find({ user: userId })
+            .populate("domain_category", "_id name slug")
+            .populate("domain_sub_category", "_id name slug")
+            .populate("domain_child", "_id name slug");
+    }
+
+    static findByUserAndDomainChild(userId, domain_child) {
+        return DomainToUser.findOne({ user: userId, domain_child });
+    }
 
 }
 
