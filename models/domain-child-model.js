@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 const slugify = require("slugify");
-
+const DomainToUser = require("./domain-to-user-model");
 const domainChildSchema = new mongoose.Schema(
   {
     domain_category: {
@@ -22,17 +22,17 @@ const domainChildSchema = new mongoose.Schema(
 );
 
 
-  domainChildSchema.pre('validate', function (next) {
-    if (this.isModified('name')) {
-      this.slug = slugify(this.name, {
-        lower: true,
-        trim: true,
-        strict: true,
-        replacement: "_",
-      });
-    }
-    next();
-  });
+domainChildSchema.pre('validate', function (next) {
+  if (this.isModified('name')) {
+    this.slug = slugify(this.name, {
+      lower: true,
+      trim: true,
+      strict: true,
+      replacement: "_",
+    });
+  }
+  next();
+});
 
 
 /**
@@ -53,7 +53,11 @@ const domainChildSchema = new mongoose.Schema(
 
 //   next();
 // });
-
+domainChildSchema.pre("findOneAndDelete", async function (next) {
+  const childId = this.getQuery()._id;
+  await DomainToUser.deleteMany({ domain_child: childId });
+  next();
+});
 
 const DomainChildModel = mongoose.model("domain_child", domainChildSchema);
 module.exports = DomainChildModel;

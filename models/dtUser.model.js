@@ -227,4 +227,10 @@ const dtUserSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+dtUserSchema.pre("findOneAndDelete", async function (next) {
+  const userId = this.getQuery()._id;
+  await mongoose.model("DomainToUser").deleteMany({ user: userId });
+  next();
+});
+
 module.exports = mongoose.model("DTUser", dtUserSchema);

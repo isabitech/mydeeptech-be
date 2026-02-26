@@ -68,45 +68,58 @@ const CreateALL = async (req, res) => {
   try {
     const { name, categoryname, subcategory } = req.body;
 
-    const categoryData = await categoryService.createCategory({ name: categoryname });
-    if (!categoryData) {
+    if (!categoryname || !categoryname.trim()) {
       return res.status(400).json({
         success: false,
-        message: 'Category creation failed',
-        error: 'CategoryCreationFailed',
+        message: 'Category name is required',
+        error: 'ValidationError',
         data: null
+      });
+    }
+
+    // 1️⃣ Find or create category
+    let categoryData = await categoryService.findByName(categoryname.trim());
+
+    if (!categoryData) {
+      categoryData = await categoryService.createCategory({
+        name: categoryname.trim()
       });
     }
 
     let subCategoryData = null;
     let domainData = null;
 
-    if (subcategory != null) {
-      subCategoryData = await subCategoryService.createSubCategory({ name: subcategory, category: categoryData._id });
-      if (!subCategoryData) {
-        return res.status(400).json({
-          success: false,
-          message: 'SubCategory creation failed',
-          error: 'SubCategoryCreationFailed',
-          data: null
-        });
-      }
-
-      domainData = await domainService.createDomain({ name, parent: subCategoryData._id, parentModel: 'SubCategory' });
-    } else {
-      domainData = await domainService.createDomain({ name, parent: categoryData._id, parentModel: 'Category' });
+    // 2️⃣ Create subcategory if provided
+    if (subcategory && subcategory.trim()) {
+      subCategoryData = await subCategoryService.createSubCategory({
+        name: subcategory.trim(),
+        category: categoryData._id
+      });
     }
 
-    res.status(201).json({
+    // 3️⃣ Create domain if provided
+    if (name && name.trim()) {
+      domainData = await domainService.createDomain({
+        name: name.trim(),
+        parent: subCategoryData ? subCategoryData._id : categoryData._id,
+        parentModel: subCategoryData ? 'SubCategory' : 'Category'
+      });
+    }
+
+    return res.status(201).json({
       success: true,
-      message: 'Domain, Category and SubCategory created',
+      message: 'Creation successful',
       error: null,
-      data: { domain: domainData, category: categoryData, subCategory: subCategoryData }
+      data: {
+        category: categoryData,
+        subCategory: subCategoryData,
+        domain: domainData
+      }
     });
 
   } catch (error) {
     console.error(error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Server error',
       error: error.message,

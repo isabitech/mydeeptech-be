@@ -33,7 +33,9 @@ const chatRoute = require('./routes/chat');
 const qaRoute = require('./routes/qa');
 const domainsRoute = require('./routes/domains.routes');
 const newDomainsRoute = require('./routes/domain.routes');
+const paymentRoutes = require('./routes/payment.routes');
 const envConfig = require('./config/envConfig');
+const partnerInvoiceRoute = require('./routes/partnerInvoice.routes');
 const { healthCheck } = require('./controllers/health-check.controller');
 const { corsOptions } = require('./utils/cors-options.utils');
 const errorMiddleware = require('./middleware/error.middleware');
@@ -73,18 +75,18 @@ app.use(bodyParser.json());
 
 // API Documentation (only if Swagger is available)
 if (swaggerUi && specs) {
-  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
-    explorer: true,
-    customSiteTitle: "MyDeepTech API Documentation",
-    customfavIcon: "/favicon.ico",
-    customCss: '.swagger-ui .topbar { display: none }'
-  }));
-  console.log(`📚 API Documentation available at: ${envConfig.SWAGGER_URL}/api-docs`);
+    app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
+        explorer: true,
+        customSiteTitle: "MyDeepTech API Documentation",
+        customfavIcon: "/favicon.ico",
+        customCss: '.swagger-ui .topbar { display: none }'
+    }));
+    console.log(`📚 API Documentation available at: ${envConfig.SWAGGER_URL}/api-docs`);
 } else {
-  const reason = !swaggerUi ? 'Swagger dependencies missing' : 
-                !envConfig.SWAGGER_ENABLED ? 'Swagger disabled via environment' : 
-                'Swagger specs not available';
-  console.log(`📚 API Documentation not available (${reason})`);
+    const reason = !swaggerUi ? 'Swagger dependencies missing' :
+        !envConfig.SWAGGER_ENABLED ? 'Swagger disabled via environment' :
+            'Swagger specs not available';
+    console.log(`📚 API Documentation not available (${reason})`);
 }
 
 // Routes
@@ -100,6 +102,8 @@ app.use('/api/chat', chatRoute);
 app.use('/api/qa', qaRoute);
 app.use('/api/domain', domainsRoute);
 app.use('/api/new-domain', newDomainsRoute);
+app.use('/api/partner-invoice', partnerInvoiceRoute);
+app.use('/api/payments', paymentRoutes);
 
 app.use(errorMiddleware);
 

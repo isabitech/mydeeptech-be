@@ -28,7 +28,7 @@ const domainSchema = Joi.object({
     domain_sub_category: Joi.string().regex(/^[0-9a-fA-F]{24}$/).optional().allow(null).messages({
         'string.pattern.base': 'Parent ID must be a valid MongoDB ObjectId'
     }),
-     description: Joi.string().trim().optional(),
+    description: Joi.string().trim().optional(),
 });
 
 const updateSchema = Joi.object({
@@ -45,11 +45,34 @@ const CreateALLSchema = Joi.object({
     name: Joi.string().trim().min(2).max(100).required()
 });
 
+const assignDomainToUserSchema = Joi.object({
+    domainIds: Joi.array().items(
+        Joi.string().regex(/^[0-9a-fA-F]{24}$/).messages({
+            'string.pattern.base': 'Domain ID must be a valid MongoDB ObjectId'
+        })
+    ).min(1).required().messages({
+        'array.min': 'At least one Domain ID is required'
+    }),
+});
+
+
+
+const updateDomainToUserSchema = Joi.object({
+    userId: Joi.string().regex(/^[0-9a-fA-F]{24}$/).required().messages({
+        'string.pattern.base': 'User ID must be a valid MongoDB ObjectId'
+    }),
+    domainId: Joi.string().regex(/^[0-9a-fA-F]{24}$/).required().messages({
+        'string.pattern.base': 'Domain ID must be a valid MongoDB ObjectId'
+    }),
+});
+
 module.exports = {
     categorySchema,
     subCategorySchema,
     domainSchema,
     updateSchema,
     CreateALLSchema,
-    idSchema
+    idSchema,
+    assignDomainToUserSchema,
+    updateDomainToUserSchema
 };

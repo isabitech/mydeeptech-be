@@ -91,7 +91,7 @@ const invoiceSchema = new mongoose.Schema(
     },
     paymentMethod: {
       type: String,
-      enum: ["bank_transfer", "paypal", "stripe", "cryptocurrency", "cash", "other"]
+      enum: ["bank_transfer", "bulk_transfer", "paypal", "stripe", "cryptocurrency", "cash", "other"]
     },
     paymentReference: {
       type: String,
@@ -349,7 +349,7 @@ invoiceSchema.methods.markAsPaid = function(paymentDetails = {}) {
   if (paymentDetails.paymentNotes) {
     this.paymentNotes = paymentDetails.paymentNotes;
   }
-  
+
   return this.save();
 };
 
