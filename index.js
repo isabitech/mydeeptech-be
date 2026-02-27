@@ -1,7 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const bodyParser = require('body-parser');
 const { createServer } = require('http');
 const { initializeSocketIO } = require('./utils/chatSocketService');
 const { initRedis, closeRedis } = require('./config/redis');
@@ -32,9 +31,11 @@ const domainsRoute = require('./routes/domains.routes');
 const newDomainsRoute = require('./routes/domain.routes');
 const envConfig = require('./config/envConfig');
 const partnerInvoiceRoute = require('./routes/partnerInvoice.routes');
+const paymentRoutes = require('./routes/payment.routes');
 const { healthCheck } = require('./controllers/health-check.controller');
 const { corsOptions } = require('./utils/cors-options.utils');
 const errorMiddleware = require('./middleware/error.middleware');
+const notFoundMiddleware = require('./middleware/notfound-middleware');
 
 const app = express();
 const server = createServer(app);
@@ -55,7 +56,6 @@ app.get("/health", healthCheck);
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(bodyParser.json());
 
 // API Documentation (only if Swagger is available)
 if (swaggerUi && specs) {
@@ -87,7 +87,9 @@ app.use('/api/qa', qaRoute);
 app.use('/api/domain', domainsRoute);
 app.use('/api/new-domain', newDomainsRoute);
 app.use('/api/partner-invoice', partnerInvoiceRoute);
+app.use('/api/payments', paymentRoutes);
 
+app.use(notFoundMiddleware);
 app.use(errorMiddleware);
 
 // Initialize Redis connection

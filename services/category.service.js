@@ -1,7 +1,8 @@
 const Category = require('../models/category.model.js');
 const SubCategory = require('../models/SubCategory.model.js');
 const Domain = require('../models/domain.model.js');
-const mongoose = require("mongoose");
+
+
 const createCategory = async (data) => {
   const baseSlug = generateSlug(data.name);
   data.slug = await generateUniqueSlug(Category, baseSlug);

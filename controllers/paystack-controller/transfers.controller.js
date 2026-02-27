@@ -49,9 +49,8 @@ function mapBankNameToCode(bankNameOrCode) {
 }
 
 // Initiate bulk transfers using Paystack's native bulk transfer API
-const initializeBulkTransfer = async (req, res, next) => {
-  try {
-    const {
+const initializeBulkTransfer = async (req, res) => {
+ const {
       transfers,
       currency = 'NGN',
       source = 'balance',
@@ -309,15 +308,11 @@ const initializeBulkTransfer = async (req, res, next) => {
       message: "Bulk transfer completed successfully",
       data: result
     });
-  } catch (err) {
-    next(err);
-  }
 };
 
 // Create transfer recipient
-const createTransferRecipient = async (req, res, next) => {
-  try {
-    const { type, name, account_number, bank_code, currency, email, description } = req.body;
+const createTransferRecipient = async (req, res) => {
+ const { type, name, account_number, bank_code, currency, email, description } = req.body;
 
     if (!type || !name || !account_number || !bank_code) {
       return ResponseClass.Error(res, {
@@ -340,33 +335,21 @@ const createTransferRecipient = async (req, res, next) => {
       message: "Transfer recipient created successfully",
       data: result
     });
-  } catch (err) {
-    next(err);
-  }
 };
 
 // Get list of banks
-const getBanks = async (req, res, next) => {
-  try {
+const getBanks = async (req, res) => {
     const { country = 'nigeria' } = req.query;
-    
     const result = await PaystackTransferService.listBanks(country);
-    
     return ResponseClass.Success(res, {
       message: "Banks retrieved successfully",
       data: result
     });
-  } catch (err) {
-    next(err);
-  }
 };
 
 // Verify transfer
-const verifyTransfer = async (req, res, next) => {
-  try {
-  
-    const { reference } = req.params;
-
+const verifyTransfer = async (req, res) => {
+   const { reference } = req.params;
     if (!reference) {
       return ResponseClass.Error(res, {
         message: "Transfer reference is required",
@@ -380,18 +363,12 @@ const verifyTransfer = async (req, res, next) => {
       message: "Transfer verification completed",
       data: result
     });
-  } catch (err) {
-    next(err);
-  }
 };
 
 // Debug endpoint to check user bank details
-const checkUserBankDetails = async (req, res, next) => {
-  try {
-    const { recipientId } = req.body;
-
+const checkUserBankDetails = async (req, res) => {
+ const { recipientId } = req.body;
     const user = await DTUser.findById(recipientId).select('_id fullName email payment_info');
-    
     if (!user) {
       return ResponseClass.Error(res, {
         message: "User not found",
@@ -415,15 +392,11 @@ const checkUserBankDetails = async (req, res, next) => {
       message: "User bank details retrieved",
       data: bankDetails
     });
-  } catch (err) {
-    next(err);
-  }
 };
 
 // Test recipient creation
-const testRecipientCreation = async (req, res, next) => {
-  try {
-    const { recipientId } = req.body;
+const testRecipientCreation = async (req, res) => {
+ const { recipientId } = req.body;
 
     const user = await DTUser.findById(recipientId).select('_id fullName email payment_info');
     
@@ -447,9 +420,6 @@ const testRecipientCreation = async (req, res, next) => {
       message: "Test recipient created successfully",
       data: result
     });
-  } catch (err) {
-    next(err);
-  }
 };
 
 module.exports = {
