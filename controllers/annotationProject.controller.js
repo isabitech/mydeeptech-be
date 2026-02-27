@@ -967,8 +967,6 @@ const getAnnotationProjectApplications = async (req, res) => {
       }
     }
     
-    console.log('🔍 Final filter object:', filter);
-
     // Build aggregation pipeline for search functionality
     let pipeline = [
       { $match: filter },

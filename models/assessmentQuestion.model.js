@@ -44,7 +44,6 @@ const assessmentQuestionSchema = new mongoose.Schema({
 
 // Indexes for efficient querying
 assessmentQuestionSchema.index({ section: 1, isActive: 1 });
-assessmentQuestionSchema.index({ id: 1 });
 assessmentQuestionSchema.index({ order: 1 });
 
 // Static method to get randomized questions per section
