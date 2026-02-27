@@ -33,7 +33,7 @@ class ResponseClass {
 
   // ===== Base error response ===== 
 
-  static Error(options = {}) {
+  static Error(res, options = {}) {
     const {
       message = "An error occurred",
       data = {},
