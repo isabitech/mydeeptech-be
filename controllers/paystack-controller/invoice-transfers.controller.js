@@ -14,7 +14,6 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
       metadata = {}
     } = req.body;
 
-
     if(!req.user?.userId) {
       return ResponseClass.Error(res, {
         message: "Unauthorized: User information missing in request",
