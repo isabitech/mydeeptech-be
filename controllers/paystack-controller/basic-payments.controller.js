@@ -2,9 +2,8 @@ const PaystackPaymentService = require("../../services/paystack-payment.service"
 const ResponseClass = require("../../utils/response-handler");
 
 // Initialize payment for freelancer
-const initializeFreelancerPayment = async (req, res, next) => {
-  try {
-    const {
+const initializeFreelancerPayment = async (req, res) => {
+   const {
       freelancerId, 
       projectId, 
       invoiceId,
@@ -38,46 +37,33 @@ const initializeFreelancerPayment = async (req, res, next) => {
     };
 
     const result = await PaystackPaymentService.initializePayment(payload);
-
     return ResponseClass.Success(res, { 
       message: "Payment initialized successfully", 
       data: result 
     });
-  } catch (err) {
-    next(err);
-  }
 };
 
 // Verify payment
-const verifyPayment = async (req, res, next) => {
-  try {
-    const { reference } = req.params;
-
+const verifyPayment = async (req, res) => {
+  const { reference } = req.params;
     if (!reference) {
-      return ResponseClass.Error(res, {
+      return ResponseClass.Error({
         message: "Payment reference is required", 
         statusCode: 400 
       });
     }
-
     const result = await PaystackPaymentService.verifyPayment(reference);
-
     return ResponseClass.Success(res, {  
       message: "Payment verified successfully", 
       data: result 
     });
-  } catch (err) {
-    next(err);
-  }
 };
 
 // Get payment details by ID
-const getPaymentDetails = async (req, res, next) => {
-  try {
-    const { paymentId } = req.params;
-    
+const getPaymentDetails = async (req, res) => {
+const { paymentId } = req.params;
     if (!paymentId) {
-      return ResponseClass.Error(res, { 
+      return ResponseClass.Error({ 
         message: "Payment ID is required", 
         statusCode: 400  
       });
@@ -89,18 +75,14 @@ const getPaymentDetails = async (req, res, next) => {
       message: "Payment details retrieved successfully",
       data: payment
     });
-  } catch (err) {
-    next(err);
-  }
 };
 
 // Get payment details by reference (for callback handling)
-const getPaymentByReference = async (req, res, next) => {
-  try {
-    const { reference } = req.params;
+const getPaymentByReference = async (req, res) => {
+  const { reference } = req.params;
     
     if (!reference) {
-      return ResponseClass.Error(res, {
+      return ResponseClass.Error({
         message: "Payment reference is required", 
         statusCode: 400
       });
@@ -112,19 +94,15 @@ const getPaymentByReference = async (req, res, next) => {
       message: "Payment details retrieved successfully",
       data: result
     });
-  } catch (err) {
-    next(err);
-  }
 };
 
 // Cancel payment
-const cancelPayment = async (req, res, next) => {
-  try {
-    const { paymentId } = req.params;
+const cancelPayment = async (req, res) => {
+   const { paymentId } = req.params;
     const { reason } = req.body;
-    
+
     if (!paymentId) {
-      return ResponseClass.Error(res, {
+      return ResponseClass.Error({
         message: "Payment ID is required",
         statusCode: 400
       });
@@ -134,11 +112,8 @@ const cancelPayment = async (req, res, next) => {
     
     return ResponseClass.Success(res, {
       message: "Payment cancelled successfully",
-      data: payment
+      data: payment,
     });
-  } catch (err) {
-    next(err);
-  }
 };
 
 module.exports = {

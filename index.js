@@ -1,7 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const bodyParser = require('body-parser');
 const { createServer } = require('http');
 const { initializeSocketIO } = require('./utils/chatSocketService');
 const { initRedis, closeRedis } = require('./config/redis');
@@ -55,7 +54,6 @@ app.get("/health", healthCheck);
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(bodyParser.json());
 
 // API Documentation (only if Swagger is available)
 if (swaggerUi && specs) {

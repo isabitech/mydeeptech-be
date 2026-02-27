@@ -3,9 +3,8 @@ const ResponseClass = require("../../utils/response-handler");
 const FreelancerPaymentRepository = require("../../repositories/freelancerPayment.repository");
 
 // Initialize bulk payment for multiple recipients (payment collection, not transfers)
-const initializeBulkPayment = async (req, res, next) => {
-  try {
-    const { 
+const initializeBulkPayment = async (req, res) => {
+ const { 
       payments,
       currency = 'NGN',
       description = 'Bulk payment service',
@@ -139,15 +138,11 @@ const initializeBulkPayment = async (req, res, next) => {
       message: "Bulk payment initialized successfully",
       data: results
     });
-  } catch (err) {
-    next(err);
-  }
 };
 
 // Get bulk payment status
-const getBulkPaymentStatus = async (req, res, next) => {
-  try {
-    const { batchId } = req.params;
+const getBulkPaymentStatus = async (req, res) => {
+  const { batchId } = req.params;
 
     if (!batchId) {
       return ResponseClass.Error(res, {
@@ -172,16 +167,12 @@ const getBulkPaymentStatus = async (req, res, next) => {
       message: "Bulk payment status retrieved successfully",
       data: { summary, payments }
     });
-  } catch (err) {
-    next(err);
-  }
 };
 
 // Retry failed bulk payments
-const retryBulkPayment = async (req, res, next) => {
-  try {
-    const { batchId } = req.params;
-    
+const retryBulkPayment = async (req, res) => {
+ const { batchId } = req.params;
+
     const failedPayments = await FreelancerPaymentRepository.findAll({
       'metadata.batchId': batchId,
       status: 'failed'
@@ -199,15 +190,11 @@ const retryBulkPayment = async (req, res, next) => {
       message: "Bulk payment retry initiated",
       data: { retriedCount: failedPayments.length }
     });
-  } catch (err) {
-    next(err);
-  }
 };
 
 // Cancel bulk payments
-const cancelBulkPayment = async (req, res, next) => {
-  try {
-    const { batchId } = req.params;
+const cancelBulkPayment = async (req, res) => {
+  const { batchId } = req.params;
     const { reason = "Bulk payment cancelled" } = req.body;
 
     const pendingPayments = await FreelancerPaymentRepository.findAll({
@@ -238,9 +225,6 @@ const cancelBulkPayment = async (req, res, next) => {
         cancelled: successfulCancellations
       }
     });
-  } catch (err) {
-    next(err);
-  }
 };
 
 module.exports = {
