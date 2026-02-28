@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assessment Invitation - MyDeeptech</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            line-height: 1.6; 
+            color: #333; 
+            max-width: 600px; 
+            margin: 0 auto; 
+            padding: 20px; 
+        }
+        .container { 
+            background: #fff; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+            overflow: hidden; 
+        }
+        .header { 
+            background: linear-gradient(135deg, #6f42c1 0%, #007bff 100%); 
+            color: white; 
+            padding: 30px; 
+            text-align: center; 
+            border-radius: 10px 10px 0 0; 
+        }
+        .content { 
+            padding: 30px; 
+            background: #f8f9fa; 
+            border: 1px solid #e9ecef; 
+        }
+        .assessment-details { 
+            background: #e8f4f8; 
+            border-left: 4px solid #007bff; 
+            padding: 20px; 
+            margin: 20px 0; 
+            border-radius: 5px; 
+        }
+        .button { 
+            display: inline-block; 
+            background: #6f42c1; 
+            color: white; 
+            padding: 15px 30px; 
+            text-decoration: none; 
+            border-radius: 8px; 
+            font-weight: bold; 
+            margin: 20px 0; 
+        }
+        .footer { 
+            background: #f8f9fa; 
+            padding: 20px; 
+            text-align: center; 
+            color: #666; 
+            font-size: 14px; 
+        }
+        .important { 
+            background: #fff3cd; 
+            border: 1px solid #ffeaa7; 
+            padding: 15px; 
+            border-radius: 5px; 
+            margin: 20px 0; 
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 Assessment Invitation</h1>
+            <p>You're invited to complete an assessment</p>
+        </div>
+        
+        <div class="content">
+            <h2>Hello {{recipientName}},</h2>
+            
+            <p>You have been invited to complete an important assessment as part of your MyDeeptech journey. This assessment will help us better understand your skills and match you with suitable projects.</p>
+            
+            <div class="assessment-details">
+                <h3>📋 Assessment Details</h3>
+                <p><strong>Assessment Title:</strong> {{assessmentTitle}}</p>
+                <p><strong>Time Limit:</strong> {{timeLimit}}</p>
+                <p><strong>Description:</strong> {{description}}</p>
+            </div>
+            
+            <div class="important">
+                <h4>⚠️ Important Information</h4>
+                <ul>
+                    <li>Complete the assessment in one sitting</li>
+                    <li>Ensure stable internet connection</li>
+                    <li>Find a quiet environment to focus</li>
+                    <li>Read all instructions carefully before starting</li>
+                    <li>Save your work frequently if prompted</li>
+                </ul>
+            </div>
+            
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="https://mydeeptech.ng/assessment" class="button">
+                    Start Assessment
+                </a>
+            </div>
+            
+            <h3>📝 What to Expect</h3>
+            <ol>
+                <li>Click the button above to access the assessment</li>
+                <li>Review the instructions and requirements</li>
+                <li>Complete all sections within the time limit</li>
+                <li>Submit your responses when finished</li>
+                <li>Receive confirmation of submission</li>
+            </ol>
+            
+            <p><strong>Need Help?</strong><br>
+            If you encounter any technical issues during the assessment, please contact our support team immediately at <a href="mailto:support@mydeeptech.ng">support@mydeeptech.ng</a></p>
+            
+            <p>We wish you the best of luck with your assessment!</p>
+        </div>
+        
+        <div class="footer">
+            <p><strong>MyDeeptech Assessment Team</strong><br>
+            <a href="https://mydeeptech.ng">mydeeptech.ng</a></p>
+            <p>This assessment invitation was sent to {{recipientName}}</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -15,6 +15,15 @@ const Joi = require("joi");
   // JWT
   JWT_SECRET: Joi.string().required(),
 
+  // Mailjet Email API (Optional alternative to Brevo)
+  MAILJET_API_KEY: Joi.string().allow('').default(''),
+  MAILJET_SECRET_KEY: Joi.string().allow('').default(''),
+  MAILJET_SENDER_EMAIL: Joi.alternatives().try(
+    Joi.string().email(),
+    Joi.string().allow('')
+  ).default(''),
+  MAILJET_SENDER_NAME: Joi.string().allow('').default('MyDeepTech'),
+
   // Brevo Email API
   BREVO_API_KEY: Joi.string().required(),
   BREVO_SENDER_EMAIL: Joi.string().email().required(),

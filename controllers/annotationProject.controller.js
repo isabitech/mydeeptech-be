@@ -740,7 +740,9 @@ const requestProjectDeletionOTP = async (req, res) => {
     const projectsOfficerEmail = 'projects@mydeeptech.ng';
 
     try {
-      const { sendProjectDeletionOTP } = require('../utils/projectMailer');
+      // const { sendProjectDeletionOTP } = require('../utils/projectMailer');
+      // Replaced with MailService:
+      const MailService = require('../services/mail-service/mail-service');
 
       const deletionData = {
         projectName: project.projectName,
@@ -751,11 +753,13 @@ const requestProjectDeletionOTP = async (req, res) => {
         activeApplications: activeApplications,
         totalApplications: allApplications,
         otp: otp,
-        expiryTime: otpExpiry.toLocaleString(),
+        expiryTime: otpExpiry,
         reason: req.body.reason || 'Administrative deletion'
       };
 
-      await sendProjectDeletionOTP(projectsOfficerEmail, deletionData);
+      // await sendProjectDeletionOTP(projectsOfficerEmail, deletionData);
+      // Replaced with MailService:
+      await MailService.sendProjectDeletionOTP(projectsOfficerEmail, 'Projects Officer', deletionData);
 
       res.status(200).json({
         success: true,
@@ -1178,7 +1182,7 @@ const approveAnnotationProjectApplication = async (req, res) => {
         projectTrackerLink: project.projectTrackerLink
       };
 
-      await sendProjectApprovalNotification(
+      await mailService.sendProjectApprovalNotification(
         application.applicantId.email,
         application.applicantId.fullName,
         projectData
@@ -1258,7 +1262,7 @@ const rejectAnnotationProjectApplication = async (req, res) => {
         reviewNotes: reviewNotes || ''
       };
 
-      await sendProjectRejectionNotification(
+      await mailService.sendProjectRejectionNotification(
         application.applicantId.email,
         application.applicantId.fullName,
         projectData
@@ -1379,8 +1383,8 @@ const removeApprovedApplicant = async (req, res) => {
 
     // Send notification email to the removed applicant
     try {
-      const { sendApplicantRemovalNotification } = require('../utils/projectMailer');
-      await sendApplicantRemovalNotification(
+      // const { sendApplicantRemovalNotification } = require('../utils/projectMailer');
+      await MailService.sendApplicantRemovalNotification(
         originalData.applicantEmail,
         originalData.applicantName,
         {
@@ -1402,8 +1406,8 @@ const removeApprovedApplicant = async (req, res) => {
 
     // Send notification to project owner/admin
     try {
-      const { sendProjectAnnotatorRemovedNotification } = require('../utils/projectMailer');
-      await sendProjectAnnotatorRemovedNotification(
+      // const { sendProjectAnnotatorRemovedNotification } = require('../utils/projectMailer');
+      await MailService.sendProjectAnnotatorRemovedNotification(
         req.admin.email,
         req.admin.fullName || 'Administrator',
         {
@@ -1864,7 +1868,7 @@ const rejectApplicationsBulk = async (req, res) => {
     const notificationResults = await Promise.allSettled(
       applications.map(async application => {
         try {
-          await sendProjectRejectionNotification(
+          await mailService.sendProjectRejectionNotification(
             application.applicantId.email,
             application.applicantId.fullName,
             {
@@ -2081,9 +2085,9 @@ const bulkApproveApplications = async (req, res) => {
 
         // Send approval email (best-effort)
         try {
-          const { sendProjectApprovalNotification } = require('../utils/projectMailer');
+          // const { sendProjectApprovalNotification } = require('../utils/projectMailer');
 
-          await sendProjectApprovalNotification(
+          await MailService.sendProjectApprovalNotification(
             application.applicantId.email,
             application.applicantId.fullName,
             {
@@ -2270,9 +2274,9 @@ const bulkRejectApplications = async (req, res) => {
 
         // Send rejection email (best-effort)
         try {
-          const { sendProjectRejectionNotification } = require('../utils/projectMailer');
+          // const { sendProjectRejectionNotification } = require('../utils/projectMailer');
 
-          await sendProjectRejectionNotification(
+          await mailService.sendProjectRejectionNotification(
             application.applicantId.email,
             application.applicantId.fullName,
             {

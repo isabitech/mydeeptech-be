@@ -1,6 +1,6 @@
 const express = require('express');
 const { getRoles } = require('../controllers/user.js');
-const { getAllDTUsers, getAllAdminUsers, getAdminDashboard, approveAnnotator, approveUserForQA, rejectUserForQA, getAllQAUsers, rejectAnnotator, getDTUserAdmin, createAdmin, requestAdminVerification, confirmAdminVerification, verifyAdminOTP, adminLogin, getAllUsersForRoleManagement, updateUserRole } = require('../controllers/dtUser.controller.js');
+const { getAllDTUsers, getAllAdminUsers, getAdminDashboard, approveAnnotator, approveUserForQA, rejectUserForQA, getAllQAUsers, rejectAnnotator, getDTUserAdmin, createAdmin, requestAdminVerification, confirmAdminVerification, verifyAdminOTP, adminLogin, getAllUsersForRoleManagement, updateUserRole, sendVerificationEmailsToUnverifiedUsers } = require('../controllers/dtUser.controller.js');
 const { createAnnotationProject, getAllAnnotationProjects, getAnnotationProjectDetails, updateAnnotationProject, toggleProjectStatus, toggleProjectVisibility, deleteAnnotationProject, requestProjectDeletionOTP, verifyOTPAndDeleteProject, getAnnotationProjectApplications, approveAnnotationProjectApplication, rejectAnnotationProjectApplication, removeApprovedApplicant, getRemovableApplicants, exportApprovedAnnotatorsCSV, attachAssessmentToProject, removeAssessmentFromProject, getAvailableAssessments, rejectApplicationsBulk, getApprovedApplicants, bulkApproveApplications, bulkRejectApplications } = require('../controllers/annotationProject.controller.js');
 const { createInvoice, getAllInvoices, getInvoiceDetails, updatePaymentStatus, sendInvoiceReminder, deleteInvoice, bulkAuthorizePayment, generatePaystackCSV, generateMPESACSV } = require('../controllers/invoice.controller.js');
 const { getAdminNotifications, createAnnouncement, getNotificationStats, cleanupNotifications, broadcastNotification } = require('../controllers/notification.controller.js');
@@ -35,6 +35,9 @@ router.patch('/dtusers/:userId/qa-approve', authenticateAdmin, approveUserForQA)
 router.patch('/dtusers/:userId/qa-reject', authenticateAdmin, rejectUserForQA);
 router.get('/qa-users', authenticateAdmin, getAllQAUsers);
 router.patch('/dtusers/:userId/reject', authenticateAdmin, rejectAnnotator);
+
+// Bulk Email Management Routes
+router.post('/dtusers/send-verification-emails', authenticateAdmin, sendVerificationEmailsToUnverifiedUsers);
 
 // User Role Management Routes
 router.put('/users/:userId/role', authenticateAdmin, updateUserRole);

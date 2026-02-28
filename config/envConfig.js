@@ -39,6 +39,12 @@ const envConfig = {
   },
 
   email: {
+    mailjet: {
+      MAILJET_API_KEY: env.MAILJET_API_KEY,
+      MAILJET_SECRET_KEY: env.MAILJET_SECRET_KEY,
+      MAILJET_SENDER_EMAIL: env.MAILJET_SENDER_EMAIL,
+      MAILJET_SENDER_NAME: env.MAILJET_SENDER_NAME,
+    },
     brevo: {
       BREVO_API_KEY: env.BREVO_API_KEY,
       BREVO_SENDER_EMAIL: env.BREVO_SENDER_EMAIL,

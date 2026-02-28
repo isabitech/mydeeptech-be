@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>New Support Ticket - Admin Notification</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Arial, sans-serif; 
+            line-height: 1.6; 
+            color: #333; 
+            margin: 0; 
+            padding: 0; 
+            background-color: #f4f4f4; 
+        }
+        .container { 
+            max-width: 600px; 
+            margin: 20px auto; 
+            background: white; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+            overflow: hidden; 
+        }
+        .header { 
+            background: linear-gradient(135deg, #dc3545, #c82333); 
+            color: white; 
+            padding: 30px; 
+            text-align: center; 
+        }
+        .content { 
+            padding: 30px; 
+        }
+        .ticket-info { 
+            background: #f8f9fa; 
+            border-left: 4px solid #dc3545; 
+            padding: 20px; 
+            margin: 20px 0; 
+            border-radius: 5px; 
+        }
+        .user-info { 
+            background: #e8f4f8; 
+            border-left: 4px solid #007bff; 
+            padding: 20px; 
+            margin: 20px 0; 
+            border-radius: 5px; 
+        }
+        .footer { 
+            background: #f8f9fa; 
+            padding: 20px; 
+            text-align: center; 
+            color: #6c757d; 
+        }
+        .btn { 
+            display: inline-block; 
+            padding: 12px 24px; 
+            background: #dc3545; 
+            color: white; 
+            text-decoration: none; 
+            border-radius: 5px; 
+            margin: 10px 0; 
+        }
+        .priority-badge { 
+            padding: 5px 10px; 
+            border-radius: 15px; 
+            font-size: 12px; 
+            font-weight: bold; 
+        }
+        .priority-low { 
+            background: #e3f2fd; 
+            color: #1976d2; 
+        }
+        .priority-medium { 
+            background: #fff3e0; 
+            color: #f57c00; 
+        }
+        .priority-high { 
+            background: #fce4ec; 
+            color: #c2185b; 
+        }
+        .priority-urgent { 
+            background: #ffebee; 
+            color: #d32f2f; 
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 style="margin: 0; font-size: 28px;">🚨 New Support Ticket</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Immediate attention required</p>
+        </div>
+        
+        <div class="content">
+            <p style="font-size: 16px; margin-bottom: 25px;">
+                Hello {{recipientName}},<br>
+                A new support ticket has been created and requires your attention.
+            </p>
+            
+            <div class="ticket-info">
+                <h3 style="margin-top: 0; color: #dc3545;">🎫 Ticket Information</h3>
+                <p><strong>Ticket Number:</strong> {{ticketNumber}}</p>
+                <p><strong>Subject:</strong> {{subject}}</p>
+                <p><strong>Category:</strong> {{category}}</p>
+                <p><strong>Priority:</strong> 
+                    <span class="priority-badge priority-{{priority}}">{{priority}}</span>
+                </p>
+                <p><strong>Created:</strong> {{createdAt}}</p>
+            </div>
+            
+            <div class="user-info">
+                <h3 style="margin-top: 0; color: #007bff;">👤 User Information</h3>
+                <p><strong>Name:</strong> {{userFullName}}</p>
+                <p><strong>Email:</strong> <a href="mailto:{{userEmail}}">{{userEmail}}</a></p>
+            </div>
+            
+            <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 20px; border-radius: 8px; margin: 25px 0;">
+                <h4 style="margin-top: 0; color: #856404;">📝 User's Message</h4>
+                <p style="font-style: italic; color: #555; margin-bottom: 0;">"{{description}}"</p>
+            </div>
+            
+            <h3 style="color: #333;">⚡ Required Actions</h3>
+            <ul style="color: #555; line-height: 1.8;">
+                <li>Review the ticket details and user information</li>
+                <li>Assign the ticket to appropriate team member</li>
+                <li>Respond to the user within 24 hours</li>
+                <li>Update ticket status as appropriate</li>
+            </ul>
+            
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="https://mydeeptech.ng/admin/support-tickets/{{ticketNumber}}" class="btn">
+                    Manage Ticket
+                </a>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p style="margin: 0 0 10px 0; color: #333;"><strong>📊 Quick Stats</strong></p>
+            <p style="margin: 5px 0; font-size: 12px;">
+                Support Dashboard: <a href="https://mydeeptech.ng/admin/support" style="color: #dc3545;">Admin Panel</a><br>
+                This notification was sent automatically.
+            </p>
+            
+            <hr style="border: none; height: 1px; background: #dee2e6; margin: 20px 0;">
+            <p style="margin: 0; font-size: 12px; color: #6c757d;">
+                Admin notification for ticket {{ticketNumber}}<br>
+                MyDeepTech Support System | <a href="https://mydeeptech.ng" style="color: #dc3545;">mydeeptech.ng</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

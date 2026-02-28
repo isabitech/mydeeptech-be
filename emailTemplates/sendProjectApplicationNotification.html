@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Application</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.6;
+            background-color: #f4f7fa;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center;
+            padding: 30px 20px;
+        }
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .message {
+            font-size: 16px;
+            margin-bottom: 25px;
+        }
+        .application-details {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            margin: 25px 0;
+        }
+        .detail-row {
+            margin-bottom: 10px;
+        }
+        .label {
+            font-weight: 600;
+            color: #667eea;
+        }
+        .cover-letter {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: white;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            text-align: center;
+            padding: 20px;
+            border-top: 1px solid #e9ecef;
+            font-size: 14px;
+            color: #6c757d;
+        }
+        .brand {
+            color: #667eea;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📋 New Project Application</h1>
+        </div>
+        
+        <div class="content">
+            <p class="message">Hello {{adminName}},</p>
+            
+            <p class="message">A new application has been submitted for one of your projects.</p>
+            
+            <div class="application-details">
+                <div class="detail-row">
+                    <span class="label">Project:</span> {{projectName}}
+                </div>
+                <div class="detail-row">
+                    <span class="label">Category:</span> {{projectCategory}}
+                </div>
+                <div class="detail-row">
+                    <span class="label">Applicant:</span> {{applicantName}}
+                </div>
+                <div class="detail-row">
+                    <span class="label">Email:</span> {{applicantEmail}}
+                </div>
+                <div class="detail-row">
+                    <span class="label">Pay Rate:</span> ${{payRate}}/hour
+                </div>
+                <div class="detail-row">
+                    <span class="label">Applied:</span> {{appliedAt}}
+                </div>
+                
+                {{#if coverLetter}}
+                <div class="cover-letter">
+                    <span class="label">Cover Letter:</span><br><br>
+                    {{coverLetter}}
+                </div>
+                {{/if}}
+            </div>
+            
+            <p class="message">Please log into the admin panel to review this application and take appropriate action.</p>
+            
+            <p class="message" style="margin-top: 30px;">
+                Best regards,<br>
+                <span class="brand">The MyDeeptech Team</span>
+            </p>
+        </div>
+        
+        <div class="footer">
+            <p>&copy; 2024 MyDeeptech. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>
