@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Deletion Authorization - MyDeeptech</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            line-height: 1.6; 
+            color: #333; 
+            max-width: 600px; 
+            margin: 0 auto; 
+            padding: 20px; 
+        }
+        .container { 
+            background: #fff; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+            overflow: hidden; 
+        }
+        .header { 
+            background: #e74c3c; 
+            color: white; 
+            padding: 20px; 
+            text-align: center; 
+            border-radius: 5px 5px 0 0; 
+        }
+        .content { 
+            background: #f9f9f9; 
+            padding: 20px; 
+            border: 1px solid #ddd; 
+        }
+        .otp-box { 
+            background: #fff; 
+            border: 2px solid #e74c3c; 
+            border-radius: 10px; 
+            padding: 20px; 
+            text-align: center; 
+            margin: 20px 0; 
+        }
+        .otp-code { 
+            font-size: 36px; 
+            font-weight: bold; 
+            color: #e74c3c; 
+            letter-spacing: 5px; 
+            font-family: 'Courier New', monospace; 
+        }
+        .warning { 
+            background: #fff3cd; 
+            border: 1px solid #ffeaa7; 
+            padding: 15px; 
+            border-radius: 5px; 
+            margin: 15px 0; 
+        }
+        .details { 
+            background: #e8f4f8; 
+            padding: 15px; 
+            border-radius: 5px; 
+            margin: 15px 0; 
+        }
+        .footer { 
+            background: #2c3e50; 
+            color: white; 
+            padding: 15px; 
+            text-align: center; 
+            border-radius: 0 0 5px 5px; 
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚨 PROJECT DELETION AUTHORIZATION</h1>
+            <h2>{{projectName}}</h2>
+        </div>
+        
+        <div class="content">
+            <p><strong>Hello {{recipientName}},</strong></p>
+            
+            <div class="warning">
+                <h3>⚠️ URGENT ACTION REQUIRED</h3>
+                <p><strong>A project deletion request has been submitted and requires your authorization.</strong></p>
+            </div>
+            
+            <div class="details">
+                <h3>📋 Deletion Request Details</h3>
+                <p><strong>Project Name:</strong> {{projectName}}</p>
+                <p><strong>Requested By:</strong> {{requestedBy}}</p>
+                <p><strong>Reason:</strong> {{reason}}</p>
+                <p><strong>Request Time:</strong> {{expiryTime}}</p>
+            </div>
+            
+            <div class="otp-box">
+                <h3>🔐 Your Authorization OTP</h3>
+                <div class="otp-code">{{otp}}</div>
+                <p><strong style="color: #e74c3c;">Expires at: {{expiryTime}}</strong></p>
+            </div>
+            
+            <div class="warning">
+                <h3>🔒 Security Instructions</h3>
+                <ul>
+                    <li>Only provide this OTP if you authorize this deletion</li>
+                    <li>This action is <strong>IRREVERSIBLE</strong></li>
+                    <li>Verify the request details carefully before proceeding</li>
+                    <li>Contact the requester if you have any questions</li>
+                    <li>This OTP will expire automatically for security</li>
+                </ul>
+            </div>
+            
+            <p><strong>⚠️ WARNING:</strong> Project deletion will permanently remove all associated data, applications, and history. This action cannot be undone.</p>
+            
+            <p>If you did not expect this request or have concerns, please contact the system administrator immediately.</p>
+        </div>
+        
+        <div class="footer">
+            <p><strong>MyDeeptech Security System</strong><br>
+            This is an automated security notification</p>
+        </div>
+    </div>
+</body>
+</html>

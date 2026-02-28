@@ -164,8 +164,6 @@ const freelancerPaymentSchema = new mongoose.Schema({
 });
 
 // Indexes for better query performance
-freelancerPaymentSchema.index({ paymentReference: 1 });
-freelancerPaymentSchema.index({ paystackReference: 1 });
 freelancerPaymentSchema.index({ freelancerId: 1, status: 1 });
 freelancerPaymentSchema.index({ projectId: 1, status: 1 });
 freelancerPaymentSchema.index({ status: 1, createdAt: -1 });

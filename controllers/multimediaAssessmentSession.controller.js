@@ -3,7 +3,9 @@ const MultimediaAssessmentConfig = require('../models/multimediaAssessmentConfig
 const VideoReel = require('../models/videoReel.model');
 const DTUser = require('../models/dtUser.model');
 const Joi = require('joi');
-const { sendAssessmentInvitationEmail, sendAssessmentCompletionEmail } = require('../utils/multimediaAssessmentEmails');
+// const { sendAssessmentInvitationEmail, sendAssessmentCompletionEmail } = require('../utils/multimediaAssessmentEmails');
+// Replaced with MailService:
+const MailService = require('../services/mail-service/mail-service');
 
 // Validation schemas
 const startAssessmentSchema = Joi.object({
@@ -609,7 +611,20 @@ const submitAssessment = async (req, res) => {
     
     // Send completion email to user
     try {
-      await sendAssessmentCompletionEmail(
+      // await sendAssessmentCompletionEmail(
+      //   submission.annotatorId.email,
+      //   submission.annotatorId.fullName,
+      //   {
+      //     assessmentTitle: submission.assessmentId.title,
+      //     projectName: submission.projectId.projectName,
+      //     submissionId: submission._id,
+      //     completedTasks: submission.tasks.length,
+      //     totalTimeSpent: submission.formattedTimeSpent,
+      //     submittedAt: submission.submittedAt
+      //   }
+      // );
+      // Replaced with MailService:
+      await MailService.sendAssessmentCompletionEmail(
         submission.annotatorId.email,
         submission.annotatorId.fullName,
         {
@@ -803,7 +818,7 @@ const handleAssessmentCompletion = async (userId, assessmentId, submissionId) =>
 
                         // Send notification to project creator
                         if (project.createdBy) {
-                            await sendProjectApplicationNotification(
+                            await mailService.sendProjectApplicationNotification(
                                 project.createdBy.email,
                                 project.createdBy.fullName,
                                 applicationData
@@ -813,7 +828,7 @@ const handleAssessmentCompletion = async (userId, assessmentId, submissionId) =>
                         // Send notification to assigned admins
                         for (const admin of project.assignedAdmins) {
                             if (admin._id.toString() !== project.createdBy._id.toString()) {
-                                await sendProjectApplicationNotification(
+                                await MailService.sendProjectApplicationNotification(
                                     admin.email,
                                     admin.fullName,
                                     applicationData

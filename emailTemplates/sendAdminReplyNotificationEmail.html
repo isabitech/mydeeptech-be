@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Reply Notification</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.6;
+            background-color: #f4f7fa;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #4ecdc4 0%, #2c5aa0 100%);
+            color: white;
+            text-align: center;
+            padding: 30px 20px;
+        }
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .message {
+            font-size: 16px;
+            margin-bottom: 25px;
+        }
+        .reply-details {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #4ecdc4;
+            margin: 25px 0;
+        }
+        .detail-row {
+            margin-bottom: 10px;
+        }
+        .label {
+            font-weight: 600;
+            color: #4ecdc4;
+        }
+        .reply-content {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: white;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            text-align: center;
+            padding: 20px;
+            border-top: 1px solid #e9ecef;
+            font-size: 14px;
+            color: #6c757d;
+        }
+        .brand {
+            color: #4ecdc4;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💬 Admin Reply</h1>
+        </div>
+        
+        <div class="content">
+            <p class="message">Hello {{userName}},</p>
+            
+            <p class="message">You have received a new reply from our support team regarding your ticket.</p>
+            
+            <div class="reply-details">
+                <div class="detail-row">
+                    <span class="label">Ticket ID:</span> {{ticketId}}
+                </div>
+                <div class="detail-row">
+                    <span class="label">Subject:</span> {{subject}}
+                </div>
+                <div class="detail-row">
+                    <span class="label">From:</span> {{senderName}}
+                </div>
+                <div class="detail-row">
+                    <span class="label">Replied:</span> {{repliedAt}}
+                </div>
+                
+                <div class="reply-content">
+                    <span class="label">Reply:</span><br><br>
+                    {{replyMessage}}
+                </div>
+            </div>
+            
+            <p class="message">You can view the full conversation and reply by logging into your account.</p>
+            
+            <p class="message" style="margin-top: 30px;">
+                Best regards,<br>
+                <span class="brand">The MyDeeptech Team</span>
+            </p>
+        </div>
+        
+        <div class="footer">
+            <p>&copy; 2024 MyDeeptech. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

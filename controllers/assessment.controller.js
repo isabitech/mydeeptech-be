@@ -364,10 +364,10 @@ const submitAssessment = async (req, res) => {
       try {
         if (passed && newAnnotatorStatus === 'approved') {
           const { sendAnnotatorApprovalEmail } = require('../utils/annotatorMailer');
-          await sendAnnotatorApprovalEmail(user.email, user.fullName);
+          await MailService.sendAnnotatorApprovalEmail(user.email, user.fullName);
         } else if (!passed && newMicroTaskerStatus === 'approved') {
           const { sendAnnotatorRejectionEmail } = require('../utils/annotatorMailer');
-          await sendAnnotatorRejectionEmail(user.email, user.fullName);
+          await MailService.sendAnnotatorRejectionEmail(user.email, user.fullName);
         }
       } catch (emailError) {
         console.error('⚠️ Failed to send email notification:', emailError);

@@ -4,7 +4,9 @@ const SupportTicket = require('../models/supportTicket.model');
 const DTUser = require('../models/dtUser.model');
 const User = require('../models/user');
 const { createNotification } = require('./notificationService');
-const { sendNewTicketNotificationToAdmin, sendTicketStatusUpdateEmail, sendAdminReplyNotificationEmail } = require('./supportEmailTemplates');
+// const { sendNewTicketNotificationToAdmin, sendTicketStatusUpdateEmail, sendAdminReplyNotificationEmail } = require('./supportEmailTemplates');
+// Replaced with MailService:
+const MailService = require('../services/mail-service/mail-service');
 const { canSendDailyEmail, markDailyEmailSent, getDailyEmailStatus } = require('./dailyEmailTracker');
 const envConfig = require('../config/envConfig');
 
@@ -264,7 +266,7 @@ const initializeSocketIO = (server) => {
         // Send email to support if no admins online
         if (connectedAdmins.size === 0) {
           const user = { fullName: socket.userName, email: socket.userEmail, _id: socket.userId };
-          await sendNewTicketNotificationToAdmin('support@mydeeptech.ng', ticket, user);
+          await mailService.sendNewTicketNotificationToAdmin('support@mydeeptech.ng', ticket, user);
         }
 
         // Create notification for user
@@ -391,7 +393,7 @@ const initializeSocketIO = (server) => {
                 console.log(`📧 Attempting to send admin reply email to ${user.email}...`);
                 
                 // Send admin reply email notification
-                const emailResult = await sendAdminReplyNotificationEmail(
+                const emailResult = await mailService.sendAdminReplyNotificationEmail(
                   user.email,
                   ticket,
                   {

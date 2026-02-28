@@ -6,15 +6,13 @@ const { convertUSDToNGN } = require("../../utils/exchangeRateService");
 
 
 // New Bulk Transfer Controller with Invoice-based Payments
-const initializeBulkTransferWithInvoices = async (req, res, next) => {
-  try {
-    const {
+const initializeBulkTransferWithInvoices = async (req, res) => {
+ const {
       transfers, // Array of transfer objects with invoiceIds and user details
       currency = 'NGN',
       source = 'balance',
       metadata = {}
     } = req.body;
-
 
     if(!req.user?.userId) {
       return ResponseClass.Error(res, {
@@ -157,10 +155,10 @@ const initializeBulkTransferWithInvoices = async (req, res, next) => {
         let ngnAmount = await convertUSDToNGN(usdAmount);
         
         // TEST MODE: Override with smaller amounts for testing
-        const isTestMode = process.env.PAYSTACK_SECRET_KEY?.startsWith('sk_test_');
-        if (isTestMode && ngnAmount > 2000) {
-          ngnAmount = Math.min(ngnAmount, 500); // Cap at ₦500 for testing
-        }
+        // const isTestMode = process.env.PAYSTACK_SECRET_KEY?.startsWith('sk_test_');
+        // if (isTestMode && ngnAmount > 2000) {
+        //   ngnAmount = Math.min(ngnAmount, 500); // Cap at ₦500 for testing
+        // }
 
         totalUSDAmount += usdAmount;
         totalNGNAmount += ngnAmount;
@@ -221,7 +219,7 @@ const initializeBulkTransferWithInvoices = async (req, res, next) => {
         processedTransfers.push(transferObj);
 
       } catch (error) {
-        console.error(`❌ Error processing invoice ${invoice.invoiceNumber}:`, error);
+        console.error(res, `❌ Error processing invoice ${invoice.invoiceNumber}:`, error);
         errors.push({
           invoiceId: invoice._id,
           invoiceNumber: invoice.invoiceNumber,
@@ -259,7 +257,7 @@ const initializeBulkTransferWithInvoices = async (req, res, next) => {
       });
 
     } catch (transferError) {
-      console.error('❌ Paystack bulk transfer failed:', transferError);
+      console.error(res, '❌ Paystack bulk transfer failed:', transferError);
 
       return ResponseClass.Error(res, {
         message: transferError?.message ?? "Bulk transfer initiation failed",
@@ -296,7 +294,7 @@ const initializeBulkTransferWithInvoices = async (req, res, next) => {
 
 
       } catch (error) {
-        console.error(`❌ Error marking invoice ${invoice.invoiceNumber} as paid:`, error);
+        console.error(res, `❌ Error marking invoice ${invoice.invoiceNumber} as paid:`, error);
         errors.push({
           invoiceId: invoice._id,
           invoiceNumber: invoice.invoiceNumber,
@@ -333,11 +331,6 @@ const initializeBulkTransferWithInvoices = async (req, res, next) => {
       message: `Bulk transfer completed successfully. ${paidInvoices.length} invoices paid.`,
       data: responseData
     });
-
-  } catch (err) {
-    console.error('❌ Bulk transfer controller error:', err);
-    next(err);
-  }
 };
 
 module.exports = {

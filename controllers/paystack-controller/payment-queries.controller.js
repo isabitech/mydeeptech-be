@@ -2,9 +2,8 @@ const PaystackPaymentService = require("../../services/paystack-payment.service"
 const ResponseClass = require("../../utils/response-handler");
 
 // Get payments for a specific freelancer
-const getFreelancerPayments = async (req, res, next) => {
-  try {
-    const { freelancerId } = req.params;
+const getFreelancerPayments = async (req, res) => {
+   const { freelancerId } = req.params;
     const { page = 1, limit = 10, status } = req.query;
     
     if (!freelancerId) {
@@ -26,15 +25,11 @@ const getFreelancerPayments = async (req, res, next) => {
       message: "Freelancer payments retrieved successfully", 
       data: result 
     });
-  } catch (err) {
-    next(err);
-  }
 };
 
 // Get payments for a specific project
-const getProjectPayments = async (req, res, next) => {
-  try {
-    const { projectId } = req.params;
+const getProjectPayments = async (req, res) => {
+   const { projectId } = req.params;
     const { page = 1, limit = 10, status } = req.query;
     
     if (!projectId) {
@@ -56,16 +51,11 @@ const getProjectPayments = async (req, res, next) => {
       message: "Project payments retrieved successfully", 
       data: result 
     });
-  } catch (err) {
-    next(err);
-  }
 };
 
 // Get all payments with filters (admin function)
-const getAllPayments = async (req, res, next) => {
-  try {
+const getAllPayments = async (req, res) => {
     const { page = 1, limit = 10, status, search } = req.query;
-
     const options = {
       page: parseInt(page),
       limit: parseInt(limit),
@@ -79,15 +69,11 @@ const getAllPayments = async (req, res, next) => {
       message: "Payments retrieved successfully", 
       data: result 
     });
-  } catch (err) {
-    next(err);
-  }
 };
 
 // Get payment statistics
-const getPaymentStats = async (req, res, next) => {
-  try {
-    const { freelancerId, projectId, startDate, endDate } = req.query;
+const getPaymentStats = async (req, res) => {
+  const { freelancerId, projectId, startDate, endDate } = req.query;
 
     const filters = {
       freelancerId,
@@ -102,16 +88,11 @@ const getPaymentStats = async (req, res, next) => {
       message: "Payment statistics retrieved successfully", 
       data: stats 
     });
-  } catch (err) {
-    next(err);
-  }
 };
 
 // Get pending payments (admin function)
-const getPendingPayments = async (req, res, next) => {
-  try {
+const getPendingPayments = async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
-
     const options = {
       page: parseInt(page),
       limit: parseInt(limit),
@@ -124,16 +105,11 @@ const getPendingPayments = async (req, res, next) => {
       message: "Pending payments retrieved successfully", 
       data: result 
     });
-  } catch (err) {
-    next(err);
-  }
 };
 
 // Get failed payments (admin function)
-const getFailedPayments = async (req, res, next) => {
-  try {
+const getFailedPayments = async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
-
     const options = {
       page: parseInt(page),
       limit: parseInt(limit),
@@ -146,15 +122,10 @@ const getFailedPayments = async (req, res, next) => {
       message: "Failed payments retrieved successfully", 
       data: result 
     });
-  } catch (err) {
-    next(err);
-  }
 };
 
 // Get successful payments (admin function)
-const getSuccessfulPayments = async (req, res, next) => {
-  try {
-    const { page = 1, limit = 10 } = req.query;
+const getSuccessfulPayments = async (req, res) => {
 
     const options = {
       page: parseInt(page),
@@ -168,9 +139,6 @@ const getSuccessfulPayments = async (req, res, next) => {
       message: "Successful payments retrieved successfully", 
       data: result 
     });
-  } catch (err) {
-    next(err);
-  }
 };
 
 module.exports = {
