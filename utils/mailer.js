@@ -53,8 +53,8 @@ const sendVerificationEmailGmail = async (email, name, userId) => {
 // Main email function with priorities: Brevo SMTP > Brevo API > Gmail
 const sendVerificationEmail = async (email, name, userId) => {
   console.log(`📧 Sending verification email to ${email}...`);
-  
-  // 1st Priority: Try Brevo SMTP (fastest and most reliable)
+
+  // 1st Priority: Try Brevo SMTP (fastest ands most reliable)
   if (envConfig.email.brevo.SMTP_LOGIN && envConfig.email.brevo.SMTP_KEY) {
     try {
       console.log("� Attempting to send email via Brevo SMTP...");
@@ -65,7 +65,7 @@ const sendVerificationEmail = async (email, name, userId) => {
       console.warn("⚠️ Brevo SMTP failed, trying other methods...", brevoSMTPError.message);
     }
   }
-  
+
   // 2nd Priority: Try Brevo API
   if (envConfig.email.brevo.BREVO_API_KEY && envConfig.email.brevo.BREVO_API_KEY !== 'your-brevo-api-key-here') {
     try {

@@ -1,6 +1,8 @@
 const PartnerInvoiceRepository = require('../repositories/partner-invoice.repository');
 const AppError = require('../utils/app-error');
-const PartnerInvoiceMailer = require('../utils/partner-invoice-malier');
+// const PartnerInvoiceMailer = require('../utils/partner-invoice-malier');
+// Replaced with MailService:
+const MailService = require('./mail-service/mail-service');
 
 class PartnerInvoiceService {
     static async createInvoice(payload) {
@@ -18,7 +20,9 @@ class PartnerInvoiceService {
             if (!createdInvoice) {
                 throw new AppError({ message: "Failed to create partner invoice", statusCode: 500 });
             }
-            await PartnerInvoiceMailer.sendInvoiceEmail(createdInvoice);
+            // await PartnerInvoiceMailer.sendInvoiceEmail(createdInvoice);
+            // Replaced with MailService:
+            await MailService.sendPartnerInvoiceEmail(createdInvoice.email, createdInvoice.name, createdInvoice);
             return createdInvoice;
         } catch (err) {
             throw new AppError({ message: `Failed to create invoice: ${err.message}`, statusCode: 500 });

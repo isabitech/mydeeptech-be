@@ -204,7 +204,6 @@ supportTicketSchema.pre('save', function(next) {
 
 // Indexes for better performance
 supportTicketSchema.index({ userId: 1 });
-supportTicketSchema.index({ ticketNumber: 1 });
 supportTicketSchema.index({ status: 1 });
 supportTicketSchema.index({ category: 1 });
 supportTicketSchema.index({ priority: 1 });

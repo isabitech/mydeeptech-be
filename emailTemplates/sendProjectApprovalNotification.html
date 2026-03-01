@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Application Approved</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.6;
+            background-color: #f4f7fa;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            text-align: center;
+            padding: 30px 20px;
+        }
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .message {
+            font-size: 16px;
+            margin-bottom: 25px;
+        }
+        .project-details {
+            background-color: #d4edda;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #28a745;
+            margin: 25px 0;
+        }
+        .detail-row {
+            margin-bottom: 10px;
+        }
+        .label {
+            font-weight: 600;
+            color: #155724;
+        }
+        .next-steps {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 25px 0;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            text-align: center;
+            padding: 20px;
+            border-top: 1px solid #e9ecef;
+            font-size: 14px;
+            color: #6c757d;
+        }
+        .brand {
+            color: #28a745;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎉 Application Approved!</h1>
+        </div>
+        
+        <div class="content">
+            <p class="message">Hello {{applicantName}},</p>
+            
+            <p class="message">Congratulations! Your application has been approved.</p>
+            
+            <div class="project-details">
+                <div class="detail-row">
+                    <span class="label">Project:</span> {{projectName}}
+                </div>
+                <div class="detail-row">
+                    <span class="label">Category:</span> {{projectCategory}}
+                </div>
+                {{#if payRate}}
+                <div class="detail-row">
+                    <span class="label">Pay Rate:</span> ${{payRate}}/hour
+                </div>
+                {{/if}}
+                {{#if projectGuidelineVideo}}
+                <div class="detail-row">
+                    <span class="label">Guidelines Video:</span> <a href="{{projectGuidelineVideo}}" style="color: #28a745;">Watch Here</a>
+                </div>
+                {{/if}}
+                {{#if projectCommunityLink}}
+                <div class="detail-row">
+                    <span class="label">Community:</span> <a href="{{projectCommunityLink}}" style="color: #28a745;">Join Here</a>
+                </div>
+                {{/if}}
+                {{#if projectTrackerLink}}
+                <div class="detail-row">
+                    <span class="label">Tracker:</span> <a href="{{projectTrackerLink}}" style="color: #28a745;">Access Here</a>
+                </div>
+                {{/if}}
+            </div>
+            
+            <div class="next-steps">
+                <p style="font-weight: 600; color: #155724; margin-bottom: 15px;">Next Steps:</p>
+                <ul style="margin-left: 20px;">
+                    <li>Log into your account to access project details</li>
+                    <li>Review project guidelines and requirements</li>
+                    <li>Join the project community (if available)</li>
+                    <li>Start working on assigned tasks</li>
+                </ul>
+            </div>
+            
+            <p class="message">Welcome to the project! We're excited to have you on board.</p>
+            
+            <p class="message" style="margin-top: 30px;">
+                Best regards,<br>
+                <span class="brand">The MyDeeptech Team</span>
+            </p>
+        </div>
+        
+        <div class="footer">
+            <p>&copy; 2024 MyDeeptech. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

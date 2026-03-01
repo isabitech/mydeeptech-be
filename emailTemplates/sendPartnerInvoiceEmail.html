@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice from {{companyName}}</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            line-height: 1.6; 
+            color: #333; 
+            max-width: 600px; 
+            margin: 0 auto; 
+            padding: 20px; 
+        }
+        .container { 
+            background: #fff; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+            overflow: hidden; 
+        }
+        .header { 
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%); 
+            color: white; 
+            padding: 30px; 
+            text-align: center; 
+            border-radius: 10px 10px 0 0; 
+        }
+        .content { 
+            padding: 30px; 
+            background: #f8f9fa; 
+            border: 1px solid #e9ecef; 
+        }
+        .invoice-details { 
+            background: #e8f4f8; 
+            padding: 20px; 
+            border-radius: 8px; 
+            margin: 20px 0; 
+            border-left: 4px solid #007bff; 
+        }
+        .amount { 
+            color: #28a745; 
+            font-weight: bold; 
+            font-size: 1.3em; 
+        }
+        .button { 
+            display: inline-block; 
+            background: #007bff; 
+            color: white; 
+            padding: 12px 24px; 
+            text-decoration: none; 
+            border-radius: 5px; 
+            margin: 20px 0; 
+        }
+        .footer { 
+            background: #f8f9fa; 
+            padding: 20px; 
+            text-align: center; 
+            color: #666; 
+            font-size: 14px; 
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📧 Invoice from {{companyName}}</h1>
+            <p>Professional Services Invoice</p>
+        </div>
+        
+        <div class="content">
+            <h2>Hello {{recipientName}},</h2>
+            
+            <p>We hope this email finds you well. Please find your invoice details below for the services provided.</p>
+            
+            <div class="invoice-details">
+                <h3>📋 Invoice Summary</h3>
+                <p><strong>Service Provider:</strong> {{companyName}}</p>
+                <p><strong>Description:</strong> {{description}}</p>
+                <p><strong>Amount Due:</strong> <span class="amount">{{formattedAmount}}</span></p>
+                <p><strong>Due Date:</strong> {{formattedDueDate}}</p>
+            </div>
+            
+            <p>Please process this invoice by the due date. If you have any questions regarding this invoice, please don't hesitate to contact us.</p>
+            
+            <div style="text-align: center;">
+                <a href="mailto:billing@mydeeptech.ng" class="button">Contact Billing Department</a>
+            </div>
+            
+            <h4>💳 Payment Instructions</h4>
+            <ul>
+                <li>Payment should be made within the specified timeframe</li>
+                <li>Include the invoice reference in your payment</li>
+                <li>Contact our billing team for payment methods</li>
+                <li>Confirmation will be sent upon receipt of payment</li>
+            </ul>
+            
+            <p><strong>Questions about this invoice?</strong><br>
+            Contact us at <a href="mailto:billing@mydeeptech.ng">billing@mydeeptech.ng</a></p>
+        </div>
+        
+        <div class="footer">
+            <p><strong>{{companyName}}</strong><br>
+            <a href="https://mydeeptech.ng">mydeeptech.ng</a></p>
+            <p>Thank you for your business partnership.</p>
+        </div>
+    </div>
+</body>
+</html>

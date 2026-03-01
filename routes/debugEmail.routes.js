@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { sendAdminReplyNotificationEmail } = require('../utils/supportEmailTemplates');
+// const { sendAdminReplyNotificationEmail } = require('../utils/supportEmailTemplates');
+const mail = require('../services/mail-service/mail-service');
 const { canSendDailyEmail, markDailyEmailSent, getDailyEmailStatus } = require('../utils/dailyEmailTracker');
 const { authenticateAdmin } = require('../middleware/adminAuth');
 
@@ -39,7 +40,7 @@ router.post('/test-admin-reply-email', authenticateAdmin, async (req, res) => {
     console.log(`🧪 Mock admin reply:`, mockAdminReply);
 
     // Send test email
-    const emailResult = await sendAdminReplyNotificationEmail(
+    const emailResult = await mail.sendAdminReplyNotificationEmail(
       userEmail,
       mockTicket,
       mockAdminReply

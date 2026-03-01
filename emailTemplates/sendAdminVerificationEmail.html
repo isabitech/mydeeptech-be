@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Account Verification</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            line-height: 1.6; 
+            color: #333; 
+            max-width: 600px; 
+            margin: 0 auto; 
+            padding: 20px; 
+        }
+        .container { 
+            background: #fff; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+            overflow: hidden; 
+        }
+        .header { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            color: white; 
+            padding: 30px; 
+            text-align: center; 
+            border-radius: 10px 10px 0 0; 
+        }
+        .content { 
+            background: #f9f9f9; 
+            padding: 30px; 
+            border-radius: 0 0 10px 10px; 
+            border: 1px solid #ddd; 
+        }
+        .verification-code { 
+            background: #fff; 
+            border: 2px solid #667eea; 
+            border-radius: 8px; 
+            padding: 20px; 
+            text-align: center; 
+            margin: 20px 0; 
+        }
+        .code { 
+            font-size: 32px; 
+            font-weight: bold; 
+            color: #667eea; 
+            letter-spacing: 8px; 
+            font-family: monospace; 
+        }
+        .warning { 
+            background: #fff3cd; 
+            border: 1px solid #ffeaa7; 
+            border-radius: 5px; 
+            padding: 15px; 
+            margin: 20px 0; 
+        }
+        .security-notice { 
+            background: #d4edda; 
+            border: 1px solid #c3e6cb; 
+            border-radius: 5px; 
+            padding: 15px; 
+            margin: 15px 0; 
+        }
+        .footer { 
+            text-align: center; 
+            margin-top: 30px; 
+            color: #666; 
+            font-size: 12px; 
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>👑 Admin Account Verification</h1>
+            <p>Secure access verification required</p>
+        </div>
+        
+        <div class="content">
+            <h2>Hello {{recipientName}},</h2>
+            
+            <p>You have requested admin account verification for MyDeepTech. Please use the verification code below to complete your admin account setup:</p>
+            
+            <div class="verification-code">
+                <h3>Your Verification Code</h3>
+                <div class="code">{{verificationCode}}</div>
+                <p style="margin: 10px 0 0 0; font-size: 14px; color: #666;">
+                    This code expires in <strong>15 minutes</strong>
+                </p>
+            </div>
+            
+            <div class="warning">
+                <h4>⚠️ Important Security Information</h4>
+                <ul>
+                    <li>This verification code is for admin access only</li>
+                    <li>Never share this code with anyone</li>
+                    <li>The code will expire in 15 minutes for security</li>
+                    <li>If you didn't request this, please contact security immediately</li>
+                </ul>
+            </div>
+            
+            <div class="security-notice">
+                <h4>🔒 Security Notice</h4>
+                <p>Admin access grants elevated permissions in the MyDeepTech system. Ensure you are the only person with access to this verification code.</p>
+            </div>
+            
+            <p>If you have any questions or concerns about this verification, please contact our security team immediately.</p>
+            
+            <p><strong>Security Contact:</strong><br>
+            Email: <a href="mailto:security@mydeeptech.ng">security@mydeeptech.ng</a></p>
+        </div>
+        
+        <div class="footer">
+            <p><strong>MyDeepTech Security Team</strong><br>
+            <a href="https://mydeeptech.ng">mydeeptech.ng</a></p>
+            <p>This verification email was generated automatically.</p>
+        </div>
+    </div>
+</body>
+</html>

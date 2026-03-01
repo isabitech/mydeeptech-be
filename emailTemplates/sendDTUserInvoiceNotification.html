@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Invoice - MyDeepTech</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            line-height: 1.6; 
+            color: #333; 
+            max-width: 600px; 
+            margin: 0 auto; 
+            padding: 20px; 
+        }
+        .container { 
+            background: #fff; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+            overflow: hidden; 
+        }
+        .header { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            color: white; 
+            padding: 30px; 
+            text-align: center; 
+            border-radius: 10px 10px 0 0; 
+        }
+        .header h1 { 
+            margin: 0; 
+            font-size: 28px; 
+        }
+        .content { 
+            background: #f8f9fa; 
+            padding: 30px; 
+            border-radius: 0 0 10px 10px; 
+            border: 1px solid #e9ecef; 
+        }
+        .invoice-details { 
+            background: #f8f9fa; 
+            padding: 20px; 
+            border-radius: 8px; 
+            margin: 20px 0; 
+        }
+        .invoice-item { 
+            display: flex; 
+            justify-content: space-between; 
+            padding: 8px 0; 
+            border-bottom: 1px solid #eee; 
+        }
+        .invoice-item:last-child { 
+            border-bottom: none; 
+            font-weight: bold; 
+            font-size: 1.1em; 
+        }
+        .amount { 
+            color: #28a745; 
+            font-weight: bold; 
+            font-size: 1.2em; 
+        }
+        .due-date { 
+            color: #dc3545; 
+            font-weight: bold; 
+        }
+        .button { 
+            display: inline-block; 
+            background: #007bff; 
+            color: white; 
+            padding: 12px 30px; 
+            text-decoration: none; 
+            border-radius: 5px; 
+            margin: 20px 0; 
+        }
+        .footer { 
+            background: #f8f9fa; 
+            padding: 20px; 
+            text-align: center; 
+            border-radius: 0 0 10px 10px; 
+            color: #666; 
+            font-size: 14px; 
+        }
+        .important { 
+            background: #fff3cd; 
+            border: 1px solid #ffeaa7; 
+            padding: 15px; 
+            border-radius: 5px; 
+            margin: 20px 0; 
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💰 New Invoice from MyDeepTech</h1>
+            <p>Invoice #{{invoiceNumber}}</p>
+        </div>
+        
+        <div class="content">
+            <h2>Hello {{recipientName}},</h2>
+            
+            <p>We've generated a new invoice for your completed work. Thank you for your excellent contribution to our annotation projects!</p>
+            
+            <div class="invoice-details">
+                <h3>📋 Invoice Details</h3>
+                <div class="invoice-item">
+                    <span>Invoice Number:</span>
+                    <span><strong>INV-{{invoiceNumber}}</strong></span>
+                </div>
+                <div class="invoice-item">
+                    <span>Project:</span>
+                    <span>{{projectName}}</span>
+                </div>
+                <div class="invoice-item">
+                    <span>Description:</span>
+                    <span>{{description}}</span>
+                </div>
+                <div class="invoice-item">
+                    <span>Due Date:</span>
+                    <span class="due-date">{{formattedDueDate}}</span>
+                </div>
+                <div class="invoice-item">
+                    <span>Amount Due:</span>
+                    <span class="amount">{{formattedAmount}}</span>
+                </div>
+            </div>
+            
+            <div class="important">
+                <h4>⚠️ Important Payment Information</h4>
+                <p>Please log in to your MyDeepTech account to view the complete invoice details and payment instructions.</p>
+            </div>
+            
+            <div style="text-align: center;">
+                <a href="https://mydeeptech.ng/dashboard/invoices" class="button">View Invoice Details</a>
+            </div>
+            
+            <h4>💳 Payment Instructions</h4>
+            <ol>
+                <li>Log in to your MyDeepTech account</li>
+                <li>Navigate to the Invoices section</li>
+                <li>View your unpaid invoices</li>
+                <li>Follow the payment instructions provided</li>
+                <li>Payment confirmation will be sent automatically</li>
+            </ol>
+            
+            <p><strong>Questions about this invoice?</strong><br>
+            Contact our payments team at <a href="mailto:payments@mydeeptech.ng">payments@mydeeptech.ng</a></p>
+        </div>
+        
+        <div class="footer">
+            <p><strong>MyDeepTech</strong><br>
+            <a href="https://mydeeptech.ng">mydeeptech.ng</a></p>
+            <p>This invoice was generated automatically. Please do not reply to this email.</p>
+        </div>
+    </div>
+</body>
+</html>

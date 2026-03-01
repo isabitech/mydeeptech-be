@@ -1,7 +1,9 @@
 const Invoice = require('../models/invoice.model');
 const DTUser = require('../models/dtUser.model');
 const AnnotationProject = require('../models/annotationProject.model');
-const { sendInvoiceNotification, sendPaymentConfirmation, sendPaymentReminder } = require('../utils/paymentMailer');
+// const { sendInvoiceNotification, sendPaymentConfirmation, sendPaymentReminder } = require('../utils/paymentMailer');
+// Replaced with MailService:
+const MailService = require('../services/mail-service/mail-service');
 const { convertUSDToNGN } = require('../utils/exchangeRateService');
 const { getBankCode, validatePaymentInfo } = require('../utils/bankCodeMapping');
 const Joi = require('joi');
@@ -109,7 +111,20 @@ const createInvoice = async (req, res) => {
     // Send email notification to DTUser
     let emailSent = false;
     try {
-      await sendInvoiceNotification(
+      // await sendInvoiceNotification(
+      //   dtUser.email,
+      //   dtUser.fullName,
+      //   {
+      //     invoiceNumber: invoice.invoiceNumber,
+      //     projectName: project.projectName,
+      //     amount: invoice.invoiceAmount,
+      //     currency: invoice.currency,
+      //     dueDate: invoice.dueDate,
+      //     description: invoice.description
+      //   }
+      // );
+      // Replaced with MailService:
+      await MailService.sendDTUserInvoiceNotification(
         dtUser.email,
         dtUser.fullName,
         {

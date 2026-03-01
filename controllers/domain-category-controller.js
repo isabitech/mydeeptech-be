@@ -2,15 +2,19 @@ const DomainCategoryService = require("../services/domain-category.service");
 const ResponseClass = require("../utils/response-handler");
 
 
-const fetchCategoryTree = async (req, res) => {
+const fetchCategoryTree = async (req, res, next) => {
+  try {
     const tree = await DomainCategoryService.getAllDomainsWithCategorization();
     return ResponseClass.Success(res, {
       message: "Category tree fetched successfully",
-      data:  tree
+      data:  tree 
     });
+  } catch (err) {
+    next(err);
+  }
 };
 
-const createDomainCategory = async (req, res) => {
+const createDomainCategory = async (req, res, next) => {
 
   const { name, description } = req.body;
 
@@ -18,11 +22,16 @@ const createDomainCategory = async (req, res) => {
     ...(name && { name }),
     ...(description && { description }),
   };
-  const newCategory = await DomainCategoryService.createDomainCategory(payload);
-  return ResponseClass.Success(res, { message: "Domain category created successfully", data: { category: newCategory } });
+  try {
+    const newCategory = await DomainCategoryService.createDomainCategory(payload);
+    return ResponseClass.Success(res, { message: "Domain category created successfully", data: { category: newCategory } });
+  } catch (err) {
+    next(err);
+  }
 };
 
-const fetchAllDomainCategories = async (req, res) => {
+const fetchAllDomainCategories = async (req, res, next) => {
+  try {
     const { page = 1, limit = 10, search = '' } = req.query;
     const paginationOptions = {
       page: parseInt(page),
@@ -30,24 +39,36 @@ const fetchAllDomainCategories = async (req, res) => {
       search: search.trim()
     };
 
-    const categories = await DomainCategoryService.fetchAllDomainCategories(paginationOptions);
-    return ResponseClass.Success(res, { 
-      message: "Domain categories retrieved successfully", 
-      data: { categories } 
+    const result = await DomainCategoryService.fetchAllDomainCategories(paginationOptions);
+    return ResponseClass.Success(res, {
+      message: "Domain categories retrieved successfully",
+      data: result
     });
+  } catch (err) {
+    next(err);
+  }
 };
 
-const fetchDomainCategoryById = async (req, res) => {
+const fetchDomainCategoryById = async (req, res, next) => {
+  try {
     const category = await DomainCategoryService.fetchDomainCategoryById(req.params.id);
     return ResponseClass.Success(res, { message: "Domain category retrieved successfully", data: { category } });
+  } catch (err) {
+    next(err);
+  }
 };
 
-const deleteDomainCategoryById = async (req, res) => {
+const deleteDomainCategoryById = async (req, res, next) => {
+  try {
     await DomainCategoryService.deleteCategoryById(req.params.id);
     return ResponseClass.Success(res, { message: "Category and related data deleted" });
+  } catch (err) {
+    next(err);
+  }
 };
 
-const updateDomainCategoryById = async (req, res) => {
+const updateDomainCategoryById = async (req, res, next) => {
+  try {
 
     const { name, description } = req.body;
 
@@ -62,11 +83,19 @@ const updateDomainCategoryById = async (req, res) => {
     );
 
     return ResponseClass.Success(res, { message: "Domain category updated successfully", data: { domainCategory } });
+
+  } catch (err) {
+    next(err);
+  }
 };
 
-const deleteCategoryById = async (req, res) => {
+const deleteCategoryById = async (req, res, next) => {
+  try {
     await DomainCategoryService.deleteCategoryById(req.params.id);
     return ResponseClass.Success(res, { message: "Category and related data deleted" });
+  } catch (err) {
+    next(err);
+  }
 };
 
 module.exports = {

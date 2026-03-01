@@ -3,7 +3,9 @@ const DTUser = require('../models/dtUser.model');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
-const { sendPasswordResetEmail, sendPasswordResetConfirmationEmail } = require('../utils/passwordResetMailer');
+// const { sendPasswordResetEmail, sendPasswordResetConfirmationEmail } = require('../utils/passwordResetMailer');
+// Replaced with MailService:
+const MailService = require('../services/mail-service/mail-service');
 
 /**
  * Generate secure random token for password reset
@@ -65,7 +67,14 @@ const forgotPassword = async (req, res) => {
 
     // Send reset email
     try {
-      await sendPasswordResetEmail(
+      // await sendPasswordResetEmail(
+      //   user.email, 
+      //   user.firstname || user.username, 
+      //   resetToken, 
+      //   'user'
+      // );
+      // Replaced with MailService:
+      await MailService.sendPasswordResetEmailWithType(
         user.email, 
         user.firstname || user.username, 
         resetToken, 
@@ -164,7 +173,7 @@ const resetPassword = async (req, res) => {
 
     // Send confirmation email
     try {
-      await sendPasswordResetConfirmationEmail(
+      await mailService.sendPasswordResetConfirmationEmail(
         user.email, 
         user.firstname || user.username, 
         'user'
@@ -249,7 +258,14 @@ const dtUserForgotPassword = async (req, res) => {
 
     // Send reset email
     try {
-      await sendPasswordResetEmail(
+      // await sendPasswordResetEmail(
+      //   dtUser.email, 
+      //   dtUser.fullName, 
+      //   resetToken, 
+      //   'dtuser'
+      // );
+      // Replaced with MailService:
+      await MailService.sendPasswordResetEmailWithType(
         dtUser.email, 
         dtUser.fullName, 
         resetToken, 
@@ -349,7 +365,7 @@ const dtUserResetPassword = async (req, res) => {
 
     // Send confirmation email
     try {
-      await sendPasswordResetConfirmationEmail(
+      await mailService.sendPasswordResetConfirmationEmail(
         dtUser.email, 
         dtUser.fullName, 
         'dtuser'

@@ -16,11 +16,126 @@ const {
 } = require("../utils/authValidator");
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const { sendAdminVerificationEmail } = require("../utils/adminMailer");
-const { sendAnnotatorApprovalEmail, sendAnnotatorRejectionEmail } = require("../utils/annotatorMailer");
+// const { sendAdminVerificationEmail } = require("../utils/adminMailer");
+// Replaced with MailService methods
+// const { sendAnnotatorApprovalEmail, sendAnnotatorRejectionEmail } = require("../utils/annotatorMailer");
+// Replaced with MailService methods
 const adminVerificationStore = require("../utils/adminVerificationStore");
 const envConfig = require("../config/envConfig");
 const { RoleType } = require("../utils/role");
+const MailService = require("../services/mail-service/mail-service");
+
+// Function to send verification emails to all unverified users
+const sendVerificationEmailsToUnverifiedUsers = async (req, res) => {
+  try {
+    console.log('🔍 Starting bulk verification email process...');
+
+    // Find all users with unverified emails
+    const unverifiedUsers = await DTUser.find({ isEmailVerified: false })
+      .select('fullName email isEmailVerified _id')
+      .sort({ createdAt: -1 });
+
+    console.log(`📊 Found ${unverifiedUsers.length} unverified users`);
+
+    if (unverifiedUsers.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "No unverified users found",
+        data: {
+          totalProcessed: 0,
+          emailsSent: 0,
+          emailsFailed: 0,
+          users: []
+        }
+      });
+    }
+
+    let emailsSent = 0;
+    let emailsFailed = 0;
+    const processedUsers = [];
+
+    // Process each unverified user
+    for (const user of unverifiedUsers) {
+      try {
+        console.log(`📧 Sending verification email to: ${user.fullName} (${user.email})`);
+        
+        // Send verification email with timeout
+        const emailPromise = Promise.race([
+          MailService.sendVerificationEmail(user.email, user.fullName, user._id.toString()),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Email sending timeout')), 10000)
+          )
+        ]);
+
+        await emailPromise;
+        emailsSent++;
+
+        console.log(`✅ Email sent successfully to: ${user.fullName} (${user.email}) - isEmailVerified: ${user.isEmailVerified}`);
+        
+        processedUsers.push({
+          name: user.fullName,
+          email: user.email,
+          isEmailVerified: user.isEmailVerified,
+          emailSent: true
+        });
+
+      } catch (emailError) {
+        emailsFailed++;
+        console.error(`❌ Failed to send email to: ${user.fullName} (${user.email}) - Error: ${emailError.message}`);
+        
+        processedUsers.push({
+          name: user.fullName,
+          email: user.email,
+          isEmailVerified: user.isEmailVerified,
+          emailSent: false,
+          error: emailError.message
+        });
+      }
+
+      // Add small delay between emails to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    console.log(`📊 Bulk verification email process completed:`);
+    console.log(`📧 Total emails sent: ${emailsSent}`);
+    console.log(`❌ Total emails failed: ${emailsFailed}`);
+    console.log(`👥 Total users processed: ${unverifiedUsers.length}`);
+
+    // Return comprehensive results
+    if (res) {
+      res.status(200).json({
+        success: true,
+        message: `Bulk verification emails processed. ${emailsSent} sent, ${emailsFailed} failed.`,
+        data: {
+          totalProcessed: unverifiedUsers.length,
+          emailsSent,
+          emailsFailed,
+          users: processedUsers
+        }
+      });
+    }
+
+    return {
+      totalProcessed: unverifiedUsers.length,
+      emailsSent,
+      emailsFailed,
+      users: processedUsers
+    };
+
+  } catch (error) {
+    console.error("❌ Error in bulk verification email process:", error);
+    
+    if (res) {
+      res.status(500).json({
+        success: false,
+        message: "Server error during bulk verification email process",
+        error: error.message,
+      });
+    }
+    
+    throw error;
+  }
+};
 
 // Option 1: Send email with timeout (current implementation)
 const createDTUser = async (req, res) => {
@@ -47,8 +162,10 @@ const createDTUser = async (req, res) => {
     const savedUser = await newUser.save();
 
     // 4️⃣ Send verification email asynchronously with timeout
+    // FIXED: Use only one email service to prevent conflicts
     const emailPromise = Promise.race([
-      sendVerificationEmail(savedUser.email, savedUser.fullName, savedUser._id),
+      // sendVerificationEmail(savedUser.email, savedUser.fullName, savedUser._id), // Modern Brevo cascade system
+      MailService.sendVerificationEmail(savedUser.email, savedUser.fullName, savedUser._id.toString()), // Disabled: Old MailJet service
       new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Email sending timeout')), 15000)
       )
@@ -86,6 +203,7 @@ const createDTUser = async (req, res) => {
 // Option 2: Background email sending (recommended for production)
 const createDTUserWithBackgroundEmail = async (req, res) => {
   try {
+
     const { fullName, phone, email, domains, socialsFollowed, consent } = req.body;
 
     // 1️⃣ Check if user already exists
@@ -135,8 +253,6 @@ const verifyEmail = async (req, res) => {
 
     // Find user by ID and email for extra security
     const user = await DTUser.findById(id);
-
-    console.log(`🔍 User lookup result:`, user);
     
     if (!user) {
       console.log(`❌ User not found with ID: ${id}`);
@@ -304,9 +420,7 @@ const dtUserLogin = async (req, res) => {
     }
 
     const { email, password } = req.body;
-
-    console.log(`🔐 Login attempt for email: ${email}`);
-
+  
     // Find user by email
     const user = await DTUser.findOne({ email });
     
@@ -328,15 +442,17 @@ const dtUserLogin = async (req, res) => {
         
         // Send verification email with timeout
         const emailPromise = Promise.race([
-          sendVerificationEmail(user.email, user.fullName, user._id),
+          MailService.sendVerificationEmail(user.email, user.fullName, user._id.toString()),
+          // sendVerificationEmail(user.email, user.fullName, user._id),
           new Promise((_, reject) => 
             setTimeout(() => reject(new Error('Email sending timeout')), 10000)
           )
         ]);
-        
+
         await emailPromise;
+
         console.log(`✅ Verification email resent successfully to: ${email}`);
-        
+
         return res.status(400).json({ 
           success: false,
           message: "Please verify your email first. A new verification email has been sent to your inbox.",
@@ -345,7 +461,7 @@ const dtUserLogin = async (req, res) => {
         
       } catch (emailError) {
         console.error(`❌ Failed to resend verification email to ${email}:`, emailError.message);
-        
+
         return res.status(400).json({ 
           success: false,
           message: "Please verify your email first. Unable to resend verification email at this time.",
@@ -1546,12 +1662,12 @@ const approveAnnotator = async (req, res) => {
     try {
       if (newStatus === 'approved') {
         // Send annotator approval email
-        await sendAnnotatorApprovalEmail(user.email, user.fullName);
+        await MailService.sendAnnotatorApprovalEmail(user.email, user.fullName);
         console.log(`📧 Annotator approval email sent to: ${user.email}`);
         
       } else if (newStatus === 'rejected') {
         // Send micro tasker approval email (rejection from annotator but approval for micro tasks)
-        await sendAnnotatorRejectionEmail(user.email, user.fullName);
+        await MailService.sendAnnotatorRejectionEmail(user.email, user.fullName);
         console.log(`📧 Micro tasker approval email sent to: ${user.email}`);
       }
     } catch (emailError) {
@@ -1874,8 +1990,10 @@ const rejectAnnotator = async (req, res) => {
 
     // Send micro tasker approval email (soft rejection - they can still do micro tasks)
     try {
-      const { sendAnnotatorRejectionEmail } = require('../utils/annotatorMailer');
-      await sendAnnotatorRejectionEmail(user.email, user.fullName);
+      // const { sendAnnotatorRejectionEmail } = require('../utils/annotatorMailer');
+      // await sendAnnotatorRejectionEmail(user.email, user.fullName);
+      // Replaced with MailService:
+      await MailService.sendAnnotatorRejectionEmail(user.email, user.fullName);
       console.log(`📧 Micro tasker approval email sent to: ${user.email}`);
     } catch (emailError) {
       console.error(`❌ Failed to send notification email to ${user.email}:`, emailError);
@@ -2007,7 +2125,9 @@ const requestAdminVerification = async (req, res) => {
 
     // Send verification email
     try {
-      await sendAdminVerificationEmail(email, verificationCode, fullName);
+      // await sendAdminVerificationEmail(email, verificationCode, fullName);
+      // Replaced with MailService:
+      await MailService.sendAdminVerificationEmail(email, verificationCode, fullName);
       
       console.log(`✅ Admin verification email sent to: ${email}`);
 
@@ -2155,7 +2275,7 @@ const confirmAdminVerification = async (req, res) => {
       });
       
       // Send OTP email using admin mailer
-      await sendAdminVerificationEmail(newAdmin.email, otpCode, newAdmin.fullName);
+      await MailService.sendAdminVerificationEmail(newAdmin.email, otpCode, newAdmin.fullName);
       console.log(`✅ OTP code sent to admin email: ${email}`);
     } catch (emailError) {
       console.error(`❌ Failed to send OTP to admin: ${email}`, emailError);
@@ -2283,7 +2403,9 @@ const createAdmin = async (req, res) => {
       });
       
       // Send OTP email using admin mailer
-      await sendAdminVerificationEmail(newAdmin.email, otpCode, newAdmin.fullName);
+      // await sendAdminVerificationEmail(newAdmin.email, otpCode, newAdmin.fullName);
+      // Replaced with MailService:
+      await MailService.sendAdminVerificationEmail(newAdmin.email, otpCode, newAdmin.fullName);
       console.log(`✅ OTP code sent to admin email: ${email}`);
     } catch (emailError) {
       console.error(`❌ Failed to send OTP to admin: ${email}`, emailError);
@@ -2580,10 +2702,11 @@ const resendVerificationEmail = async (req, res) => {
           setTimeout(() => reject(new Error('Email sending timeout')), 15000)
         )
       ]);
-      
+
       await emailPromise;
+
       console.log(`✅ Verification email resent successfully to: ${email}`);
-      
+
       res.status(200).json({
         success: true,
         message: "Verification email sent successfully. Please check your inbox.",
@@ -2592,7 +2715,7 @@ const resendVerificationEmail = async (req, res) => {
       
     } catch (emailError) {
       console.error(`❌ Failed to resend verification email to ${email}:`, emailError.message);
-      
+
       res.status(500).json({
         success: false,
         message: "Failed to send verification email. Please try again later.",
@@ -3011,21 +3134,32 @@ const applyToProject = async (req, res) => {
           });
 
           // Send assessment invitation email
-          const { sendAssessmentInvitation } = require('../utils/emailService');
-          const assessmentLink = `${(envConfig.FRONTEND_URL || 'https://app.mydeeptech.ng')}/assessment/${assessmentConfig._id}`;
+          // const { sendAssessmentInvitation } = require('../utils/emailService');
+          // const assessmentLink = `${(envConfig.FRONTEND_URL || 'https://app.mydeeptech.ng')}/assessment/${assessmentConfig._id}`;
           
-          await sendAssessmentInvitation({
-            userEmail: user.email,
-            userName: user.fullName,
-            assessmentTitle: assessmentConfig.title,
-            projectTitle: project.projectName,
-            assessmentLink,
-            estimatedDuration: assessmentConfig.estimatedDuration,
-            numberOfTasks: assessmentConfig.numberOfTasks,
-            deadline: assessmentConfig.deadline,
-            attemptNumber: (user.multimediaAssessmentAttempts || 0) + 1,
-            maxRetries: assessmentConfig.maxRetries
-          });
+          // await sendAssessmentInvitation({
+          //   userEmail: user.email,
+          //   userName: user.fullName,
+          //   assessmentTitle: assessmentConfig.title,
+          //   projectTitle: project.projectName,
+          //   assessmentLink,
+          //   estimatedDuration: assessmentConfig.estimatedDuration,
+          //   numberOfTasks: assessmentConfig.numberOfTasks,
+          //   deadline: assessmentConfig.deadline,
+          //   attemptNumber: (user.multimediaAssessmentAttempts || 0) + 1,
+          //   maxRetries: assessmentConfig.maxRetries
+          // });
+          
+          // Replaced with MailService:
+          await MailService.sendAssessmentInvitationEmail(
+            user.email,
+            user.fullName,
+            {
+              title: assessmentConfig.title,
+              timeLimit: assessmentConfig.estimatedDuration || '60 minutes',
+              description: `Complete assessment for ${project.projectName}`
+            }
+          );
 
           assessmentTriggered = true;
           console.log(`📧 Assessment invitation sent to ${user.email} for project: ${project.projectName}`);
@@ -3091,7 +3225,7 @@ const applyToProject = async (req, res) => {
 
         // Send notification to project creator
         if (projectWithAdmins.createdBy) {
-          await sendProjectApplicationNotification(
+          await mailService.sendProjectApplicationNotification(
             projectWithAdmins.createdBy.email,
             projectWithAdmins.createdBy.fullName,
             applicationData
@@ -3101,7 +3235,7 @@ const applyToProject = async (req, res) => {
         // Send notification to assigned admins (excluding creator to avoid duplicate)
         for (const admin of projectWithAdmins.assignedAdmins) {
           if (admin._id.toString() !== projectWithAdmins.createdBy._id.toString()) {
-            await sendProjectApplicationNotification(
+            await MailService.sendProjectApplicationNotification(
               admin.email,
               admin.fullName,
               applicationData
@@ -4615,6 +4749,7 @@ module.exports = {
   updateDTUserProfile,
   resetDTUserPassword,
   resendVerificationEmail,
+  sendVerificationEmailsToUnverifiedUsers,
   getDTUser,
   getAllDTUsers,
   getAllAdminUsers,

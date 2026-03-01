@@ -217,7 +217,6 @@ const qaReviewSchema = new mongoose.Schema({
 });
 
 // Indexes for performance
-qaReviewSchema.index({ submissionId: 1 }, { unique: true });
 qaReviewSchema.index({ reviewerId: 1, reviewedAt: -1 });
 qaReviewSchema.index({ decision: 1, reviewedAt: -1 });
 qaReviewSchema.index({ overallScore: 1 });

@@ -3,7 +3,9 @@ const DTUser = require('../models/dtUser.model');
 const User = require('../models/user');
 const { createNotification } = require('../utils/notificationService');
 const { getOnlineAdminsCount, broadcastToAdmins } = require('../utils/chatSocketService');
-const { sendNewTicketNotificationToAdmin, sendOfflineAgentNotification } = require('../utils/supportEmailTemplates');
+// const { sendNewTicketNotificationToAdmin, sendOfflineAgentNotification } = require('../utils/supportEmailTemplates');
+// Replaced with MailService:
+const MailService = require('../services/mail-service/mail-service');
 
 /**
  * Start a new chat session (creates ticket automatically)
@@ -148,7 +150,9 @@ const startChatSession = async (req, res) => {
       });
     } else {
       // Send urgent email to support team for offline agents
-      await sendOfflineAgentNotification('support@mydeeptech.ng', ticket, user);
+      // await sendOfflineAgentNotification('support@mydeeptech.ng', ticket, user);
+      // Replaced with MailService:
+      await MailService.sendadminSupportTicketNotification('support@mydeeptech.ng', 'Support Team', ticket, user);
     }
 
     // Create notification for user

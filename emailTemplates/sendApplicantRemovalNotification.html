@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Removed from Project</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.6;
+            background-color: #f4f7fa;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
+            color: white;
+            text-align: center;
+            padding: 30px 20px;
+        }
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .message {
+            font-size: 16px;
+            margin-bottom: 25px;
+        }
+        .removal-details {
+            background-color: #fff3cd;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #ffc107;
+            margin: 25px 0;
+        }
+        .detail-row {
+            margin-bottom: 10px;
+        }
+        .label {
+            font-weight: 600;
+            color: #856404;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            text-align: center;
+            padding: 20px;
+            border-top: 1px solid #e9ecef;
+            font-size: 14px;
+            color: #6c757d;
+        }
+        .brand {
+            color: #ffc107;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📋 Project Status Update</h1>
+        </div>
+        
+        <div class="content">
+            <p class="message">Hello {{applicantName}},</p>
+            
+            <p class="message">We regret to inform you that you have been removed from the following project:</p>
+            
+            <div class="removal-details">
+                <div class="detail-row">
+                    <span class="label">Project:</span> {{projectName}}
+                </div>
+                <div class="detail-row">
+                    <span class="label">Project ID:</span> {{projectId}}
+                </div>
+                <div class="detail-row">
+                    <span class="label">Removed by:</span> {{removedBy}}
+                </div>
+                <div class="detail-row">
+                    <span class="label">Date:</span> {{removedAt}}
+                </div>
+                {{#if removalReason}}
+                <div class="detail-row" style="margin-top: 15px;">
+                    <span class="label">Reason:</span><br>
+                    <div style="margin-top: 5px;">{{removalReason}}</div>
+                </div>
+                {{/if}}
+            </div>
+            
+            <p class="message">If you believe this removal was in error, please contact our support team.</p>
+            
+            <p class="message">You are welcome to apply for other available projects on our platform.</p>
+            
+            <p class="message" style="margin-top: 30px;">
+                Best regards,<br>
+                <span class="brand">The MyDeeptech Team</span>
+            </p>
+        </div>
+        
+        <div class="footer">
+            <p>&copy; 2024 MyDeeptech. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

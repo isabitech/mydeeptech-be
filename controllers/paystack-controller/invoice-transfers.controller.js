@@ -155,10 +155,10 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
         let ngnAmount = await convertUSDToNGN(usdAmount);
         
         // TEST MODE: Override with smaller amounts for testing
-        const isTestMode = process.env.PAYSTACK_SECRET_KEY?.startsWith('sk_test_');
-        if (isTestMode && ngnAmount > 2000) {
-          ngnAmount = Math.min(ngnAmount, 500); // Cap at ₦500 for testing
-        }
+        // const isTestMode = process.env.PAYSTACK_SECRET_KEY?.startsWith('sk_test_');
+        // if (isTestMode && ngnAmount > 2000) {
+        //   ngnAmount = Math.min(ngnAmount, 500); // Cap at ₦500 for testing
+        // }
 
         totalUSDAmount += usdAmount;
         totalNGNAmount += ngnAmount;
