@@ -39,6 +39,7 @@ const envConfig = {
   },
 
   email: {
+    defaultProvider: env.EMAIL_PROVIDER || 'brevo', // 'mailjet' or 'brevo'
     mailjet: {
       MAILJET_API_KEY: env.MAILJET_API_KEY,
       MAILJET_SECRET_KEY: env.MAILJET_SECRET_KEY,

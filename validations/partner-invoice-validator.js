@@ -1,5 +1,10 @@
 const Joi = require('joi');
 
+
+const IdFieldSchema = Joi.string().regex(/^[0-9a-fA-F]{24}$/).required().messages({
+        'string.pattern.base': 'ID must be a valid MongoDB ObjectId'
+    });
+
 const createInvoiceSchema = Joi.object({
     name: Joi.string().trim().min(2).max(100).required(),
     email: Joi.string().email().required(),
@@ -18,14 +23,22 @@ const updateInvoiceSchema = Joi.object({
     duration: Joi.string().trim().optional(),
 }).min(1);
 
-const IdSchema = Joi.object({
-    id: Joi.string().regex(/^[0-9a-fA-F]{24}$/).required().messages({
-        'string.pattern.base': 'ID must be a valid MongoDB ObjectId'
-    })
-});
+
+const IdSchema = Joi.object({ id: IdFieldSchema });
+
+const validateIdParamSchema = (fieldName = "id") => {
+    return Joi.object({
+            [fieldName]: Joi.string().regex(/^[0-9a-fA-F]{24}$/).required().messages({
+            'string.pattern.base': `${fieldName} must be a valid MongoDB ObjectId`
+        })
+    });
+}
+
+
 
 module.exports = {
     createInvoiceSchema,
     updateInvoiceSchema,
-    IdSchema
+    IdSchema,
+    validateIdParamSchema,
 };

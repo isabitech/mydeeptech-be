@@ -93,22 +93,6 @@ class MailService {
     static async sendPartnerInvoiceEmail(recipientEmail, recipientName, invoiceData) {
         return await InvoiceMailService.sendPartnerInvoiceEmail(recipientEmail, recipientName, invoiceData);
     }
-
-    // Legacy methods for backward compatibility
-    static async sendProjectUpdateEmail(recipientEmail, recipientName, projectId, updateDetails) {
-        // TODO: Implement if needed
-        console.log('sendProjectUpdateEmail - Not implemented yet');
-    }
-
-    static async sendResultSubmissionNotification(recipientEmail, recipientName, submissionId) {
-        // TODO: Implement if needed
-        console.log('sendResultSubmissionNotification - Not implemented yet');
-    }
-
-    static async sendGeneralNotification(recipientEmail, recipientName, subject, message) {
-        // TODO: Implement if needed
-        console.log('sendGeneralNotification - Not implemented yet');
-    }
 }
 
 module.exports = MailService;
