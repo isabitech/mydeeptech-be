@@ -1078,9 +1078,6 @@ const getAnnotationProjectApplications = async (req, res) => {
     // Calculate pagination info
     const totalPages = Math.ceil(totalApplications / limit);
 
-
-    console.log(JSON.stringify({applications}, null, 2));
-
     res.status(200).json({
       success: true,
       message: `Retrieved ${applications.length} applications${search ? ` matching search: "${search}"` : ''}`,
@@ -1168,6 +1165,7 @@ const approveAnnotationProjectApplication = async (req, res) => {
 
     // Send approval email to applicant
     try {
+
       const { sendProjectApprovalNotification } = require('../utils/projectMailer');
 
       const projectData = {

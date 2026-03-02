@@ -32,6 +32,7 @@ const newDomainsRoute = require('./routes/domain.routes');
 const envConfig = require('./config/envConfig');
 const partnerInvoiceRoute = require('./routes/partnerInvoice.routes');
 const paymentRoutes = require('./routes/payment.routes');
+const exchangeRateRoutes = require('./routes/exchangeRate.routes');
 const { healthCheck } = require('./controllers/health-check.controller');
 const { corsOptions } = require('./utils/cors-options.utils');
 const errorMiddleware = require('./middleware/error.middleware');
@@ -54,6 +55,10 @@ app.get("/health", healthCheck);
 
 // Middleware
 app.use(cors(corsOptions));
+
+// Handle webhook routes with raw body (BEFORE express.json())
+app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -88,6 +93,7 @@ app.use('/api/domain', domainsRoute);
 app.use('/api/new-domain', newDomainsRoute);
 app.use('/api/partner-invoice', partnerInvoiceRoute);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/exchange-rate-by-country', exchangeRateRoutes);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);

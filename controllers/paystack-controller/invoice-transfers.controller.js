@@ -1,6 +1,8 @@
 const PaystackTransferService = require("../../services/paystack-transfer.service");
 const ResponseClass = require("../../utils/response-handler");
 const Invoice = require("../../models/invoice.model");
+const DTUser = require("../../models/dtUser.model");
+const PaymentNotificationService = require("../../services/mail-service/payment-notification.service");
 const { convertUSDToNGN } = require("../../utils/exchangeRateService");
 
 
@@ -11,14 +13,23 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
       transfers, // Array of transfer objects with invoiceIds and user details
       currency = 'NGN',
       source = 'balance',
-      metadata = {}
+      metadata = {},
+      exchangeRate: frontendExchangeRate
     } = req.body;
+
+    // console.log({ body: JSON.stringify(req.body, null, 2) });
+
+    // return res.status(200).json({
+    //   success: true,
+    //   message: "Bulk transfer with invoice-based payments is currently under development. Please check back later or contact support for assistance.",
+    //   data: null
+    // });
 
     if(!req.user?.userId) {
       return ResponseClass.Error(res, {
         message: "Unauthorized: User information missing in request",
         statusCode: 401
-      }); 
+      });
     }
 
     // Validate input
@@ -112,19 +123,22 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
     // Test exchange rate API first
 
     let exchangeRate;
-    try {
-      exchangeRate = await convertUSDToNGN(1); // Test with $1
-
-    } catch (rateError) {
-      return ResponseClass.Error(res, {
-        message: "Cannot process transfers due to exchange rate service failure",
-        statusCode: 503,
-        error: "Exchange rate service unavailable",
-        details: {
-          exchangeRateError: rateError.message,
-          message: "Please try again later or contact support if the issue persists"
-        }
-      });
+    if (typeof frontendExchangeRate === 'number' && frontendExchangeRate > 0) {
+      exchangeRate = Number(Number(frontendExchangeRate).toFixed(2));
+    } else {
+      try {
+        exchangeRate = await convertUSDToNGN(1); // Test with $1
+      } catch (rateError) {
+        return ResponseClass.Error(res, {
+          message: "Cannot process transfers due to exchange rate service failure",
+          statusCode: 503,
+          error: "Exchange rate service unavailable",
+          details: {
+            exchangeRateError: rateError.message,
+            message: "Please try again later or contact support if the issue persists"
+          }
+        });
+      }
     }
 
     // Create mapping between transfer requests and invoices
@@ -141,8 +155,8 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
 
     // Process transfers with currency conversion
 
-
     const processedTransfers = [];
+    const invoiceAmountMap = new Map(); // Store calculated NGN amounts to avoid duplicate API calls
     const batchId = `bulk_transfer_invoice_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     let totalUSDAmount = 0;
     let totalNGNAmount = 0;
@@ -152,7 +166,19 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
       try {
         // Convert USD amount to NGN
         const usdAmount = invoice.invoiceAmount;
-        let ngnAmount = await convertUSDToNGN(usdAmount);
+        let ngnAmount;
+        if (typeof exchangeRate === 'number' && exchangeRate > 0) {
+          ngnAmount = usdAmount * exchangeRate;
+        } else {
+          ngnAmount = await convertUSDToNGN(usdAmount);
+        }
+        
+        // Store the calculated NGN amount for later use in email notifications
+        invoiceAmountMap.set(invoice._id.toString(), {
+          usdAmount,
+          ngnAmount,
+          exchangeRate: ngnAmount / usdAmount
+        });
         
         // TEST MODE: Override with smaller amounts for testing
         // const isTestMode = process.env.PAYSTACK_SECRET_KEY?.startsWith('sk_test_');
@@ -237,8 +263,10 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
       });
     }
 
+    // Debug: Log processedTransfers and return early for inspection
+    // console.log('Processed transfers payload for Paystack:', JSON.stringify(processedTransfers, null, 2));
+    
     // Initiate bulk transfer with Paystack
-
     let bulkTransferResponse;
     try {
       bulkTransferResponse = await PaystackTransferService.initiateBulkTransfer({
@@ -257,7 +285,7 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
       });
 
     } catch (transferError) {
-      console.error(res, '❌ Paystack bulk transfer failed:', transferError);
+      console.error('❌ Paystack bulk transfer failed:', transferError);
 
       return ResponseClass.Error(res, {
         message: transferError?.message ?? "Bulk transfer initiation failed",
@@ -271,64 +299,91 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
       });
     }
 
-    // Mark invoices as paid after successful Paystack transfer
-
-    const paidInvoices = [];
+    // Mark invoices as payment initiated (will be confirmed by webhook)
+    const initiatedInvoices = [];
+    
     for (const invoice of invoices) {
       try {
         const transferRequest = transfers.find(t => t.invoiceId === invoice._id.toString());
-        await invoice.markAsPaid({
-          paymentMethod: 'bulk_transfer',
-          paymentReference: `TXN-${invoice.invoiceNumber}-${Date.now()}`,
-          paymentNotes: `Bulk transfer payment via Paystack. Batch ID: ${batchId}. Converted from $${invoice.invoiceAmount} USD to NGN.`
-        });
+        const amountData = invoiceAmountMap.get(invoice._id.toString());
+        
+        if (!amountData) {
+          throw new Error(`Amount data not found for invoice ${invoice.invoiceNumber}`);
+        }
 
-        paidInvoices.push({
+        // Update invoice status to indicate payment is being processed
+        invoice.paymentStatus = 'payment_initiated';
+        invoice.paymentMetadata = {
+          batchId,
+          paystackBatchId: bulkTransferResponse.batchId || bulkTransferResponse.data?.batch_id,
+          transferReference: `TXN-${invoice.invoiceNumber}-${Date.now()}`,
+          usdAmount: amountData.usdAmount,
+          ngnAmount: amountData.ngnAmount,
+          exchangeRate: amountData.exchangeRate,
+          recipientEmail: transferRequest.recipientEmail,
+          recipientName: transferRequest.recipientName,
+          initiatedAt: new Date(),
+          initiatedBy: req.user?.userId || req.user?.id
+        };
+        
+        await invoice.save();
+
+        initiatedInvoices.push({
           invoiceId: invoice._id,
           invoiceNumber: invoice.invoiceNumber,
           recipient: transferRequest.recipientName,
-          usdAmount: invoice.invoiceAmount,
-          ngnAmount: await convertUSDToNGN(invoice.invoiceAmount),
-          status: 'paid'
+          usdAmount: amountData.usdAmount,
+          ngnAmount: amountData.ngnAmount,
+          status: 'payment_initiated'
         });
 
+        console.log(`✅ Payment initiated for invoice ${invoice.invoiceNumber} - awaiting Paystack confirmation`);
 
       } catch (error) {
-        console.error(res, `❌ Error marking invoice ${invoice.invoiceNumber} as paid:`, error);
+        console.error(`❌ Error marking invoice ${invoice.invoiceNumber} as payment initiated:`, error);
         errors.push({
           invoiceId: invoice._id,
           invoiceNumber: invoice.invoiceNumber,
-          error: 'Failed to mark as paid',
+          error: 'Failed to mark as payment initiated',
           details: error.message
         });
       }
     }
 
-    // Return success response
+    console.log(`🔄 Bulk transfer initiated - payments will be confirmed via Paystack webhooks`);
+    console.log(`📧 Email notifications will be sent after webhook confirmation`);
+
+    // Return transfer initiation response
     const responseData = {
       success: true,
       batchId,
       paystackBatchId: bulkTransferResponse.batchId || bulkTransferResponse.data?.batch_id,
       transferCode: bulkTransferResponse.data?.transfer_code,
+      status: 'transfers_initiated',
       summary: {
         totalTransfers: processedTransfers.length,
-        successfulTransfers: paidInvoices.length,
+        initiatedTransfers: initiatedInvoices.length,
         totalUSDAmount: totalUSDAmount.toFixed(2),
         totalNGNAmount: totalNGNAmount.toFixed(2),
         exchangeRateUsed: (totalNGNAmount / totalUSDAmount).toFixed(2),
-        conversionDate: new Date()
+        initiatedAt: new Date()
       },
-      paidInvoices,
+      initiatedInvoices,
       errors: errors.length > 0 ? errors : undefined,
       paystackResponse: {
         status: bulkTransferResponse.success,
         message: bulkTransferResponse.message || 'Bulk transfer initiated',
         reference: bulkTransferResponse.reference
+      },
+      webhookInfo: {
+        message: 'Transfers have been initiated with Paystack. Payment confirmations and email notifications will be sent when Paystack webhooks confirm successful transfers.',
+        webhookUrl: '/api/payments/webhook',
+        statusTracking: `Monitor transfer status using batch ID: ${batchId}`
       }
     };
 
     return ResponseClass.Success(res, {
-      message: `Bulk transfer completed successfully. ${paidInvoices.length} invoices paid.`,
+      message: `Bulk transfer initiated successfully. ${initiatedInvoices.length} transfers submitted to Paystack. Payment confirmations and email notifications will be sent via webhooks.`,
       data: responseData
     });
 };

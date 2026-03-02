@@ -316,8 +316,6 @@ invoiceSchema.statics.getInvoiceStats = async function(dtUserId, adminId = null)
     }
   ]);
   
-  console.log(`📊 Raw aggregation result:`, stats);
-  
   const result = stats[0] || {
     totalInvoices: 0,
     totalAmount: 0,

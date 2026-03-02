@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+        .content { background: #fff; padding: 30px; border: 1px solid #ddd; }
+        .summary-box { background: #e3f2fd; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #007bff; }
+        .summary-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #90caf9; }
+        .summary-item:last-child { border-bottom: none; font-weight: bold; }
+        .success-rate { color: #28a745; font-weight: bold; font-size: 1.2em; }
+        .table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        .table th { background: #f8f9fa; padding: 12px; text-align: left; border: 1px solid #ddd; font-weight: bold; }
+        .table td { padding: 12px; border: 1px solid #ddd; }
+        .footer { background: #f8f9fa; padding: 20px; text-align: center; border-radius: 0 0 10px 10px; color: #666; font-size: 14px; }
+        .highlight { background: #d4edda; border: 1px solid #c3e6cb; padding: 15px; border-radius: 5px; margin: 15px 0; }
+        .warning { background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 15px 0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📊 Bulk Payment Complete</h1>
+        <p>Paystack Bulk Transfer Summary Report</p>
+    </div>
+    
+    <div class="content">
+        <h2>Hello {{adminName}},</h2>
+        
+        <p>Your bulk payment transfer has been completed successfully. Below is the detailed summary of all processed payments.</p>
+        
+        <div class="summary-box">
+            <h3>💰 Payment Summary</h3>
+            <div class="summary-item">
+                <span>Batch ID:</span>
+                <span><strong>{{batchId}}</strong></span>
+            </div>
+            <div class="summary-item">
+                <span>Paystack Batch ID:</span>
+                <span><strong>{{paystackBatchId}}</strong></span>
+            </div>
+            <div class="summary-item">
+                <span>Total Transfers Initiated:</span>
+                <span><strong>{{totalTransfers}}</strong></span>
+            </div>
+            <div class="summary-item">
+                <span>Successful Transfers:</span>
+                <span class="success-rate">{{successfulTransfers}}/{{totalTransfers}} ({{successRate}}%)</span>
+            </div>
+            <div class="summary-item">
+                <span>Total Amount (USD):</span>
+                <span><strong>{{formattedTotalUSD}}</strong></span>
+            </div>
+            <div class="summary-item">
+                <span>Total Amount Sent (NGN):</span>
+                <span><strong>{{formattedTotalNGN}}</strong></span>
+            </div>
+            <div class="summary-item">
+                <span>Exchange Rate Used:</span>
+                <span><strong>₦{{exchangeRate}} per $1</strong></span>
+            </div>
+            <div class="summary-item">
+                <span>Processed At:</span>
+                <span><strong>{{formattedDate}}</strong></span>
+            </div>
+        </div>
+
+        <div class="highlight">
+            <h4>✅ Successfully Processed Payments</h4>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Invoice Number</th>
+                        <th>Recipient</th>
+                        <th>Amount (USD)</th>
+                        <th>Amount (NGN)</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{invoiceRows}}
+                </tbody>
+            </table>
+            <p><strong>📧 Email Notifications:</strong> All recipients have been sent payment confirmation emails with transaction details.</p>
+        </div>
+
+        {{#if hasErrors}}
+        <div class="warning">
+            <h4>⚠️ Failed Transfers ({{errorCount}})</h4>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Invoice Number</th>
+                        <th>Recipient</th>
+                        <th>Amount (USD)</th>
+                        <th>Amount (NGN)</th>
+                        <th>Error</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{errorRows}}
+                </tbody>
+            </table>
+            <p><strong>⚠️ Action Required:</strong> Please review the failed transfers and retry them individually or contact the Paystack support team.</p>
+        </div>
+        {{/if}}
+
+        <div class="highlight">
+            <h4>🏦 Transfer Timeline</h4>
+            <ul>
+                <li><strong>Initiation:</strong> Transfers have been submitted to Paystack</li>
+                <li><strong>Processing:</strong> Paystack is processing the transfers (usually within minutes)</li>
+                <li><strong>Bank Transfer:</strong> Recipients will receive funds in their bank accounts within 1-2 business days</li>
+                <li><strong>Confirmation:</strong> Recipients will receive SMS notifications from their banks</li>
+            </ul>
+        </div>
+
+        <p><strong>Additional Notes:</strong></p>
+        <ul>
+            <li>All successful invoices have been marked as <strong>PAID</strong> in the system</li>
+            <li>Recipients have been notified via email about their payments</li>
+            <li>You can track individual transfer statuses in the Paystack dashboard</li>
+            <li>All payment receipts are available in the admin dashboard</li>
+        </ul>
+        
+        <p><strong>Need Support?</strong><br>
+        Contact the payments team at <a href="mailto:payments@mydeeptech.ng">payments@mydeeptech.ng</a> with batch ID: <strong>{{batchId}}</strong></p>
+    </div>
+    
+    <!-- <div class="footer">
+        <p>© 2025 MyDeepTech. All rights reserved.</p>
+    </div> -->
+    
+    <div class="footer">
+         <p><strong>MyDeepTech Admin Notifications</strong></p>
+         <p>Automated bulk payment report</p>
+        <p>&copy; <span id="year"></span> MyDeepTech. All rights reserved.</p>
+    </div>
+</div>
+
+        <!-- Inline JavaScript -->
+        <script>
+            document.getElementById("year").textContent = new Date().getFullYear();
+        </script>
+</body>
+</html>
