@@ -1,5 +1,6 @@
 const axios = require('axios');
 const envConfig = require('../config/envConfig');
+const { getServiceStatus } = require('../utils/exchangeRateService');
 
 // GET /api/exchange-rate?country=Nigeria
 const countryCurrencyMap = {
@@ -41,5 +42,38 @@ exports.getExchangeRate = async (req, res) => {
   } catch (err) {
     console.error('Exchange rate API error:', err);
     return res.status(500).json({ success: false, message: 'Failed to fetch exchange rate', data: null });
+  }
+};
+
+/**
+ * GET /api/exchange-rate/health
+ * Health check endpoint for exchange rate service
+ */
+exports.getExchangeRateHealth = async (req, res) => {
+  try {
+    const status = getServiceStatus();
+    
+    // Determine overall health status
+    const isHealthy = !status.rateLimit.isCircuitBreakerActive && 
+                      (!status.rateLimit.isRateLimited || status.cache.rate);
+    
+    const httpStatus = isHealthy ? 200 : 503;
+    
+    return res.status(httpStatus).json({
+      success: isHealthy,
+      message: isHealthy ? 'Exchange rate service is healthy' : 'Exchange rate service has issues',
+      data: {
+        status: isHealthy ? 'healthy' : 'degraded',
+        timestamp: new Date().toISOString(),
+        ...status
+      }
+    });
+  } catch (error) {
+    console.error('Exchange rate health check error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Health check failed',
+      data: { error: error.message }
+    });
   }
 };
