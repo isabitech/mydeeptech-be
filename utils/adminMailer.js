@@ -2,6 +2,7 @@ const { sendEmail } = require('./brevoSMTP');
 
 const sendAdminVerificationEmail = async (email, verificationCode, adminName) => {
     try {
+
         console.log(`📧 Sending admin verification email to: ${email}`);
 
         const emailData = {
