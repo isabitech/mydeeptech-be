@@ -514,6 +514,11 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
     });
 };
 
+const TransferApproved = async (req, res) => {
+  return res.status(200);
+}
+
 module.exports = {
-  initializeBulkTransferWithInvoices
+  initializeBulkTransferWithInvoices,
+  TransferApproved
 };

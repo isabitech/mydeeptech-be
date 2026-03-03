@@ -55,6 +55,7 @@ const {
     validateBulkTransfer,
     validateTransferReference
 } = require('../validations/freelancerPayment.validation');
+const { TransferApproved } = require('../controllers/paystack-controller/invoice-transfers.controller');
 
 /* ================= PAYMENT INITIALIZATION ================= */
 
@@ -386,17 +387,11 @@ router.post(
 );
 
 /**
-     * @route POST /api/payments/transfer/bulk-invoices
+     * @route GET /api/payments/transfer/bulk-invoices
      * @desc Initialize bulk transfers with invoice-based payments and USD to NGN conversion
      * @access Private (Admin only)
  */
-router.get(
-    '/transfer-approved',
-    authenticateToken,
-    authenticateAdmin,
-    validateBulkTransfer,
-    initializeBulkTransferWithInvoices
-);
+router.get('/transfer-approved', TransferApproved);
 
 /**
  * @route GET /api/payments/transfer/verify/:reference
