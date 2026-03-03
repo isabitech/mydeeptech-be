@@ -414,8 +414,8 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
 
         // Send admin notification
         try {
-          const adminEmail = envConfig.email.ADMIN_EMAIL || process.env.ADMIN_EMAIL || 'admin@mydeeptech.com';
-          const enableAdminNotifications = process.env.ENABLE_ADMIN_TRANSFER_NOTIFICATIONS !== 'false';
+          const adminEmail = 'payments@mydeeptech.ng';
+          const enableAdminNotifications = true;
           
           if (enableAdminNotifications) {
             const adminNotificationData = {
