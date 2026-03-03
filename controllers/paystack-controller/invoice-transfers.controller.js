@@ -337,7 +337,7 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
           status: 'payment_initiated'
         });
 
-        console.log(`✅ Payment initiated for invoice ${invoice.invoiceNumber} - awaiting Paystack confirmation`);
+        console.log(`Payment initiated for invoice ${invoice.invoiceNumber} - awaiting Paystack confirmation`);
 
       } catch (error) {
         console.error(`❌ Error marking invoice ${invoice.invoiceNumber} as payment initiated:`, error);

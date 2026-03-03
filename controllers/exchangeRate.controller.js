@@ -1,6 +1,8 @@
 const axios = require('axios');
 const envConfig = require('../config/envConfig');
 const { getServiceStatus } = require('../utils/exchangeRateService');
+const ResponseClass = require('../utils/response-handler');
+const ErrorMessage = require('../utils/error-message');
 
 // GET /api/exchange-rate?country=Nigeria
 const countryCurrencyMap = {
@@ -37,11 +39,12 @@ exports.getExchangeRate = async (req, res) => {
     if (response.data && response.data.rates && rate) {
       return res.json({ success: true, message: "Exchange rate fetched successfully", data: { country, currency, rate } });
     } else {
-      return res.status(404).json({ success: false, message: 'Rate not found', data: null });
+       console.error('Rate not found');
+      return ResponseClass.Error(res, { message: 'Rate not found', statusCode: 404 });
     }
   } catch (err) {
-    console.error('Exchange rate API error:', err);
-    return res.status(500).json({ success: false, message: 'Failed to fetch exchange rate', data: null });
+    console.error('Exchange rate API error:', ErrorMessage(err));
+    return ResponseClass.Error(res, { message: 'Failed to fetch exchange rate', statusCode: 500, stack: err.stack ? err.stack : err });
   }
 };
 
@@ -69,11 +72,7 @@ exports.getExchangeRateHealth = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Exchange rate health check error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Health check failed',
-      data: { error: error.message }
-    });
+    console.error('Exchange rate health check error:', ErrorMessage(error));
+    return ResponseClass.Error(res, { message: 'Health check failed', statusCode: 500, message: error.message, stack: error.stack });
   }
 };
