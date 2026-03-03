@@ -434,7 +434,11 @@ const bulkTransferPayloadSchema = Joi.object({
   .required()
   .messages({
     'any.required': 'Metadata is required'
-  })
+  }),
+
+  exchangeRate: Joi.number().positive().precision(6).optional().messages({
+    'number.positive': 'Frontend exchange rate must be greater than 0'
+  }),
   
   // Note: initiatedBy is automatically populated from req.user.id by the server
 });

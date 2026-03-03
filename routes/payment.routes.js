@@ -55,6 +55,7 @@ const {
     validateBulkTransfer,
     validateTransferReference
 } = require('../validations/freelancerPayment.validation');
+const { TransferApproved } = require('../controllers/paystack-controller/invoice-transfers.controller');
 
 /* ================= PAYMENT INITIALIZATION ================= */
 
@@ -373,9 +374,9 @@ router.post(
 );
 
 /**
-     * @route POST /api/payments/transfer/bulk-invoices
-     * @desc Initialize bulk transfers with invoice-based payments and USD to NGN conversion
-     * @access Private (Admin only)
+ * @route POST /api/payments/bulk-transfer-with-invoices
+ * @desc Initialize bulk transfers with invoice-based payments and USD to NGN conversion
+ * @access Private (Admin only)
  */
 router.post(
     '/bulk-transfer-with-invoices',
@@ -383,6 +384,30 @@ router.post(
     authenticateAdmin,
     validateBulkTransfer,
     initializeBulkTransferWithInvoices
+);
+
+/**
+ * @route POST /api/payments/transfer/approve-complete/:batchId
+ * @desc Mark transfers as completed after manual Paystack approval
+ * @access Private (Admin only)
+ */
+router.post(
+    '/transfer/approve-complete/:batchId',
+    authenticateToken,
+    authenticateAdmin,
+    require('../controllers/paystack-controller/invoice-transfers.controller').completeApprovedTransfers
+);
+
+/**
+ * @route GET /api/payments/transfer/pending-approval
+ * @desc Get all transfers pending approval
+ * @access Private (Admin only)
+ */
+router.get(
+    '/transfer/pending-approval',
+    authenticateToken,
+    authenticateAdmin,
+    require('../controllers/paystack-controller/invoice-transfers.controller').getPendingApprovalTransfers
 );
 
 /**

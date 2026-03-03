@@ -273,8 +273,6 @@ class PaystackTransferService {
         })
       };
 
-
-
       const transferResponse = await axios.post(
         `${service.baseURL}/transfer/bulk`,
         bulkTransferPayload,

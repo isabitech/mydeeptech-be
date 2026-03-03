@@ -3023,7 +3023,8 @@ const applyToProject = async (req, res) => {
     console.log(`✅ User ${req.user.email} approved for project application with resume: ${user.attachments.resume_url}`);
 
     // Check if project exists and is available
-    const AnnotationProject = require('../models/annotationProject.model');
+
+
     const project = await AnnotationProject.findById(projectId);
     
     if (!project) {
@@ -3049,7 +3050,6 @@ const applyToProject = async (req, res) => {
     // }
 
     // Check if user has already applied
-    const ProjectApplication = require('../models/projectApplication.model');
   
     const existingApplication = await ProjectApplication.findOne({
       projectId: projectId,
@@ -3284,6 +3284,68 @@ const applyToProject = async (req, res) => {
     });
   }
 };
+
+const manuallyAddUserToProject = async (req, res) => {
+  
+  const applicantId = '692579fdc3f8027ecbc1fc34';
+  const projectId = '693a8f6f99988f6cda380131';
+
+  const [user, project] = await Promise.all([
+     DTUser.findById(applicantId),
+     AnnotationProject.findById(projectId),
+  ]);
+
+  if (!user) {
+    console.log('User not found for ID:', applicantId);
+    return res.status(404).json({ 
+      success: false,
+      message: "User not found"
+    });
+  }
+
+  if (!project) {
+    console.log('Project not found for ID:', projectId);
+    return res.status(404).json({ 
+      success: false,
+      message: "Project not found"
+    });
+  }
+
+  // Check if application already exists
+  const existing = await ProjectApplication.findOne({ projectId, applicantId });
+  if (existing) {
+    console.log('User has already applied to this project.');
+    return res.status(404).json({ 
+    success: false,
+    message: "Project application already exists for this user"
+  });
+  }
+
+  // Create new application
+  const application = new ProjectApplication({
+    projectId,
+    applicantId,
+    status: 'approved', // or 'pending' if you want to follow the normal flow
+    coverLetter: user.coverLetter || 'Manually added by admin.',
+    resumeUrl: user.attachments?.resume_url || '', // Add resume URL if available
+    availability: 'flexible',
+    appliedAt: new Date(),
+    approvedAt: new Date()
+  });
+
+ const applicationSaved =  await application.save();
+
+ if(!applicationSaved) {
+  console.log('Failed to save application.');
+
+  return res.status(500).json({ 
+    success: false,
+    message: "Failed to manually add user to project"
+  });
+
+ }
+  console.log('User manually added to project.');
+}
 
 // DTUser function: Get user's active projects
 const getUserActiveProjects = async (req, res) => {
@@ -4781,4 +4843,5 @@ module.exports = {
   getProjectGuidelines,
   getAllUsersForRoleManagement,
   updateUserRole,
+  manuallyAddUserToProject,
 };

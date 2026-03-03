@@ -268,6 +268,7 @@ const getAllInvoices = async (req, res) => {
       }
     ]);
 
+
     res.status(200).json({
       success: true,
       data: {
@@ -353,7 +354,7 @@ const updatePaymentStatus = async (req, res) => {
     const { invoiceId } = req.params;
     const { paymentStatus, paymentMethod, paymentReference, paymentNotes, paidAmount } = req.body;
 
-    const validStatuses = ["unpaid", "paid", "overdue", "cancelled", "disputed"];
+    const validStatuses = ["unpaid", "payment_initiated", "paid", "overdue", "cancelled", "disputed"];
     if (!validStatuses.includes(paymentStatus)) {
       return res.status(400).json({
         success: false,
