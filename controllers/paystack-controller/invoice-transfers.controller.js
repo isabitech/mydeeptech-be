@@ -78,7 +78,7 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
       return ResponseClass.Error(res, {
         message: "Validation errors in transfers",
         statusCode: 400,
-        details: validationErrors
+        data: { errors: validationErrors }
       });
     }
 
@@ -102,7 +102,7 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
       return ResponseClass.Error(res, {
         message: "Some invoice IDs were not found",
         statusCode: 404,
-        details: { missingInvoiceIds: missingIds }
+        data: { missingInvoiceIds: missingIds }
       });
     }
 
@@ -116,29 +116,52 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
       return ResponseClass.Error(res, {
         message: "Some invoices are already paid. Cannot process double payments.",
         statusCode: 400,
-        details: { alreadyPaidInvoices: paidInvoiceNumbers }
+        data: { alreadyPaidInvoices: paidInvoiceNumbers }
       });
     }
 
-    // Test exchange rate API first
-
+    // Handle exchange rate with improved fallback logic
     let exchangeRate;
-    if (typeof frontendExchangeRate === 'number' && frontendExchangeRate > 0) {
-      exchangeRate = Number(Number(frontendExchangeRate).toFixed(2));
-    } else {
-      try {
-        exchangeRate = await convertUSDToNGN(1); // Test with $1
-      } catch (rateError) {
+    let exchangeRateSource = 'api'; // Track the source for logging
+    
+    // First, try to get exchange rate from the service
+    try {
+      exchangeRate = await convertUSDToNGN(1); // Test with $1
+      exchangeRateSource = 'api';
+    } catch (rateError) {
+      console.warn('Exchange rate service failed:', rateError.message);
+      
+      // If service fails, check for frontend-provided exchange rate
+      if (typeof frontendExchangeRate === 'number' && frontendExchangeRate > 0) {
+        exchangeRate = Number(Number(frontendExchangeRate).toFixed(2));
+        exchangeRateSource = 'frontend';
+        console.log(`Using frontend-provided exchange rate: ${exchangeRate} (API service unavailable)`);
+      } else {
+        // Check if frontendExchangeRate exists but is invalid
+        const exchangeRateInfo = frontendExchangeRate !== undefined 
+          ? `Received: ${frontendExchangeRate} (type: ${typeof frontendExchangeRate})`
+          : 'Not provided';
+          
         return ResponseClass.Error(res, {
-          message: "Cannot process transfers due to exchange rate service failure",
+          message: "Cannot process transfers: Exchange rate service unavailable and no valid fallback rate provided",
           statusCode: 503,
           error: "Exchange rate service unavailable",
-          details: {
+          data: {
             exchangeRateError: rateError.message,
-            message: "Please try again later or contact support if the issue persists"
+            frontendExchangeRateInfo: exchangeRateInfo,
+            message: "Please provide a valid exchange rate value or try again when the service is available",
+            expectedFormat: "exchangeRate should be a positive number (e.g., 1650.50)"
           }
         });
       }
+    }
+    
+    // If API worked but we have a frontend rate, prefer the frontend rate for manual override
+    if (exchangeRateSource === 'api' && typeof frontendExchangeRate === 'number' && frontendExchangeRate > 0) {
+      const apiRate = exchangeRate;
+      exchangeRate = Number(Number(frontendExchangeRate).toFixed(2));
+      exchangeRateSource = 'frontend_override';
+      console.log(`Using frontend override exchange rate: ${exchangeRate} (API rate was: ${apiRate})`);
     }
 
     // Create mapping between transfer requests and invoices
@@ -250,7 +273,7 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
           invoiceId: invoice._id,
           invoiceNumber: invoice.invoiceNumber,
           error: 'Processing failed',
-          details: error.message
+          data: { message: error.message }
         });
       }
     }
@@ -259,7 +282,7 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
       return ResponseClass.Error(res, {
         message: "No transfers could be processed",
         statusCode: 400,
-        details: { errors }
+        data: { errors }
       });
     }
 
@@ -291,7 +314,7 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
         message: transferError?.message ?? "Bulk transfer initiation failed",
         statusCode: 500,
         error: transferError.message,
-        details: {
+        data: {
           batchId,
           processedTransfers: processedTransfers.length,
           totalAmount: `$${totalUSDAmount.toFixed(2)} USD (₦${totalNGNAmount.toFixed(2)} NGN)`
