@@ -11,7 +11,14 @@ const handleWebhook = async (req, res) => {
   try {
     const signature = req.get('x-paystack-signature');
     
+    console.log('🔍 Webhook received from Paystack:');
+    console.log('- Headers:', req.headers);
+    console.log('- Signature present:', !!signature);
+    console.log('- Body type:', typeof req.body);
+    console.log('- Body length:', req.body?.length);
+    
     if (!signature) {
+      console.log('❌ Missing webhook signature');
       return ResponseClass.Error(res, { 
         message: "Missing webhook signature", 
         statusCode: 400 
@@ -21,6 +28,7 @@ const handleWebhook = async (req, res) => {
     // Get raw body for signature verification
     const rawBody = req.body;
     if (!rawBody || !Buffer.isBuffer(rawBody)) {
+      console.log('❌ Invalid webhook body:', typeof rawBody);
       return ResponseClass.Error(res, { 
         message: "Invalid webhook body", 
         statusCode: 400 
@@ -34,17 +42,24 @@ const handleWebhook = async (req, res) => {
       .digest('hex');
 
     if (hash !== signature) {
+      console.log('❌ Webhook signature mismatch');
+      console.log('- Computed hash:', hash);
+      console.log('- Received signature:', signature);
       return ResponseClass.Error(res, {
         message: "Invalid webhook signature", 
         statusCode: 400 
       });
     }
 
+    console.log('✅ Webhook signature verified');
+
     // Parse JSON after signature verification
     let payload;
     try {
       payload = JSON.parse(rawBody.toString());
+      console.log('✅ Webhook payload parsed successfully');
     } catch (error) {
+      console.log('❌ Failed to parse webhook JSON:', error.message);
       return ResponseClass.Error(res, { 
         message: "Invalid JSON in webhook body", 
         statusCode: 400 
@@ -52,19 +67,27 @@ const handleWebhook = async (req, res) => {
     }
 
     const { event, data } = payload;
-    console.log(`📨 Paystack webhook received: ${event}`, { reference: data.reference });
+    console.log(`📨 Paystack webhook received: ${event}`, { 
+      reference: data.reference,
+      amount: data.amount,
+      status: data.status,
+      recipient: data.recipient?.name 
+    });
 
     // Handle payment events (existing functionality)
     if (event === 'charge.success' || event === 'charge.failed') {
+      console.log('🔄 Processing charge event...');
       await PaystackPaymentService.handleWebhook(payload, signature);
     }
     
     // Handle transfer events for bulk invoice transfers
     else if (event === 'transfer.success') {
+      console.log('🔄 Processing transfer success event...');
       await handleTransferSuccess(data);
     }
     
     else if (event === 'transfer.failed') {
+      console.log('🔄 Processing transfer failed event...');
       await handleTransferFailed(data);
     }
     
@@ -72,6 +95,7 @@ const handleWebhook = async (req, res) => {
       console.log(`ℹ️ Unhandled webhook event: ${event}`);
     }
     
+    console.log('✅ Webhook processed successfully');
     return res.status(200).json({ status: 'success' });
 
   } catch (error) {
@@ -88,6 +112,7 @@ async function handleTransferSuccess(transferData) {
   try {
     const { reference, amount, recipient } = transferData;
     console.log(`✅ Transfer success webhook: ${reference}`);
+    console.log(`💰 Amount: ${amount}, Recipient: ${recipient?.name || 'N/A'}`);
     
     // Find invoice(s) with matching transfer reference in payment metadata
     const invoices = await Invoice.find({
@@ -98,16 +123,42 @@ async function handleTransferSuccess(transferData) {
       { path: 'projectId', select: 'projectName' }
     ]);
 
+    console.log(`🔍 Searching for invoices with transfer reference: ${reference}`);
+    
     if (invoices.length === 0) {
       console.log(`⚠️ No matching invoices found for transfer reference: ${reference}`);
+      
+      // Try to find any invoice with this reference (maybe in different status)
+      const allWithRef = await Invoice.find({
+        'paymentMetadata.transferReference': reference
+      }).select('invoiceNumber paymentStatus');
+      
+      if (allWithRef.length > 0) {
+        console.log('📋 Found invoices with this reference but different status:');
+        allWithRef.forEach(inv => {
+          console.log(`  - ${inv.invoiceNumber}: ${inv.paymentStatus}`);
+        });
+      } else {
+        console.log('📋 No invoices found with this reference at all');
+      }
       return;
     }
 
     console.log(`📋 Found ${invoices.length} invoice(s) for transfer reference: ${reference}`);
+    
+    // Log invoice details
+    invoices.forEach(invoice => {
+      console.log(`📄 Invoice: ${invoice.invoiceNumber}`);
+      console.log(`  - Status: ${invoice.paymentStatus}`);
+      console.log(`  - User: ${invoice.dtUserId?.fullName} (${invoice.dtUserId?.email})`);
+      console.log(`  - Project: ${invoice.projectId?.projectName || 'N/A'}`);
+    });
 
     // Process each invoice
     for (const invoice of invoices) {
       try {
+        console.log(`🔄 Processing invoice: ${invoice.invoiceNumber}`);
+        
         // Mark invoice as paid
         await invoice.markAsPaid({
           paymentMethod: 'bulk_transfer',
@@ -129,17 +180,28 @@ async function handleTransferSuccess(transferData) {
           batchId: invoice.paymentMetadata?.batchId || 'unknown'
         };
 
-        if (invoice.paymentMetadata?.recipientEmail) {
+        console.log(`📧 Preparing to send email for invoice ${invoice.invoiceNumber}`);
+        console.log(`   - Recipient: ${invoice.paymentMetadata?.recipientEmail || invoice.dtUserId?.email}`);
+        console.log(`   - Name: ${invoice.paymentMetadata?.recipientName || invoice.dtUserId?.fullName}`);
+
+        const recipientEmail = invoice.paymentMetadata?.recipientEmail || invoice.dtUserId?.email;
+        const recipientName = invoice.paymentMetadata?.recipientName || invoice.dtUserId?.fullName;
+
+        if (recipientEmail) {
           try {
+            console.log(`📨 Sending payment confirmation email to ${recipientEmail}...`);
             await PaymentNotificationService.sendPaymentConfirmation(
-              invoice.paymentMetadata.recipientEmail,
-              invoice.paymentMetadata.recipientName || invoice.dtUserId?.fullName || 'Recipient',
+              recipientEmail,
+              recipientName || 'Recipient',
               paymentData
             );
-            console.log(`📧 Payment confirmation email sent for invoice ${invoice.invoiceNumber}`);
+            console.log(`📧 ✅ Payment confirmation email sent for invoice ${invoice.invoiceNumber}`);
           } catch (emailError) {
             console.error(`❌ Failed to send payment email for invoice ${invoice.invoiceNumber}:`, emailError);
+            console.error('   - Error details:', emailError.stack);
           }
+        } else {
+          console.log(`⚠️ No email address found for invoice ${invoice.invoiceNumber}`);
         }
 
       } catch (invoiceError) {
