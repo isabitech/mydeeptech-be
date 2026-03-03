@@ -323,8 +323,119 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
       });
     }
 
+    // Check if Paystack requires approval before marking invoices as paid
+    const requiresApproval = !bulkTransferResponse.success || 
+                            bulkTransferResponse.data?.status === 'pending' ||
+                            bulkTransferResponse.data?.approval_url ||
+                            bulkTransferResponse.message?.toLowerCase().includes('approval');
+
+    if (requiresApproval) {
+      console.log('Transfer requires manual approval in Paystack Dashboard');
+      
+      // Mark invoices as pending approval (not paid yet)
+      const pendingInvoices = [];
+      
+      for (const invoice of invoices) {
+        try {
+          const transferRequest = transfers.find(t => t.invoiceId === invoice._id.toString());
+          const amountData = invoiceAmountMap.get(invoice._id.toString());
+          
+          if (!amountData) {
+            throw new Error(`Amount data not found for invoice ${invoice.invoiceNumber}`);
+          }
+
+          const transferReference = `TXN-${invoice.invoiceNumber}-${Date.now()}`;
+
+          // Mark invoice as pending approval (not paid yet)
+          invoice.paymentStatus = 'approval_required';
+          invoice.paymentMetadata = {
+            batchId,
+            paystackBatchId: bulkTransferResponse.batchId || bulkTransferResponse.data?.batch_id,
+            transferReference,
+            usdAmount: amountData.usdAmount,
+            ngnAmount: amountData.ngnAmount,
+            exchangeRate: amountData.exchangeRate,
+            recipientEmail: transferRequest.recipientEmail,
+            recipientName: transferRequest.recipientName,
+            approvalUrl: bulkTransferResponse.data?.approval_url,
+            requiresApproval: true,
+            submittedAt: new Date(),
+            submittedBy: req.user?.userId || req.user?.id
+          };
+          
+          await invoice.save();
+
+          pendingInvoices.push({
+            invoiceNumber: invoice.invoiceNumber,
+            invoiceId: invoice._id.toString(),
+            amountUSD: amountData.usdAmount,
+            amountNGN: amountData.ngnAmount,
+            recipientName: transferRequest.recipientName || 'N/A',
+            recipientEmail: transferRequest.recipientEmail || 'N/A',
+            transferReference,
+            status: 'approval_required'
+          });
+
+          console.log(`⏳ Invoice ${invoice.invoiceNumber} pending approval`);
+
+        } catch (error) {
+          console.error(`❌ Error processing invoice ${invoice._id}:`, error);
+        }
+      }
+
+      // Send admin notification with approval URL
+      const adminEmail = envConfig.email.ADMIN_EMAIL || process.env.ADMIN_EMAIL || 'admin@mydeeptech.com';
+      const approvalUrl = bulkTransferResponse.data?.approval_url;
+      
+      if (approvalUrl) {
+        // Send approval required notification to admin
+        console.log(`📧 Sending approval required notification to admin: ${adminEmail}`);
+        // You could create a new email template for approval notifications
+      }
+
+      return ResponseClass.Success(res, {
+        message: `⚠️ Transfer submitted but requires manual approval. ${pendingInvoices.length} invoices pending approval.`,
+        data: {
+          success: true,
+          batchId,
+          paystackBatchId: bulkTransferResponse.batchId || bulkTransferResponse.data?.batch_id,
+          status: 'approval_required',
+          approvalUrl: approvalUrl,
+          approvalInstructions: {
+            message: "Manual approval required in Paystack Dashboard",
+            steps: [
+              "1. Visit the approval URL below",
+              "2. Login to your Paystack Dashboard", 
+              "3. Review transfer details",
+              "4. Approve or reject the transfers",
+              "5. Recipients will be notified after approval"
+            ],
+            approvalUrl: approvalUrl
+          },
+          summary: {
+            totalTransfers: processedTransfers.length,
+            pendingApproval: pendingInvoices.length,
+            totalUSDAmount: totalUSDAmount.toFixed(2),
+            totalNGNAmount: totalNGNAmount.toFixed(2),
+            exchangeRateUsed: exchangeRateSource === 'frontend' ? exchangeRate : (totalNGNAmount / totalUSDAmount).toFixed(2),
+            exchangeRateSource: exchangeRateSource,
+            submittedAt: new Date()
+          },
+          pendingInvoices,
+          paystackResponse: {
+            status: bulkTransferResponse.success,
+            message: bulkTransferResponse.message || 'Transfer submitted for approval',
+            reference: bulkTransferResponse.reference
+          }
+        }
+      });
+    }
+
+    // If no approval required, process immediately as before
+    console.log('✅ Transfer approved automatically, processing payments...');
+
     // Mark invoices as paid and send email notifications immediately 
-    // (since Paystack doesn't support transfer webhooks)
+    // (when no approval is required)
     const processedInvoices = [];
     const emailResults = [];
     
@@ -514,11 +625,228 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
     });
 };
 
-const TransferApproved = async (req, res) => {
-  return res.status(200);
-}
+// Complete transfers after manual Paystack approval
+const completeApprovedTransfers = async (req, res) => {
+  try {
+    const { batchId } = req.params;
+    
+    console.log(`🔄 Processing approved transfers for batch: ${batchId}`);
+    
+    // Find all invoices with approval_required status for this batch
+    const pendingInvoices = await Invoice.find({
+      'paymentMetadata.batchId': batchId,
+      paymentStatus: 'approval_required'
+    }).populate([
+      { path: 'dtUserId', select: 'fullName email' },  
+      { path: 'projectId', select: 'projectName' }
+    ]);
+
+    if (pendingInvoices.length === 0) {
+      return ResponseClass.Error(res, {
+        message: "No pending approval invoices found for this batch",
+        statusCode: 404,
+        data: { batchId }
+      });
+    }
+
+    const processedInvoices = [];
+    const emailResults = [];
+
+    // Process each invoice - mark as paid and send emails
+    for (const invoice of pendingInvoices) {
+      try {
+        // Mark invoice as paid
+        await invoice.markAsPaid({
+          paymentMethod: 'bulk_transfer',
+          paymentReference: invoice.paymentMetadata.transferReference,
+          paymentNotes: `Bulk transfer payment approved and completed via Paystack Dashboard. Batch ID: ${batchId}.`
+        });
+
+        // Update metadata to reflect approval completion
+        invoice.paymentMetadata = {
+          ...invoice.paymentMetadata,
+          approvedAt: new Date(),
+          approvedBy: req.user?.userId || req.user?.id
+        };
+        await invoice.save();
+
+        console.log(`✅ Invoice ${invoice.invoiceNumber} marked as paid after approval`);
+
+        // Send payment confirmation email to recipient
+        const paymentData = {
+          invoiceNumber: invoice.invoiceNumber,
+          projectName: invoice.projectId?.projectName || 'Project',
+          amountUSD: invoice.paymentMetadata.usdAmount,
+          amountNGN: invoice.paymentMetadata.ngnAmount,
+          exchangeRate: invoice.paymentMetadata.exchangeRate,
+          paymentReference: invoice.paymentMetadata.transferReference,
+          paymentDate: new Date(),
+          batchId: batchId
+        };
+
+        const recipientEmail = invoice.paymentMetadata.recipientEmail || invoice.dtUserId?.email;
+        const recipientName = invoice.paymentMetadata.recipientName || invoice.dtUserId?.fullName;
+
+        if (recipientEmail) {
+          try {
+            await PaymentNotificationService.sendPaymentConfirmation(
+              recipientEmail,
+              recipientName || 'Recipient',
+              paymentData
+            );
+            console.log(`📧 ✅ Payment confirmation sent for invoice ${invoice.invoiceNumber}`);
+            emailResults.push({
+              invoiceNumber: invoice.invoiceNumber,
+              recipientEmail,
+              status: 'sent'
+            });
+          } catch (emailError) {
+            console.error(`❌ Failed to send payment email for invoice ${invoice.invoiceNumber}:`, emailError);
+            emailResults.push({
+              invoiceNumber: invoice.invoiceNumber,
+              recipientEmail,
+              status: 'failed',
+              error: emailError.message
+            });
+          }
+        }
+
+        // Send admin notification  
+        try {
+          const adminEmail = envConfig.email.ADMIN_EMAIL || process.env.ADMIN_EMAIL || 'admin@mydeeptech.com';
+          const adminNotificationData = {
+            ...paymentData,
+            recipientName: recipientName || 'N/A',
+            recipientEmail: recipientEmail || 'N/A',
+            invoiceStatus: 'paid'
+          };
+
+          await PaymentNotificationService.sendAdminTransferNotification(
+            adminEmail,
+            'Administrator',
+            adminNotificationData
+          );
+          console.log(`📧 ✅ Admin notification sent for invoice ${invoice.invoiceNumber}`);
+        } catch (adminEmailError) {
+          console.error(`❌ Failed to send admin notification for invoice ${invoice.invoiceNumber}:`, adminEmailError);
+        }
+
+        processedInvoices.push({
+          invoiceNumber: invoice.invoiceNumber,
+          invoiceId: invoice._id.toString(),
+          amountUSD: invoice.paymentMetadata.usdAmount,
+          amountNGN: invoice.paymentMetadata.ngnAmount,
+          recipientName: recipientName || 'N/A',
+          recipientEmail: recipientEmail || 'N/A', 
+          transferReference: invoice.paymentMetadata.transferReference,
+          status: 'completed'
+        });
+
+      } catch (error) {
+        console.error(`❌ Error processing approved invoice ${invoice.invoiceNumber}:`, error);
+        processedInvoices.push({
+          invoiceNumber: invoice.invoiceNumber,
+          invoiceId: invoice._id.toString(),
+          status: 'error',
+          error: error.message
+        });
+      }
+    }
+
+    const successfulTransfers = processedInvoices.filter(inv => inv.status === 'completed').length;
+    const sentEmails = emailResults.filter(e => e.status === 'sent').length;
+
+    return ResponseClass.Success(res, {
+      message: `✅ ${successfulTransfers} approved transfers completed. Email notifications sent to ${sentEmails} recipients.`,
+      data: {
+        batchId,
+        processedInvoices,
+        emailResults,
+        summary: {
+          totalInvoices: pendingInvoices.length,
+          successful: successfulTransfers,
+          emailsSent: sentEmails,
+          completedAt: new Date()
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error completing approved transfers:', error);
+    return ResponseClass.Error(res, {
+      message: "Failed to complete approved transfers",
+      statusCode: 500,
+      error: error.message
+    });
+  }
+};
+
+// Get all transfers pending approval
+const getPendingApprovalTransfers = async (req, res) => {
+  try {
+    const pendingInvoices = await Invoice.find({
+      paymentStatus: 'approval_required'
+    }).populate([
+      { path: 'dtUserId', select: 'fullName email' },
+      { path: 'projectId', select: 'projectName' }
+    ]).sort({ createdAt: -1 });
+
+    const groupedByBatch = {};
+
+    pendingInvoices.forEach(invoice => {
+      const batchId = invoice.paymentMetadata?.batchId;
+      if (!groupedByBatch[batchId]) {
+        groupedByBatch[batchId] = {
+          batchId,
+          approvalUrl: invoice.paymentMetadata?.approval_url,
+          submittedAt: invoice.paymentMetadata?.submittedAt,
+          paystackBatchId: invoice.paymentMetadata?.paystackBatchId,
+          invoices: [],
+          totalUSD: 0,
+          totalNGN: 0
+        };
+      }
+
+      groupedByBatch[batchId].invoices.push({
+        invoiceNumber: invoice.invoiceNumber,
+        invoiceId: invoice._id,
+        recipientName: invoice.paymentMetadata?.recipientName,
+        recipientEmail: invoice.paymentMetadata?.recipientEmail,
+        amountUSD: invoice.paymentMetadata?.usdAmount,
+        amountNGN: invoice.paymentMetadata?.ngnAmount,
+        projectName: invoice.projectId?.projectName
+      });
+
+      groupedByBatch[batchId].totalUSD += invoice.paymentMetadata?.usdAmount || 0;
+      groupedByBatch[batchId].totalNGN += invoice.paymentMetadata?.ngnAmount || 0;
+    });
+
+    const pendingBatches = Object.values(groupedByBatch);
+
+    return ResponseClass.Success(res, {
+      message: `Found ${pendingBatches.length} batches with ${pendingInvoices.length} invoices pending approval`,
+      data: {
+        pendingBatches,
+        totalPendingInvoices: pendingInvoices.length,
+        instructions: {
+          message: "Use the approval URLs to approve transfers in Paystack Dashboard",
+          nextStep: "After approval, call POST /transfer/approve-complete/:batchId to complete the process"
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching pending approval transfers:', error);
+    return ResponseClass.Error(res, {
+      message: "Failed to fetch pending approval transfers",
+      statusCode: 500,
+      error: error.message
+    });
+  }
+};
 
 module.exports = {
   initializeBulkTransferWithInvoices,
-  TransferApproved
+  completeApprovedTransfers,
+  getPendingApprovalTransfers
 };
