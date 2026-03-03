@@ -1,6 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const morgan = require('morgan');
 const { createServer } = require('http');
 const { initializeSocketIO } = require('./utils/chatSocketService');
 const { initRedis, closeRedis } = require('./config/redis');
@@ -46,6 +47,7 @@ initializeSocketIO(server);
 
 
 app.disable('x-powered-by'); // Security best practice: hide Express usage
+app.use(morgan('dev'));
 app.get("/", (_req, res) => {
     res.send('Welcome to My Deep Tech');
 });
