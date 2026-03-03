@@ -411,13 +411,6 @@ router.get(
 );
 
 /**
-     * @route GET /api/payments/transfer/bulk-invoices
-     * @desc Initialize bulk transfers with invoice-based payments and USD to NGN conversion
-     * @access Private (Admin only)
- */
-router.get('/transfer-approved', TransferApproved);
-
-/**
  * @route GET /api/payments/transfer/verify/:reference
  * @desc Verify a transfer using reference
  * @access Private (Admin only)
