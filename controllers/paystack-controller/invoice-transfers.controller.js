@@ -4,6 +4,7 @@ const Invoice = require("../../models/invoice.model");
 const DTUser = require("../../models/dtUser.model");
 const PaymentNotificationService = require("../../services/mail-service/payment-notification.service");
 const { convertUSDToNGN } = require("../../utils/exchangeRateService");
+const envConfig = require("../../config/envConfig");
 
 
 
