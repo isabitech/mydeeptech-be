@@ -55,7 +55,7 @@ const {
     validateBulkTransfer,
     validateTransferReference
 } = require('../validations/freelancerPayment.validation');
-const { TransferApproved } = require('../controllers/paystack-controller/invoice-transfers.controller');
+const { VerifyAccountNumber, getAllBanksByCountryInAfrica } = require('../controllers/paystack-controller/invoice-transfers.controller');
 
 /* ================= PAYMENT INITIALIZATION ================= */
 
@@ -113,6 +113,28 @@ router.post('/webhook', handleWebhook);
  * @access Public (Payment callback)
  */
 router.get('/callback', callback);
+
+/**
+ * @route GET /api/payments/verify-account-number
+ * @desc Verify account number for a transfer
+ * @access Private (Authenticated users)
+ */
+router.get(
+    '/verify-account-number',
+    authenticateToken,
+    VerifyAccountNumber,
+);
+
+/**
+ * @route GET /api/payments/get-banks-by-country
+ * @desc Get all banks by country in Africa
+ * @access Private (Authenticated users)
+ */
+router.get(
+    '/get-banks-by-country',
+      authenticateToken,
+    getAllBanksByCountryInAfrica,
+);
 
 /* ================= PAYMENT DETAILS ================= */
 
@@ -359,6 +381,7 @@ router.get(
     authenticateToken,
     getBanks
 );
+
 
 /**
  * @route POST /api/payments/transfer/bulk
