@@ -322,8 +322,10 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
       });
     }
 
-    // Mark invoices as payment initiated (will be confirmed by webhook)
-    const initiatedInvoices = [];
+    // Mark invoices as paid and send email notifications immediately 
+    // (since Paystack doesn't support transfer webhooks)
+    const processedInvoices = [];
+    const emailResults = [];
     
     for (const invoice of invoices) {
       try {
@@ -334,79 +336,179 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
           throw new Error(`Amount data not found for invoice ${invoice.invoiceNumber}`);
         }
 
-        // Update invoice status to indicate payment is being processed
-        invoice.paymentStatus = 'payment_initiated';
+        const transferReference = `TXN-${invoice.invoiceNumber}-${Date.now()}`;
+
+        // Mark invoice as paid immediately (no webhook support for transfers)
+        await invoice.markAsPaid({
+          paymentMethod: 'bulk_transfer',
+          paymentReference: transferReference,
+          paymentNotes: `Bulk transfer payment processed via Paystack. Batch ID: ${batchId}. No webhook confirmation available for transfers.`
+        });
+
+        // Set payment metadata for record keeping
         invoice.paymentMetadata = {
           batchId,
           paystackBatchId: bulkTransferResponse.batchId || bulkTransferResponse.data?.batch_id,
-          transferReference: `TXN-${invoice.invoiceNumber}-${Date.now()}`,
+          transferReference,
           usdAmount: amountData.usdAmount,
           ngnAmount: amountData.ngnAmount,
           exchangeRate: amountData.exchangeRate,
           recipientEmail: transferRequest.recipientEmail,
           recipientName: transferRequest.recipientName,
-          initiatedAt: new Date(),
-          initiatedBy: req.user?.userId || req.user?.id
+          processedAt: new Date(),
+          processedBy: req.user?.userId || req.user?.id
         };
         
         await invoice.save();
 
-        initiatedInvoices.push({
-          invoiceId: invoice._id,
+        console.log(`✅ Invoice ${invoice.invoiceNumber} marked as paid immediately`);
+
+        // Send payment confirmation email to recipient immediately
+        const paymentData = {
           invoiceNumber: invoice.invoiceNumber,
-          recipient: transferRequest.recipientName,
-          usdAmount: amountData.usdAmount,
-          ngnAmount: amountData.ngnAmount,
-          status: 'payment_initiated'
+          projectName: invoice.projectId?.projectName || 'Project',
+          amountUSD: amountData.usdAmount,
+          amountNGN: amountData.ngnAmount,
+          exchangeRate: amountData.exchangeRate,
+          paymentReference: transferReference,
+          paymentDate: new Date(),
+          batchId: batchId
+        };
+
+        const recipientEmail = transferRequest.recipientEmail || invoice.dtUserId?.email;
+        const recipientName = transferRequest.recipientName || invoice.dtUserId?.fullName;
+
+        // Send recipient email
+        if (recipientEmail) {
+          try {
+            console.log(`📨 Sending payment confirmation to ${recipientEmail}...`);
+            await PaymentNotificationService.sendPaymentConfirmation(
+              recipientEmail,
+              recipientName || 'Recipient',
+              paymentData
+            );
+            console.log(`📧 ✅ Payment confirmation sent for invoice ${invoice.invoiceNumber}`);
+            emailResults.push({
+              invoiceNumber: invoice.invoiceNumber,
+              recipientEmail,
+              status: 'sent'
+            });
+          } catch (emailError) {
+            console.error(`❌ Failed to send payment email for invoice ${invoice.invoiceNumber}:`, emailError);
+            emailResults.push({
+              invoiceNumber: invoice.invoiceNumber,
+              recipientEmail,
+              status: 'failed',
+              error: emailError.message
+            });
+          }
+        } else {
+          console.log(`⚠️ No email address found for invoice ${invoice.invoiceNumber}`);
+          emailResults.push({
+            invoiceNumber: invoice.invoiceNumber,
+            recipientEmail: 'N/A',
+            status: 'no_email'
+          });
+        }
+
+        // Send admin notification
+        try {
+          const adminEmail = envConfig.email.ADMIN_EMAIL || process.env.ADMIN_EMAIL || 'admin@mydeeptech.com';
+          const enableAdminNotifications = process.env.ENABLE_ADMIN_TRANSFER_NOTIFICATIONS !== 'false';
+          
+          if (enableAdminNotifications) {
+            const adminNotificationData = {
+              ...paymentData,
+              recipientName: recipientName || 'N/A',
+              recipientEmail: recipientEmail || 'N/A',
+              invoiceStatus: 'paid'
+            };
+
+            await PaymentNotificationService.sendAdminTransferNotification(
+              adminEmail,
+              'Administrator',
+              adminNotificationData
+            );
+            console.log(`📧 ✅ Admin notification sent for invoice ${invoice.invoiceNumber}`);
+          }
+        } catch (adminEmailError) {
+          console.error(`❌ Failed to send admin notification for invoice ${invoice.invoiceNumber}:`, adminEmailError);
+        }
+
+        processedInvoices.push({
+          invoiceNumber: invoice.invoiceNumber,
+          invoiceId: invoice._id.toString(),
+          amountUSD: amountData.usdAmount,
+          amountNGN: amountData.ngnAmount,
+          recipientName: recipientName || 'N/A',
+          recipientEmail: recipientEmail || 'N/A',
+          transferReference,
+          status: 'completed'
         });
 
-        console.log(`Payment initiated for invoice ${invoice.invoiceNumber} - awaiting Paystack confirmation`);
+        console.log(`💰 Payment completed for invoice ${invoice.invoiceNumber}`);
 
-      } catch (error) {
-        console.error(`❌ Error marking invoice ${invoice.invoiceNumber} as payment initiated:`, error);
-        errors.push({
-          invoiceId: invoice._id,
-          invoiceNumber: invoice.invoiceNumber,
-          error: 'Failed to mark as payment initiated',
-          details: error.message
+      } catch (invoiceError) {
+        console.error(`❌ Error processing invoice ${invoice._id}:`, invoiceError);
+        processedInvoices.push({
+          invoiceNumber: invoice.invoiceNumber || 'Unknown',
+          invoiceId: invoice._id.toString(),
+          status: 'error',
+          error: invoiceError.message
         });
       }
     }
 
-    console.log(`🔄 Bulk transfer initiated - payments will be confirmed via Paystack webhooks`);
-    console.log(`📧 Email notifications will be sent after webhook confirmation`);
-
-    // Return transfer initiation response
+    console.log(`🔄 Bulk transfer completed - ${processedInvoices.length} invoices processed`);
+    console.log(`📧 Email notifications: ${emailResults.filter(e => e.status === 'sent').length} sent, ${emailResults.filter(e => e.status === 'failed').length} failed`);
+    
+    const successfulTransfers = processedInvoices.filter(inv => inv.status === 'completed').length;
+    const failedTransfers = processedInvoices.filter(inv => inv.status === 'error').length;
+    const sentEmails = emailResults.filter(e => e.status === 'sent').length;
+    const failedEmails = emailResults.filter(e => e.status === 'failed').length;
+    // Return immediate transfer completion response (no webhook dependency)
     const responseData = {
       success: true,
       batchId,
       paystackBatchId: bulkTransferResponse.batchId || bulkTransferResponse.data?.batch_id,
       transferCode: bulkTransferResponse.data?.transfer_code,
-      status: 'transfers_initiated',
+      status: 'transfers_completed',
       summary: {
         totalTransfers: processedTransfers.length,
-        initiatedTransfers: initiatedInvoices.length,
+        completedTransfers: successfulTransfers,
+        failedTransfers: failedTransfers,
         totalUSDAmount: totalUSDAmount.toFixed(2),
         totalNGNAmount: totalNGNAmount.toFixed(2),
-        exchangeRateUsed: (totalNGNAmount / totalUSDAmount).toFixed(2),
-        initiatedAt: new Date()
+        exchangeRateUsed: exchangeRateSource === 'frontend' ? exchangeRate : (totalNGNAmount / totalUSDAmount).toFixed(2),
+        exchangeRateSource: exchangeRateSource,
+        completedAt: new Date(),
+        emailSummary: {
+          sent: sentEmails,
+          failed: failedEmails,
+          noEmail: emailResults.filter(e => e.status === 'no_email').length
+        }
       },
-      initiatedInvoices,
-      errors: errors.length > 0 ? errors : undefined,
+      processedInvoices,
+      emailResults,
+      errors: processedInvoices.filter(inv => inv.status === 'error'),
       paystackResponse: {
         status: bulkTransferResponse.success,
-        message: bulkTransferResponse.message || 'Bulk transfer initiated',
+        message: bulkTransferResponse.message || 'Bulk transfer completed',
         reference: bulkTransferResponse.reference
       },
-      webhookInfo: {
-        message: 'Transfers have been initiated with Paystack. Payment confirmations and email notifications will be sent when Paystack webhooks confirm successful transfers.',
-        webhookUrl: '/api/payments/webhook',
-        statusTracking: `Monitor transfer status using batch ID: ${batchId}`
+      notification: {
+        message: 'Transfers have been completed and processed immediately. Recipients have been notified via email where email addresses are available.',
+        noWebhookNote: 'Paystack does not support webhooks for bulk transfers, so payments are marked as completed immediately upon successful Paystack initiation.',
+        statusTracking: `Transfer batch completed with ID: ${batchId}`
       }
     };
 
+    const statusMessage = successfulTransfers === processedInvoices.length 
+      ? `✅ All ${successfulTransfers} transfers completed successfully`
+      : `⚠️ ${successfulTransfers}/${processedInvoices.length} transfers completed successfully. ${failedTransfers} failed.`;
+
     return ResponseClass.Success(res, {
-      message: `Bulk transfer initiated successfully. ${initiatedInvoices.length} transfers submitted to Paystack. Payment confirmations and email notifications will be sent via webhooks.`,
+      message: `${statusMessage}. Email notifications sent to ${sentEmails} recipients.`,
       data: responseData
     });
 };

@@ -204,6 +204,33 @@ async function handleTransferSuccess(transferData) {
           console.log(`⚠️ No email address found for invoice ${invoice.invoiceNumber}`);
         }
 
+        // Send admin notification for successful transfer
+        try {
+          const adminEmail = envConfig.email.ADMIN_EMAIL || process.env.ADMIN_EMAIL || 'admin@mydeeptech.com';
+          const enableAdminNotifications = process.env.ENABLE_ADMIN_TRANSFER_NOTIFICATIONS !== 'false';
+          
+          if (enableAdminNotifications) {
+            const adminNotificationData = {
+              ...paymentData,
+              recipientName: recipientName || 'N/A',
+              recipientEmail: recipientEmail || 'N/A',
+              invoiceStatus: 'paid'
+            };
+
+            console.log(`📨 Sending admin transfer notification to ${adminEmail} for invoice ${invoice.invoiceNumber}...`);
+            await PaymentNotificationService.sendAdminTransferNotification(
+              adminEmail,
+              'Administrator',
+              adminNotificationData
+            );
+            console.log(`📧 ✅ Admin transfer notification sent for invoice ${invoice.invoiceNumber}`);
+          } else {
+            console.log(`⭕ Admin transfer notifications disabled via environment variable`);
+          }
+        } catch (adminEmailError) {
+          console.error(`❌ Failed to send admin notification for invoice ${invoice.invoiceNumber}:`, adminEmailError);
+        }
+
       } catch (invoiceError) {
         console.error(`❌ Error processing invoice ${invoice.invoiceNumber}:`, invoiceError);
       }

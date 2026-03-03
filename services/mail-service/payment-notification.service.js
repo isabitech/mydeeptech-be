@@ -220,6 +220,98 @@ class PaymentNotificationService extends BaseMailService {
             senderName: 'MyDeepTech Payments'
         });
     }
+
+    /**
+     * Send admin notification for individual transfer success
+     */
+    static async sendAdminTransferNotification(adminEmail, adminName, transferData) {
+        console.log(`Sending admin transfer notification to ${adminEmail}`);
+        
+        const { 
+            invoiceNumber, 
+            projectName, 
+            amountUSD, 
+            amountNGN, 
+            exchangeRate,
+            paymentReference,
+            paymentDate = new Date(),
+            recipientName,
+            recipientEmail,
+            batchId
+        } = transferData;
+        
+        const formattedAmountUSD = new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD'
+        }).format(amountUSD);
+        
+        const formattedAmountNGN = new Intl.NumberFormat('en-NG', {
+            style: 'currency',
+            currency: 'NGN'
+        }).format(amountNGN);
+        
+        const formattedDate = new Date(paymentDate).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        // Use bulk payment summary template as base (can be customized later)
+        let htmlTemplate = this.getMailTemplate('sendBulkPaymentSummary');
+        
+        // Replace template placeholders for admin notification
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{adminName}}', adminName);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{batchId}}', batchId || 'N/A');
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{formattedTotalAmount}}', formattedAmountNGN);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{successfulTransfers}}', '1');
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{totalTransfers}}', '1');
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{failedTransfers}}', '0');
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{transferList}}', 
+            `<tr><td>${invoiceNumber}</td><td>${recipientName}</td><td>${formattedAmountUSD}</td><td>${formattedAmountNGN}</td><td>✅ Success</td></tr>`
+        );
+
+        const textContent = `
+            Transfer Successfully Completed - Invoice #${invoiceNumber}
+            
+            Dear ${adminName},
+            
+            A Paystack transfer has been successfully completed:
+            
+            Transfer Details:
+            - Invoice Number: #${invoiceNumber}
+            - Project: ${projectName || 'N/A'}
+            - Amount (USD): ${formattedAmountUSD}
+            - Amount Sent (NGN): ${formattedAmountNGN}
+            - Exchange Rate: ₦${Number(exchangeRate).toFixed(2)} per $1
+            - Transfer Date: ${formattedDate}
+            - Reference: ${paymentReference}
+            - Batch ID: ${batchId || 'N/A'}
+            
+            Recipient Information:
+            - Name: ${recipientName}
+            - Email: ${recipientEmail}
+            
+            The recipient has been notified and payment should reflect in their account within 1-2 business days.
+            Invoice status has been updated to PAID.
+            
+            View full transfer details in the admin dashboard.
+            
+            Best regards,
+            MyDeepTech Payments System
+        `;
+
+        return await this.sendMail({
+            recipientEmail: adminEmail,
+            recipientName: adminName,
+            subject: `💰 Transfer Completed - Invoice #${invoiceNumber} (${formattedAmountNGN})`,
+            message: textContent,
+            htmlTemplate,
+            senderEmail: 'payments@mydeeptech.ng',
+            senderName: 'MyDeepTech Payments'
+        });
+    }
 }
 
 module.exports = PaymentNotificationService;
