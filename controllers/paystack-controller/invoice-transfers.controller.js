@@ -1,7 +1,7 @@
+const axios = require('axios');
 const PaystackTransferService = require("../../services/paystack-transfer.service");
 const ResponseClass = require("../../utils/response-handler");
 const Invoice = require("../../models/invoice.model");
-const DTUser = require("../../models/dtUser.model");
 const PaymentNotificationService = require("../../services/mail-service/payment-notification.service");
 const { convertUSDToNGN } = require("../../utils/exchangeRateService");
 const envConfig = require("../../config/envConfig");
@@ -845,8 +845,321 @@ const getPendingApprovalTransfers = async (req, res) => {
   }
 };
 
+
+const VerifyAccountNumber = async (req, res) => {
+
+    let { accountNumber, bankCode } = req.query;
+
+    try {
+        // Validate input parameters
+        if (!accountNumber || !bankCode) {
+            return ResponseClass.Error(res, {
+                message: "Account number and bank code are required",
+                statusCode: 400,
+                data: {
+                    required: ["accountNumber", "bankCode"],
+                    received: { accountNumber, bankCode }
+                }
+            });
+        }
+
+        // Validate account number format (should be 10 digits for Nigerian banks)
+        // if (!/^\d{10}$/.test(accountNumber)) {
+        //     return ResponseClass.Error(res, {
+        //         message: "Invalid account number format. Account number should be 10 digits",
+        //         statusCode: 400,
+        //         data: { accountNumber }
+        //     });
+        // }
+
+        // Validate bank code format (should be 3 digits)
+        // if (!/^\d{3}$/.test(bankCode)) {
+        //     return ResponseClass.Error(res, {
+        //         message: "Invalid bank code format. Bank code should be 3 digits",
+        //         statusCode: 400,
+        //         data: { bankCode }
+        //     });
+        // }
+
+        const paystackSecretKey = envConfig.paystack.PAYSTACK_SECRET_KEY;
+
+        if (!paystackSecretKey) {
+            return ResponseClass.Error(res, {
+                message: "Paystack configuration error: Secret key not found",
+                statusCode: 500,
+                error: "Missing PAYSTACK_SECRET_KEY"
+            });
+        }
+
+        const paystackUrl = `${envConfig.paystack.PAYSTACK_BASE_URL}/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`;
+        
+        console.log(`🔍 Verifying account: ${accountNumber} with bank code: ${bankCode}`);
+
+        const response = await axios.get(paystackUrl, {
+            headers: {
+                'Authorization': `Bearer ${paystackSecretKey}`,
+                'Content-Type': 'application/json'
+            },
+            timeout: 10000 // 10 second timeout
+        });
+
+        if (response.data && response.data.status === true) {
+            const accountData = response.data.data;
+            
+            return ResponseClass.Success(res, {
+                message: "Account number verified successfully",
+                data: {
+                    accountNumber: accountData.account_number,
+                    accountName: accountData.account_name,
+                    bankCode: bankCode,
+                    verified: true,
+                    verificationDate: new Date()
+                }
+            });
+        } else {
+            return ResponseClass.Error(res, {
+                message: "Account verification failed",
+                statusCode: 400,
+                data: {
+                    accountNumber,
+                    bankCode,
+                    paystackResponse: response.data
+                }
+            });
+        }
+
+    } catch (error) {
+
+        console.error('❌ Account verification error:', error);
+
+        // Handle specific Paystack API errors
+        if (error.response && error.response.data) {
+
+            const errorData = error.response.data;
+
+            return ResponseClass.Error(res, {
+                message: errorData.message || "Account verification failed",
+                statusCode: error.response.status || 400,
+                error: errorData.message,
+                data: {
+                    accountNumber,
+                    bankCode,
+                    paystackError: errorData
+                }
+            });
+        }
+
+        // Handle network/timeout errors
+        if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+            return ResponseClass.Error(res, {
+                message: "Account verification request timed out. Please try again.",
+                statusCode: 408,
+                error: "Request timeout"
+            });
+        }
+
+        // Handle other errors
+        return ResponseClass.Error(res, {
+            message: "Account verification service unavailable",
+            statusCode: 503,
+            error: error.message,
+            data: { accountNumber, bankCode }
+        });
+    }
+}
+
+const getAllBanksByCountryInAfrica = async (req, res) => {
+    try {
+        const {
+            country,
+            use_cursor,
+            perPage = 50,
+            pay_with_bank_transfer,
+            pay_with_bank,
+            enabled_for_verification,
+            next,
+            previous,
+            gateway,
+            type,
+            currency,
+            include_nip_sort_code
+        } = req.query;
+
+        console.log(`🏦 Fetching banks for country: ${country || 'all'}`);
+
+        // Validate country parameter if provided
+        const validCountries = ['ghana', 'kenya', 'nigeria', 'south africa'];
+        if (country && !validCountries.includes(country.toLowerCase())) {
+            return ResponseClass.Error(res, {
+                message: "Invalid country parameter",
+                statusCode: 400,
+                data: {
+                    validCountries,
+                    received: country
+                }
+            });
+        }
+
+        // Validate perPage parameter
+        const pageSize = parseInt(perPage);
+        if (pageSize && (pageSize < 1 || pageSize > 100)) {
+            return ResponseClass.Error(res, {
+                message: "perPage must be between 1 and 100",
+                statusCode: 400,
+                data: { received: perPage, allowed: "1-100" }
+            });
+        }
+
+        // Get Paystack configuration
+        const paystackSecretKey = envConfig.paystack.PAYSTACK_SECRET_KEY;
+        if (!paystackSecretKey) {
+            return ResponseClass.Error(res, {
+                message: "Paystack configuration error: Secret key not found",
+                statusCode: 500,
+                error: "Missing PAYSTACK_SECRET_KEY"
+            });
+        }
+
+        // Build query parameters for Paystack API
+        const queryParams = new URLSearchParams();
+        
+        // Add parameters only if they are provided
+        if (country) queryParams.append('country', country.toLowerCase());
+        if (use_cursor !== undefined) queryParams.append('use_cursor', use_cursor);
+        if (perPage) queryParams.append('perPage', pageSize.toString());
+        if (pay_with_bank_transfer !== undefined) queryParams.append('pay_with_bank_transfer', pay_with_bank_transfer);
+        if (pay_with_bank !== undefined) queryParams.append('pay_with_bank', pay_with_bank);
+        if (enabled_for_verification !== undefined) queryParams.append('enabled_for_verification', enabled_for_verification);
+        if (next) queryParams.append('next', next);
+        if (previous) queryParams.append('previous', previous);
+        if (gateway) queryParams.append('gateway', gateway);
+        if (type) queryParams.append('type', type);
+        if (currency) queryParams.append('currency', currency);
+        if (include_nip_sort_code !== undefined) queryParams.append('include_nip_sort_code', include_nip_sort_code);
+
+        // Build the complete Paystack URL
+        const paystackUrl = `${envConfig.paystack.PAYSTACK_BASE_URL}/bank${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+        
+        console.log(`🔍 Fetching banks from: ${paystackUrl}`);
+
+        // Make API call to Paystack
+        const response = await axios.get(paystackUrl, {
+            headers: {
+                'Authorization': `Bearer ${paystackSecretKey}`,
+                'Content-Type': 'application/json'
+            },
+            timeout: 15000 // 15 second timeout
+        });
+
+        if (response.data && response.data.status === true) {
+            const banksData = response.data.data;
+            const meta = response.data.meta;
+            
+            console.log(`✅ Successfully fetched ${Array.isArray(banksData) ? banksData.length : 0} banks`);
+            
+            // Transform the data to include useful information
+            const transformedBanks = Array.isArray(banksData) ? banksData.map(bank => ({
+                id: bank.id,
+                name: bank.name,
+                slug: bank.slug,
+                code: bank.code,
+                longcode: bank.longcode,
+                gateway: bank.gateway,
+                pay_with_bank: bank.pay_with_bank,
+                active: bank.active,
+                country: bank.country,
+                currency: bank.currency,
+                type: bank.type,
+                is_deleted: bank.is_deleted,
+                createdAt: bank.createdAt,
+                updatedAt: bank.updatedAt,
+                // Include NIP sort code if available (Nigeria specific)
+                ...(bank.nip_institution_code && { nip_institution_code: bank.nip_institution_code })
+            })) : [];
+
+            return ResponseClass.Success(res, {
+                message: `Successfully fetched ${transformedBanks.length} banks${country ? ` for ${country}` : ''}`,
+                data: {
+                    banks: transformedBanks,
+                    meta: meta || null,
+                    summary: {
+                        total: transformedBanks.length,
+                        country: country || 'all',
+                        active_banks: transformedBanks.filter(bank => bank.active).length,
+                        inactive_banks: transformedBanks.filter(bank => !bank.active).length,
+                        countries_available: [...new Set(transformedBanks.map(bank => bank.country))].sort(),
+                        currencies_available: [...new Set(transformedBanks.map(bank => bank.currency))].filter(Boolean).sort()
+                    },
+                    filters_applied: {
+                        country: country || null,
+                        perPage: pageSize || 50,
+                        pay_with_bank_transfer: pay_with_bank_transfer || null,
+                        pay_with_bank: pay_with_bank || null,
+                        enabled_for_verification: enabled_for_verification || null,
+                        gateway: gateway || null,
+                        type: type || null,
+                        currency: currency || null,
+                        cursor_pagination: use_cursor === 'true'
+                    },
+                    pagination: meta ? {
+                        next: meta.next || null,
+                        previous: meta.previous || null,
+                        perPage: meta.perPage || pageSize,
+                        total: meta.total || null
+                    } : null
+                }
+            });
+        } else {
+            return ResponseClass.Error(res, {
+                message: "Failed to fetch banks from Paystack",
+                statusCode: 400,
+                data: {
+                    paystackResponse: response.data
+                }
+            });
+        }
+
+    } catch (error) {
+        console.error('❌ Error fetching banks:', error);
+
+        // Handle specific Paystack API errors
+        if (error.response && error.response.data) {
+            const errorData = error.response.data;
+            
+            return ResponseClass.Error(res, {
+                message: errorData.message || "Failed to fetch banks from Paystack",
+                statusCode: error.response.status || 400,
+                error: errorData.message,
+                data: {
+                    paystackError: errorData,
+                    request_url: error.config?.url || 'N/A'
+                }
+            });
+        }
+
+        // Handle network/timeout errors
+        if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+            return ResponseClass.Error(res, {
+                message: "Request to fetch banks timed out. Please try again.",
+                statusCode: 408,
+                data: { error: "Request timeout" }
+            });
+        }
+
+        // Handle other errors
+        return ResponseClass.Error(res, {
+            message: "Bank service unavailable",
+            statusCode: 503,
+            data: { error: error.message }
+        });
+    }
+}
+
+
 module.exports = {
   initializeBulkTransferWithInvoices,
   completeApprovedTransfers,
-  getPendingApprovalTransfers
+  getPendingApprovalTransfers,
+  VerifyAccountNumber,
+  getAllBanksByCountryInAfrica,
 };
