@@ -91,9 +91,10 @@ const dtUserProfileUpdateSchema = Joi.object({
         accountName: Joi.string().max(100).allow(''),
         accountNumber: Joi.string().max(50).allow(''),
         bankName: Joi.string().max(100).allow(''),
+        bank_slug: Joi.string().allow(''), // For Paystack integration
         bankCode: Joi.string().max(50).allow(''), // For Paystack integration
         paymentMethod: Joi.string().valid('bank_transfer', 'paypal', 'crypto', 'mobile_money', '').allow(''),
-        paymentCurrency: Joi.string().valid('USD', 'EUR', 'GBP', 'NGN', 'KES', 'GHS', '').allow('')
+        paymentCurrency: Joi.string().valid('USD', 'EUR', 'GBP', 'NGN', 'KES', 'GHS', 'CAD', 'AUD', 'ZAR', 'EGP', '').allow('')
     }).optional(),
 
     // Professional background updates

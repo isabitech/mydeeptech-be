@@ -594,6 +594,7 @@ const getDTUserProfile = async (req, res) => {
         accountNumber: user.payment_info?.account_number || "",
         bankName: user.payment_info?.bank_name || "",
         bankCode: user.payment_info?.bank_code || "",
+        bank_slug: user.payment_info?.bank_slug || "",
         paymentMethod: user.payment_info?.payment_method || "",
         paymentCurrency: user.payment_info?.payment_currency || ""
       },
@@ -666,8 +667,6 @@ const updateDTUserProfile = async (req, res) => {
       });
     }
 
-    console.log(`📝 Profile update request for user ID: ${userId}`);
-
     // Check if requesting user can update this profile (from auth middleware)
     if (req.user.userId !== userId) {
       return res.status(403).json({
@@ -680,7 +679,6 @@ const updateDTUserProfile = async (req, res) => {
     // Find the user
     const user = await DTUser.findById(userId);
     if (!user) {
-      console.log(`❌ User not found with ID: ${userId}`);
       return res.status(404).json({ 
         success: false,
         message: "User not found" 
@@ -696,16 +694,11 @@ const updateDTUserProfile = async (req, res) => {
         currentStatus: user.annotatorStatus
       });
     }
-
-    console.log(`✅ User ${user.email} is ${user.annotatorStatus}, proceeding with update`);
-    console.log(`📊 Request body received:`, JSON.stringify(req.body, null, 2));
-
     // Prepare update object
     const updateData = {};
     
     // Update personal info
     if (req.body.personalInfo) {
-      console.log(`🔄 Updating personal info...`);
       updateData.personal_info = {
         ...user.personal_info?.toObject(),
         country: req.body.personalInfo.country !== undefined ? req.body.personalInfo.country : user.personal_info?.country,
@@ -717,9 +710,6 @@ const updateDTUserProfile = async (req, res) => {
 
     // Update payment info
     if (req.body.paymentInfo) {
-      console.log(`💳 Updating payment info...`);
-      console.log(`💳 Current payment_info:`, user.payment_info);
-      console.log(`💳 Incoming paymentInfo:`, req.body.paymentInfo);
       
       updateData.payment_info = {
         ...user.payment_info?.toObject(),
@@ -727,11 +717,11 @@ const updateDTUserProfile = async (req, res) => {
         account_number: req.body.paymentInfo.accountNumber !== undefined ? req.body.paymentInfo.accountNumber : user.payment_info?.account_number,
         bank_name: req.body.paymentInfo.bankName !== undefined ? req.body.paymentInfo.bankName : user.payment_info?.bank_name,
         bank_code: req.body.paymentInfo.bankCode !== undefined ? req.body.paymentInfo.bankCode : user.payment_info?.bank_code,
+        bank_slug: req.body.paymentInfo.bank_slug !== undefined ? req.body.paymentInfo.bank_slug : user.payment_info?.bank_slug,
         payment_method: req.body.paymentInfo.paymentMethod !== undefined ? req.body.paymentInfo.paymentMethod : user.payment_info?.payment_method,
         payment_currency: req.body.paymentInfo.paymentCurrency !== undefined ? req.body.paymentInfo.paymentCurrency : user.payment_info?.payment_currency
       };
       
-      console.log(`💳 Prepared payment_info update:`, updateData.payment_info);
     }
 
     // Update professional background
@@ -797,17 +787,12 @@ const updateDTUserProfile = async (req, res) => {
       };
     }
 
-    console.log(`🔄 Final updateData being sent to MongoDB:`, JSON.stringify(updateData, null, 2));
-
     // Perform the update
     const updatedUser = await DTUser.findByIdAndUpdate(
       userId,
       { $set: updateData },
       { new: true, runValidators: true }
     );
-
-    console.log(`✅ Profile updated successfully for user: ${user.email}`);
-    console.log(`💳 Final payment_info in database:`, updatedUser.payment_info);
 
     // Return updated profile in the same format as getDTUserProfile
     const profileData = {
