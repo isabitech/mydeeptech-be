@@ -108,8 +108,6 @@ class PaystackTransferService {
         description
       };
 
-
-
       const response = await axios.post(
         `${service.baseURL}/transferrecipient`,
         recipientPayload,
