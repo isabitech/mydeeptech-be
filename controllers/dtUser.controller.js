@@ -3746,13 +3746,6 @@ const getInvoiceDashboard = async (req, res) => {
       }
     ]);
 
-    console.log(`📊 Dashboard response data:`, {
-      statistics: stats,
-      recentInvoicesCount: recentInvoices.length,
-      overdueInvoicesCount: overdueInvoices.length,
-      monthlyEarningsCount: monthlyEarnings.length
-    });
-
     res.status(200).json({
       success: true,
       data: {
