@@ -134,8 +134,13 @@
         </div>
         
         <div class="footer">
-            <p>&copy; 2024 MyDeeptech. All rights reserved.</p>
+                <p>&copy; <span id="year"></span> MyDeepTech. All rights reserved.</p>
         </div>
-    </div>
+        </div>
+
+        <!-- Inline JavaScript -->
+    <script>
+        document.getElementById("year").textContent = new Date().getFullYear();
+    </script>
 </body>
 </html>

@@ -115,9 +115,15 @@
             </p>
         </div>
         
-        <div class="footer">
-            <p>&copy; 2024 MyDeeptech. All rights reserved.</p>
+         <div class="footer">
+                <p>&copy; <span id="year"></span> MyDeepTech. All rights reserved.</p>
+                <p>This email was sent from a trusted source. Please do not reply to this email.</p>
+            </div>
         </div>
-    </div>
+
+        <!-- Inline JavaScript -->
+        <script>
+            document.getElementById("year").textContent = new Date().getFullYear();
+        </script>
 </body>
 </html>

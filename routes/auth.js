@@ -3,8 +3,33 @@ const { signup, login, getAllUsers, getUsers, updateUserRole, getUserById, getRo
 const { createProject, getProject, updateProject, deleteProject } = require('../controllers/project.js')
 const { createTask, getTask, getAllTasks, assignTask} = require('../controllers/task.js')
 const {validateVisitor} = require('../controllers/validateuser.js')
-const dtUserController = require("../controllers/dtUser.controller.js");
-const { createDTUser, verifyEmail, submitResult, updateUserStatus, setupPassword, dtUserLogin, getDTUserProfile, updateDTUserProfile, resetDTUserPassword, resendVerificationEmail, getAvailableProjects, applyToProject, getUserActiveProjects, getUserInvoices, getUnpaidInvoices, getPaidInvoices, getInvoiceDetails, getInvoiceDashboard, getDTUserDashboard, submitResultWithCloudinary, getUserResultSubmissions, uploadIdDocument, uploadResume, getProjectGuidelines } = require("../controllers/dtUser.controller.js");
+const { 
+  createDTUser, 
+  verifyEmail, 
+  submitResult, 
+  updateUserStatus,
+  // manuallyAddUserToProject,
+  setupPassword, 
+  dtUserLogin, 
+  getDTUserProfile, 
+  updateDTUserProfile, 
+  resetDTUserPassword, 
+  resendVerificationEmail, 
+  getAvailableProjects, 
+  applyToProject, 
+  getUserActiveProjects, 
+  getUserInvoices, 
+  getUnpaidInvoices, 
+  getPaidInvoices, 
+  getInvoiceDetails, 
+  getInvoiceDashboard, 
+  getDTUserDashboard, 
+  submitResultWithCloudinary, 
+  getUserResultSubmissions, 
+  uploadIdDocument, 
+  uploadResume, 
+  getProjectGuidelines 
+} = require("../controllers/dtUser.controller.js");
 const { authenticateToken, authorizeProfileAccess } = require('../middleware/auth.js');
 
 // Import password reset controllers
@@ -68,6 +93,7 @@ router.patch("/dtUserResetPassword", authenticateToken, resetDTUserPassword);
 
 // Project routes for DTUsers (approved annotators only)
 router.get("/projects", authenticateToken, getAvailableProjects);
+// router.post("/projects/manually-apply", dtUserController.manuallyAddUserToProject);
 router.post("/projects/:projectId/apply", authenticateToken, applyToProject);
 router.get("/projects/:projectId/guidelines", authenticateToken, getProjectGuidelines);
 router.get("/activeProjects/:userId", authenticateToken, getUserActiveProjects);

@@ -33,19 +33,19 @@
                         <a href="{{verificationUrl}}" class="button">Verify Email Address</a>
                         </div>
                         <p>If the button doesn't work, you can copy and paste this link into your browser:</p>
-                        <p class="link">{{verificationUrl}}</p>
+                        <a class="link" href="{{verificationUrl}}">{{verificationUrl}}</a>
                         <p>If you didn't create an account with us, please ignore this email.</p>
                         <p>Best regards,<br>The MyDeepTech Team</p>
                     </div>
-                    <div class="footer">
-                         <p>© <span id="year"></span> MyDeepTech. All rights reserved.</p>
-                        <p>This email was sent from a trusted source. Please do not reply to this email.</p>
-                    </div>
-                    </div>
+                <div class="footer">
+                        <p>&copy; <span id="year"></span> MyDeepTech. All rights reserved.</p>
+                    <p>This email was sent from a trusted source. Please do not reply to this email.</p>
+                </div>
+                </div>
 
-                      <!-- Inline JavaScript -->
-                    <script>
-                        document.getElementById("year").textContent = new Date().getFullYear();
-                    </script>
-                </body>
-                </html>
+                <!-- Inline JavaScript -->
+            <script>
+                document.getElementById("year").textContent = new Date().getFullYear();
+            </script>
+    </body>
+</html>

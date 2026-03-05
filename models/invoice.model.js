@@ -77,7 +77,7 @@ const invoiceSchema = new mongoose.Schema(
     // Payment status
     paymentStatus: {
       type: String,
-      enum: ["unpaid", "paid", "overdue", "cancelled", "disputed"],
+      enum: ["unpaid", "payment_initiated", "paid", "overdue", "cancelled", "disputed"],
       default: "unpaid"
     },
     
@@ -315,8 +315,6 @@ invoiceSchema.statics.getInvoiceStats = async function(dtUserId, adminId = null)
       }
     }
   ]);
-  
-  console.log(`📊 Raw aggregation result:`, stats);
   
   const result = stats[0] || {
     totalInvoices: 0,

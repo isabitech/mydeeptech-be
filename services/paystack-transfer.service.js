@@ -81,15 +81,18 @@ class PaystackTransferService {
         name,
         account_number,
         bank_code,
+        bankCode,
         currency = 'NGN',
         email,
         description
       } = recipientData;
 
+      
+
       const service = new PaystackTransferService();
       
       // Convert bank slug code to Paystack numeric code
-      const paystackBankCode = convertToPaystackBankCode(bank_code);
+      const paystackBankCode = (bank_code || bankCode);
       if (!paystackBankCode) {
         throw new AppError({
           message: `Invalid or unsupported bank code: ${bank_code}`,
@@ -106,8 +109,6 @@ class PaystackTransferService {
         email,
         description
       };
-
-
 
       const response = await axios.post(
         `${service.baseURL}/transferrecipient`,
@@ -273,8 +274,6 @@ class PaystackTransferService {
         })
       };
 
-
-
       const transferResponse = await axios.post(
         `${service.baseURL}/transfer/bulk`,
         bulkTransferPayload,
@@ -432,7 +431,7 @@ class PaystackTransferService {
       } else if (error.response?.data?.code === 'validation_error') {
         customMessage = `❌ Validation Error: ${errorMessage}. Please check transfer data format.`;
       }
-                          
+           
       throw new AppError({
         message: customMessage,
         statusCode: error.response?.status || 500,

@@ -594,6 +594,7 @@ const getDTUserProfile = async (req, res) => {
         accountNumber: user.payment_info?.account_number || "",
         bankName: user.payment_info?.bank_name || "",
         bankCode: user.payment_info?.bank_code || "",
+        bank_slug: user.payment_info?.bank_slug || "",
         paymentMethod: user.payment_info?.payment_method || "",
         paymentCurrency: user.payment_info?.payment_currency || ""
       },
@@ -666,8 +667,6 @@ const updateDTUserProfile = async (req, res) => {
       });
     }
 
-    console.log(`📝 Profile update request for user ID: ${userId}`);
-
     // Check if requesting user can update this profile (from auth middleware)
     if (req.user.userId !== userId) {
       return res.status(403).json({
@@ -680,7 +679,6 @@ const updateDTUserProfile = async (req, res) => {
     // Find the user
     const user = await DTUser.findById(userId);
     if (!user) {
-      console.log(`❌ User not found with ID: ${userId}`);
       return res.status(404).json({ 
         success: false,
         message: "User not found" 
@@ -696,16 +694,11 @@ const updateDTUserProfile = async (req, res) => {
         currentStatus: user.annotatorStatus
       });
     }
-
-    console.log(`✅ User ${user.email} is ${user.annotatorStatus}, proceeding with update`);
-    console.log(`📊 Request body received:`, JSON.stringify(req.body, null, 2));
-
     // Prepare update object
     const updateData = {};
     
     // Update personal info
     if (req.body.personalInfo) {
-      console.log(`🔄 Updating personal info...`);
       updateData.personal_info = {
         ...user.personal_info?.toObject(),
         country: req.body.personalInfo.country !== undefined ? req.body.personalInfo.country : user.personal_info?.country,
@@ -717,9 +710,6 @@ const updateDTUserProfile = async (req, res) => {
 
     // Update payment info
     if (req.body.paymentInfo) {
-      console.log(`💳 Updating payment info...`);
-      console.log(`💳 Current payment_info:`, user.payment_info);
-      console.log(`💳 Incoming paymentInfo:`, req.body.paymentInfo);
       
       updateData.payment_info = {
         ...user.payment_info?.toObject(),
@@ -727,11 +717,11 @@ const updateDTUserProfile = async (req, res) => {
         account_number: req.body.paymentInfo.accountNumber !== undefined ? req.body.paymentInfo.accountNumber : user.payment_info?.account_number,
         bank_name: req.body.paymentInfo.bankName !== undefined ? req.body.paymentInfo.bankName : user.payment_info?.bank_name,
         bank_code: req.body.paymentInfo.bankCode !== undefined ? req.body.paymentInfo.bankCode : user.payment_info?.bank_code,
+        bank_slug: req.body.paymentInfo.bank_slug !== undefined ? req.body.paymentInfo.bank_slug : user.payment_info?.bank_slug,
         payment_method: req.body.paymentInfo.paymentMethod !== undefined ? req.body.paymentInfo.paymentMethod : user.payment_info?.payment_method,
         payment_currency: req.body.paymentInfo.paymentCurrency !== undefined ? req.body.paymentInfo.paymentCurrency : user.payment_info?.payment_currency
       };
       
-      console.log(`💳 Prepared payment_info update:`, updateData.payment_info);
     }
 
     // Update professional background
@@ -797,17 +787,12 @@ const updateDTUserProfile = async (req, res) => {
       };
     }
 
-    console.log(`🔄 Final updateData being sent to MongoDB:`, JSON.stringify(updateData, null, 2));
-
     // Perform the update
     const updatedUser = await DTUser.findByIdAndUpdate(
       userId,
       { $set: updateData },
       { new: true, runValidators: true }
     );
-
-    console.log(`✅ Profile updated successfully for user: ${user.email}`);
-    console.log(`💳 Final payment_info in database:`, updatedUser.payment_info);
 
     // Return updated profile in the same format as getDTUserProfile
     const profileData = {
@@ -3023,7 +3008,8 @@ const applyToProject = async (req, res) => {
     console.log(`✅ User ${req.user.email} approved for project application with resume: ${user.attachments.resume_url}`);
 
     // Check if project exists and is available
-    const AnnotationProject = require('../models/annotationProject.model');
+
+
     const project = await AnnotationProject.findById(projectId);
     
     if (!project) {
@@ -3049,7 +3035,6 @@ const applyToProject = async (req, res) => {
     // }
 
     // Check if user has already applied
-    const ProjectApplication = require('../models/projectApplication.model');
   
     const existingApplication = await ProjectApplication.findOne({
       projectId: projectId,
@@ -3284,6 +3269,68 @@ const applyToProject = async (req, res) => {
     });
   }
 };
+
+const manuallyAddUserToProject = async (req, res) => {
+  
+  const applicantId = '692579fdc3f8027ecbc1fc34';
+  const projectId = '693a8f6f99988f6cda380131';
+
+  const [user, project] = await Promise.all([
+     DTUser.findById(applicantId),
+     AnnotationProject.findById(projectId),
+  ]);
+
+  if (!user) {
+    console.log('User not found for ID:', applicantId);
+    return res.status(404).json({ 
+      success: false,
+      message: "User not found"
+    });
+  }
+
+  if (!project) {
+    console.log('Project not found for ID:', projectId);
+    return res.status(404).json({ 
+      success: false,
+      message: "Project not found"
+    });
+  }
+
+  // Check if application already exists
+  const existing = await ProjectApplication.findOne({ projectId, applicantId });
+  if (existing) {
+    console.log('User has already applied to this project.');
+    return res.status(404).json({ 
+    success: false,
+    message: "Project application already exists for this user"
+  });
+  }
+
+  // Create new application
+  const application = new ProjectApplication({
+    projectId,
+    applicantId,
+    status: 'approved', // or 'pending' if you want to follow the normal flow
+    coverLetter: user.coverLetter || 'Manually added by admin.',
+    resumeUrl: user.attachments?.resume_url || '', // Add resume URL if available
+    availability: 'flexible',
+    appliedAt: new Date(),
+    approvedAt: new Date()
+  });
+
+ const applicationSaved =  await application.save();
+
+ if(!applicationSaved) {
+  console.log('Failed to save application.');
+
+  return res.status(500).json({ 
+    success: false,
+    message: "Failed to manually add user to project"
+  });
+
+ }
+  console.log('User manually added to project.');
+}
 
 // DTUser function: Get user's active projects
 const getUserActiveProjects = async (req, res) => {
@@ -3698,13 +3745,6 @@ const getInvoiceDashboard = async (req, res) => {
         $sort: { '_id.year': 1, '_id.month': 1 }
       }
     ]);
-
-    console.log(`📊 Dashboard response data:`, {
-      statistics: stats,
-      recentInvoicesCount: recentInvoices.length,
-      overdueInvoicesCount: overdueInvoices.length,
-      monthlyEarningsCount: monthlyEarnings.length
-    });
 
     res.status(200).json({
       success: true,
@@ -4781,4 +4821,5 @@ module.exports = {
   getProjectGuidelines,
   getAllUsersForRoleManagement,
   updateUserRole,
+  manuallyAddUserToProject,
 };

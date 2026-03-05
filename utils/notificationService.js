@@ -12,7 +12,7 @@ const mongoose = require('mongoose');
  */
 const createNotification = async (notificationData) => {
   try {
-    const { userId, type, title, message, data = {}, priority = 'medium' } = notificationData;
+    const { userId, type, title, message, data = {}, priority = 'medium', scheduleFor = null, actionUrl = null, actionText = null } = notificationData;
     // Determine user model type
     let userModel = 'User';
     if (mongoose.Types.ObjectId.isValid(userId)) {
@@ -27,9 +27,12 @@ const createNotification = async (notificationData) => {
       title,
       message,
       data,
-      priority
+      priority,
+      scheduleFor,
+      actionUrl,
+      actionText
     });
-    console.log(`✅ Notification created in DB:`, notification);
+    // console.log(`✅ Notification created in DB:`, notification);
     return notification;
   } catch (error) {
     console.error('❌ Error creating notification:', error);

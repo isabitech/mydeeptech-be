@@ -33,7 +33,7 @@ class AuthMailService extends BaseMailService {
             subject: 'Verify Your Email Address - MyDeepTech',
             message,
             htmlTemplate,
-            senderEmail: 'no-reply@mydeeptech.ng',
+            senderEmail: 'support@mydeeptech.ng',
             senderName: 'MyDeepTech'
         });
     }
@@ -158,7 +158,7 @@ class AuthMailService extends BaseMailService {
         let htmlTemplate = this.getMailTemplate('sendAnnotatorRejectionEmail');
         
         htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{recipientName}}', recipientName);
-        
+
         const message = `Hi ${recipientName}, thank you for your interest in becoming an annotator. While your annotator application was not approved, you have been approved as a micro-tasker and can still participate in smaller tasks on our platform.`;
         
         return await this.sendMail({
