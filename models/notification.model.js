@@ -27,6 +27,14 @@ const notificationSchema = new mongoose.Schema({
     type: Object,
     default: {}
   },
+  actionUrl: {
+    type: String,
+    default: null
+  },
+  actionText: {
+    type: String,
+    default: null
+  },
   isRead: {
     type: Boolean,
     default: false
@@ -39,6 +47,10 @@ const notificationSchema = new mongoose.Schema({
     type: String,
     enum: ['low', 'medium', 'high'],
     default: 'medium'
+  },
+  scheduleFor: {
+    type: Date,
+    default: null
   },
   createdAt: {
     type: Date,

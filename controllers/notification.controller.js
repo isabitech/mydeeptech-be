@@ -20,7 +20,7 @@ const createAdminNotification = async (req, res) => {
 
 const updateAdminNotification = async (req, res) => {
   try {
-    const data = AdminNotificationService.updateAdminNotification(
+    const data = await AdminNotificationService.updateAdminNotification(
       req.params.notificationId,
       req.body
     );
@@ -31,9 +31,9 @@ const updateAdminNotification = async (req, res) => {
       data
     });
   } catch (error) {
-    res.status(500).json({
+    res.status(error.statusCode || 500).json({
       success: false,
-      message: 'Server error updating notification',
+      message: error.message || 'Server error updating notification',
       error: error.message
     });
   }
@@ -41,7 +41,7 @@ const updateAdminNotification = async (req, res) => {
 
 const deleteAdminNotification = async (req, res) => {
   try {
-    const data = AdminNotificationService.deleteAdminNotification(req.params.notificationId);
+    const data = await AdminNotificationService.deleteAdminNotification(req.params.notificationId);
 
     res.status(200).json({
       success: true,
@@ -49,9 +49,9 @@ const deleteAdminNotification = async (req, res) => {
       data
     });
   } catch (error) {
-    res.status(500).json({
+    res.status(error.statusCode || 500).json({
       success: false,
-      message: 'Server error deleting notification',
+      message: error.message || 'Server error deleting notification',
       error: error.message
     });
   }
@@ -76,27 +76,55 @@ const getAdminNotificationAnalytics = async (req, res) => {
 };
 
 const getAdminNotifications = async (req, res) => {
+
+  const { 
+    page = 1, 
+    limit = 10, 
+    type, 
+    priority, 
+    recipientType, 
+    recipientId, 
+    isRead, 
+    startDate, 
+    endDate 
+  } = req.query;
+  
+  const skip = (page - 1) * limit;
+
+  const payloads = {
+    page: parseInt(page, 10),
+    limit: parseInt(limit, 10),
+    skip,
+    type,
+    priority,
+    recipientType,
+    recipientId,
+    isRead: isRead !== undefined ? isRead === 'true' : undefined,
+    startDate,
+    endDate
+  };
+
   try {
-    const { notifications, totalNotifications } =
-      AdminNotificationService.getAdminNotifications();
+
+    const notificationsService = await AdminNotificationService.getAdminNotifications(payloads);
 
     res.status(200).json({
       success: true,
       message: 'Admin notifications retrieved successfully',
       data: {
-        notifications,
+        notifications: notificationsService.notifications,
         pagination: {
-          currentPage: 1,
-          totalPages: 0,
-          totalNotifications,
-          hasNextPage: false,
-          hasPrevPage: false,
-          limit: 10
+          currentPage: payloads.page,
+          totalPages: Math.ceil(notificationsService.totalNotifications / payloads.limit),
+          totalCount: notificationsService.totalNotifications,
+          hasNext: payloads.page * payloads.limit < notificationsService.totalNotifications,
+          hasPrev: payloads.page > 1,
+          limit: payloads.limit
         },
         summary: {
-          totalNotifications,
-          unreadNotifications: 0,
-          recentNotifications: 0
+          totalNotifications: notificationsService.totalNotifications,
+          unreadNotifications: notificationsService.unreadNotifications,
+          recentNotifications: notificationsService.recentNotifications
         }
       }
     });
