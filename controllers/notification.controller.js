@@ -101,7 +101,7 @@ const getAdminNotifications = async (req, res) => {
     recipientId,
     isRead: isRead !== undefined ? isRead === 'true' : undefined,
     startDate,
-    endDate
+    endDate,
   };
 
   try {
@@ -116,7 +116,7 @@ const getAdminNotifications = async (req, res) => {
         pagination: {
           currentPage: payloads.page,
           totalPages: Math.ceil(notificationsService.totalNotifications / payloads.limit),
-          totalCount: notificationsService.totalNotifications,
+          totalNotifications: notificationsService.totalNotifications,
           hasNext: payloads.page * payloads.limit < notificationsService.totalNotifications,
           hasPrev: payloads.page > 1,
           limit: payloads.limit
