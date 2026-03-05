@@ -87,6 +87,8 @@ class PaystackTransferService {
         description
       } = recipientData;
 
+      
+
       const service = new PaystackTransferService();
       
       // Convert bank slug code to Paystack numeric code

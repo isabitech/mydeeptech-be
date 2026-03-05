@@ -18,14 +18,6 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
       exchangeRate: frontendExchangeRate
     } = req.body;
 
-    // console.log({ body: JSON.stringify(req.body, null, 2) });
-
-    // return res.status(200).json({
-    //   success: true,
-    //   message: "Bulk transfer with invoice-based payments is currently under development. Please check back later or contact support for assistance.",
-    //   data: null
-    // });
-
     if(!req.user?.userId) {
       return ResponseClass.Error(res, {
         message: "Unauthorized: User information missing in request",

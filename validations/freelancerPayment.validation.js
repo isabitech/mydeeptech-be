@@ -372,6 +372,11 @@ const bulkTransferPayloadSchema = Joi.object({
         'any.required': 'Bank code is required'
       }),
 
+      bankSlug: Joi.string().trim().min(2).required().messages({
+        'string.min': 'Bank slug must be at least 2 characters',
+        'any.required': 'Bank slug is required'
+      }),
+
       accountNumber: Joi.string()
         .pattern(/^\d{10}$/)
         .required()
