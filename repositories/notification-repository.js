@@ -5,10 +5,14 @@ class NotificationRepository {
 
     static async getAdminNotifications(payloads) {
 
-        const { limit, skip, type, priority, recipientType, recipientId, isRead, startDate, endDate } = payloads;
+        const { limit, skip, type, priority, recipientType, recipientId, isRead, startDate, endDate, userId } = payloads;
 
         // Build filter query
         const filterQuery = { userModel: 'DTUser' };
+        
+        if (userId) {
+            filterQuery.userId = userId;
+        }
         
         if (type) {
             filterQuery.type = type;
