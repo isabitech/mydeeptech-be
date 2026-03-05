@@ -91,7 +91,7 @@ const getPaymentDetails = async (req, res, next) => {
   try {
 
     const { paymentId } = req.params;
-    
+
     if (!paymentId) {
       return ResponseClass.Error(res, { message: "Payment ID is required", statusCode: 400  });
     }
@@ -341,10 +341,11 @@ const createTransferRecipient = async (req, res, next) => {
 // Get list of banks for recipient creation
 const getBanks = async (req, res, next) => {
   try {
+
     const { country = 'nigeria' } = req.query;
     
     const result = await PaystackTransferService.listBanks(country);
-    
+ 
     return ResponseClass.Success(res, {
       message: "Banks retrieved successfully",
       data: result
@@ -419,14 +420,14 @@ const initializeBulkTransfer = async (req, res, next) => {
     const recipients = await DTUser.find({ _id: { $in: recipientIds } })
       .select('_id fullName email payment_info');
 
-    console.log('Found recipients:', recipients.map(r => ({
-      id: r._id,
-      name: r.fullName,
-      email: r.email,
-      hasPaymentInfo: !!r.payment_info,
-      hasAccountNumber: !!r.payment_info?.account_number,
-      hasBankCode: !!r.payment_info?.bank_code
-    })));
+    // console.log('Found recipients:', recipients.map(r => ({
+    //   id: r._id,
+    //   name: r.fullName,
+    //   email: r.email,
+    //   hasPaymentInfo: !!r.payment_info,
+    //   hasAccountNumber: !!r.payment_info?.account_number,
+    //   hasBankCode: !!r.payment_info?.bank_code
+    // })));
 
     if (recipients.length !== recipientIds.length) {
       const foundIds = recipients.map(r => r._id.toString());

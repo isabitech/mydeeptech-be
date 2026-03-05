@@ -1,10 +1,11 @@
 const mongoose = require('mongoose');
 const DTUser = require('../models/dtUser.model');
 const { createNotification } = require('../utils/notificationService');
+const NotificationRepository = require('../repositories/notification-repository');
 
 class AdminNotificationService {
     static async createAdminNotification(payload) {
-        const { recipientId, recipientType, title, message, type, priority, actionUrl, actionText, relatedData, scheduleFor, targetUsers } = payload;
+        const { recipientId, recipientType, title, message, type, priority, relatedData, scheduleFor, targetUsers } = payload;
         if (!title || !message || !type) {
             const error = new Error('Title, message, and type are required');
             error.statusCode = 400;
@@ -35,9 +36,11 @@ class AdminNotificationService {
                     type,
                     title,
                     message,
+                    priority,
+                    scheduleFor: scheduleFor ? new Date(scheduleFor) : null,
+                    actionUrl: relatedData?.actionUrl || null,
+                    actionText: relatedData?.actionText || null,
                     data: {
-                        actionUrl,
-                        actionText,
                         ...relatedData
                     }
                 })
@@ -51,16 +54,61 @@ class AdminNotificationService {
         };
     }
 
-    static updateAdminNotification(notificationId, body) {
-        return {
-            notificationId,
-            updatedFields: Object.keys(body),
-            updatedAt: new Date().toISOString()
-        };
+    static async updateAdminNotification(notificationId, body) {
+        const { title, message, type, priority, relatedData, scheduleFor } = body;
+        
+        if (!title || !message || !type) {
+            const error = new Error('Title, message, and type are required');
+            error.statusCode = 400;
+            throw error;
+        }
+
+        try {
+            const updatedNotification = await NotificationRepository.updateAdminNotification(
+                notificationId, 
+                {
+                    title,
+                    message,
+                    type,
+                    priority: priority || 'medium',
+                    scheduleFor: scheduleFor ? new Date(scheduleFor) : null,
+                    actionUrl: relatedData?.actionUrl || null,
+                    actionText: relatedData?.actionText || null,
+                    relatedData: relatedData || {}
+                }
+            );
+
+            return {
+                notificationId,
+                notification: updatedNotification,
+                updatedAt: new Date().toISOString()
+            };
+        } catch (error) {
+            if (error.message === 'Notification not found') {
+                const notFoundError = new Error('Notification not found');
+                notFoundError.statusCode = 404;
+                throw notFoundError;
+            }
+            throw error;
+        }
     }
 
-    static deleteAdminNotification(notificationId) {
-        return { notificationId };
+    static async deleteAdminNotification(notificationId) {
+        try {
+            const deletedNotification = await NotificationRepository.deleteAdminNotification(notificationId);
+            return { 
+                notificationId,
+                deletedNotification,
+                deletedAt: new Date().toISOString()
+            };
+        } catch (error) {
+            if (error.message === 'Notification not found') {
+                const notFoundError = new Error('Notification not found');
+                notFoundError.statusCode = 404;
+                throw notFoundError;
+            }
+            throw error;
+        }
     }
 
     static getAnalytics() {
@@ -108,11 +156,8 @@ class AdminNotificationService {
         };
     }
 
-    static getAdminNotifications() {
-        return {
-            notifications: [],
-            totalNotifications: 0
-        };
+    static getAdminNotifications(payloads) {
+        return NotificationRepository.getAdminNotifications(payloads);
     }
 
     static createAnnouncement(adminEmail, payload) {
@@ -166,6 +211,7 @@ class AdminNotificationService {
     }
 
     static async cleanupNotifications(adminEmail, payload) {
+
         const { daysOld = 30, notificationType = 'all' } = payload;
 
         return {
@@ -180,6 +226,7 @@ class AdminNotificationService {
     }
 
     static async broadcastNotification(adminEmail, payload) {
+
         const { title, message, priority = 'medium', targetUsers = 'all', type = 'system_announcement' } = payload;
 
         if (!title || !message) {
