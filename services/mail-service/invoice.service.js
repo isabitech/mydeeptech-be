@@ -41,7 +41,7 @@ class InvoiceMailService extends BaseMailService {
         console.log(`Preparing to send partner invoice to ${recipientEmail}`);
         let htmlTemplate = this.getMailTemplate('sendPartnerInvoiceEmail');
         
-        const { name, amount, due_date, description = 'Partner invoice', companyName = 'MyDeepTech' } = invoiceData;
+        const { name, amount, due_date, description = 'Partner invoice', companyName = 'MyDeepTech', currency  } = invoiceData;
         const formattedAmount = amount ? `$${parseFloat(amount).toFixed(2)}` : 'TBD';
         const formattedDueDate = due_date ? new Date(due_date).toLocaleDateString('en-US', {
             year: 'numeric',
@@ -54,8 +54,9 @@ class InvoiceMailService extends BaseMailService {
         htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{formattedAmount}}', formattedAmount);
         htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{formattedDueDate}}', formattedDueDate);
         htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{description}}', description);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{currency}}', currency || 'USD');
         
-        const message = `Hi ${recipientName}, you have received a new invoice for ${formattedAmount} from ${companyName}. Due date: ${formattedDueDate}.`;
+        const message = `Hi ${recipientName}, you have received a new invoice for ${currency}${formattedAmount} from ${companyName}. Due date: ${formattedDueDate}.`;
         
         return await this.sendMail({
             recipientEmail,
