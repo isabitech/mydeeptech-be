@@ -12,6 +12,7 @@ class PartnerInvoiceController {
                 ...(due_date && { due_date }),
                 ...(description && { description }),
                 ...(email && { email }),
+                ...(currency && { currency }),
             }
             const invoice = await PartnerInvoiceService.createInvoice(invoicePayload);
             return ResponseClass.Success(res, { message: "Invoice created successfully", data: invoice });

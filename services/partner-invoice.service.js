@@ -7,7 +7,7 @@ const MailService = require('./mail-service/mail-service');
 class PartnerInvoiceService {
     static async createInvoice(payload) {
         try {
-            const { name, amount, duration, email, due_date, description } = payload;
+            const { name, amount, duration, email, due_date, description, currency } = payload;
             const invoicePayload = {
                 ...(name && { name }),
                 ...(amount && { amount }),
@@ -15,6 +15,7 @@ class PartnerInvoiceService {
                 ...(due_date && { due_date }),
                 ...(description && { description }),
                 ...(email && { email }),
+                ...(currency && { currency }),
             }
             const createdInvoice = await PartnerInvoiceRepository.createInvoice(invoicePayload);
             if (!createdInvoice) {
@@ -54,13 +55,14 @@ class PartnerInvoiceService {
         if (!id) {
             throw new AppError({ message: "Invoice ID is required", statusCode: 400 });
         }
-        const { name, amount, duration, email, due_date } = payload;
+        const { name, amount, duration, email, due_date, currency } = payload;
         const invoicePayload = {
             ...(name && { name }),
             ...(amount && { amount }),
             ...(duration && { duration }),
             ...(due_date && { due_date }),
             ...(email && { email }),
+            ...(currency && { currency }),
         }
         const updatedInvoice = await PartnerInvoiceRepository.updateInvoice(id, invoicePayload);
         if (!updatedInvoice) {
