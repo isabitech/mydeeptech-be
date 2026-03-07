@@ -20,7 +20,8 @@ class PartnerInvoiceMailer {
             due_date,
             description,
             action_url,
-            companyName = "MyDeepTech"
+            companyName = "MyDeepTech",
+            currency 
         } = invoice;
 
         if (!email) {
