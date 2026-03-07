@@ -4,7 +4,7 @@ const ResponseClass = require('../utils/response-handler');
 class PartnerInvoiceController {
     static async createInvoice(req, res, next) {
         try {
-            const { name, amount, duration, email, due_date, description } = req.body;
+            const { name, amount, duration, email, due_date, description , currency} = req.body;
             const invoicePayload = {
                 ...(name && { name }),
                 ...(amount && { amount }),
