@@ -6,7 +6,6 @@ const PaymentNotificationService = require("../../services/mail-service/payment-
 const { convertUSDToNGN } = require("../../utils/exchangeRateService");
 const envConfig = require("../../config/envConfig");
 
-
 // New Bulk Transfer Controller with Invoice-based Payments
 const initializeBulkTransferWithInvoices = async (req, res) => {
  const {
@@ -116,14 +115,7 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
     let exchangeRate;
     let exchangeRateSource = 'api'; // Track the source for logging
     
-    // First, try to get exchange rate from the service
-    try {
-      exchangeRate = await convertUSDToNGN(1); // Test with $1
-      exchangeRateSource = 'api';
-    } catch (rateError) {
-      console.warn('Exchange rate service failed:', rateError.message);
-      
-      // If service fails, check for frontend-provided exchange rate
+     // If service fails, check for frontend-provided exchange rate
       if (typeof frontendExchangeRate === 'number' && frontendExchangeRate > 0) {
         exchangeRate = Number(Number(frontendExchangeRate).toFixed(2));
         exchangeRateSource = 'frontend';
@@ -139,22 +131,13 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
           statusCode: 503,
           error: "Exchange rate service unavailable",
           data: {
-            exchangeRateError: rateError.message,
+            exchangeRateError: "Exchange rate service unavailable",
             frontendExchangeRateInfo: exchangeRateInfo,
             message: "Please provide a valid exchange rate value or try again when the service is available",
             expectedFormat: "exchangeRate should be a positive number (e.g., 1650.50)"
           }
         });
       }
-    }
-    
-    // If API worked but we have a frontend rate, prefer the frontend rate for manual override
-    if (exchangeRateSource === 'api' && typeof frontendExchangeRate === 'number' && frontendExchangeRate > 0) {
-      const apiRate = exchangeRate;
-      exchangeRate = Number(Number(frontendExchangeRate).toFixed(2));
-      exchangeRateSource = 'frontend_override';
-      console.log(`Using frontend override exchange rate: ${exchangeRate} (API rate was: ${apiRate})`);
-    }
 
     // Create mapping between transfer requests and invoices
     const transferInvoiceMap = new Map();
@@ -195,12 +178,6 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
           exchangeRate: ngnAmount / usdAmount
         });
         
-        // TEST MODE: Override with smaller amounts for testing
-        // const isTestMode = process.env.PAYSTACK_SECRET_KEY?.startsWith('sk_test_');
-        // if (isTestMode && ngnAmount > 2000) {
-        //   ngnAmount = Math.min(ngnAmount, 500); // Cap at ₦500 for testing
-        // }
-
         totalUSDAmount += usdAmount;
         totalNGNAmount += ngnAmount;
 
@@ -277,10 +254,7 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
         data: { errors }
       });
     }
-
-    // Debug: Log processedTransfers and return early for inspection
-    // console.log('Processed transfers payload for Paystack:', JSON.stringify(processedTransfers, null, 2));
-    
+  
     // Initiate bulk transfer with Paystack
     let bulkTransferResponse;
     try {
@@ -367,10 +341,10 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
             status: 'approval_required'
           });
 
-          console.log(`⏳ Invoice ${invoice.invoiceNumber} pending approval`);
+          console.log(`Invoice ${invoice.invoiceNumber} pending approval`);
 
         } catch (error) {
-          console.error(`❌ Error processing invoice ${invoice._id}:`, error);
+          console.error(`Error processing invoice ${invoice._id}:`, error);
         }
       }
 
@@ -380,12 +354,12 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
       
       if (approvalUrl) {
         // Send approval required notification to admin
-        console.log(`📧 Sending approval required notification to admin: ${adminEmail}`);
+        console.log(`Sending approval required notification to admin: ${adminEmail}`);
         // You could create a new email template for approval notifications
       }
 
       return ResponseClass.Success(res, {
-        message: `⚠️ Transfer submitted but requires manual approval. ${pendingInvoices.length} invoices pending approval.`,
+        message: `Transfer submitted but requires manual approval. ${pendingInvoices.length} invoices pending approval.`,
         data: {
           success: true,
           batchId,
@@ -423,7 +397,7 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
     }
 
     // If no approval required, process immediately as before
-    console.log('✅ Transfer approved automatically, processing payments...');
+    console.log('Transfer approved automatically, processing payments...');
 
     // Mark invoices as paid and send email notifications immediately 
     // (when no approval is required)
@@ -461,10 +435,10 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
           processedAt: new Date(),
           processedBy: req.user?.userId || req.user?.id
         };
-        
+
         await invoice.save();
 
-        console.log(`✅ Invoice ${invoice.invoiceNumber} marked as paid immediately`);
+        console.log(`Invoice ${invoice.invoiceNumber} marked as paid immediately`);
 
         // Send payment confirmation email to recipient immediately
         const paymentData = {
@@ -484,20 +458,20 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
         // Send recipient email
         if (recipientEmail) {
           try {
-            console.log(`📨 Sending payment confirmation to ${recipientEmail}...`);
+            console.log(`Sending payment confirmation to ${recipientEmail}...`);
             await PaymentNotificationService.sendPaymentConfirmation(
               recipientEmail,
               recipientName || 'Recipient',
               paymentData
             );
-            console.log(`📧 ✅ Payment confirmation sent for invoice ${invoice.invoiceNumber}`);
+            console.log(`Payment confirmation sent for invoice ${invoice.invoiceNumber}`);
             emailResults.push({
               invoiceNumber: invoice.invoiceNumber,
               recipientEmail,
               status: 'sent'
             });
           } catch (emailError) {
-            console.error(`❌ Failed to send payment email for invoice ${invoice.invoiceNumber}:`, emailError);
+            console.error(`Failed to send payment email for invoice ${invoice.invoiceNumber}:`, emailError);
             emailResults.push({
               invoiceNumber: invoice.invoiceNumber,
               recipientEmail,
@@ -506,7 +480,7 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
             });
           }
         } else {
-          console.log(`⚠️ No email address found for invoice ${invoice.invoiceNumber}`);
+          console.log(`No email address found for invoice ${invoice.invoiceNumber}`);
           emailResults.push({
             invoiceNumber: invoice.invoiceNumber,
             recipientEmail: 'N/A',
@@ -532,10 +506,10 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
               'Administrator',
               adminNotificationData
             );
-            console.log(`📧 ✅ Admin notification sent for invoice ${invoice.invoiceNumber}`);
+            console.log(`Admin notification sent for invoice ${invoice.invoiceNumber}`);
           }
         } catch (adminEmailError) {
-          console.error(`❌ Failed to send admin notification for invoice ${invoice.invoiceNumber}:`, adminEmailError);
+          console.error(` Failed to send admin notification for invoice ${invoice.invoiceNumber}:`, adminEmailError);
         }
 
         processedInvoices.push({
