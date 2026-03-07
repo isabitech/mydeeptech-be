@@ -11,7 +11,7 @@ class PartnerInvoiceController {
                 ...(duration && { duration }),
                 ...(due_date && { due_date }),
                 ...(description && { description }),
-                ...(email && { email }),
+                ...(email && { email }),    
                 ...(currency && { currency }),
             }
             const invoice = await PartnerInvoiceService.createInvoice(invoicePayload);
