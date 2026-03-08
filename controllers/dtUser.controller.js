@@ -3787,11 +3787,9 @@ const getInvoiceDashboard = async (req, res) => {
 
     // Debug: Get all invoices for this user to inspect their paymentStatus
     const allInvoices = await Invoice.find({ dtUserId: objectId }).select('invoiceAmount paymentStatus paidAt createdAt');
-    console.log(`🔍 All user invoices:`, allInvoices);
 
     // Get comprehensive statistics
     const stats = await Invoice.getInvoiceStats(objectId);
-    console.log(`📈 Calculated stats:`, stats);
 
     // Get recent invoices (last 5)
     const recentInvoices = await Invoice.find({ dtUserId: objectId })

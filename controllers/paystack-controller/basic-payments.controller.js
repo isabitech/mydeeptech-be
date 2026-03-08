@@ -51,6 +51,7 @@ const initializeFreelancerPayment = async (req, res, next) => {
 // Verify payment
 const verifyPayment = async (req, res, next) => {
   try {
+  
     const { reference } = req.params;
 
     if (!reference) {
