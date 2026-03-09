@@ -45,6 +45,6 @@ router.delete('/:id/delete', authenticateToken, authenticateAdmin, validateReque
 
 router.post('/user/assign', authenticateToken, validateRequest({ body: assignDomainToUserSchema }), domainToUserController.assignDomainToUser);
 router.get('/user/domains', authenticateToken, domainToUserController.fetchDomainsForUser);
-router.post('/user/:id/remove', authenticateToken, authenticateAdmin, validateRequest({ params: idSchema }), domainToUserController.removeDomainFromUser);
+router.post('/user/:id/remove', authenticateToken,  validateRequest({ params: idSchema }), domainToUserController.removeDomainFromUser);
 router.get('/user/all', authenticateToken, authenticateAdmin, domainToUserController.getAllDomainToUser);
 module.exports = router;
