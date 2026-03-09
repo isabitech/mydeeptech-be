@@ -13,5 +13,6 @@ router.get("/pagination", authenticateToken, authenticateAdmin, PartnerInvoiceCo
 router.get("/:id", authenticateToken, authenticateAdmin, validateRequest({ params: IdSchema }), PartnerInvoiceController.fetchInvoiceById);
 router.patch("/:id", authenticateToken, authenticateAdmin, validateRequest({ params: IdSchema, body: updateInvoiceSchema }), PartnerInvoiceController.updateInvoice);
 router.delete("/:id", authenticateToken, authenticateAdmin, validateRequest({ params: IdSchema }), PartnerInvoiceController.deleteInvoice);
+router.post("/send", authenticateToken, authenticateAdmin, validateRequest({ body: IdSchema }), PartnerInvoiceController.sendInvoiceMail);
 
 module.exports = router;

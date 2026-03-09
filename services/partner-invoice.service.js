@@ -80,6 +80,16 @@ class PartnerInvoiceService {
         }
         return deletedInvoice;
     }
+    static async sendInvoiceMail(id) {
+        const mail = await this.fetchInvoiceById(id);
+        console.log("Mail details: ", mail);
+        const Sendmail = await MailService.sendPartnerInvoiceEmail(mail.email, mail.name, mail);
+        if (Sendmail) {
+            return true;
+        } else {
+            throw new AppError({ message: "Failed to send invoice mail", statusCode: 500 });
+        }
+    }
 }
 
 module.exports = PartnerInvoiceService;
