@@ -36,7 +36,6 @@ const validateIdParamSchema = (fieldName = "id") => {
 }
 
 
-
 module.exports = {
     createInvoiceSchema,
     updateInvoiceSchema,
