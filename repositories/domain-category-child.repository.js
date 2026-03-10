@@ -49,7 +49,7 @@ class DomainCategoryChildRepository {
   }
 
   static deleteById(id) {
-    return DomainChildModel.findByIdAndDelete(id);
+    return DomainChildModel.findOneAndDelete({ _id: id });
   }
   static getAllDomainsWithCategorization(options = {}) {
     const { search = '', skip = 0, limit = 50 } = options;

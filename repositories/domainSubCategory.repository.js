@@ -4,7 +4,7 @@ const DomainSubCategoryModel = require("../models/domain-sub-category-model");
 class DomainSubCategoryRepository {
 
   static getAllDomainSubCategories() {
-   return DomainSubCategoryModel.find().populate("domain_category", "_id name slug");
+    return DomainSubCategoryModel.find().populate("domain_category", "_id name slug");
   }
 
   static countDocuments(query = {}) {
@@ -26,7 +26,7 @@ class DomainSubCategoryRepository {
 
   static findDomainCategorySubCategoryById(id) {
     return DomainCategoryModel.findById(id).select("domain_category name description");
-  } 
+  }
 
   static findById(id) {
     return DomainSubCategoryModel.findById(id).populate("domain_category", "_id name slug");
@@ -37,25 +37,25 @@ class DomainSubCategoryRepository {
   }
 
 
-static async create(payload) {
-  const newSubCategory = new DomainSubCategoryModel(payload);
-  const saved = await newSubCategory.save();
+  static async create(payload) {
+    const newSubCategory = new DomainSubCategoryModel(payload);
+    const saved = await newSubCategory.save();
 
-  await saved.populate({
-    path: "domain_category", 
-    select: "_id name slug",
-  });
+    await saved.populate({
+      path: "domain_category",
+      select: "_id name slug",
+    });
 
-  return saved;
-}
+    return saved;
+  }
 
   static async update(id, payload) {
     const updated = await DomainSubCategoryModel.findByIdAndUpdate(id, payload, { new: true });
     return DomainSubCategoryModel.findById(updated._id).populate("domain_category", "_id name slug");
   }
 
-  static deleteById(id) {
-    return DomainSubCategoryModel.findByIdAndDelete(id).populate("domain_category", "_id name slug");
+  static async deleteById(id) {
+    return await DomainSubCategoryModel.findOneAndDelete({ _id: id }).populate("domain_category", "_id name slug");
   }
 
 }

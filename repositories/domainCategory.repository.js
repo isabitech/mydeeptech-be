@@ -4,13 +4,13 @@ const DomainCategoryModel = require("../models/domain-category-model");
 
 class DomainCategoryRepository {
 
-  static create(payload) {
+  static async create(payload) {
     const newCategory = new DomainCategoryModel(payload);
-    return newCategory.save();
+    return await newCategory.save();
   }
 
-  static findAll() {
-    return DomainCategoryModel.find();
+  static async findAll() {
+    return await DomainCategoryModel.find();
   }
 
   static countDocuments(query = {}) {
@@ -34,12 +34,12 @@ class DomainCategoryRepository {
     return DomainCategoryModel.findOne({ name });
   }
 
-  static updateById(id, updateData) {
-    return DomainCategoryModel.findByIdAndUpdate(id, updateData, { new: true });
+  static async updateById(id, updateData) {
+    return await DomainCategoryModel.findByIdAndUpdate(id, updateData, { new: true });
   }
 
-  static deleteById(id) {
-    return DomainCategoryModel.findByIdAndDelete(id);
+  static async deleteById(id) {
+    return await DomainCategoryModel.findOneAndDelete({ _id: id });
   }
 
 }
