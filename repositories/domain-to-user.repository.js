@@ -38,7 +38,7 @@ class DomainTOUserRepository {
     }
 
     static deleteById(id) {
-        return DomainToUser.findByIdAndDelete(id);
+        return DomainToUser.findOneAndDelete({ _id: id });
     }
     static findByUserId(userId) {
         return DomainToUser.find({ user: userId })
