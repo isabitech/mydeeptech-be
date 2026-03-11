@@ -4,14 +4,15 @@ const ResponseClass = require('../utils/response-handler');
 class PartnerInvoiceController {
     static async createInvoice(req, res, next) {
         try {
-            const { name, amount, duration, email, due_date, description } = req.body;
+            const { name, amount, duration, email, due_date, description , currency} = req.body;
             const invoicePayload = {
                 ...(name && { name }),
                 ...(amount && { amount }),
                 ...(duration && { duration }),
                 ...(due_date && { due_date }),
                 ...(description && { description }),
-                ...(email && { email }),
+                ...(email && { email }),    
+                ...(currency && { currency }),
             }
             const invoice = await PartnerInvoiceService.createInvoice(invoicePayload);
             return ResponseClass.Success(res, { message: "Invoice created successfully", data: invoice });
@@ -39,7 +40,7 @@ class PartnerInvoiceController {
     static async updateInvoice(req, res, next) {
         try {
             const id = req.params.id;
-            const { name, amount, duration, email, due_date, description } = req.body;
+            const { name, amount, duration, email, due_date, description,currency } = req.body;
             const invoicePayload = {
                 ...(name && { name }),
                 ...(duration && { duration }),
@@ -47,6 +48,7 @@ class PartnerInvoiceController {
                 ...(amount && { amount }),
                 ...(description && { description }),
                 ...(email && { email }),
+                ...(currency && { currency }),
             }
             const invoice = await PartnerInvoiceService.updateInvoice(id, invoicePayload);
             return ResponseClass.Success(res, { message: "Invoice updated successfully", data: invoice });
@@ -76,6 +78,15 @@ class PartnerInvoiceController {
             const { page = 1, limit = 10, search = '' } = req.query;
             const invoices = await PartnerInvoiceService.fetchAllInvoicesWithPagination({ page, limit, search });
             return ResponseClass.Success(res, { message: "Invoices retrieved successfully", data: invoices });
+        } catch (err) {
+            next(err);
+        }
+    }
+    static async sendInvoiceMail(req, res, next) {
+        try {
+            const { id } = req.body;
+            await PartnerInvoiceService.sendInvoiceMail(id);
+            return ResponseClass.Success(res, { message: "Invoice mail sent successfully" });
         } catch (err) {
             next(err);
         }

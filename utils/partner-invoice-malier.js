@@ -20,7 +20,8 @@ class PartnerInvoiceMailer {
             due_date,
             description,
             action_url,
-            companyName = "MyDeepTech"
+            companyName = "MyDeepTech",
+            currency 
         } = invoice;
 
         if (!email) {
@@ -75,7 +76,7 @@ class PartnerInvoiceMailer {
             style="background:#FFD700;border-radius:6px;margin:0 auto;text-align:center;">
             <tr>
             <td style="color:#000000;font-size:16px;font-weight:bold;text-align:center;">
-            Amount Due: $${safeAmount}<br>
+            Amount Due: ${currency} ${safeAmount}<br>
             Due By: ${formattedDueDate}
             </td>
             </tr>
@@ -96,12 +97,12 @@ class PartnerInvoiceMailer {
 
             <tr>
             <td style="color:#555555;text-align:center;">${safeDescription}</td>
-            <td style="color:#555555;text-align:center;">$${safeAmount}</td>
+            <td style="color:#555555;text-align:center;">${currency}${safeAmount}</td>
             </tr>
 
             <tr>
             <td style="padding-top:15px;color:#000000;font-weight:bold;text-align:center;">Total</td>
-            <td style="padding-top:15px;color:#000000;font-weight:bold;text-align:center;">$${safeAmount}</td>
+            <td style="padding-top:15px;color:#000000;font-weight:bold;text-align:center;">${currency}${safeAmount}</td>
             </tr>
 
             </table>
@@ -130,7 +131,7 @@ class PartnerInvoiceMailer {
 
         Hi ${safeName},
 
-        Amount Due: $${safeAmount}
+        Amount Due: ${currency}${safeAmount}
         Due Date: ${formattedDueDate}
         Description: ${safeDescription}
 
@@ -139,7 +140,7 @@ class PartnerInvoiceMailer {
 
         const response = await sendEmail({
             to: email,
-            subject: `Invoice Reminder - $${safeAmount} Due ${formattedDueDate}`,
+            subject: `Invoice Reminder - ${currency}${safeAmount} Due ${formattedDueDate}`,
             html: htmlContent,
             text: textContent
         });

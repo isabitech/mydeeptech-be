@@ -1,4 +1,4 @@
-const NotificationModel = require('../models/notification.model');
+const Notification = require('../models/notification.model');
 
 class NotificationRepository {
     constructor() {}
@@ -48,13 +48,13 @@ class NotificationRepository {
         twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
 
         const [totalNotifications, notifications, unreadNotifications, recentNotifications] = await Promise.all([
-            NotificationModel.countDocuments(filterQuery),
-            NotificationModel.find(filterQuery)
+            Notification.countDocuments(filterQuery),
+            Notification.find(filterQuery)
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limit),
-            NotificationModel.countDocuments({ ...filterQuery, isRead: false }),
-            NotificationModel.countDocuments({ 
+            Notification.countDocuments({ ...filterQuery, isRead: false }),
+            Notification.countDocuments({ 
                 ...filterQuery, 
                 createdAt: { $gte: twentyFourHoursAgo } 
             })
@@ -73,11 +73,11 @@ class NotificationRepository {
         const { limit, skip } = payloads;
 
         const [notifications, totalNotifications] = await Promise.all([
-            NotificationModel.find({ userModel: 'DTUser' })
+            Notification.find({ userModel: 'DTUser' })
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limit),
-            NotificationModel.countDocuments({ userModel: 'DTUser' })
+            Notification.countDocuments({ userModel: 'DTUser' })
         ]);
 
         return {
@@ -88,7 +88,7 @@ class NotificationRepository {
 
     static async updateAdminNotification(notificationId, updateData) {
         try {
-            const updatedNotification = await NotificationModel.findByIdAndUpdate(
+            const updatedNotification = await Notification.findByIdAndUpdate(
                 notificationId,
                 {
                     title: updateData.title,
@@ -118,7 +118,7 @@ class NotificationRepository {
 
     static async deleteAdminNotification(notificationId) {
         try {
-            const deletedNotification = await NotificationModel.findByIdAndDelete(notificationId);
+            const deletedNotification = await Notification.findByIdAndDelete(notificationId);
             
             if (!deletedNotification) {
                 throw new Error('Notification not found');

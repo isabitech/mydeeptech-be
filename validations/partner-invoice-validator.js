@@ -11,6 +11,7 @@ const createInvoiceSchema = Joi.object({
     due_date: Joi.date().iso().required(),
     description: Joi.string().trim().optional(),
     duration: Joi.string().trim().optional(),
+    currency: Joi.string().valid("USD", "EUR", "GBP", "NGN", "KES", "GHS").required(),
 });
 
 const updateInvoiceSchema = Joi.object({
@@ -20,6 +21,7 @@ const updateInvoiceSchema = Joi.object({
     due_date: Joi.date().iso().optional(),
     description: Joi.string().trim().optional(),
     duration: Joi.string().trim().optional(),
+    currency: Joi.string().valid("USD", "EUR", "GBP", "NGN", "KES", "GHS").optional(),
 }).min(1);
 
 
@@ -32,7 +34,6 @@ const validateIdParamSchema = (fieldName = "id") => {
         })
     });
 }
-
 
 
 module.exports = {
