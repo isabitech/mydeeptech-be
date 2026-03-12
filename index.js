@@ -5,6 +5,7 @@ const morgan = require('morgan');
 const { createServer } = require('http');
 const { initializeSocketIO } = require('./utils/chatSocketService');
 const { initializeHVNCSocket } = require('./services/hvnc-websocket.service');
+const { initializeDeviceManagementSocket } = require('./config/socket');
 const { initRedis, closeRedis } = require('./config/redis');
 
 // Conditionally load Swagger (optional dependency)
@@ -31,6 +32,7 @@ const chatRoute = require('./routes/chat');
 const qaRoute = require('./routes/qa');
 const domainsRoute = require('./routes/domains.routes');
 const newDomainsRoute = require('./routes/domain.routes');
+const rolesPermissionRoute = require('./routes/roles-permission.routes');
 const envConfig = require('./config/envConfig');
 const partnerInvoiceRoute = require('./routes/partnerInvoice.routes');
 const paymentRoutes = require('./routes/payment.routes');
@@ -49,6 +51,9 @@ initializeSocketIO(server);
 
 // Initialize HVNC WebSocket functionality
 initializeHVNCSocket(server);
+
+// Initialize Socket.IO for device management and real-time logs
+initializeDeviceManagementSocket(server);
 
 
 app.disable('x-powered-by'); // Security best practice: hide Express usage
@@ -103,7 +108,15 @@ app.use('/api/new-domain', newDomainsRoute);
 app.use('/api/partner-invoice', partnerInvoiceRoute);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/exchange-rate-by-country', exchangeRateRoutes);
+app.use('/api/roles-permission', rolesPermissionRoute);
 app.use('/api/hvnc', hvncRoutes);
+
+// Device Management Routes 
+app.use('/api/devices', require('./routes/devices.routes'));
+app.use('/api/shifts', require('./routes/shifts.routes'));
+app.use('/api/access-codes', require('./routes/accessCodes.routes'));
+app.use('/api/logs', require('./routes/logs.routes'));
+app.use('/api/users', require('./routes/users.routes'));
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
