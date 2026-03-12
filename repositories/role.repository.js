@@ -1,4 +1,4 @@
-const Role = require("../models/Role");
+const Role = require("../models/roles.model");
 
 class RoleRepository {
     //  CREATE 
@@ -9,17 +9,24 @@ class RoleRepository {
 
     //  READ 
     async findAll() {
-        return await Role.find({ isActive: true }).populate("permissions");
+        return await Role.find({ isActive: true }).populate({
+            path: 'permissions',
+            select: 'name resource action -_id',
+        });
     }
 
     async findById(id) {
-        return await Role.findById(id).populate("permissions");
+        return await Role.findById(id).populate({
+            path: 'permissions',
+            select: 'name resource action -_id',
+        });
     }
 
     async findByName(name) {
-        return await Role.findOne({ name: name.toLowerCase().trim() }).populate(
-            "permissions"
-        );
+        return await Role.findOne({ name: name.toLowerCase().trim() }).populate({
+            path: 'permissions',
+            select: 'name resource action -_id',
+        });
     }
 
     async findByIdRaw(id) {
@@ -29,9 +36,21 @@ class RoleRepository {
 
     //  UPDATE 
     async update(id, data) {
-        return await Role.findByIdAndUpdate(id, { $set: data }, { new: true }).populate(
-            "permissions"
-        );
+        const { permissions, ...otherData } = data;
+        const updateQuery = {};
+        
+        if (Object.keys(otherData).length > 0) {
+            updateQuery.$set = otherData;
+        }
+        
+        if (permissions && permissions.length > 0) {
+            updateQuery.$addToSet = { permissions: { $each: permissions } };
+        }
+
+        return await Role.findByIdAndUpdate(id, updateQuery, { new: true }).populate({
+            path: 'permissions',
+            select: 'name resource action -_id',
+        });
     }
 
     async addPermission(roleId, permissionId) {
@@ -39,7 +58,10 @@ class RoleRepository {
             roleId,
             { $addToSet: { permissions: permissionId } }, // addToSet prevents duplicates
             { new: true }
-        ).populate("permissions");
+        ).populate({
+            path: 'permissions',
+            select: 'name resource action -_id',
+        });
     }
 
     async removePermission(roleId, permissionId) {
@@ -47,7 +69,10 @@ class RoleRepository {
             roleId,
             { $pull: { permissions: permissionId } },
             { new: true }
-        ).populate("permissions");
+        ).populate({
+            path: 'permissions',
+            select: 'name resource action -_id',
+        });
     }
 
     async addManyPermissions(roleId, permissionIds = []) {
@@ -55,7 +80,10 @@ class RoleRepository {
             roleId,
             { $addToSet: { permissions: { $each: permissionIds } } },
             { new: true }
-        ).populate("permissions");
+        ).populate({
+            path: 'permissions',
+            select: 'name resource action -_id',
+        });
     }
 
     async deactivate(id) {
