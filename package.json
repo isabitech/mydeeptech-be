@@ -21,7 +21,8 @@
     "manage-questions": "node scripts/questionManager.js",
     "add-qa-status": "node scripts/addQaStatusToUsers.js update",
     "check-qa-status": "node scripts/addQaStatusToUsers.js check",
-    "update-qa-categories": "node scripts/updateQaStatusToThreeCategories.js"
+    "update-qa-categories": "node scripts/updateQaStatusToThreeCategories.js",
+    "seed-rbac": "node scripts/rbacSeeder.js"
   },
   "author": "Wura",
   "license": "ISC",

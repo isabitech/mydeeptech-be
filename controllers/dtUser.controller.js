@@ -6,14 +6,14 @@ const Assessment = require("../models/assessment.model");
 const mongoose = require("mongoose");
 const { sendVerificationEmail } = require("../utils/mailer");
 const { emailQueue } = require("../utils/emailQueue");
-const { 
-  dtUserPasswordSchema, 
-  dtUserLoginSchema, 
-  dtUserProfileUpdateSchema, 
-  adminCreateSchema, 
-  adminVerificationRequestSchema, 
-  adminVerificationConfirmSchema, 
-  dtUserPasswordResetSchema 
+const {
+  dtUserPasswordSchema,
+  dtUserLoginSchema,
+  dtUserProfileUpdateSchema,
+  adminCreateSchema,
+  adminVerificationRequestSchema,
+  adminVerificationConfirmSchema,
+  dtUserPasswordResetSchema
 } = require("../utils/authValidator");
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
@@ -59,11 +59,11 @@ const sendVerificationEmailsToUnverifiedUsers = async (req, res) => {
     for (const user of unverifiedUsers) {
       try {
         console.log(`📧 Sending verification email to: ${user.fullName} (${user.email})`);
-        
+
         // Send verification email with timeout
         const emailPromise = Promise.race([
           MailService.sendVerificationEmail(user.email, user.fullName, user._id.toString()),
-          new Promise((_, reject) => 
+          new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Email sending timeout')), 10000)
           )
         ]);
@@ -72,7 +72,7 @@ const sendVerificationEmailsToUnverifiedUsers = async (req, res) => {
         emailsSent++;
 
         console.log(`✅ Email sent successfully to: ${user.fullName} (${user.email}) - isEmailVerified: ${user.isEmailVerified}`);
-        
+
         processedUsers.push({
           name: user.fullName,
           email: user.email,
@@ -83,7 +83,7 @@ const sendVerificationEmailsToUnverifiedUsers = async (req, res) => {
       } catch (emailError) {
         emailsFailed++;
         console.error(`❌ Failed to send email to: ${user.fullName} (${user.email}) - Error: ${emailError.message}`);
-        
+
         processedUsers.push({
           name: user.fullName,
           email: user.email,
@@ -125,7 +125,7 @@ const sendVerificationEmailsToUnverifiedUsers = async (req, res) => {
 
   } catch (error) {
     console.error("❌ Error in bulk verification email process:", error);
-    
+
     if (res) {
       res.status(500).json({
         success: false,
@@ -133,7 +133,7 @@ const sendVerificationEmailsToUnverifiedUsers = async (req, res) => {
         error: error.message,
       });
     }
-    
+
     throw error;
   }
 };
@@ -167,7 +167,7 @@ const createDTUser = async (req, res) => {
     const emailPromise = Promise.race([
       // sendVerificationEmail(savedUser.email, savedUser.fullName, savedUser._id), // Modern Brevo cascade system
       MailService.sendVerificationEmail(savedUser.email, savedUser.fullName, savedUser._id.toString()), // Disabled: Old MailJet service
-      new Promise((_, reject) => 
+      new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Email sending timeout')), 15000)
       )
     ]);
@@ -175,14 +175,14 @@ const createDTUser = async (req, res) => {
     try {
       await emailPromise;
       console.log(`✅ Verification email sent successfully to ${savedUser.email}`);
-      
+
       res.status(201).json({
         message: "User created successfully. Verification email sent.",
         user: savedUser,
       });
     } catch (emailError) {
       console.error("❌ Email sending failed:", emailError.message);
-      
+
       // Still respond with success since user was created
       res.status(201).json({
         message: "User created successfully. However, there was an issue sending the verification email. Please contact support.",
@@ -254,28 +254,28 @@ const verifyEmail = async (req, res) => {
 
     // Find user by ID and email for extra security
     const user = await DTUser.findById(id);
-    
+
     if (!user) {
       console.log(`❌ User not found with ID: ${id}`);
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: "User not found" 
+        message: "User not found"
       });
     }
 
     // Verify email matches
     if (user.email !== email) {
       console.log(`❌ Email mismatch for user ${id}. Expected: ${user.email}, Got: ${email}`);
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Invalid verification link" 
+        message: "Invalid verification link"
       });
     }
 
     // Check if already verified
     if (user.isEmailVerified) {
       console.log(`✅ Email already verified for user: ${email}`);
-      return res.status(200).json({ 
+      return res.status(200).json({
         success: true,
         message: "Email is already verified",
         user: {
@@ -320,9 +320,9 @@ const setupPassword = async (req, res) => {
     // Validate input
     const { error } = dtUserPasswordSchema.validate(req.body);
     if (error) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: error.details[0].message 
+        message: error.details[0].message
       });
     }
 
@@ -332,39 +332,39 @@ const setupPassword = async (req, res) => {
 
     // Find user by ID and email for extra security
     const user = await DTUser.findById(userId);
-    
+
     if (!user) {
       console.log(`❌ User not found with ID: ${userId}`);
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: "User not found" 
+        message: "User not found"
       });
     }
 
     // Verify email matches
     if (user.email !== email) {
       console.log(`❌ Email mismatch for user ${userId}. Expected: ${user.email}, Got: ${email}`);
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Invalid request" 
+        message: "Invalid request"
       });
     }
 
     // Check if email is verified
     if (!user.isEmailVerified) {
       console.log(`❌ Email not verified for user: ${email}`);
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Email must be verified before setting up password" 
+        message: "Email must be verified before setting up password"
       });
     }
 
     // Check if password already set
     if (user.hasSetPassword) {
       console.log(`⚠️ Password already set for user: ${email}`);
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Password has already been set. Use login instead." 
+        message: "Password has already been set. Use login instead."
       });
     }
 
@@ -414,38 +414,44 @@ const dtUserLogin = async (req, res) => {
     // Validate input
     const { error } = dtUserLoginSchema.validate(req.body);
     if (error) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: error.details[0].message 
+        message: error.details[0].message
       });
     }
 
     const { email, password } = req.body;
-  
+
     // Find user by email
-    const user = await DTUser.findOne({ email });
-    
+    const user = await DTUser.findOne({ email }).populate({
+      path: 'role_permission',
+      populate: {
+        path: 'permissions',
+        model: 'Permission',
+      },
+    });
+
     if (!user) {
       console.log(`❌ User not found with email: ${email}`);
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: "User not found" 
+        message: "User not found"
       });
     }
 
     // Check if email is verified
     if (!user.isEmailVerified) {
       console.log(`❌ Email not verified for user: ${email}`);
-      
+
       // Automatically resend verification email
       try {
         console.log(`📧 Resending verification email to: ${email}`);
-        
+
         // Send verification email with timeout
         const emailPromise = Promise.race([
           MailService.sendVerificationEmail(user.email, user.fullName, user._id.toString()),
           // sendVerificationEmail(user.email, user.fullName, user._id),
-          new Promise((_, reject) => 
+          new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Email sending timeout')), 10000)
           )
         ]);
@@ -454,16 +460,16 @@ const dtUserLogin = async (req, res) => {
 
         console.log(`✅ Verification email resent successfully to: ${email}`);
 
-        return res.status(400).json({ 
+        return res.status(400).json({
           success: false,
           message: "Please verify your email first. A new verification email has been sent to your inbox.",
           emailResent: true
         });
-        
+
       } catch (emailError) {
         console.error(`❌ Failed to resend verification email to ${email}:`, emailError.message);
 
-        return res.status(400).json({ 
+        return res.status(400).json({
           success: false,
           message: "Please verify your email first. Unable to resend verification email at this time.",
           emailResent: false
@@ -474,7 +480,7 @@ const dtUserLogin = async (req, res) => {
     // Check if password is set
     if (!user.hasSetPassword || !user.password) {
       console.log(`❌ Password not set for user: ${email}`);
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
         message: "Please set up your password first",
         requiresPasswordSetup: true,
@@ -486,9 +492,9 @@ const dtUserLogin = async (req, res) => {
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       console.log(`❌ Invalid password for user: ${email}`);
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Invalid credentials" 
+        message: "Invalid credentials"
       });
     }
 
@@ -529,6 +535,7 @@ const dtUserLogin = async (req, res) => {
         microTaskerStatus: user.microTaskerStatus,
         qaStatus: user.qaStatus,
         resultLink: user.resultLink,
+        role_permission: user.role_permission, // Include role and permissions for frontend access control
         createdAt: user.createdAt,
         updatedAt: user.updatedAt
       }
@@ -553,12 +560,12 @@ const getDTUserProfile = async (req, res) => {
 
     // Find user by ID
     const user = await DTUser.findById(userId);
-    
+
     if (!user) {
       console.log(`❌ User not found with ID: ${userId}`);
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: "User not found" 
+        message: "User not found"
       });
     }
 
@@ -658,13 +665,13 @@ const getDTUserProfile = async (req, res) => {
 const updateDTUserProfile = async (req, res) => {
   try {
     const { userId } = req.params;
-    
+
     // Validate input
     const { error } = dtUserProfileUpdateSchema.validate(req.body);
     if (error) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: error.details[0].message 
+        message: error.details[0].message
       });
     }
 
@@ -680,9 +687,9 @@ const updateDTUserProfile = async (req, res) => {
     // Find the user
     const user = await DTUser.findById(userId);
     if (!user) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: "User not found" 
+        message: "User not found"
       });
     }
 
@@ -697,7 +704,7 @@ const updateDTUserProfile = async (req, res) => {
     }
     // Prepare update object
     const updateData = {};
-    
+
     // Update personal info
     if (req.body.personalInfo) {
       updateData.personal_info = {
@@ -711,7 +718,7 @@ const updateDTUserProfile = async (req, res) => {
 
     // Update payment info
     if (req.body.paymentInfo) {
-      
+
       updateData.payment_info = {
         ...user.payment_info?.toObject(),
         account_name: req.body.paymentInfo.accountName !== undefined ? req.body.paymentInfo.accountName : user.payment_info?.account_name,
@@ -722,7 +729,7 @@ const updateDTUserProfile = async (req, res) => {
         payment_method: req.body.paymentInfo.paymentMethod !== undefined ? req.body.paymentInfo.paymentMethod : user.payment_info?.payment_method,
         payment_currency: req.body.paymentInfo.paymentCurrency !== undefined ? req.body.paymentInfo.paymentCurrency : user.payment_info?.payment_currency
       };
-      
+
     }
 
     // Update professional background
@@ -888,9 +895,9 @@ const resetDTUserPassword = async (req, res) => {
     // Validate input
     const { error } = dtUserPasswordResetSchema.validate(req.body);
     if (error) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: error.details[0].message 
+        message: error.details[0].message
       });
     }
 
@@ -901,19 +908,19 @@ const resetDTUserPassword = async (req, res) => {
 
     // Find user by ID
     const user = await DTUser.findById(userId);
-    
+
     if (!user) {
       console.log(`❌ User not found with ID: ${userId}`);
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: "User not found" 
+        message: "User not found"
       });
     }
 
     // Check if user has a password set
     if (!user.hasSetPassword || !user.password) {
       console.log(`❌ User ${user.email} does not have a password set`);
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
         message: "No password is currently set. Please use the setup password endpoint instead.",
         requiresPasswordSetup: true
@@ -924,9 +931,9 @@ const resetDTUserPassword = async (req, res) => {
     const isOldPasswordValid = await bcrypt.compare(oldPassword, user.password);
     if (!isOldPasswordValid) {
       console.log(`❌ Invalid old password for user: ${user.email}`);
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "Current password is incorrect" 
+        message: "Current password is incorrect"
       });
     }
 
@@ -934,9 +941,9 @@ const resetDTUserPassword = async (req, res) => {
     const isSamePassword = await bcrypt.compare(newPassword, user.password);
     if (isSamePassword) {
       console.log(`❌ New password same as old password for user: ${user.email}`);
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: "New password must be different from current password" 
+        message: "New password must be different from current password"
       });
     }
 
@@ -981,12 +988,12 @@ const getDTUser = async (req, res) => {
     console.log(`👤 Fetching DTUser details for ID: ${id}`);
 
     const user = await DTUser.findById(id).select('-password'); // Exclude password for security
-    
+
     if (!user) {
       console.log(`❌ User not found with ID: ${id}`);
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: "User not found" 
+        message: "User not found"
       });
     }
 
@@ -1028,40 +1035,40 @@ const getAllDTUsers = async (req, res) => {
     console.log(`👥 Admin ${req.admin.email} requesting all DTUsers`);
 
     // Query parameters for filtering and pagination
-    const { 
-      page = 1, 
-      limit = 20, 
+    const {
+      page = 1,
+      limit = 20,
       status,
       verified,
       hasPassword,
-      search 
+      search
     } = req.query;
 
     // Build filter object
     const filter = {};
-    
+
     // Exclude admin users (those with admin email domains or admin-related domains)
     filter.$and = [
-      { 
+      {
         $nor: [
           { email: { $regex: /@mydeeptech\.ng$/, $options: 'i' } }, // Exclude @mydeeptech.ng emails
           { domains: { $in: ['Administration', 'Management'] } } // Exclude admin domains
         ]
       }
     ];
-    
+
     if (status) {
       filter.annotatorStatus = status;
     }
-    
+
     if (verified !== undefined) {
       filter.isEmailVerified = verified === 'true';
     }
-    
+
     if (hasPassword !== undefined) {
       filter.hasSetPassword = hasPassword === 'true';
     }
-    
+
     if (search) {
       filter.$or = [
         { fullName: { $regex: search, $options: 'i' } },
@@ -1072,7 +1079,7 @@ const getAllDTUsers = async (req, res) => {
 
     // Calculate pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
-    
+
     // Get users with pagination
     const users = await DTUser.find(filter)
       .select('-password') // Exclude password field
@@ -1086,7 +1093,7 @@ const getAllDTUsers = async (req, res) => {
 
     // Get status summary (excluding admin users)
     const statusSummary = await DTUser.aggregate([
-      { 
+      {
         $match: {
           $nor: [
             { email: { $regex: /@mydeeptech\.ng$/, $options: 'i' } }, // Exclude @mydeeptech.ng emails
@@ -1697,33 +1704,33 @@ const approveAnnotator = async (req, res) => {
     const user = await DTUser.findById(userId);
     if (!user) {
       console.log(`❌ User not found with ID: ${userId}`);
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: "User not found" 
+        message: "User not found"
       });
     }
 
     const previousStatus = user.annotatorStatus;
-    
+
     // Update the statuses based on approval/rejection
     if (newStatus === 'approved') {
       // Approved annotator: both statuses set to approved
       user.annotatorStatus = 'approved';
       user.microTaskerStatus = 'approved';
-      
+
       console.log(`✅ Setting ${user.email} as approved annotator (both statuses approved)`);
-      
+
     } else if (newStatus === 'rejected') {
       // Rejected annotator: annotator rejected but micro tasker approved
       user.annotatorStatus = 'rejected';
       user.microTaskerStatus = 'approved';
-      
+
       console.log(`❌ Setting ${user.email} as rejected annotator but approved micro tasker`);
-      
+
     } else {
       // Other statuses: only update annotator status
       user.annotatorStatus = newStatus;
-      
+
       console.log(`🔄 Setting ${user.email} annotator status to: ${newStatus}`);
     }
 
@@ -1737,7 +1744,7 @@ const approveAnnotator = async (req, res) => {
         // Send annotator approval email
         await MailService.sendAnnotatorApprovalEmail(user.email, user.fullName);
         console.log(`📧 Annotator approval email sent to: ${user.email}`);
-        
+
       } else if (newStatus === 'rejected') {
         // Send micro tasker approval email (rejection from annotator but approval for micro tasks)
         await MailService.sendAnnotatorRejectionEmail(user.email, user.fullName);
@@ -1787,7 +1794,7 @@ const getAllQAUsers = async (req, res) => {
 
     // Build filter query
     let filterQuery = {};
-    
+
     // Filter by qaStatus if provided
     if (qaStatus && ['pending', 'approved', 'rejected'].includes(qaStatus)) {
       filterQuery.qaStatus = qaStatus;
@@ -1805,7 +1812,7 @@ const getAllQAUsers = async (req, res) => {
 
     // Get total count for pagination
     const totalUsers = await DTUser.countDocuments(filterQuery);
-    
+
     // Fetch QA users with pagination
     const qaUsers = await DTUser.find(filterQuery)
       .select('fullName email qaStatus annotatorStatus microTaskerStatus createdAt updatedAt phoneNumber country')
@@ -2044,14 +2051,14 @@ const rejectAnnotator = async (req, res) => {
     const user = await DTUser.findById(userId);
     if (!user) {
       console.log(`❌ User not found with ID: ${userId}`);
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: "User not found" 
+        message: "User not found"
       });
     }
 
     const previousStatus = user.annotatorStatus;
-    
+
     // Reject annotator: annotator rejected but micro tasker approved
     user.annotatorStatus = 'rejected';
     user.microTaskerStatus = 'approved';
@@ -2109,12 +2116,12 @@ const getDTUserAdmin = async (req, res) => {
     console.log(`👤 Admin ${req.admin.email} requesting details for user: ${userId}`);
 
     const user = await DTUser.findById(userId).select('-password');
-    
+
     if (!user) {
       console.log(`❌ User not found with ID: ${userId}`);
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: "User not found" 
+        message: "User not found"
       });
     }
 
@@ -2144,9 +2151,9 @@ const requestAdminVerification = async (req, res) => {
     // Validate input
     const { error } = adminVerificationRequestSchema.validate(req.body);
     if (error) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: error.details[0].message 
+        message: error.details[0].message
       });
     }
 
@@ -2168,7 +2175,7 @@ const requestAdminVerification = async (req, res) => {
     // Check if admin email is valid
     const adminEmails = envConfig.admin.ADMIN_EMAILS ? envConfig.admin.ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase()) : [];
     const isValidAdminEmail = email.toLowerCase().endsWith('@mydeeptech.ng') || adminEmails.includes(email.toLowerCase());
-    
+
     if (!isValidAdminEmail) {
       console.log(`❌ Invalid admin email domain: ${email}`);
       return res.status(400).json({
@@ -2201,7 +2208,7 @@ const requestAdminVerification = async (req, res) => {
       // await sendAdminVerificationEmail(email, verificationCode, fullName);
       // Replaced with MailService:
       await MailService.sendAdminVerificationEmail(email, verificationCode, fullName);
-      
+
       console.log(`✅ Admin verification email sent to: ${email}`);
 
       res.status(200).json({
@@ -2216,10 +2223,10 @@ const requestAdminVerification = async (req, res) => {
 
     } catch (emailError) {
       console.error(`❌ Failed to send verification email:`, emailError);
-      
+
       // Clean up stored verification data if email fails
       adminVerificationStore.removeVerificationCode(email);
-      
+
       res.status(500).json({
         success: false,
         message: "Failed to send verification email. Please try again.",
@@ -2243,9 +2250,9 @@ const confirmAdminVerification = async (req, res) => {
     // Validate input
     const { error } = adminVerificationConfirmSchema.validate(req.body);
     if (error) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: error.details[0].message 
+        message: error.details[0].message
       });
     }
 
@@ -2337,7 +2344,7 @@ const confirmAdminVerification = async (req, res) => {
 
     // Generate and send OTP code for email verification
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
-    
+
     // Store OTP in Redis with user data
     try {
       await adminVerificationStore.setVerificationCode(newAdmin.email, otpCode, {
@@ -2346,7 +2353,7 @@ const confirmAdminVerification = async (req, res) => {
         email: newAdmin.email,
         purpose: 'email_verification'
       });
-      
+
       // Send OTP email using admin mailer
       await MailService.sendAdminVerificationEmail(newAdmin.email, otpCode, newAdmin.fullName);
       console.log(`✅ OTP code sent to admin email: ${email}`);
@@ -2396,9 +2403,9 @@ const createAdmin = async (req, res) => {
     // Validate input
     const { error } = adminCreateSchema.validate(req.body);
     if (error) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: error.details[0].message 
+        message: error.details[0].message
       });
     }
 
@@ -2420,7 +2427,7 @@ const createAdmin = async (req, res) => {
     // Check if admin email is valid (must end with @mydeeptech.ng or be in admin emails)
     const adminEmails = envConfig.admin.ADMIN_EMAILS ? envConfig.admin.ADMIN_EMAILS.split(',').map(e => e.trim().toLowerCase()) : [];
     const isValidAdminEmail = email.toLowerCase().endsWith('@mydeeptech.ng') || adminEmails.includes(email.toLowerCase());
-    
+
     if (!isValidAdminEmail) {
       console.log(`❌ Invalid admin email domain: ${email}`);
       return res.status(400).json({
@@ -2465,7 +2472,7 @@ const createAdmin = async (req, res) => {
 
     // Generate and send OTP code for email verification
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
-    
+
     // Store OTP in Redis with user data
     try {
       await adminVerificationStore.setVerificationCode(newAdmin.email, otpCode, {
@@ -2474,7 +2481,7 @@ const createAdmin = async (req, res) => {
         email: newAdmin.email,
         purpose: 'email_verification'
       });
-      
+
       // Send OTP email using admin mailer
       // await sendAdminVerificationEmail(newAdmin.email, otpCode, newAdmin.fullName);
       // Replaced with MailService:
@@ -2594,8 +2601,8 @@ const verifyAdminOTP = async (req, res) => {
 
     // Generate JWT token for login
     const token = jwt.sign(
-      { 
-        userId: admin._id, 
+      {
+        userId: admin._id,
         email: admin.email,
         isAdmin: true,
         role: admin.role || 'admin'
@@ -2664,11 +2671,11 @@ const adminLogin = async (req, res) => {
       });
     }
 
-    const admin = await DTUser.findOne({ 
+    const admin = await DTUser.findOne({
       email: email.toLowerCase(),
       isEmailVerified: true,
       hasSetPassword: true
-    });
+    }).pop;
 
     if (!admin) {
       return res.status(401).json({
@@ -2688,8 +2695,8 @@ const adminLogin = async (req, res) => {
 
     // 4️⃣ Generate JWT token
     const token = jwt.sign(
-      { 
-        userId: admin._id, 
+      {
+        userId: admin._id,
         email: admin.email,
         isAdmin: true,
         role: admin.role || 'admin'
@@ -2751,7 +2758,7 @@ const resendVerificationEmail = async (req, res) => {
 
     // Find user by email
     const user = await DTUser.findOne({ email });
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -2771,7 +2778,7 @@ const resendVerificationEmail = async (req, res) => {
     try {
       const emailPromise = Promise.race([
         sendVerificationEmail(user.email, user.fullName, user._id),
-        new Promise((_, reject) => 
+        new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Email sending timeout')), 15000)
         )
       ]);
@@ -2785,7 +2792,7 @@ const resendVerificationEmail = async (req, res) => {
         message: "Verification email sent successfully. Please check your inbox.",
         emailSent: true
       });
-      
+
     } catch (emailError) {
       console.error(`❌ Failed to resend verification email to ${email}:`, emailError.message);
 
@@ -2917,14 +2924,14 @@ const getAvailableProjects = async (req, res) => {
     if (view === 'available') {
       // Show only projects user hasn't applied to (need all applications for this)
       const allUserApps = await ProjectApplication.find({ applicantId: userId }).select('projectId').lean();
-    
+
       // This filter is filters out projects the user has applied to
 
       const allAppliedProjectIds = allUserApps.map(app => app.projectId);
       if (allAppliedProjectIds.length > 0) {
         finalFilter._id = { $nin: allAppliedProjectIds };
       }
- 
+
       projects = await AnnotationProject.find(finalFilter)
         .populate('createdBy', 'fullName email')
         .select('-assignedAdmins')
@@ -2972,13 +2979,13 @@ const getAvailableProjects = async (req, res) => {
         .skip(skip)
         .limit(limit)
         .lean();
-        totalProjects = await AnnotationProject.countDocuments(finalFilter);
+      totalProjects = await AnnotationProject.countDocuments(finalFilter);
     }
 
     // Add application and project metadata
     for (let project of projects) {
       // Add application count
-      const appCount = await ProjectApplication.countDocuments({ 
+      const appCount = await ProjectApplication.countDocuments({
         projectId: project._id,
         status: { $in: ['pending', 'approved'] }
       });
@@ -3070,7 +3077,7 @@ const applyToProject = async (req, res) => {
       annotatorStatus: user?.annotatorStatus,
       hasResume: !!(user?.attachments?.resume_url)
     });
-    
+
     if (!user || user.annotatorStatus !== 'approved') {
       console.log(`❌ User ${req.user.email} access denied - Status: ${user?.annotatorStatus || 'unknown'}`);
       return res.status(403).json({
@@ -3099,7 +3106,7 @@ const applyToProject = async (req, res) => {
 
 
     const project = await AnnotationProject.findById(projectId);
-    
+
     if (!project) {
       return res.status(404).json({
         success: false,
@@ -3123,7 +3130,7 @@ const applyToProject = async (req, res) => {
     // }
 
     // Check if user has already applied
-  
+
     const existingApplication = await ProjectApplication.findOne({
       projectId: projectId,
       applicantId: userId
@@ -3162,7 +3169,7 @@ const applyToProject = async (req, res) => {
     if (requiresAssessment) {
       // Check user's multimedia assessment status
       console.log(`🎯 Project requires multimedia assessment. User status: ${user.multimediaAssessmentStatus}`);
-      
+
       if (user.multimediaAssessmentStatus === 'approved') {
         // User already passed assessment, proceed normally
         console.log(`✅ User ${user.email} already approved for multimedia assessment`);
@@ -3171,7 +3178,7 @@ const applyToProject = async (req, res) => {
         const cooldownHours = 24;
         const lastFailedAt = user.multimediaAssessmentLastFailedAt || new Date(0);
         const cooldownEnd = new Date(lastFailedAt.getTime() + cooldownHours * 60 * 60 * 1000);
-        
+
         if (new Date() < cooldownEnd) {
           return res.status(400).json({
             success: false,
@@ -3183,17 +3190,17 @@ const applyToProject = async (req, res) => {
             }
           });
         }
-        
+
         console.log(`🔄 User ${user.email} eligible for assessment retake after cooldown`);
       }
-      
+
       if (user.multimediaAssessmentStatus !== 'approved') {
         // User needs to take the assessment
         try {
           const MultimediaAssessmentConfig = require('../models/multimediaAssessmentConfig.model');
           const assessmentConfig = await MultimediaAssessmentConfig.findById(project.assessment.assessmentId)
             .populate('projectId', 'projectName');
-          
+
           if (!assessmentConfig || !assessmentConfig.isActive) {
             return res.status(400).json({
               success: false,
@@ -3209,7 +3216,7 @@ const applyToProject = async (req, res) => {
           // Send assessment invitation email
           // const { sendAssessmentInvitation } = require('../utils/emailService');
           // const assessmentLink = `${(envConfig.FRONTEND_URL || 'https://app.mydeeptech.ng')}/assessment/${assessmentConfig._id}`;
-          
+
           // await sendAssessmentInvitation({
           //   userEmail: user.email,
           //   userName: user.fullName,
@@ -3222,7 +3229,7 @@ const applyToProject = async (req, res) => {
           //   attemptNumber: (user.multimediaAssessmentAttempts || 0) + 1,
           //   maxRetries: assessmentConfig.maxRetries
           // });
-          
+
           // Replaced with MailService:
           await MailService.sendAssessmentInvitationEmail(
             user.email,
@@ -3236,7 +3243,7 @@ const applyToProject = async (req, res) => {
 
           assessmentTriggered = true;
           console.log(`📧 Assessment invitation sent to ${user.email} for project: ${project.projectName}`);
-          
+
         } catch (assessmentError) {
           console.error(`❌ Failed to trigger assessment for user ${user.email}:`, assessmentError);
           return res.status(500).json({
@@ -3279,12 +3286,12 @@ const applyToProject = async (req, res) => {
     if (!assessmentTriggered) {
       try {
         const { sendProjectApplicationNotification } = require('../utils/projectMailer');
-        
+
         // Get project creator and assigned admins
         const projectWithAdmins = await AnnotationProject.findById(projectId)
           .populate('createdBy', 'fullName email')
           .populate('assignedAdmins', 'fullName email');
-        
+
         const applicationData = {
           applicantName: user.fullName,
           applicantEmail: user.email,
@@ -3317,7 +3324,7 @@ const applyToProject = async (req, res) => {
         }
 
         console.log(`✅ Admin notifications sent for project application: ${project.projectName}`);
-        
+
       } catch (emailError) {
         console.error(`⚠️ Failed to send admin notification for application:`, emailError.message);
         // Don't fail the request if email fails
@@ -3359,18 +3366,18 @@ const applyToProject = async (req, res) => {
 };
 
 const manuallyAddUserToProject = async (req, res) => {
-  
+
   const applicantId = '692579fdc3f8027ecbc1fc34';
   const projectId = '693a8f6f99988f6cda380131';
 
   const [user, project] = await Promise.all([
-     DTUser.findById(applicantId),
-     AnnotationProject.findById(projectId),
+    DTUser.findById(applicantId),
+    AnnotationProject.findById(projectId),
   ]);
 
   if (!user) {
     console.log('User not found for ID:', applicantId);
-    return res.status(404).json({ 
+    return res.status(404).json({
       success: false,
       message: "User not found"
     });
@@ -3378,7 +3385,7 @@ const manuallyAddUserToProject = async (req, res) => {
 
   if (!project) {
     console.log('Project not found for ID:', projectId);
-    return res.status(404).json({ 
+    return res.status(404).json({
       success: false,
       message: "Project not found"
     });
@@ -3388,10 +3395,10 @@ const manuallyAddUserToProject = async (req, res) => {
   const existing = await ProjectApplication.findOne({ projectId, applicantId });
   if (existing) {
     console.log('User has already applied to this project.');
-    return res.status(404).json({ 
-    success: false,
-    message: "Project application already exists for this user"
-  });
+    return res.status(404).json({
+      success: false,
+      message: "Project application already exists for this user"
+    });
   }
 
   // Create new application
@@ -3406,17 +3413,17 @@ const manuallyAddUserToProject = async (req, res) => {
     approvedAt: new Date()
   });
 
- const applicationSaved =  await application.save();
+  const applicationSaved = await application.save();
 
- if(!applicationSaved) {
-  console.log('Failed to save application.');
+  if (!applicationSaved) {
+    console.log('Failed to save application.');
 
-  return res.status(500).json({ 
-    success: false,
-    message: "Failed to manually add user to project"
-  });
+    return res.status(500).json({
+      success: false,
+      message: "Failed to manually add user to project"
+    });
 
- }
+  }
   console.log('User manually added to project.');
 }
 
@@ -3435,7 +3442,7 @@ const getUserActiveProjects = async (req, res) => {
     }
 
     const ProjectApplication = require('../models/projectApplication.model');
-    
+
     // Get all user's applications with project details
     const applications = await ProjectApplication.find({ applicantId: userId })
       .populate({
@@ -3491,10 +3498,10 @@ const getUserActiveProjects = async (req, res) => {
 const getUserInvoices = async (req, res) => {
   try {
     const userId = req.user.userId; // From JWT token
-    const { 
-      page = 1, 
-      limit = 20, 
-      paymentStatus, 
+    const {
+      page = 1,
+      limit = 20,
+      paymentStatus,
       projectId,
       startDate,
       endDate
@@ -3575,8 +3582,8 @@ const getUnpaidInvoices = async (req, res) => {
     const skip = (page - 1) * limit;
 
     // Get unpaid and overdue invoices
-    const unpaidInvoices = await Invoice.find({ 
-      dtUserId: userId, 
+    const unpaidInvoices = await Invoice.find({
+      dtUserId: userId,
       paymentStatus: { $in: ['unpaid', 'overdue'] }
     })
       .populate('projectId', 'projectName projectCategory')
@@ -3585,16 +3592,16 @@ const getUnpaidInvoices = async (req, res) => {
       .skip(skip)
       .limit(parseInt(limit));
 
-    const totalUnpaid = await Invoice.countDocuments({ 
-      dtUserId: userId, 
+    const totalUnpaid = await Invoice.countDocuments({
+      dtUserId: userId,
       paymentStatus: { $in: ['unpaid', 'overdue'] }
     });
 
     // Calculate total amount due
     const totalAmountDue = await Invoice.aggregate([
-      { 
-        $match: { 
-          dtUserId: new mongoose.Types.ObjectId(userId), 
+      {
+        $match: {
+          dtUserId: new mongoose.Types.ObjectId(userId),
           paymentStatus: { $in: ['unpaid', 'overdue'] }
         }
       },
@@ -3652,8 +3659,8 @@ const getPaidInvoices = async (req, res) => {
     const skip = (page - 1) * limit;
 
     // Get paid invoices
-    const paidInvoices = await Invoice.find({ 
-      dtUserId: userId, 
+    const paidInvoices = await Invoice.find({
+      dtUserId: userId,
       paymentStatus: 'paid'
     })
       .populate('projectId', 'projectName projectCategory')
@@ -3662,16 +3669,16 @@ const getPaidInvoices = async (req, res) => {
       .skip(skip)
       .limit(parseInt(limit));
 
-    const totalPaid = await Invoice.countDocuments({ 
-      dtUserId: userId, 
+    const totalPaid = await Invoice.countDocuments({
+      dtUserId: userId,
       paymentStatus: 'paid'
     });
 
     // Calculate total earnings
     const totalEarnings = await Invoice.aggregate([
-      { 
-        $match: { 
-          dtUserId: new mongoose.Types.ObjectId(userId), 
+      {
+        $match: {
+          dtUserId: new mongoose.Types.ObjectId(userId),
           paymentStatus: 'paid'
         }
       },
@@ -3726,9 +3733,9 @@ const getInvoiceDetails = async (req, res) => {
     }
 
     // Find invoice and ensure it belongs to the user
-    const invoice = await Invoice.findOne({ 
-      _id: invoiceId, 
-      dtUserId: userId 
+    const invoice = await Invoice.findOne({
+      _id: invoiceId,
+      dtUserId: userId
     })
       .populate('projectId', 'projectName projectDescription projectCategory')
       .populate('createdBy', 'fullName email')
@@ -3798,9 +3805,9 @@ const getInvoiceDashboard = async (req, res) => {
       .limit(5);
 
     // Get overdue invoices
-    const overdueInvoices = await Invoice.find({ 
-      dtUserId: objectId, 
-      paymentStatus: 'overdue' 
+    const overdueInvoices = await Invoice.find({
+      dtUserId: objectId,
+      paymentStatus: 'overdue'
     })
       .populate('projectId', 'projectName')
       .sort({ dueDate: 1 });
@@ -3930,13 +3937,13 @@ const getDTUserDashboard = async (req, res) => {
         $group: {
           _id: null,
           totalApplications: { $sum: 1 },
-          pendingApplications: { 
+          pendingApplications: {
             $sum: { $cond: [{ $eq: ['$status', 'pending'] }, 1, 0] }
           },
-          approvedApplications: { 
+          approvedApplications: {
             $sum: { $cond: [{ $eq: ['$status', 'approved'] }, 1, 0] }
           },
-          rejectedApplications: { 
+          rejectedApplications: {
             $sum: { $cond: [{ $eq: ['$status', 'rejected'] }, 1, 0] }
           }
         }
@@ -3960,22 +3967,22 @@ const getDTUserDashboard = async (req, res) => {
           _id: null,
           totalInvoices: { $sum: 1 },
           totalEarnings: { $sum: '$invoiceAmount' },
-          paidEarnings: { 
+          paidEarnings: {
             $sum: { $cond: [{ $eq: ['$paymentStatus', 'paid'] }, '$invoiceAmount', 0] }
           },
-          pendingEarnings: { 
+          pendingEarnings: {
             $sum: { $cond: [{ $eq: ['$paymentStatus', 'unpaid'] }, '$invoiceAmount', 0] }
           },
-          overdueEarnings: { 
+          overdueEarnings: {
             $sum: { $cond: [{ $eq: ['$paymentStatus', 'overdue'] }, '$invoiceAmount', 0] }
           },
-          paidInvoices: { 
+          paidInvoices: {
             $sum: { $cond: [{ $eq: ['$paymentStatus', 'paid'] }, 1, 0] }
           },
-          pendingInvoices: { 
+          pendingInvoices: {
             $sum: { $cond: [{ $eq: ['$paymentStatus', 'unpaid'] }, 1, 0] }
           },
-          overdueInvoices: { 
+          overdueInvoices: {
             $sum: { $cond: [{ $eq: ['$paymentStatus', 'overdue'] }, 1, 0] }
           }
         }
@@ -4018,7 +4025,7 @@ const getDTUserDashboard = async (req, res) => {
     const resultSubmissions = {
       totalSubmissions: user.resultSubmissions?.length || 0,
       recentSubmissions: user.resultSubmissions?.slice(-5) || [],
-      lastSubmissionDate: user.resultSubmissions?.length > 0 ? 
+      lastSubmissionDate: user.resultSubmissions?.length > 0 ?
         Math.max(...user.resultSubmissions.map(sub => new Date(sub.submissionDate))) : null
     };
 
@@ -4027,21 +4034,21 @@ const getDTUserDashboard = async (req, res) => {
       status: 'active',
       'requirements.maxAnnotators': { $gt: 0 }
     })
-    .select('projectName description budget timeline requirements status')
-    .sort({ createdAt: -1 })
-    .limit(5);
+      .select('projectName description budget timeline requirements status')
+      .sort({ createdAt: -1 })
+      .limit(5);
 
     // Check which projects user has already applied to
     const userApplications = await ProjectApplication.find({ dtUserId: userId })
       .select('projectId status');
-    
+
     const appliedProjectIds = userApplications.map(app => app.projectId.toString());
-    
+
     // Mark available projects with application status
     const availableProjectsWithStatus = availableProjects.map(project => ({
       ...project.toObject(),
       hasApplied: appliedProjectIds.includes(project._id.toString()),
-      applicationStatus: userApplications.find(app => 
+      applicationStatus: userApplications.find(app =>
         app.projectId.toString() === project._id.toString()
       )?.status || null
     }));
@@ -4049,11 +4056,11 @@ const getDTUserDashboard = async (req, res) => {
     // ===== PERFORMANCE METRICS =====
     const performanceMetrics = {
       profileCompletionPercentage: completionPercentage,
-      applicationSuccessRate: (applicationStats[0]?.totalApplications || 0) > 0 ? 
+      applicationSuccessRate: (applicationStats[0]?.totalApplications || 0) > 0 ?
         Math.round(((applicationStats[0]?.approvedApplications || 0) / applicationStats[0].totalApplications) * 100) : 0,
-      paymentRate: (invoiceStats[0]?.totalInvoices || 0) > 0 ? 
+      paymentRate: (invoiceStats[0]?.totalInvoices || 0) > 0 ?
         Math.round(((invoiceStats[0]?.paidInvoices || 0) / invoiceStats[0].totalInvoices) * 100) : 0,
-      avgEarningsPerInvoice: (invoiceStats[0]?.totalInvoices || 0) > 0 ? 
+      avgEarningsPerInvoice: (invoiceStats[0]?.totalInvoices || 0) > 0 ?
         Math.round((invoiceStats[0]?.totalEarnings || 0) / invoiceStats[0].totalInvoices) : 0,
       accountStatus: {
         annotatorStatus: user.annotatorStatus,
@@ -4065,7 +4072,7 @@ const getDTUserDashboard = async (req, res) => {
 
     // ===== NEXT STEPS RECOMMENDATIONS =====
     const nextSteps = [];
-    
+
     if (!user.isEmailVerified) {
       nextSteps.push({
         priority: 'high',
@@ -4074,7 +4081,7 @@ const getDTUserDashboard = async (req, res) => {
         description: 'Complete email verification to unlock all features'
       });
     }
-    
+
     if (!user.hasSetPassword) {
       nextSteps.push({
         priority: 'high',
@@ -4083,7 +4090,7 @@ const getDTUserDashboard = async (req, res) => {
         description: 'Create a secure password for your account'
       });
     }
-    
+
     if (completionPercentage < 80) {
       nextSteps.push({
         priority: 'medium',
@@ -4092,7 +4099,7 @@ const getDTUserDashboard = async (req, res) => {
         description: `Your profile is ${completionPercentage}% complete. Add missing information to improve your chances of approval.`
       });
     }
-    
+
     if (!user.attachments?.resume_url) {
       nextSteps.push({
         priority: 'medium',
@@ -4101,7 +4108,7 @@ const getDTUserDashboard = async (req, res) => {
         description: 'Upload your resume to showcase your experience'
       });
     }
-    
+
     if (!user.attachments?.id_document_url) {
       nextSteps.push({
         priority: 'medium',
@@ -4110,7 +4117,7 @@ const getDTUserDashboard = async (req, res) => {
         description: 'Upload a valid ID document for verification'
       });
     }
-    
+
     if (user.annotatorStatus === 'pending' && !user.resultLink) {
       nextSteps.push({
         priority: 'high',
@@ -4119,7 +4126,7 @@ const getDTUserDashboard = async (req, res) => {
         description: 'Upload a work sample to demonstrate your skills'
       });
     }
-    
+
     if (user.annotatorStatus === 'approved' && (applicationStats[0]?.totalApplications || 0) === 0) {
       nextSteps.push({
         priority: 'medium',
@@ -4142,21 +4149,21 @@ const getDTUserDashboard = async (req, res) => {
         joinedDate: user.createdAt,
         profilePicture: user.profilePicture?.url || null
       },
-      
+
       profileCompletion: {
         percentage: completionPercentage,
         sections: profileCompletion,
         completedSections: completedSections,
         totalSections: completionSections.length
       },
-      
+
       applicationStatistics: applicationStats[0] || {
         totalApplications: 0,
         pendingApplications: 0,
         approvedApplications: 0,
         rejectedApplications: 0
       },
-      
+
       financialSummary: invoiceStats[0] || {
         totalInvoices: 0,
         totalEarnings: 0,
@@ -4167,27 +4174,27 @@ const getDTUserDashboard = async (req, res) => {
         pendingInvoices: 0,
         overdueInvoices: 0
       },
-      
+
       resultSubmissions: resultSubmissions,
-      
+
       recentActivity: {
         recentApplications: recentApplications,
         recentInvoices: recentInvoices,
         recentPayments: recentPayments
       },
-      
+
       availableOpportunities: {
         availableProjects: availableProjectsWithStatus,
         projectCount: availableProjectsWithStatus.length
       },
-      
+
       performanceMetrics: performanceMetrics,
-      
+
       recommendations: {
         nextSteps: nextSteps,
         priorityActions: nextSteps.filter(step => step.priority === 'high').length
       },
-      
+
       generatedAt: new Date(),
       timeframe: {
         recentActivity: '30 days',
@@ -4217,7 +4224,7 @@ const submitResultWithCloudinary = async (req, res) => {
   try {
     const userId = req.user.userId;
     const { projectId, notes } = req.body;
-    
+
     console.log(`📤 User ${req.user.email} uploading result file`);
 
     // Validate that a file was uploaded
@@ -4245,7 +4252,7 @@ const submitResultWithCloudinary = async (req, res) => {
     try {
       // The file is already uploaded to Cloudinary via multer middleware
       const uploadResult = req.file;
-      
+
       console.log(`✅ Result uploaded to Cloudinary: ${uploadResult.filename}`);
 
       // Generate optimized URLs based on file type
@@ -4325,7 +4332,7 @@ const submitResultWithCloudinary = async (req, res) => {
 
     } catch (cloudinaryError) {
       console.error('❌ Cloudinary processing error:', cloudinaryError);
-      
+
       // Create a failed submission record
       const failedSubmission = {
         originalResultLink: '',
@@ -4380,22 +4387,22 @@ const uploadIdDocument = async (req, res) => {
     console.log(`🆔 User ${user.email} uploading ID document`);
 
     if (!req.file) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
         message: 'ID document file is required. Please upload a file.'
       });
     }
 
     // Find the user in the database
-    const dtUser = await DTUser.findOne({ 
+    const dtUser = await DTUser.findOne({
       email: user.email,
-      _id: user.userId 
+      _id: user.userId
     });
 
     if (!dtUser) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: 'User not found' 
+        message: 'User not found'
       });
     }
 
@@ -4410,7 +4417,7 @@ const uploadIdDocument = async (req, res) => {
       const updatedUser = await dtUser.save();
 
       console.log(`✅ ID document saved for user: ${user.email}`);
-      
+
       res.status(200).json({
         success: true,
         message: 'ID document uploaded and stored successfully',
@@ -4428,7 +4435,7 @@ const uploadIdDocument = async (req, res) => {
 
     } catch (cloudinaryError) {
       console.error('❌ Cloudinary processing error:', cloudinaryError);
-      return res.status(500).json({ 
+      return res.status(500).json({
         success: false,
         message: 'Failed to process uploaded ID document',
         error: cloudinaryError.message
@@ -4437,7 +4444,7 @@ const uploadIdDocument = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Error in ID document upload:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       message: 'Server error during ID document upload',
       error: error.message
@@ -4452,22 +4459,22 @@ const uploadResume = async (req, res) => {
     console.log(`📄 User ${user.email} uploading resume`);
 
     if (!req.file) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
         message: 'Resume file is required. Please upload a file.'
       });
     }
 
     // Find the user in the database
-    const dtUser = await DTUser.findOne({ 
+    const dtUser = await DTUser.findOne({
       email: user.email,
-      _id: user.userId 
+      _id: user.userId
     });
 
     if (!dtUser) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: 'User not found' 
+        message: 'User not found'
       });
     }
 
@@ -4482,7 +4489,7 @@ const uploadResume = async (req, res) => {
       const updatedUser = await dtUser.save();
 
       console.log(`✅ Resume saved for user: ${user.email}`);
-      
+
       res.status(200).json({
         success: true,
         message: 'Resume uploaded and stored successfully',
@@ -4500,7 +4507,7 @@ const uploadResume = async (req, res) => {
 
     } catch (cloudinaryError) {
       console.error('❌ Cloudinary processing error:', cloudinaryError);
-      return res.status(500).json({ 
+      return res.status(500).json({
         success: false,
         message: 'Failed to process uploaded resume',
         error: cloudinaryError.message
@@ -4509,7 +4516,7 @@ const uploadResume = async (req, res) => {
 
   } catch (error) {
     console.error('❌ Error in resume upload:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
       message: 'Server error during resume upload',
       error: error.message
@@ -4522,11 +4529,11 @@ const getUserResultSubmissions = async (req, res) => {
   try {
     const userId = req.user.userId;
     const { page = 1, limit = 10, status } = req.query;
-    
+
     console.log(`📋 User ${req.user.email} requesting result submissions`);
 
     const user = await DTUser.findById(userId).populate('resultSubmissions.projectId', 'projectName projectCategory');
-    
+
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -4535,7 +4542,7 @@ const getUserResultSubmissions = async (req, res) => {
     }
 
     let resultSubmissions = user.resultSubmissions || [];
-    
+
     // Filter by status if provided
     if (status && ['pending', 'processing', 'stored', 'failed'].includes(status)) {
       resultSubmissions = resultSubmissions.filter(submission => submission.status === status);
@@ -4702,7 +4709,7 @@ const getAllUsersForRoleManagement = async (req, res) => {
     const requestedPage = req.query.page;
     const requestedLimit = req.query.limit;
     const searchTerm = req.query.search?.trim() || '';
-    
+
     const page = Math.max(1, parseInt(requestedPage) || 1);
     // const limit = Math.min(100, Math.max(1, parseInt(requestedLimit) || 20)); // Default to 20, cap at 100
 
@@ -4725,7 +4732,7 @@ const getAllUsersForRoleManagement = async (req, res) => {
         ]
       };
     }
-   
+
     // Get total count of users for pagination metadata (with search filter)
     const totalUsers = await DTUser.countDocuments(searchQuery);
 
@@ -4773,8 +4780,8 @@ const getAllUsersForRoleManagement = async (req, res) => {
 
     res.status(200).json({
       responseCode: "200",
-      responseMessage: searchTerm 
-        ? `Users matching "${searchTerm}" retrieved successfully` 
+      responseMessage: searchTerm
+        ? `Users matching "${searchTerm}" retrieved successfully`
         : "All users retrieved successfully",
       data: transformedDTUsers,
       pagination: {
@@ -4833,7 +4840,7 @@ const updateUserRole = async (req, res) => {
     delete updatedUser.password;
 
     const userResponse = {
-        _id: user._id,
+      _id: user._id,
       firstname: user.fullName ? user.fullName.split(' ')[0] : '',
       lastname: user.fullName ? user.fullName.split(' ').slice(1).join(' ') : '',
       username: user.email.split('@')[0], // Use email prefix as username
@@ -4865,13 +4872,13 @@ const updateUserRole = async (req, res) => {
   }
 };
 
-module.exports = { 
-  createDTUser, 
-  createDTUserWithBackgroundEmail, 
-  verifyEmail, 
-  setupPassword, 
-  dtUserLogin, 
-  getDTUserProfile, 
+module.exports = {
+  createDTUser,
+  createDTUserWithBackgroundEmail,
+  verifyEmail,
+  setupPassword,
+  dtUserLogin,
+  getDTUserProfile,
   updateDTUserProfile,
   resetDTUserPassword,
   resendVerificationEmail,
