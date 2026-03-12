@@ -15,6 +15,8 @@ const {
   adminVerificationConfirmSchema,
   dtUserPasswordResetSchema
 } = require("../utils/authValidator");
+const Role = require('../models/roles.model'); // ensure model is registered
+const Permission = require('../models/permissions.model'); // ensure model is registered
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 // const { sendAdminVerificationEmail } = require("../utils/adminMailer");
@@ -423,13 +425,7 @@ const dtUserLogin = async (req, res) => {
     const { email, password } = req.body;
 
     // Find user by email
-    const user = await DTUser.findOne({ email }).populate({
-      path: 'role_permission',
-      populate: {
-        path: 'permissions',
-        model: 'Permission',
-      },
-    });
+    const user = await DTUser.findOne({ email });
 
     if (!user) {
       console.log(`❌ User not found with email: ${email}`);
@@ -535,7 +531,6 @@ const dtUserLogin = async (req, res) => {
         microTaskerStatus: user.microTaskerStatus,
         qaStatus: user.qaStatus,
         resultLink: user.resultLink,
-        role_permission: user.role_permission, // Include role and permissions for frontend access control
         createdAt: user.createdAt,
         updatedAt: user.updatedAt
       }
@@ -2674,8 +2669,16 @@ const adminLogin = async (req, res) => {
     const admin = await DTUser.findOne({
       email: email.toLowerCase(),
       isEmailVerified: true,
-      hasSetPassword: true
-    }).pop;
+      hasSetPassword: true,
+    }).populate({
+      path: 'role_permission',
+      select: 'name description permissions isActive -_id',
+      populate: {
+        path: 'permissions',
+        model: 'Permission',
+        select: 'name resource action -_id',
+      },
+    }).lean();// adds .lean() for plain JS object, faster if you don't need Mongoose methods
 
     if (!admin) {
       return res.status(401).json({
@@ -2683,6 +2686,10 @@ const adminLogin = async (req, res) => {
         message: "Invalid credentials or account not verified"
       });
     }
+    console.log("🔍 Admin raw data:", JSON.stringify({
+      role_permission: admin.role_permission || 'admin is a mess',
+      role: admin.role,
+    }, null, 2));
 
     // 3️⃣ Verify password
     const isPasswordValid = await bcrypt.compare(password, admin.password);
@@ -2699,7 +2706,7 @@ const adminLogin = async (req, res) => {
         userId: admin._id,
         email: admin.email,
         isAdmin: true,
-        role: admin.role || 'admin'
+        role: admin.role || 'admin',
       },
       envConfig.jwt.JWT_SECRET || 'your-secret-key',
       { expiresIn: '7d' }
@@ -2728,7 +2735,8 @@ const adminLogin = async (req, res) => {
         qaStatus: admin.qaStatus,
         createdAt: admin.createdAt,
         isAdmin: true,
-        role: admin.role || 'admin'
+        role: admin.role || 'admin',
+        role_permission: admin.role_permission, // Include role and permissions for frontend access control
       }
     });
 

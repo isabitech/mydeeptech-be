@@ -1,16 +1,16 @@
-const permissionRepository = require("../repositories/permission.repository");
+const PermissionRepository = require("../repositories/permission.repository");
 
 class PermissionService {
   //  CREATE 
   async createPermission(data) {
     const { name, description, resource, action } = data;
 
-    const alreadyExists = await permissionRepository.exists(name);
+    const alreadyExists = await PermissionRepository.exists(name);
     if (alreadyExists) {
       throw new Error(`Permission "${name}" already exists`);
     }
 
-    return await permissionRepository.create({ name, description, resource, action });
+    return await PermissionRepository.create({ name, description, resource, action });
   }
 
   async createManyPermissions(permissionsArray = []) {
@@ -19,7 +19,7 @@ class PermissionService {
     const results = [];
 
     for (const item of permissionsArray) {
-      const exists = await permissionRepository.exists(item.name);
+      const exists = await PermissionRepository.exists(item.name);
       if (!exists) results.push(item);
     }
 
@@ -27,56 +27,56 @@ class PermissionService {
       throw new Error("All provided permissions already exist");
     }
 
-    return await permissionRepository.createMany(results);
+    return await PermissionRepository.createMany(results);
   }
 
   //  READ 
   async getAllPermissions() {
-    return await permissionRepository.findAll();
+    return await PermissionRepository.findAll();
   }
 
   async getPermissionById(id) {
-    const permission = await permissionRepository.findById(id);
+    const permission = await PermissionRepository.findById(id);
     if (!permission) throw new Error("Permission not found");
     return permission;
   }
 
   async getPermissionByName(name) {
-    const permission = await permissionRepository.findByName(name);
+    const permission = await PermissionRepository.findByName(name);
     if (!permission) throw new Error(`Permission "${name}" not found`);
     return permission;
   }
 
   async getPermissionsByResource(resource) {
-    return await permissionRepository.findByResource(resource);
+    return await PermissionRepository.findByResource(resource);
   }
 
   async getPermissionsByAction(action) {
-    return await permissionRepository.findByAction(action);
+    return await PermissionRepository.findByAction(action);
   }
 
   //  UPDATE 
   async updatePermission(id, data) {
-    const permission = await permissionRepository.findById(id);
+    const permission = await PermissionRepository.findById(id);
     if (!permission) throw new Error("Permission not found");
 
     // Prevent name collision with another permission
     if (data.name) {
-      const existing = await permissionRepository.findByName(data.name);
+      const existing = await PermissionRepository.findByName(data.name);
       if (existing && existing._id.toString() !== id) {
         throw new Error(`Permission name "${data.name}" is already taken`);
       }
     }
 
-    return await permissionRepository.update(id, data);
+    return await PermissionRepository.update(id, data);
   }
 
   //  DELETE 
   async deletePermission(id) {
-    const permission = await permissionRepository.findById(id);
-    if (!permission) throw new Error("Permission not found");
+    const deleted = await PermissionRepository.delete(id);
+    if (!deleted) throw new Error("Permission not found");
 
-    return await permissionRepository.delete(id);
+    return deleted;
   }
 }
 

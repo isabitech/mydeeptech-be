@@ -22,7 +22,9 @@
     "add-qa-status": "node scripts/addQaStatusToUsers.js update",
     "check-qa-status": "node scripts/addQaStatusToUsers.js check",
     "update-qa-categories": "node scripts/updateQaStatusToThreeCategories.js",
-    "seed-rbac": "node scripts/rbacSeeder.js"
+    "seed-rbac": "node scripts/rbacSeeder.js",
+    "assign-super-admin": "node scripts/assignSuperAdmin.js",
+    "remove-old-admin": "node scripts/removeOldAdmin.js"
   },
   "author": "Wura",
   "license": "ISC",

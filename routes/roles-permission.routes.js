@@ -1,0 +1,32 @@
+const express = require("express");
+const router = express.Router();
+const PermissionController = require("../controllers/permission.controller");
+const RoleController = require("../controllers/role.controller");
+
+const { authenticateToken } = require('../middleware/auth');
+const { authenticateAdmin } = require('../middleware/adminAuth');
+
+const {
+    validateCreatePermission,
+    validateUpdatePermission,
+    validatePermissionId,
+    validateCreateRole,
+    validateUpdateRole,
+    validateRoleId,
+} = require('../validations/rbac.validation');
+
+// Permission routes
+router.post("/permission/create", authenticateToken, authenticateAdmin, validateCreatePermission, PermissionController.createPermission);
+router.get("/permission/all", authenticateToken, authenticateAdmin, PermissionController.getAllPermissions);
+router.get("/permission/:id", authenticateToken, authenticateAdmin, validatePermissionId, PermissionController.getPermissionById);
+router.put("/permission/update/:id", authenticateToken, authenticateAdmin, validatePermissionId, validateUpdatePermission, PermissionController.updatePermission);
+router.delete("/permission/delete/:id", authenticateToken, authenticateAdmin, validatePermissionId, PermissionController.deletePermission);
+
+// Role routes
+router.post("/role/create", authenticateToken, authenticateAdmin, validateCreateRole, RoleController.createRole);
+router.get("/role/all", authenticateToken, authenticateAdmin, RoleController.getAllRoles);
+router.get("/role/:id", authenticateToken, authenticateAdmin, validateRoleId, RoleController.getRoleById);
+router.put("/role/:id", authenticateToken, authenticateAdmin, validateRoleId, validateUpdateRole, RoleController.updateRole);
+router.delete("/role/:id", authenticateToken, authenticateAdmin, validateRoleId, RoleController.deleteRole);
+
+module.exports = router;

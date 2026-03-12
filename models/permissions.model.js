@@ -32,6 +32,8 @@ const permissionSchema = new mongoose.Schema(
         "user_roles",
         "employees",
         "settings",
+        "roles",
+        "permissions",
       ],
       required: true,
     },
@@ -53,5 +55,15 @@ const permissionSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+permissionSchema.post("findOneAndDelete", async function (doc) {
+  if (doc) {
+    await mongoose.model("Role").updateMany(
+      { permissions: doc._id },
+      { $pull: { permissions: doc._id } }
+    );
+    console.log(`🧹 Removed permission ${doc._id} from all roles`);
+  }
+});
 
 module.exports = mongoose.model("Permission", permissionSchema);
