@@ -2707,7 +2707,7 @@ const adminLogin = async (req, res) => {
 
     console.log("✅ Admin login successful for:", email);
 
-    // 5️⃣ Return success response
+    // Return success response
     res.status(200).json({
       success: true,
       message: "Admin login successful",
