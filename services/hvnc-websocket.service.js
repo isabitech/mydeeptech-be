@@ -47,81 +47,52 @@ const initializeHVNCSocket = (server) => {
     return;
   }
 
-  // Device authentication middleware
+  // Device authentication middleware - lightweight for WebSocket upgrade
   deviceNamespace.use(async (socket, next) => {
     try {
-      // First check handshake for token (standard Socket.IO clients)
-      let token = socket.handshake.auth.token || socket.handshake.query.token;
+      // Get token from query params (C++ client) or auth
+      const token = socket.handshake.query.token || socket.handshake.auth.token;
 
-      // If no token in handshake, check for C++ client token in connect data
-      if (!token && socket.handshake.auth) {
-        // Parse token from C++ client format: "40/hvnc-device,{"token":"xyz"}"
-        const authData = socket.handshake.auth;
-        if (typeof authData === "string") {
-          try {
-            const parsed = JSON.parse(authData);
-            token = parsed.token;
-          } catch (e) {
-            // Not JSON, might be in different format
-          }
-        }
-
-        // Also check if token is directly in the auth object
-        if (!token && socket.handshake.auth.token) {
-          token = socket.handshake.auth.token;
-        }
-      }
-
-      console.log("🔐 Device authentication attempt...");
+      console.log("🔐 Device WebSocket authentication middleware triggered");
+      console.log("   Socket ID:", socket.id);
+      console.log("   Token:", token);
+      console.log("   Transport:", socket.conn?.transport?.name || "unknown");
       console.log("   Token provided:", token ? "YES" : "NO");
-      console.log("   Handshake auth:", socket.handshake.auth);
-      console.log("   Handshake query:", socket.handshake.query);
-      console.log(
-        "   Raw token:",
-        token ? token.substring(0, 20) + "..." : "NULL",
-      );
+      console.log("   Query params:", Object.keys(socket.handshake.query));
+      console.log("   Headers:", Object.keys(socket.handshake.headers));
 
       if (!token) {
-        console.log("❌ No token provided in handshake or auth data");
+        console.log("❌ No token provided");
         return next(new Error("Device authentication token required"));
       }
 
-      const decoded = jwt.verify(token, envConfig.jwt.JWT_SECRET);
-      console.log("✅ Token decoded successfully:", {
-        id: decoded.id,
-        device_id: decoded.device_id,
-        type: decoded.type,
-      });
+      // Only validate JWT format/signature for upgrade - no database lookup yet
+      try {
+        const decoded = jwt.verify(token, envConfig.jwt.JWT_SECRET);
+        console.log("✅ Token signature valid:", {
+          device_id: decoded.device_id,
+          type: decoded.type,
+        });
 
-      if (decoded.type !== "device") {
-        console.log("❌ Invalid token type:", decoded.type);
-        return next(new Error("Invalid token type for device connection"));
+        if (decoded.type !== "device") {
+          console.log("❌ Invalid token type:", decoded.type);
+          return next(new Error("Invalid token type for device connection"));
+        }
+
+        // Store decoded token data for later database validation
+        socket.deviceAuth = decoded;
+        socket.authToken = token;
+
+        console.log(
+          "✅ WebSocket upgrade allowed - database validation will occur after connection",
+        );
+        next();
+      } catch (jwtError) {
+        console.log("❌ JWT verification failed:", jwtError.message);
+        return next(new Error("Invalid authentication token"));
       }
-
-      // Fetch device from database
-      console.log("🔍 Looking up device in database...");
-      const device = await HVNCDevice.findById(decoded.id);
-      console.log("📊 Database lookup result:", device ? "FOUND" : "NOT FOUND");
-
-      if (!device || device.device_id !== decoded.device_id) {
-        console.log("❌ Device validation failed");
-        console.log("   Database device:", device ? device.device_id : "NULL");
-        console.log("   Token device_id:", decoded.device_id);
-        return next(new Error("Device not found or invalid"));
-      }
-
-      if (device.status === "disabled") {
-        console.log("❌ Device is disabled");
-        return next(new Error("Device is disabled"));
-      }
-
-      socket.deviceId = device.device_id;
-      socket.device = device;
-
-      console.log("✅ Device authentication successful!");
-      next();
     } catch (error) {
-      console.error("❌ Device WebSocket auth error:", error.message);
+      console.error("❌ Device WebSocket upgrade error:", error.message);
       next(new Error("Device authentication failed"));
     }
   });
@@ -194,62 +165,111 @@ const initializeHVNCSocket = (server) => {
     }
   });
 
-  // Device connection handling
-  deviceNamespace.on("connection", (socket) => {
-    const device = socket.device;
-    console.log(`🖥️ Device connected: ${device.pc_name} (${device.device_id})`);
+  // Device connection handling - database validation happens here
+  deviceNamespace.on("connection", async (socket) => {
+    try {
+      console.log(
+        `🔌 Device WebSocket connected - starting database validation...`,
+      );
 
-    // Store device connection
-    connectedDevices.set(device.device_id, {
-      socket: socket,
-      device: device,
-      connectedAt: new Date(),
-      lastHeartbeat: new Date(),
-    });
+      // Now perform database validation (after WebSocket upgrade completed)
+      const decoded = socket.deviceAuth;
+      if (!decoded) {
+        console.log("❌ No auth data stored during upgrade");
+        socket.emit("auth_error", { message: "Authentication data missing" });
+        socket.disconnect();
+        return;
+      }
 
-    // Update device status
-    device.status = "online";
-    device.last_seen = new Date();
-    device.save();
+      console.log("🔍 Looking up device in database...");
+      console.log("   Device ID from token:", decoded.device_id);
 
-    // Join device to its room for targeted messaging
-    socket.join(`device_${device.device_id}`);
+      const device = await HVNCDevice.findById(decoded.id);
+      console.log("📊 Database lookup result:", device ? "FOUND" : "NOT FOUND");
 
-    // ✅ Send authentication success confirmation to PC agent
-    socket.emit("authenticated", {
-      success: true,
-      deviceId: device.device_id,
-      pcName: device.pc_name,
-      message: "Device authenticated and connected successfully",
-      timestamp: new Date().toISOString(),
-      socketId: socket.id,
-    });
+      if (!device || device.device_id !== decoded.device_id) {
+        console.log("❌ Device validation failed");
+        console.log("   Database device:", device ? device.device_id : "NULL");
+        console.log("   Token device_id:", decoded.device_id);
+        socket.emit("auth_error", { message: "Device not found or invalid" });
+        socket.disconnect();
+        return;
+      }
 
-    console.log(`📤 Sent 'authenticated' event to device ${device.device_id}`);
+      if (device.status === "disabled") {
+        console.log("❌ Device is disabled");
+        socket.emit("auth_error", { message: "Device is disabled" });
+        socket.disconnect();
+        return;
+      }
 
-    // Log device connection
-    HVNCActivityLog.logDeviceEvent(
-      device.device_id,
-      "device_connected",
-      {
-        socket_id: socket.id,
-        connection_type: "websocket",
+      // Authentication successful - complete setup
+      socket.deviceId = device.device_id;
+      socket.device = device;
+
+      console.log(
+        `✅ Device fully authenticated: ${device.pc_name} (${device.device_id})`,
+      );
+
+      // Store device connection
+      connectedDevices.set(device.device_id, {
+        socket: socket,
+        device: device,
+        connectedAt: new Date(),
+        lastHeartbeat: new Date(),
+      });
+
+      // Update device status
+      device.status = "online";
+      device.last_seen = new Date();
+      device.save();
+
+      // Join device to its room for targeted messaging
+      socket.join(`device_${device.device_id}`);
+
+      // ✅ Send authentication success confirmation to PC agent
+      socket.emit("authenticated", {
+        success: true,
+        deviceId: device.device_id,
+        pcName: device.pc_name,
+        message: "Device authenticated and connected successfully",
+        timestamp: new Date().toISOString(),
+        socketId: socket.id,
+      });
+
+      console.log(
+        `📤 Sent 'authenticated' event to device ${device.device_id}`,
+      );
+
+      // Log device connection
+      HVNCActivityLog.logDeviceEvent(
+        device.device_id,
+        "device_connected",
+        {
+          socket_id: socket.id,
+          connection_type: "websocket",
+          pc_name: device.pc_name,
+        },
+        {
+          status: "success",
+          ip_address: socket.handshake.address,
+        },
+      );
+
+      // Notify admins of device connection
+      adminNamespace.emit("device_online", {
+        device_id: device.device_id,
         pc_name: device.pc_name,
-      },
-      {
-        status: "success",
+        hostname: device.hostname,
+        connected_at: new Date(),
         ip_address: socket.handshake.address,
-      },
-    );
-
-    // Notify admins of device connection
-    adminNamespace.emit("device_online", {
-      device_id: device.device_id,
-      pc_name: device.pc_name,
-      hostname: device.hostname,
-      connected_at: new Date(),
-      ip_address: socket.handshake.address,
-    });
+      });
+    } catch (error) {
+      console.error(`❌ Device database validation error:`, error.message);
+      socket.emit("connect_error", { message: "Database validation failed" });
+      socket.disconnect();
+      return;
+    }
 
     // Handle device status updates
     socket.on("device_status", async (data) => {
