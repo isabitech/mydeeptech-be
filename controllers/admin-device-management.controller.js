@@ -1,5 +1,6 @@
 const HVNCDevice = require('../models/hvnc-device.model');
 const HVNCUser = require('../models/hvnc-user.model');
+const DTUser = require('../models/dtUser.model');
 const HVNCShift = require('../models/hvnc-shift.model');
 const HVNCSession = require('../models/hvnc-session.model');
 const HVNCActivityLog = require('../models/hvnc-activity-log.model');
@@ -328,11 +329,24 @@ const updateDevice = async (req, res) => {
 
     // Handle user assignment
     if (assignedUserId) {
-      const user = await HVNCUser.findById(assignedUserId).select('full_name email');
+      // Check both HVNCUser and DTUser models
+      let user = await HVNCUser.findById(assignedUserId).select('full_name email');
+      
+      if (!user) {
+        // Check DTUser model if not found in HVNCUser
+        const dtUser = await DTUser.findById(assignedUserId).select('fullName email');
+        if (dtUser) {
+          user = {
+            full_name: dtUser.fullName,
+            email: dtUser.email
+          };
+        }
+      }
+
       if (!user) {
         return res.status(404).json({
           success: false,
-          error: 'User not found'
+          error: 'User not found in either HVNC or DT users'
         });
       }
 
