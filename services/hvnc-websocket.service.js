@@ -2,43 +2,38 @@ const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 const HVNCDevice = require('../models/hvnc-device.model');
 const HVNCUser = require('../models/hvnc-user.model');
+const DTUser = require('../models/dtUser.model');
 const HVNCSession = require('../models/hvnc-session.model');
 const HVNCCommand = require('../models/hvnc-command.model');
 const HVNCActivityLog = require('../models/hvnc-activity-log.model');
+const HVNCShift = require('../models/hvnc-shift.model');
 const envConfig = require('../config/envConfig');
+const { getIO } = require('../utils/chatSocketService');
 
 let io;
 const connectedDevices = new Map(); // Track online devices: { device_id: { socket, device_info } }
 const connectedAdmins = new Map(); // Track admin connections: { admin_id: socketId }
+const connectedUsers = new Map(); // Track user connections: { user_id: socketId }
 const activeCommands = new Map(); // Track pending commands: { command_id: timeout }
+const activeSessions = new Map(); // Track active user sessions: { session_id: { user, device, socket } }
 
 /**
- * Initialize HVNC WebSocket server
- * @param {Object} server - HTTP server instance
+ * Initialize HVNC WebSocket namespaces on existing Socket.IO server
+ * @param {Object} server - HTTP server instance (for compatibility)
  */
 const initializeHVNCSocket = (server) => {
-  io = new Server(server, {
-    path: '/hvnc/socket.io',
-    cors: {
-      origin: [
-        'http://localhost:3000',
-        'http://127.0.0.1:3000',
-        'https://hvnc.mydeeptech.ng',
-        'https://admin.mydeeptech.ng',
-        envConfig.FRONTEND_URL,
-        envConfig.BACKEND_URL
-      ].filter(Boolean),
-      credentials: true,
-      methods: ['GET', 'POST']
-    },
-    transports: ['websocket', 'polling']
-  });
-
-  // Device namespace for client connections
-  const deviceNamespace = io.of('/device');
+  // Get existing Socket.IO instance from chat service
+  io = getIO();
   
-  // Admin namespace for admin dashboard
-  const adminNamespace = io.of('/admin');
+  if (!io) {
+    console.error('❌ Socket.IO instance not found. Chat service must be initialized first.');
+    return;
+  }
+
+  // Create HVNC namespaces on existing Socket.IO instance
+  const deviceNamespace = io.of('/hvnc-device');
+  const adminNamespace = io.of('/hvnc-admin'); 
+  const userNamespace = io.of('/hvnc-user');
 
   // Device authentication middleware
   deviceNamespace.use(async (socket, next) => {
@@ -102,6 +97,43 @@ const initializeHVNCSocket = (server) => {
     } catch (error) {
       console.error('Admin WebSocket auth error:', error);
       next(new Error('Admin authentication failed'));
+    }
+  });
+
+  // User authentication middleware (following chat pattern)
+  userNamespace.use(async (socket, next) => {
+    try {
+      const token = socket.handshake.auth.token;
+      if (!token) {
+        return next(new Error('User authentication token required'));
+      }
+
+      const decoded = jwt.verify(token, envConfig.jwt.JWT_SECRET);
+      
+      // Fetch user (DTUser for HVNC system)
+      const user = await DTUser.findById(decoded.userId);
+      
+      if (!user) {
+        return next(new Error('User not found'));
+      }
+
+      if (!user.isEmailVerified) {
+        return next(new Error('Email not verified'));
+      }
+
+      // Check if user is admin
+      const isAdmin = user.email && user.email.includes('@mydeeptech.ng');
+
+      socket.userId = decoded.userId;
+      socket.userEmail = user.email;
+      socket.userName = user.fullName;
+      socket.isAdmin = isAdmin;
+      socket.user = user;
+      
+      next();
+    } catch (error) {
+      console.error('User WebSocket auth error:', error);
+      next(new Error('User authentication failed'));
     }
   });
 
@@ -570,6 +602,298 @@ const initializeHVNCSocket = (server) => {
     });
   });
 
+  // User connection handling (following chat pattern)
+  userNamespace.on('connection', (socket) => {
+    const user = socket.user;
+    console.log(`👤 User connected to HVNC: ${user.fullName} (${user.email})`);
+    
+    // Track user connection
+    connectedUsers.set(user._id.toString(), socket.id);
+
+    // Join user to their personal room for targeted messages
+    socket.join(`user_${user._id}`);
+    
+    // Send user their assigned devices
+    socket.on('get_assigned_devices', async () => {
+      try {
+        // Find devices assigned to this user through shifts
+        const activeShifts = await HVNCShift.find({
+          user_email: user.email,
+          status: 'active',
+          start_date: { $lte: new Date() },
+          end_date: { $gte: new Date() }
+        });
+
+        const deviceIds = activeShifts.map(shift => shift.device_id);
+        const devices = await HVNCDevice.find({
+          device_id: { $in: deviceIds }
+        });
+
+        const deviceList = devices.map(device => {
+          const isOnline = connectedDevices.has(device.device_id);
+          return {
+            id: device._id,
+            device_id: device.device_id,
+            pc_name: device.pc_name,
+            status: isOnline ? 'online' : 'offline',
+            last_seen: device.last_seen,
+            system_info: device.system_info
+          };
+        });
+
+        socket.emit('assigned_devices', { devices: deviceList });
+      } catch (error) {
+        console.error('Get assigned devices error:', error);
+        socket.emit('error', { message: 'Failed to get assigned devices' });
+      }
+    });
+
+    // Start session with device
+    socket.on('start_session', async (data) => {
+      try {
+        const { device_id } = data;
+
+        // Validate device assignment
+        const activeShift = await HVNCShift.findOne({
+          user_email: user.email,
+          device_id: device_id,
+          status: 'active',
+          start_date: { $lte: new Date() },
+          end_date: { $gte: new Date() }
+        });
+
+        if (!activeShift) {
+          socket.emit('session_error', {
+            error: 'No active shift for this device',
+            device_id
+          });
+          return;
+        }
+
+        // Check if device is online
+        const deviceConnection = connectedDevices.get(device_id);
+        if (!deviceConnection) {
+          socket.emit('session_error', {
+            error: 'Device is not online',
+            device_id
+          });
+          return;
+        }
+
+        // Create session
+        const session = await HVNCSession.create({
+          user_email: user.email,
+          device_id: device_id,
+          started_at: new Date(),
+          status: 'active',
+          client_info: {
+            connection_type: 'websocket',
+            user_id: user._id
+          }
+        });
+
+        // Store active session
+        activeSessions.set(session._id.toString(), {
+          session: session,
+          userSocket: socket,
+          deviceSocket: deviceConnection.socket,
+          user: user,
+          device: deviceConnection.device
+        });
+
+        // Join session room
+        socket.join(`session_${session._id}`);
+
+        // Notify device about new session
+        deviceConnection.socket.emit('session_started', {
+          session_id: session._id,
+          user_email: user.email,
+          user_name: user.fullName
+        });
+
+        // Notify user about successful session start
+        socket.emit('session_started', {
+          session_id: session._id,
+          device_id: device_id,
+          device_name: deviceConnection.device.pc_name,
+          start_time: session.started_at,
+          status: 'active'
+        });
+
+        // Log session start
+        await HVNCActivityLog.logUserEvent(user.email, 'session_started', {
+          session_id: session._id,
+          device_id: device_id,
+          device_name: deviceConnection.device.pc_name
+        });
+
+        console.log(`🎮 Session started: ${user.fullName} → ${deviceConnection.device.pc_name}`);
+
+      } catch (error) {
+        console.error('Start session error:', error);
+        socket.emit('session_error', {
+          error: 'Failed to start session',
+          message: error.message
+        });
+      }
+    });
+
+    // End session
+    socket.on('end_session', async (data) => {
+      try {
+        const { session_id } = data;
+
+        const sessionData = activeSessions.get(session_id);
+        if (!sessionData || sessionData.user._id.toString() !== user._id.toString()) {
+          socket.emit('session_error', {
+            error: 'Session not found or access denied',
+            session_id
+          });
+          return;
+        }
+
+        // Update session in database
+        const session = await HVNCSession.findById(session_id);
+        if (session) {
+          session.ended_at = new Date();
+          session.status = 'ended';
+          session.duration_minutes = Math.round((Date.now() - new Date(session.started_at).getTime()) / (1000 * 60));
+          await session.save();
+        }
+
+        // Notify device about session end
+        if (sessionData.deviceSocket) {
+          sessionData.deviceSocket.emit('session_ended', {
+            session_id: session_id,
+            user_email: user.email
+          });
+        }
+
+        // Remove from active sessions
+        activeSessions.delete(session_id);
+
+        // Leave session room
+        socket.leave(`session_${session_id}`);
+
+        // Notify user
+        socket.emit('session_ended', {
+          session_id: session_id,
+          end_time: new Date(),
+          duration: session ? session.duration_minutes : 0
+        });
+
+        // Log session end
+        await HVNCActivityLog.logUserEvent(user.email, 'session_ended', {
+          session_id: session_id,
+          duration_minutes: session ? session.duration_minutes : 0
+        });
+
+        console.log(`🛑 Session ended: ${user.fullName} (${session_id})`);
+
+      } catch (error) {
+        console.error('End session error:', error);
+        socket.emit('session_error', {
+          error: 'Failed to end session',
+          message: error.message
+        });
+      }
+    });
+
+    // Send command to device during session
+    socket.on('send_command', async (data) => {
+      try {
+        const { session_id, action, parameters } = data;
+
+        const sessionData = activeSessions.get(session_id);
+        if (!sessionData || sessionData.user._id.toString() !== user._id.toString()) {
+          socket.emit('command_error', {
+            error: 'Session not found or access denied',
+            session_id
+          });
+          return;
+        }
+
+        // Create command
+        const command = await HVNCCommand.createCommand({
+          device_id: sessionData.device.device_id,
+          session_id: session_id,
+          user_email: user.email,
+          type: 'user_control',
+          action: action,
+          parameters: parameters || {},
+          priority: 'normal',
+          metadata: {
+            source: 'user_session',
+            user_id: user._id
+          }
+        });
+
+        // Send command to device
+        sessionData.deviceSocket.emit('command', {
+          id: command.command_id,
+          type: 'user_control',
+          action: action,
+          parameters: parameters,
+          session_id: session_id,
+          user: user.fullName
+        });
+
+        socket.emit('command_sent', {
+          command_id: command.command_id,
+          action: action,
+          timestamp: new Date()
+        });
+
+        // Log command
+        await HVNCActivityLog.logUserEvent(user.email, 'user_command', {
+          session_id: session_id,
+          device_id: sessionData.device.device_id,
+          action: action,
+          parameters: parameters
+        });
+
+      } catch (error) {
+        console.error('Send command error:', error);
+        socket.emit('command_error', {
+          error: 'Failed to send command',
+          message: error.message
+        });
+      }
+    });
+
+    // Handle disconnection
+    socket.on('disconnect', (reason) => {
+      console.log(`👤 User disconnected from HVNC: ${user.fullName} (${reason})`);
+      connectedUsers.delete(user._id.toString());
+
+      // End any active sessions for this user
+      for (const [sessionId, sessionData] of activeSessions.entries()) {
+        if (sessionData.user._id.toString() === user._id.toString()) {
+          // End session in database
+          HVNCSession.findById(sessionId).then(session => {
+            if (session) {
+              session.ended_at = new Date();
+              session.status = 'disconnected';
+              session.duration_minutes = Math.round((Date.now() - new Date(session.started_at).getTime()) / (1000 * 60));
+              return session.save();
+            }
+          }).catch(err => console.error('Error ending session on disconnect:', err));
+
+          // Notify device
+          if (sessionData.deviceSocket) {
+            sessionData.deviceSocket.emit('session_ended', {
+              session_id: sessionId,
+              reason: 'user_disconnected'
+            });
+          }
+
+          // Remove from active sessions
+          activeSessions.delete(sessionId);
+        }
+      }
+    });
+  });
+
   console.log('🔌 HVNC WebSocket server initialized');
   return io;
 };
@@ -619,7 +943,7 @@ function broadcastToAdmins(event, data) {
  */
 function notifyAdmin(adminId, event, data) {
   if (io) {
-    io.of('/admin').to(`admin_${adminId}`).emit(event, data);
+    io.of('/hvnc-admin').to(`admin_${adminId}`).emit(event, data);
   }
 }
 
@@ -683,6 +1007,79 @@ async function cleanupExpiredCommands() {
   }
 }
 
+/**
+ * Get connected users
+ */
+function getConnectedUsers() {
+  return Array.from(connectedUsers.keys());
+}
+
+/**
+ * Send notification to specific user
+ */
+function notifyUser(userId, event, data) {
+  if (io) {
+    io.of('/hvnc-user').to(`user_${userId}`).emit(event, data);
+  }
+}
+
+/**
+ * Get active sessions
+ */
+function getActiveSessions() {
+  return Array.from(activeSessions.entries()).map(([sessionId, data]) => ({
+    session_id: sessionId,
+    user_email: data.user.email,
+    user_name: data.user.fullName,
+    device_id: data.device.device_id,
+    device_name: data.device.pc_name,
+    started_at: data.session.started_at
+  }));
+}
+
+/**
+ * End user session by session ID
+ */
+async function endUserSession(sessionId, reason = 'admin_action') {
+  const sessionData = activeSessions.get(sessionId);
+  if (!sessionData) {
+    return false;
+  }
+
+  try {
+    // Update session in database
+    const session = await HVNCSession.findById(sessionId);
+    if (session) {
+      session.ended_at = new Date();
+      session.status = 'ended';
+      session.end_reason = reason;
+      session.duration_minutes = Math.round((Date.now() - new Date(session.started_at).getTime()) / (1000 * 60));
+      await session.save();
+    }
+
+    // Notify user
+    sessionData.userSocket.emit('session_force_ended', {
+      session_id: sessionId,
+      reason: reason,
+      end_time: new Date()
+    });
+
+    // Notify device
+    sessionData.deviceSocket.emit('session_ended', {
+      session_id: sessionId,
+      reason: reason
+    });
+
+    // Remove from active sessions
+    activeSessions.delete(sessionId);
+
+    return true;
+  } catch (error) {
+    console.error('Error ending user session:', error);
+    return false;
+  }
+}
+
 // Periodic cleanup
 setInterval(cleanupExpiredCommands, 60000); // Every minute
 
@@ -691,9 +1088,13 @@ module.exports = {
   sendCommandToDevice,
   broadcastToAdmins,
   notifyAdmin,
+  notifyUser,
   getConnectedDevices,
   getConnectedAdmins,
+  getConnectedUsers,
+  getActiveSessions,
   isDeviceConnected,
   sendConfigUpdate,
+  endUserSession,
   cleanupExpiredCommands
 };
