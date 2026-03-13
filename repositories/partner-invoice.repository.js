@@ -9,7 +9,7 @@ class PartnerInvoiceRepository {
         return await PartnersInvoice.findById(id);
     }
     static async getAllInvoices() {
-        return await PartnersInvoice.find();
+        return await PartnersInvoice.find().sort({ createdAt: -1 });
     }
     static async updateInvoice(id, data) {
         return await PartnersInvoice.findByIdAndUpdate(id, data, { new: true });
@@ -24,7 +24,7 @@ class PartnerInvoiceRepository {
         const { page = 1, limit = 10, search = '' } = paginationOptions;
         const skip = (page - 1) * limit;
         const totalCount = await this.countDocuments();
-        const invoices = await PartnersInvoice.find().skip(skip).limit(limit);
+        const invoices = await PartnersInvoice.find().skip(skip).limit(limit).sort({ createdAt: -1 });
         return { invoices, pagination: { page, limit, totalCount } };
     }
     static async countDocuments() {
