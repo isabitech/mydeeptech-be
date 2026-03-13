@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HVNC Access Code</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            line-height: 1.6; 
+            color: #333; 
+            max-width: 600px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background-color: #f4f4f4;
+        }
+        .container { 
+            background: #fff; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+            overflow: hidden; 
+        }
+        .header { 
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%); 
+            color: white; 
+            padding: 30px; 
+            text-align: center; 
+        }
+        .content { 
+            background: #f9f9f9; 
+            padding: 30px; 
+            border-radius: 0 0 10px 10px; 
+            border: 1px solid #ddd; 
+        }
+        .access-code-section { 
+            background: #fff; 
+            border: 3px solid #3498db; 
+            border-radius: 12px; 
+            padding: 25px; 
+            text-align: center; 
+            margin: 20px 0; 
+            box-shadow: 0 2px 10px rgba(52, 152, 219, 0.2);
+        }
+        .access-code { 
+            font-size: 36px; 
+            font-weight: bold; 
+            color: #2c3e50; 
+            letter-spacing: 6px; 
+            font-family: 'Courier New', monospace; 
+            background: #ecf0f1;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        .device-info {
+            background: #e8f4fd;
+            border: 1px solid #bde0f7;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .expiry-warning { 
+            background: #fff3cd; 
+            border: 1px solid #ffeaa7; 
+            border-radius: 8px; 
+            padding: 15px; 
+            margin: 20px 0; 
+            color: #856404;
+        }
+        .security-notice { 
+            background: #f8d7da; 
+            border: 1px solid #f5c6cb; 
+            border-radius: 8px; 
+            padding: 15px; 
+            margin: 20px 0; 
+            color: #721c24;
+        }
+        .footer { 
+            text-align: center; 
+            padding: 20px; 
+            font-size: 12px; 
+            color: #666; 
+        }
+        .strong { font-weight: bold; }
+        .highlight { color: #3498db; font-weight: bold; }
+        .danger { color: #e74c3c; font-weight: bold; }
+        ul { padding-left: 20px; }
+        li { margin: 8px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 HVNC Access Code</h1>
+            <p>Secure Remote Desktop Access</p>
+        </div>
+        
+        <div class="content">
+            <h2>Hello {{userName}},</h2>
+            
+            <p>Your HVNC access code has been generated for secure remote desktop access.</p>
+            
+            <div class="device-info">
+                <h3>📱 Device Information</h3>
+                <p><span class="strong">Device Name:</span> {{deviceName}}</p>
+                <p><span class="strong">Device ID:</span> {{deviceId}}</p>
+                <p><span class="strong">User Email:</span> {{userEmail}}</p>
+            </div>
+
+            <div class="access-code-section">
+                <h3>🔑 Your Access Code</h3>
+                <div class="access-code">{{accessCode}}</div>
+                <p><em>Enter this code exactly as shown above</em></p>
+            </div>
+
+            <div class="expiry-warning">
+                <h3>⏰ Important Timing Information</h3>
+                <p><span class="strong">Expires in:</span> <span class="highlight">{{expiresInMinutes}} minutes</span></p>
+                <p><span class="strong">Expiration Time:</span> {{expiresAt}}</p>
+                <p class="danger">This code will be automatically deleted after expiration for security.</p>
+            </div>
+
+            <div class="security-notice">
+                <h3>🛡️ Security Guidelines</h3>
+                <ul>
+                    <li><span class="strong">Do not share</span> this access code with anyone</li>
+                    <li><span class="strong">Use immediately</span> - codes expire within 15 minutes</li>
+                    <li><span class="strong">Only use on trusted devices</span> and secure networks</li>
+                    <li><span class="strong">Log out properly</span> when your session is complete</li>
+                    <li><span class="strong">Report suspicious activity</span> immediately to support</li>
+                </ul>
+            </div>
+
+            <div style="text-align: center; margin: 30px 0;">
+                <h3>📞 Need Help?</h3>
+                <p>If you have trouble accessing your session or didn't request this code:</p>
+                <p>
+                    <a href="{{supportUrl}}" style="background: #3498db; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; margin: 10px;">
+                        Contact Support
+                    </a>
+                </p>
+                <p>Or visit your <a href="{{dashboardUrl}}" style="color: #3498db;">dashboard</a> to manage your sessions.</p>
+            </div>
+
+            <hr style="border: 1px solid #ddd; margin: 30px 0;">
+            
+            <div style="background: #ecf0f1; padding: 15px; border-radius: 8px; font-size: 14px;">
+                <p><span class="strong">What is HVNC?</span></p>
+                <p>HVNC (Hidden Virtual Network Computing) provides secure, monitored remote desktop access for work purposes. All sessions are logged for security and compliance.</p>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>This is an automated message from MyDeepTech HVNC System</p>
+            <p>&copy; {{currentYear}} MyDeepTech. All rights reserved.</p>
+            <p><em>Do not reply to this email. For support, use the links above.</em></p>
+        </div>
+    </div>
+
+    <script>
+        // Add current year to the template
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentYear = new Date().getFullYear();
+            document.body.innerHTML = document.body.innerHTML.replace('{{currentYear}}', currentYear);
+        });
+    </script>
+</body>
+</html>
