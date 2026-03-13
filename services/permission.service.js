@@ -4,7 +4,6 @@ class PermissionService {
   //  CREATE 
   async createPermission(data) {
     const { name, description, resource, action } = data;
-
     const alreadyExists = await PermissionRepository.exists(name);
     if (alreadyExists) {
       throw new Error(`Permission "${name}" already exists`);
@@ -31,8 +30,9 @@ class PermissionService {
   }
 
   //  READ 
-  async getAllPermissions() {
-    return await PermissionRepository.findAll();
+  async getAllPermissions(options = {}) {
+    const { page = 1, limit = 10 } = options;
+    return await PermissionRepository.findAllPaginated(page, limit);
   }
 
   async getPermissionById(id) {
@@ -53,6 +53,11 @@ class PermissionService {
 
   async getPermissionsByAction(action) {
     return await PermissionRepository.findByAction(action);
+  }
+
+  async getAllPermissionsByName(options = {}) {
+    const { name = "", page = 1, limit = 10 } = options;
+    return await PermissionRepository.findAllByNamePaginated(name, page, limit);
   }
 
   //  UPDATE 

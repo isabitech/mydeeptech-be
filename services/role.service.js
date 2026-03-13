@@ -40,8 +40,9 @@ class RoleService {
   }
 
   //  READ 
-  async getAllRoles() {
-    return await roleRepository.findAll();
+  async getAllRoles(options = {}) {
+    const { page = 1, limit = 10 } = options;
+    return await roleRepository.findAll(page, limit);
   }
 
   async getRoleById(id) {

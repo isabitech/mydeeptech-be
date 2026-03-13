@@ -90,6 +90,9 @@ const updatePermissionSchema = Joi.object({
     description: Joi.string().trim().max(300).optional().messages({
         'string.max': 'Description must not exceed 300 characters',
     }),
+    decription: Joi.string().trim().max(300).optional().messages({
+        'string.max': 'Description must not exceed 300 characters',
+    }),
     resource: Joi.string()
         .trim()
         .lowercase()

@@ -8,11 +8,31 @@ class RoleRepository {
     }
 
     //  READ 
-    async findAll() {
-        return await Role.find({ isActive: true }).populate({
-            path: 'permissions',
-            select: 'name resource action -_id',
-        });
+    async findAll(page = 1, limit = 10) {
+        const skip = (page - 1) * limit;
+
+        const [roles, totalRoles] = await Promise.all([
+            Role.find({ isActive: true })
+                .populate({ path: 'permissions', select: 'name resource action -_id' })
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit),
+            Role.countDocuments({ isActive: true }),
+        ]);
+
+        const totalPages = Math.ceil(totalRoles / limit);
+
+        return {
+            roles,
+            pagination: {
+                currentPage: page,
+                totalPages,
+                totalRoles,
+                rolesPerPage: limit,
+                hasNextPage: page < totalPages,
+                hasPreviousPage: page > 1,
+            },
+        };
     }
 
     async findById(id) {
