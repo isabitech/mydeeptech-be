@@ -8,7 +8,6 @@ const HVNCCommand = require('../models/hvnc-command.model');
 const HVNCActivityLog = require('../models/hvnc-activity-log.model');
 const HVNCShift = require('../models/hvnc-shift.model');
 const envConfig = require('../config/envConfig');
-const { getIO } = require('../utils/chatSocketService');
 
 let io;
 const connectedDevices = new Map(); // Track online devices: { device_id: { socket, device_info } }
@@ -18,21 +17,29 @@ const activeCommands = new Map(); // Track pending commands: { command_id: timeo
 const activeSessions = new Map(); // Track active user sessions: { session_id: { user, device, socket } }
 
 /**
- * Initialize HVNC WebSocket namespaces on existing Socket.IO server
- * @param {Object} server - HTTP server instance (for compatibility)
+ * Initialize HVNC WebSocket server on its own dedicated path
+ * @param {Object} server - HTTP server instance
  */
 const initializeHVNCSocket = (server) => {
-  // Get existing Socket.IO instance from chat service
-  io = getIO();
-  
-  if (!io) {
-    console.error('❌ Socket.IO instance not found. Chat service must be initialized first.');
-    return;
-  }
+  io = new Server(server, {
+    path: '/hvnc/socket.io',
+    cors: {
+      origin: [
+        'http://localhost:5173',
+        'http://127.0.0.1:5173',
+        'https://mydeeptech.ng',
+        'https://www.mydeeptech.ng',
+        'https://mydeeptech.onrender.com',
+        'https://mydeeptech-frontend.onrender.com',
+      ],
+      credentials: true,
+      methods: ['GET', 'POST']
+    }
+  });
 
-  // Create HVNC namespaces on existing Socket.IO instance
+  // Create HVNC namespaces
   const deviceNamespace = io.of('/hvnc-device');
-  const adminNamespace = io.of('/hvnc-admin'); 
+  const adminNamespace = io.of('/hvnc-admin');
   const userNamespace = io.of('/hvnc-user');
 
   // Device authentication middleware
@@ -934,7 +941,7 @@ async function sendCommandToDevice(deviceId, command) {
  */
 function broadcastToAdmins(event, data) {
   if (io) {
-    io.of('/admin').emit(event, data);
+    io.of('/hvnc-admin').emit(event, data);
   }
 }
 
