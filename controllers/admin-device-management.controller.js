@@ -1,5 +1,4 @@
 const HVNCDevice = require('../models/hvnc-device.model');
-const HVNCUser = require('../models/hvnc-user.model');
 const DTUser = require('../models/dtUser.model');
 const HVNCShift = require('../models/hvnc-shift.model');
 const HVNCSession = require('../models/hvnc-session.model');
@@ -50,9 +49,9 @@ const getAllDevices = async (req, res) => {
       });
 
       if (shift) {
-        const user = await HVNCUser.findOne({ email: shift.user_email }).select('full_name email');
+        const user = await DTUser.findOne({ email: shift.user_email }).select('fullName email');
         if (user) {
-          assignedUser = user.full_name;
+          assignedUser = user.fullName;
           assignedUserId = user._id.toString();
         }
       }
@@ -135,9 +134,9 @@ const getDeviceDetail = async (req, res) => {
     });
 
     if (shift) {
-      const user = await HVNCUser.findOne({ email: shift.user_email }).select('full_name email');
+      const user = await DTUser.findOne({ email: shift.user_email }).select('fullName email');
       if (user) {
-        assignedUser = user.full_name;
+        assignedUser = user.fullName;
         assignedUserId = user._id.toString();
       }
     }
@@ -241,9 +240,9 @@ const registerDevice = async (req, res) => {
     // Get assigned user info
     let assignedUser = 'Unassigned';
     if (assignedUserId) {
-      const user = await HVNCUser.findById(assignedUserId).select('full_name email');
+      const user = await DTUser.findById(assignedUserId).select('fullName email');
       if (user) {
-        assignedUser = user.full_name;
+        assignedUser = user.fullName;
         
         // Create a shift for this user/device assignment
         await HVNCShift.create({
@@ -329,24 +328,13 @@ const updateDevice = async (req, res) => {
 
     // Handle user assignment
     if (assignedUserId) {
-      // Check both HVNCUser and DTUser models
-      let user = await HVNCUser.findById(assignedUserId).select('full_name email');
+      // Use only DTUser model
+      const user = await DTUser.findById(assignedUserId).select('fullName email');
       
-      if (!user) {
-        // Check DTUser model if not found in HVNCUser
-        const dtUser = await DTUser.findById(assignedUserId).select('fullName email');
-        if (dtUser) {
-          user = {
-            full_name: dtUser.fullName,
-            email: dtUser.email
-          };
-        }
-      }
-
       if (!user) {
         return res.status(404).json({
           success: false,
-          error: 'User not found in either HVNC or DT users'
+          error: 'User not found in DT users'
         });
       }
 
@@ -617,12 +605,50 @@ function formatTime(timestamp) {
 }
 
 async function getDeviceDetailById(deviceId) {
-  // This is a helper to return device detail in the expected format
-  // Implementation similar to getDeviceDetail but returns data directly
   const device = await HVNCDevice.findById(deviceId).lean();
-  // ... implement similar logic to getDeviceDetail
-  // For brevity, returning a basic structure
-  return { id: deviceId, pcName: device.pc_name };
+  if (!device) return null;
+  
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+  const isOnline = device.last_seen > fiveMinutesAgo && device.status === 'online';
+
+  // Get assigned user
+  let assignedUser = 'Unassigned';
+  let assignedUserId = null;
+  const shift = await HVNCShift.findOne({
+    device_id: device.device_id,
+    status: 'active',
+    $or: [
+      { end_date: null },
+      { end_date: { $gte: new Date() } }
+    ]
+  });
+
+  if (shift) {
+    const user = await DTUser.findOne({ email: shift.user_email }).select('fullName email');
+    if (user) {
+      assignedUser = user.fullName;
+      assignedUserId = user._id.toString();
+    }
+  }
+
+  // Calculate Hubstaff data
+  const hubstaffSeconds = device.system_info?.hubstaff_seconds || 0;
+  const hubstaffHours = Math.floor(hubstaffSeconds / 3600);
+  const hubstaffMinutes = Math.floor((hubstaffSeconds % 3600) / 60);
+  const hubstaffSecondsRem = hubstaffSeconds % 60;
+  const hubstaffDisplay = `${hubstaffHours.toString().padStart(2, '0')}:${hubstaffMinutes.toString().padStart(2, '0')}:${hubstaffSecondsRem.toString().padStart(2, '0')}`;
+  const hubstaffPercent = Math.min(100, Math.floor((hubstaffSeconds / (8 * 3600)) * 100));
+
+  return {
+    id: device._id,
+    pcName: device.pc_name,
+    status: isOnline ? 'Active' : 'Offline',
+    assigned: assignedUser,
+    assignedUserId: assignedUserId,
+    hubstaff: hubstaffDisplay,
+    hubstaffSeconds: hubstaffSeconds,
+    hubstaffPercent: hubstaffPercent
+  };
 }
 
 module.exports = {
