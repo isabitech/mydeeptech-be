@@ -53,6 +53,8 @@ initializeHVNCSocket(server);
 
 app.disable('x-powered-by'); // Security best practice: hide Express usage
 app.use(morgan('dev'));
+
+
 app.get("/", (_req, res) => {
     res.send('Welcome to My Deep Tech');
 });
