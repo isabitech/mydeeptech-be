@@ -3313,7 +3313,7 @@ const applyToProject = async (req, res) => {
 
         // Send notification to project creator
         if (projectWithAdmins.createdBy) {
-          await mailService.sendProjectApplicationNotification(
+          await MailService.sendProjectApplicationNotification(
             projectWithAdmins.createdBy.email,
             projectWithAdmins.createdBy.fullName,
             applicationData
