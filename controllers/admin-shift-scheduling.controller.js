@@ -1,5 +1,5 @@
 const HVNCShift = require('../models/hvnc-shift.model');
-const HVNCUser = require('../models/hvnc-user.model');
+const DTUser = require('../models/dtUser.model');
 const HVNCDevice = require('../models/hvnc-device.model');
 const HVNCActivityLog = require('../models/hvnc-activity-log.model');
 
@@ -35,7 +35,7 @@ const getAllShifts = async (req, res) => {
     }
 
     if (user_id) {
-      const user = await HVNCUser.findById(user_id).select('email');
+      const user = await DTUser.findById(user_id).select('email');
       if (user) {
         query.user_email = user.email;
       }
@@ -59,7 +59,7 @@ const getAllShifts = async (req, res) => {
     // Transform shifts for frontend
     const shiftData = await Promise.all(shifts.map(async (shift) => {
       // Get user info
-      const user = await HVNCUser.findOne({ email: shift.user_email }).select('full_name email');
+      const user = await DTUser.findOne({ email: shift.user_email }).select('fullName email');
       
       // Get device info
       const device = await HVNCDevice.findOne({ device_id: shift.device_id }).select('pc_name device_id');
@@ -85,7 +85,7 @@ const getAllShifts = async (req, res) => {
 
       return {
         id: shift._id,
-        userName: user?.full_name || 'Unknown User',
+        userName: user?.fullName || 'Unknown User',
         userEmail: shift.user_email,
         deviceName: device?.pc_name || 'Unknown Device',
         deviceId: shift.device_id,
@@ -132,7 +132,7 @@ const getShiftDetail = async (req, res) => {
     }
 
     // Get user info
-    const user = await HVNCUser.findOne({ email: shift.user_email }).select('_id full_name email');
+    const user = await DTUser.findOne({ email: shift.user_email }).select('_id fullName email');
     
     // Get device info
     const device = await HVNCDevice.findOne({ device_id: shift.device_id }).select('_id pc_name device_id');
@@ -140,7 +140,7 @@ const getShiftDetail = async (req, res) => {
     res.json({
       id: shift._id,
       userId: user?._id?.toString(),
-      userName: user?.full_name || 'Unknown User',
+      userName: user?.fullName || 'Unknown User',
       userEmail: shift.user_email,
       deviceId: device?._id?.toString(),
       deviceIdValue: shift.device_id,
@@ -191,7 +191,7 @@ const createShift = async (req, res) => {
     }
 
     // Get user and device info
-    const user = await HVNCUser.findById(userId).select('email full_name');
+    const user = await DTUser.findById(userId).select('email fullName');
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -254,7 +254,7 @@ const createShift = async (req, res) => {
     // Return created shift
     res.json({
       id: shift._id,
-      userName: user.full_name,
+      userName: user.fullName,
       userEmail: user.email,
       deviceName: device.pc_name,
       deviceId: device.device_id,
@@ -310,7 +310,7 @@ const updateShift = async (req, res) => {
 
     // Get new user and device if changed
     if (userId) {
-      const user = await HVNCUser.findById(userId).select('email full_name');
+      const user = await DTUser.findById(userId).select('email fullName');
       if (user) {
         shift.user_email = user.email;
       }
@@ -442,10 +442,10 @@ const getShiftsCalendar = async (req, res) => {
     
     for (const shift of shifts) {
       // Get user and device info
-      const user = await HVNCUser.findOne({ email: shift.user_email }).select('full_name');
+      const user = await DTUser.findOne({ email: shift.user_email }).select('fullName');
       const device = await HVNCDevice.findOne({ device_id: shift.device_id }).select('pc_name');
 
-      const eventTitle = `${user?.full_name || 'Unknown'} - ${device?.pc_name || 'Unknown'}`;
+      const eventTitle = `${user?.fullName || 'Unknown'} - ${device?.pc_name || 'Unknown'}`;
       
       if (shift.is_recurring) {
         // Generate events for each day of week in the month
@@ -460,7 +460,7 @@ const getShiftsCalendar = async (req, res) => {
               date: date.toISOString().split('T')[0],
               startTime: shift.start_time,
               endTime: shift.end_time,
-              user: user?.full_name || 'Unknown',
+              user: user?.fullName || 'Unknown',
               device: device?.pc_name || 'Unknown',
               isRecurring: true,
               status: shift.status
@@ -478,7 +478,7 @@ const getShiftsCalendar = async (req, res) => {
             date: eventDate.toISOString().split('T')[0],
             startTime: shift.start_time,
             endTime: shift.end_time,
-            user: user?.full_name || 'Unknown',
+            user: user?.fullName || 'Unknown',
             device: device?.pc_name || 'Unknown',
             isRecurring: false,
             status: shift.status
@@ -507,12 +507,12 @@ const getShiftsCalendar = async (req, res) => {
  */
 async function getShiftDetailById(shiftId) {
   const shift = await HVNCShift.findById(shiftId).lean();
-  const user = await HVNCUser.findOne({ email: shift.user_email }).select('full_name');
+  const user = await DTUser.findOne({ email: shift.user_email }).select('fullName');
   const device = await HVNCDevice.findOne({ device_id: shift.device_id }).select('pc_name');
   
   return {
     id: shift._id,
-    userName: user?.full_name || 'Unknown User',
+    userName: user?.fullName || 'Unknown User',
     userEmail: shift.user_email,
     deviceName: device?.pc_name || 'Unknown Device',
     deviceId: shift.device_id,
