@@ -1,5 +1,5 @@
 const HVNCAccessCode = require('../models/hvnc-access-code.model');
-const HVNCUser = require('../models/hvnc-user.model');
+const DTUser = require('../models/dtUser.model');
 const HVNCDevice = require('../models/hvnc-device.model');
 const HVNCShift = require('../models/hvnc-shift.model');
 const HVNCSession = require('../models/hvnc-session.model');
@@ -42,10 +42,10 @@ const validateCode = async (req, res) => {
     }
 
     // Find the user
-    const user = await HVNCUser.findByEmail(email);
-    if (!user || user.is_account_locked) {
+    const user = await DTUser.findOne({ email: email.toLowerCase() });
+    if (!user) {
       await HVNCActivityLog.logSecurityEvent('authentication_failed', {
-        reason: user ? 'account_locked' : 'user_not_found',
+        reason: 'user_not_found',
         email,
         device_id
       }, {
@@ -57,7 +57,7 @@ const validateCode = async (req, res) => {
       return res.status(401).json({
         valid: false,
         error: {
-          code: user ? 'ACCOUNT_LOCKED' : 'USER_NOT_FOUND',
+          code: 'USER_NOT_FOUND',
           message: user ? 'User account is locked' : 'Invalid credentials'
         }
       });
@@ -163,7 +163,7 @@ const validateCode = async (req, res) => {
       parameters: {
         session_id: session.session_id,
         user_email: email,
-        user_name: user.full_name,
+        user_name: user.fullName,
         ip_address: ip_address || req.ip
       },
       priority: 'high'
@@ -201,7 +201,7 @@ const validateCode = async (req, res) => {
         session_id: session.session_id,
         user: {
           email: user.email,
-          name: user.full_name,
+          name: user.fullName,
           role: user.role
         },
         expires_at: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(), // 8 hours
@@ -268,13 +268,13 @@ const requestCode = async (req, res) => {
     }
 
     // Find the user
-    const user = await HVNCUser.findByEmail(email);
-    if (!user || user.is_account_locked) {
+    const user = await DTUser.findOne({ email: email.toLowerCase() });
+    if (!user) {
       // Log attempt but don't reveal user existence
       await HVNCActivityLog.logSecurityEvent('access_code_requested', {
         email,
         device_id,
-        result: user ? 'account_locked' : 'user_not_found'
+        result: 'user_not_found'
       }, {
         ip_address: req.ip,
         user_agent: req.headers['user-agent'],
@@ -344,7 +344,7 @@ const requestCode = async (req, res) => {
     const userData = {
       userId: user._id,
       email: user.email,
-      fullName: user.full_name,
+      fullName: user.fullName,
       role: user.role,
       deviceId: device_id,
       deviceName: device.pc_name,
@@ -356,7 +356,7 @@ const requestCode = async (req, res) => {
     // Send email with access code
     try {
       console.log('📧 Attempting to send access code email...');
-      console.log('   User:', { email: user.email, name: user.full_name });
+      console.log('   User:', { email: user.email, name: user.fullName });
       console.log('   Device:', { name: device.pc_name, id: device.device_id });
       console.log('   Code:', code);
       
@@ -459,7 +459,7 @@ const generateCode = async (req, res) => {
     }
 
     // Find the user
-    const user = await HVNCUser.findByEmail(email);
+    const user = await DTUser.findOne({ email: email.toLowerCase() });
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -539,7 +539,7 @@ const generateCode = async (req, res) => {
       },
       user: {
         email: user.email,
-        name: user.full_name
+        name: user.fullName
       },
       device: {
         device_id: device.device_id,
@@ -591,11 +591,6 @@ const listCodes = async (req, res) => {
     const skip = (page - 1) * limit;
     
     const codes = await HVNCAccessCode.find(query)
-      .populate({
-        path: 'user_email',
-        model: 'HVNCUser',
-        select: 'email full_name role'
-      })
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
