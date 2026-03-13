@@ -425,8 +425,8 @@ hvncShiftSchema.pre('save', function(next) {
             endMinutes - startMinutes : 
             (24 * 60) - startMinutes + endMinutes;
             
-        if (duration > 16 * 60) { // Max 16 hour shifts
-            return next(new Error('Shift duration cannot exceed 16 hours'));
+        if (duration > 24 * 60) { // Max 24 hour shifts (for 24/7 operations)
+            return next(new Error('Shift duration cannot exceed 24 hours'));
         }
     }
     
