@@ -178,8 +178,11 @@ const validateCode = async (req, res) => {
       console.log(`📋 Device ${resolvedDeviceId} not connected via WS, command queued for polling`);
     }
 
-    // Record successful login
-    await user.recordLogin(ip_address || req.ip);
+    // Record successful login for DTUser
+    await DTUser.findByIdAndUpdate(user._id, {
+      lastLogin: new Date(),
+      lastLoginIP: ip_address || req.ip
+    });
 
     // Log successful authentication
     await HVNCActivityLog.logUserEvent(email, 'user_login', {
