@@ -44,12 +44,7 @@ const notFoundMiddleware = require('./middleware/notfound-middleware');
 const app = express();
 const server = createServer(app);
 
-// Initialize Socket.IO for chat functionality
-initializeSocketIO(server);
-
-// Initialize HVNC WebSocket functionality
-initializeHVNCSocket(server);
-
+// Note: Socket.IO and HVNC will be initialized after MongoDB connection
 
 app.disable('x-powered-by'); // Security best practice: hide Express usage
 app.use(morgan('dev'));
@@ -152,6 +147,22 @@ const connectDB = async () => {
             const collections = await mongoose.connection.db.listCollections().toArray();
             console.log(`📊 Database verification: Found ${collections.length} collections`);
 
+            // Now that MongoDB is ready, initialize Socket.IO services
+            console.log('🔌 Initializing Socket.IO services after MongoDB connection...');
+            initializeSocketIO(server);
+            initializeHVNCSocket(server);
+            console.log('✅ Socket.IO and HVNC services initialized');
+
+            // Start server only after everything is initialized
+            const PORT = envConfig.PORT || 4000;
+            server.listen(PORT, () => {
+                console.log(`🚀 Server running on port ${PORT}`);
+                console.log(`💬 Socket.IO chat server active`);
+                console.log(`🕹️  HVNC WebSocket server active`);
+                console.log(`🔗 Health check available at: http://localhost:${PORT}/health`);
+                console.log(`🔧 HVNC API endpoints available at: http://localhost:${PORT}/api/hvnc/`);
+            });
+
             return conn;
         } catch (error) {
             console.log(`❌ MongoDB connection attempt  failed:`, error);
@@ -204,12 +215,4 @@ const gracefulShutdown = async (signal) => {
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
-// Start Server
-const PORT = envConfig.PORT || 4000;
-server.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`💬 Socket.IO chat server active`);
-    console.log(`�️  HVNC WebSocket server active`);
-    console.log(`🔗 Health check available at: http://localhost:${PORT}/health`);
-    console.log(`🔧 HVNC API endpoints available at: http://localhost:${PORT}/api/hvnc/`);
-});
+// Server startup is now handled in connectDB() after MongoDB and Socket.IO initialization
