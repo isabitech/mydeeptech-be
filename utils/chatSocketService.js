@@ -28,6 +28,12 @@ const initializeSocketIO = (server) => {
         'https://www.mydeeptech.ng', 
         'https://mydeeptech.onrender.com', 
         'https://mydeeptech-frontend.onrender.com',
+        // Allow PC agents from any local connection
+        /^http:\/\/localhost:\d+$/,
+        /^http:\/\/127\.0\.0\.1:\d+$/,
+        /^http:\/\/192\.168\.\d+\.\d+:\d+$/,
+        // Allow all for development (remove in production)
+        true
       ],
       credentials: true,
       methods: ['GET', 'POST']
