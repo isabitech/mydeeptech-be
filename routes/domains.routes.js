@@ -367,16 +367,5 @@ router.get('/domains/by-parent', authenticateToken, authenticateAdmin,  domainCo
  */
 router.get('/domains', authenticateToken, authenticateAdmin,  domainController.findAll);
 
-/**
- * @swagger * paths:
- *   /domains/create-all:
- *     post:
- *      summary: Create sample data for categories, subcategories, and domains
- *      tags: [Domain]
- *     responses:
- *      200:
- *       description: Sample data created
- *        
- */
 router.post('/domains/create-all', authenticateToken, authenticateAdmin, domainController.CreateALL);
 module.exports = router;

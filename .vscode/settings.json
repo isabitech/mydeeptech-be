@@ -42,5 +42,7 @@
             "group": "test",
             "askForPassword": true
         }
-    ]
+    ],
+    "editor.formatOnSave": true,
+    "files.autoSave": "afterDelay"
 }

@@ -3,6 +3,8 @@ const ProjectApplication = require('../models/projectApplication.model');
 const mongoose = require('mongoose');
 const Joi = require('joi');
 
+const NotificationService = require('../services/notification.service');
+
 // Validation schema for creating projects
 const createProjectSchema = Joi.object({
   projectName: Joi.string().trim().max(200).required(),

@@ -4,6 +4,7 @@ const cors = require('cors');
 const morgan = require('morgan');
 const { createServer } = require('http');
 const { initializeSocketIO } = require('./utils/chatSocketService');
+const { initializeHVNCSocket } = require('./services/hvnc-websocket.service');
 const { initRedis, closeRedis } = require('./config/redis');
 
 // Conditionally load Swagger (optional dependency)
@@ -34,6 +35,7 @@ const envConfig = require('./config/envConfig');
 const partnerInvoiceRoute = require('./routes/partnerInvoice.routes');
 const paymentRoutes = require('./routes/payment.routes');
 const exchangeRateRoutes = require('./routes/exchangeRate.routes');
+const hvncRoutes = require('./routes/hvnc.routes');
 const { healthCheck } = require('./controllers/health-check.controller');
 const { corsOptions } = require('./utils/cors-options.utils');
 const errorMiddleware = require('./middleware/error.middleware');
@@ -45,9 +47,14 @@ const server = createServer(app);
 // Initialize Socket.IO for chat functionality
 initializeSocketIO(server);
 
+// Initialize HVNC WebSocket functionality
+initializeHVNCSocket(server);
+
 
 app.disable('x-powered-by'); // Security best practice: hide Express usage
 app.use(morgan('dev'));
+
+
 app.get("/", (_req, res) => {
     res.send('Welcome to My Deep Tech');
 });
@@ -96,6 +103,7 @@ app.use('/api/new-domain', newDomainsRoute);
 app.use('/api/partner-invoice', partnerInvoiceRoute);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/exchange-rate-by-country', exchangeRateRoutes);
+app.use('/api/hvnc', hvncRoutes);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
@@ -201,5 +209,7 @@ const PORT = envConfig.PORT || 4000;
 server.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`💬 Socket.IO chat server active`);
+    console.log(`�️  HVNC WebSocket server active`);
     console.log(`🔗 Health check available at: http://localhost:${PORT}/health`);
+    console.log(`🔧 HVNC API endpoints available at: http://localhost:${PORT}/api/hvnc/`);
 });

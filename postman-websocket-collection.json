@@ -1,0 +1,100 @@
+{
+  "info": {
+    "name": "MyDeepTech WebSocket Tests",
+    "description": "Collection for testing WebSocket connections in MyDeepTech",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "localhost:4000",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OGRmNGY0MGEyZDZlZDdiMmQyZmY1NzciLCJlbWFpbCI6ImRhbW15Y2VvQG1haWxpbmF0b3IuY29tIiwicm9sZSI6InVzZXIiLCJpYXQiOjE3NzM0MTczNDksImV4cCI6MTc3MzUwMzc0OX0.naWasUOOvtvDTQvXTT58nBXNrVsfO6_rVtfY6uhN1ZM",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://{{base_url}}/health",
+          "protocol": "http",
+          "host": ["{{base_url}}"],
+          "path": ["health"]
+        }
+      }
+    },
+    {
+      "name": "Chat WebSocket Connection",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "ws://{{base_url}}/socket.io/?EIO=4&transport=websocket&token={{jwt_token}}",
+          "protocol": "ws",
+          "host": ["{{base_url}}"],
+          "path": ["socket.io"],
+          "query": [
+            {
+              "key": "EIO",
+              "value": "4"
+            },
+            {
+              "key": "transport", 
+              "value": "websocket"
+            },
+            {
+              "key": "token",
+              "value": "{{jwt_token}}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "HVNC WebSocket Connection",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "ws://{{base_url}}/hvnc/socket.io/?EIO=4&transport=websocket&token={{jwt_token}}",
+          "protocol": "ws",
+          "host": ["{{base_url}}"],
+          "path": ["hvnc", "socket.io"],
+          "query": [
+            {
+              "key": "EIO",
+              "value": "4"
+            },
+            {
+              "key": "transport",
+              "value": "websocket"
+            },
+            {
+              "key": "token",
+              "value": "{{jwt_token}}"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
