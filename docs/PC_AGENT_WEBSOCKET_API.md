@@ -9,7 +9,6 @@
 ### **Connection URL**
 ```javascript
 const socket = io('wss://mydeeptech-be.onrender.com/hvnc-device', {
-  path: '/hvnc/socket.io',
   auth: { token: deviceAuthToken },
   transports: ['websocket', 'polling']
 });
@@ -28,6 +27,7 @@ HVNC_SERVER_URL=ws://localhost:4000
 - **Namespace:** `/hvnc-device`
 - **Authentication:** JWT Token (from device registration)
 - **Transports:** WebSocket (primary), Polling (fallback)
+- **Path:** `/hvnc/socket.io` (dedicated HVNC engine, separate from chat)
 
 ---
 
@@ -61,7 +61,6 @@ const deviceAuthToken = auth.token; // Use for WebSocket connection
 ### **2. WebSocket Authentication**
 ```javascript
 const socket = io('wss://mydeeptech-be.onrender.com/hvnc-device', {
-  path: '/hvnc/socket.io',
   auth: { token: deviceAuthToken } // JWT token from registration
 });
 ```
