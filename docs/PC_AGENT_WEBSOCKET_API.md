@@ -8,10 +8,24 @@
 
 ### **Connection URL**
 ```javascript
+// ✅ CORRECT: Connect to domain with namespace
 const socket = io('wss://mydeeptech-be.onrender.com/hvnc-device', {
   auth: { token: deviceAuthToken },
   transports: ['websocket', 'polling']
 });
+
+// This will:
+// 1. Connect to Socket.IO engine: /socket.io 
+// 2. Join HVNC device namespace: /hvnc-device
+```
+
+### **Connection Flow:**
+```
+PC Agent → wss://mydeeptech-be.onrender.com/hvnc-device
+         ↓
+1. Socket.IO Engine: GET /socket.io?EIO=4&transport=polling ✅
+2. Join Namespace: /hvnc-device ✅  
+3. Authentication: JWT device token ✅
 ```
 
 ### **Environment Variables**
@@ -27,7 +41,7 @@ HVNC_SERVER_URL=ws://localhost:4000
 - **Namespace:** `/hvnc-device`
 - **Authentication:** JWT Token (from device registration)
 - **Transports:** WebSocket (primary), Polling (fallback)
-- **Path:** `/hvnc/socket.io` (dedicated HVNC engine, separate from chat)
+- **Path:** Uses default Socket.IO path `/socket.io` (shared with chat system)
 
 ---
 
@@ -71,14 +85,65 @@ const socket = io('wss://mydeeptech-be.onrender.com/hvnc-device', {
 
 ### **Connection Events**
 ```javascript
-// Connection successful
+// 1. Basic connection established
 socket.on('connect', () => {
-  console.log('✅ Connected to HVNC server');
-  console.log('Device ID:', socket.id);
+  console.log('🔌 Connected to HVNC server');
+  console.log('Socket ID:', socket.id);
+  // At this point, authentication is happening in the background
+});
+
+// 2. Authentication successful ✅ 
+socket.on('authenticated', (data) => {
+  console.log('✅ Authentication successful!');
+  console.log('Device ID:', data.deviceId);
+  console.log('PC Name:', data.pcName);
+  console.log('Message:', data.message);
+  console.log('Timestamp:', data.timestamp);
   
-  // Send initial status
+  // Now the PC agent is ready to:
+  // - Send status updates 
+  // - Receive commands
+  // - Send screen captures
+  
+  // Send initial device status
   socket.emit('device_status', {
     status: 'online',
+    cpu_usage: 45.2,
+    memory_usage: 67.8,
+    disk_usage: 23.1,
+    timestamp: new Date().toISOString()
+  });
+  
+  console.log('📡 Device ready for remote control');
+});
+
+// 3. Connection failed ❌
+socket.on('connect_error', (error) => {
+  console.error('❌ Connection failed:', error.message);
+  
+  // Handle specific error types
+  if (error.message.includes('Authentication failed')) {
+    console.error('🔑 Check device token validity');
+  } else if (error.message.includes('Device not found')) {
+    console.error('🖥️ Device not registered in system');
+  } else if (error.message.includes('Device is disabled')) {
+    console.error('⛔ Device account disabled');
+  }
+});
+
+// 4. Disconnection handling
+socket.on('disconnect', (reason) => {
+  console.log('🔌 Disconnected from HVNC server');
+  console.log('Reason:', reason);
+  
+  if (reason === 'io server disconnect') {
+    // Server disconnected the client (e.g., authentication revoked)
+    console.log('🚫 Server force-disconnected this device');
+  } else {
+    // Client disconnected or network issue
+    console.log('🔄 Attempting reconnection...');
+  }
+});
     uptime: process.uptime(),
     chrome_status: 'running',
     hubstaff_status: 'active',
@@ -101,7 +166,148 @@ socket.on('disconnect', (reason) => {
 
 ---
 
-## 📤 **Outbound Events (PC Agent → Server)**
+## � **Complete PC Agent Implementation**
+
+### **Full Connection Flow Example**
+
+```javascript
+const io = require('socket.io-client');
+
+class HVNCAgent {
+  constructor(deviceToken) {
+    this.deviceToken = deviceToken;
+    this.socket = null;
+    this.isAuthenticated = false;
+    this.deviceId = null;
+  }
+
+  connect() {
+    console.log('🚀 Starting HVNC Agent...');
+    
+    // Connect to HVNC server
+    this.socket = io('wss://mydeeptech-be.onrender.com/hvnc-device', {
+      auth: { token: this.deviceToken },
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 2000
+    });
+
+    this.setupEventHandlers();
+  }
+
+  setupEventHandlers() {
+    // ✅ Connection successful
+    this.socket.on('connect', () => {
+      console.log('🔌 Connected to HVNC server');
+      console.log('Socket ID:', this.socket.id);
+      console.log('⏳ Waiting for authentication...');
+    });
+
+    // ✅ Authentication confirmed - THIS IS KEY!
+    this.socket.on('authenticated', (data) => {
+      console.log('🎉 AUTHENTICATION SUCCESSFUL!');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log(`📋 Device ID: ${data.deviceId}`);
+      console.log(`🖥️  PC Name: ${data.pcName}`);
+      console.log(`📅 Connected: ${data.timestamp}`);
+      console.log(`✅ Status: ${data.message}`);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      this.isAuthenticated = true;
+      this.deviceId = data.deviceId;
+      
+      // Start device operations
+      this.startDeviceOperations();
+    });
+
+    // ❌ Connection errors
+    this.socket.on('connect_error', (error) => {
+      console.error('❌ Connection failed:', error.message);
+      this.handleConnectionError(error);
+    });
+
+    // 🔌 Disconnection
+    this.socket.on('disconnect', (reason) => {
+      console.warn('🔌 Disconnected:', reason);
+      this.isAuthenticated = false;
+      
+      if (reason === 'io server disconnect') {
+        console.warn('🚫 Server disconnected this device');
+      }
+    });
+  }
+
+  startDeviceOperations() {
+    console.log('📡 Starting device operations...');
+    
+    // Send initial status
+    this.sendDeviceStatus();
+    
+    // Start periodic status updates
+    setInterval(() => {
+      if (this.isAuthenticated) {
+        this.sendDeviceStatus();
+      }
+    }, 30000);
+
+    console.log('✅ PC Agent ready for remote control!');
+  }
+
+  sendDeviceStatus() {
+    const status = {
+      status: 'online',
+      cpu_usage: this.getCpuUsage(),
+      memory_usage: this.getMemoryUsage(), 
+      disk_usage: this.getDiskUsage(),
+      timestamp: new Date().toISOString()
+    };
+
+    this.socket.emit('device_status', status);
+  }
+
+  handleConnectionError(error) {
+    if (error.message.includes('Authentication failed')) {
+      console.error('🔑 Check device token validity');
+    } else if (error.message.includes('Device not found')) {
+      console.error('🖥️ Device not registered');
+    } else if (error.message.includes('Device is disabled')) {
+      console.error('⛔ Device account disabled');
+    }
+  }
+
+  getCpuUsage() { return Math.floor(Math.random() * 100); }
+  getMemoryUsage() { return Math.floor(Math.random() * 100); }
+  getDiskUsage() { return Math.floor(Math.random() * 100); }
+}
+
+// Usage
+const agent = new HVNCAgent('your-device-token-here');
+agent.connect();
+```
+
+### **Connection Status Flow**
+
+```mermaid
+graph TD
+    A[PC Agent Starts] --> B[Connect to Socket.IO]
+    B --> C{Connection Successful?}
+    C -->|Yes| D[`connect` event fired]
+    C -->|No| E[`connect_error` event fired]
+    D --> F[Authentication in background]
+    F --> G{Authentication Valid?}
+    G -->|Yes| H[`authenticated` event fired ✅]
+    G -->|No| I[`connect_error` event fired ❌]
+    H --> J[Start Device Operations]
+    J --> K[Send Status Updates]
+    K --> L[Ready for Commands]
+    E --> M[Handle Error & Retry]
+    I --> M
+```
+
+---
+
+## �📤 **Outbound Events (PC Agent → Server)**
 
 ### **1. Device Status Updates**
 ```javascript
@@ -591,6 +797,59 @@ localStorage.debug = 'socket.io-client:socket';
 
 // Or in Node.js
 process.env.DEBUG = 'socket.io-client:socket';
+```
+
+## **13. Troubleshooting**
+
+### **Connection Issues**
+
+#### **Problem: 404 GET /socket.io**
+```javascript
+// ❌ Server not ready or initialization order issue
+// ✅ Solution: Ensure server initialized MongoDB before WebSocket
+```
+
+#### **Problem: Authentication Failed**
+```javascript
+socket.on('connect_error', (error) => {
+  if (error.message === 'Authentication failed') {
+    console.error('Device token invalid or expired');
+    // Re-authenticate with device management API
+  }
+});
+```
+
+#### **Problem: Namespace Connection Failed**
+```javascript
+socket.on('disconnect', (reason) => {
+  console.log('Disconnected:', reason);
+  if (reason === 'io server disconnect') {
+    console.log('Server force-disconnected - check authentication');
+  }
+});
+```
+
+### **Test Connection**
+```javascript
+// Basic connection test
+const socket = io('wss://mydeeptech-be.onrender.com/hvnc-device', {
+  auth: { token: 'your-device-token' },
+  transports: ['websocket', 'polling']
+});
+
+// Connection events
+socket.on('connect', () => {
+  console.log('✅ Connected to HVNC WebSocket');
+  console.log('Socket ID:', socket.id);
+});
+
+socket.on('connect_error', (error) => {
+  console.error('❌ Connection failed:', error.message);
+});
+
+socket.on('authenticated', (data) => {
+  console.log('✅ Authenticated as device:', data.deviceId);
+});
 ```
 
 ---

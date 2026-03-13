@@ -8,6 +8,7 @@ const HVNCCommand = require('../models/hvnc-command.model');
 const HVNCActivityLog = require('../models/hvnc-activity-log.model');
 const HVNCShift = require('../models/hvnc-shift.model');
 const envConfig = require('../config/envConfig');
+const { getIO } = require('../utils/chatSocketService');
 
 let io;
 const connectedDevices = new Map(); // Track online devices: { device_id: { socket, device_info } }
@@ -17,61 +18,101 @@ const activeCommands = new Map(); // Track pending commands: { command_id: timeo
 const activeSessions = new Map(); // Track active user sessions: { session_id: { user, device, socket } }
 
 /**
- * Initialize HVNC WebSocket server on its own dedicated path
- * @param {Object} server - HTTP server instance
+ * Initialize HVNC WebSocket namespaces on existing Socket.IO instance
+ * @param {Object} server - HTTP server instance (for compatibility)
  */
 const initializeHVNCSocket = (server) => {
-  io = new Server(server, {
-    path: '/hvnc/socket.io',
-    cors: {
-      origin: [
-        'http://localhost:5173',
-        'http://127.0.0.1:5173',
-        'https://mydeeptech.ng',
-        'https://www.mydeeptech.ng',
-        'https://mydeeptech.onrender.com',
-        'https://mydeeptech-frontend.onrender.com',
-      ],
-      credentials: true,
-      methods: ['GET', 'POST']
+  let deviceNamespace, adminNamespace, userNamespace;
+  
+  try {
+    // Get existing Socket.IO instance from chat service
+    io = getIO();
+    
+    if (!io) {
+      console.error('❌ Socket.IO instance not found. Chat service must be initialized first.');
+      return;
     }
-  });
 
-  // Create HVNC namespaces
-  const deviceNamespace = io.of('/hvnc-device');
-  const adminNamespace = io.of('/hvnc-admin');
-  const userNamespace = io.of('/hvnc-user');
+    console.log('🔌 Adding HVNC namespaces to existing Socket.IO instance...');
 
-  // Device authentication middleware
+    // Create HVNC namespaces on existing Socket.IO instance
+    deviceNamespace = io.of('/hvnc-device');
+    adminNamespace = io.of('/hvnc-admin');
+    userNamespace = io.of('/hvnc-user');
+  } catch (error) {
+    console.error('❌ Failed to get Socket.IO instance:', error.message);
+    console.error('❌ Chat service must be initialized before HVNC service');
+    return;
+  }
+
+  // Device authentication middleware  
   deviceNamespace.use(async (socket, next) => {
     try {
-      const token = socket.handshake.auth.token || socket.handshake.query.token;
+      // First check handshake for token (standard Socket.IO clients)
+      let token = socket.handshake.auth.token || socket.handshake.query.token;
+      
+      // If no token in handshake, check for C++ client token in connect data
+      if (!token && socket.handshake.auth) {
+        // Parse token from C++ client format: "40/hvnc-device,{"token":"xyz"}"
+        const authData = socket.handshake.auth;
+        if (typeof authData === 'string') {
+          try {
+            const parsed = JSON.parse(authData);
+            token = parsed.token;
+          } catch (e) {
+            // Not JSON, might be in different format
+          }
+        }
+        
+        // Also check if token is directly in the auth object
+        if (!token && socket.handshake.auth.token) {
+          token = socket.handshake.auth.token;
+        }
+      }
+      
+      console.log('🔐 Device authentication attempt...');
+      console.log('   Token provided:', token ? 'YES' : 'NO');
+      console.log('   Handshake auth:', socket.handshake.auth);
+      console.log('   Handshake query:', socket.handshake.query);
+      console.log('   Raw token:', token ? token.substring(0, 20) + '...' : 'NULL');
+      
       if (!token) {
+        console.log('❌ No token provided in handshake or auth data');
         return next(new Error('Device authentication token required'));
       }
 
       const decoded = jwt.verify(token, envConfig.jwt.JWT_SECRET);
+      console.log('✅ Token decoded successfully:', { id: decoded.id, device_id: decoded.device_id, type: decoded.type });
       
       if (decoded.type !== 'device') {
+        console.log('❌ Invalid token type:', decoded.type);
         return next(new Error('Invalid token type for device connection'));
       }
 
       // Fetch device from database
+      console.log('🔍 Looking up device in database...');
       const device = await HVNCDevice.findById(decoded.id);
+      console.log('📊 Database lookup result:', device ? 'FOUND' : 'NOT FOUND');
+      
       if (!device || device.device_id !== decoded.device_id) {
+        console.log('❌ Device validation failed');
+        console.log('   Database device:', device ? device.device_id : 'NULL');
+        console.log('   Token device_id:', decoded.device_id);
         return next(new Error('Device not found or invalid'));
       }
 
       if (device.status === 'disabled') {
+        console.log('❌ Device is disabled');
         return next(new Error('Device is disabled'));
       }
 
       socket.deviceId = device.device_id;
       socket.device = device;
       
+      console.log('✅ Device authentication successful!');
       next();
     } catch (error) {
-      console.error('Device WebSocket auth error:', error);
+      console.error('❌ Device WebSocket auth error:', error.message);
       next(new Error('Device authentication failed'));
     }
   });
@@ -164,6 +205,18 @@ const initializeHVNCSocket = (server) => {
 
     // Join device to its room for targeted messaging
     socket.join(`device_${device.device_id}`);
+
+    // ✅ Send authentication success confirmation to PC agent
+    socket.emit('authenticated', {
+      success: true,
+      deviceId: device.device_id,
+      pcName: device.pc_name,
+      message: 'Device authenticated and connected successfully',
+      timestamp: new Date().toISOString(),
+      socketId: socket.id
+    });
+
+    console.log(`📤 Sent 'authenticated' event to device ${device.device_id}`);
 
     // Log device connection
     HVNCActivityLog.logDeviceEvent(device.device_id, 'device_connected', {
