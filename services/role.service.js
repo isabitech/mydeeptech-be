@@ -2,7 +2,7 @@ const roleRepository = require("../repositories/role.repository");
 const permissionRepository = require("../repositories/permission.repository");
 
 class RoleService {
-  //  CREATE 
+  //  CREATE
   async createRole(data) {
     const { name, description, permissions = [] } = data;
 
@@ -39,7 +39,7 @@ class RoleService {
     return await roleRepository.createMany(results);
   }
 
-  //  READ 
+  //  READ
   async getAllRoles(options = {}) {
     const { page = 1, limit = 10 } = options;
     return await roleRepository.findAll(page, limit);
@@ -57,7 +57,7 @@ class RoleService {
     return role;
   }
 
-  //  UPDATE 
+  //  UPDATE
   async updateRole(id, data) {
     const role = await roleRepository.findByIdRaw(id);
     if (!role) throw new Error("Role not found");
@@ -70,10 +70,18 @@ class RoleService {
       }
     }
 
+    // Validate permission IDs if provided
+    if (Array.isArray(data.permissions) && data.permissions.length > 0) {
+      const found = await permissionRepository.findManyByIds(data.permissions);
+      if (found.length !== data.permissions.length) {
+        throw new Error("One or more permission IDs are invalid");
+      }
+    }
+
     return await roleRepository.update(id, data);
   }
 
-  //  PERMISSION MANAGEMENT   
+  //  PERMISSION MANAGEMENT
   async addPermissionToRole(roleId, permissionId) {
     const role = await roleRepository.findByIdRaw(roleId);
     if (!role) throw new Error("Role not found");
@@ -103,7 +111,7 @@ class RoleService {
     return await roleRepository.removePermission(roleId, permissionId);
   }
 
-  //  DEACTIVATE / DELETE   
+  //  DEACTIVATE / DELETE
   async deactivateRole(id) {
     const role = await roleRepository.findByIdRaw(id);
     if (!role) throw new Error("Role not found");
@@ -118,12 +126,14 @@ class RoleService {
     return await roleRepository.delete(id);
   }
 
-  // UTILITY 
+  // UTILITY
   async roleHasPermission(roleId, permissionName) {
     const role = await roleRepository.findById(roleId); // populated
     if (!role) throw new Error("Role not found");
 
-    return role.permissions.some((p) => p.name === permissionName.toLowerCase());
+    return role.permissions.some(
+      (p) => p.name === permissionName.toLowerCase(),
+    );
   }
 }
 
