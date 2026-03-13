@@ -104,11 +104,15 @@ class RoleService {
     return await roleRepository.addManyPermissions(roleId, permissionIds);
   }
 
-  async removePermissionFromRole(roleId, permissionId) {
+  async removePermissionsFromRole(roleId, permissionIds = []) {
     const role = await roleRepository.findByIdRaw(roleId);
     if (!role) throw new Error("Role not found");
 
-    return await roleRepository.removePermission(roleId, permissionId);
+    if (!Array.isArray(permissionIds) || permissionIds.length === 0) {
+      throw new Error("At least one permission ID is required");
+    }
+
+    return await roleRepository.removeManyPermissions(roleId, permissionIds);
   }
 
   //  DEACTIVATE / DELETE

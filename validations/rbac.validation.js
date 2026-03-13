@@ -16,6 +16,14 @@ const mongoIdParamSchema = Joi.object({
   }),
 });
 
+const removePermissionsFromRoleSchema = Joi.object({
+  permissions: Joi.array().items(mongoIdSchema).min(1).required().messages({
+    "array.base": "permissions must be an array of permission IDs",
+    "array.min": "At least one permission ID is required",
+    "any.required": "permissions is required",
+  }),
+});
+
 // ─────────────────────────────────────────────
 //  PERMISSION SCHEMAS
 // ─────────────────────────────────────────────
@@ -199,4 +207,7 @@ module.exports = {
   validateCreateRole: validateSchema(createRoleSchema),
   validateUpdateRole: validateSchema(updateRoleSchema),
   validateRoleId: validateSchema(mongoIdParamSchema, "params"),
+  validateRemovePermissionsFromRole: validateSchema(
+    removePermissionsFromRoleSchema,
+  ),
 };

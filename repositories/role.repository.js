@@ -117,6 +117,17 @@ class RoleRepository {
     });
   }
 
+  async removeManyPermissions(roleId, permissionIds = []) {
+    return await Role.findByIdAndUpdate(
+      roleId,
+      { $pull: { permissions: { $in: permissionIds } } },
+      { new: true },
+    ).populate({
+      path: "permissions",
+      select: "name resource action -_id",
+    });
+  }
+
   async deactivate(id) {
     return await Role.findByIdAndUpdate(
       id,

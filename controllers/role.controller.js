@@ -99,6 +99,25 @@ class RoleController {
     }
   }
 
+  async removePermissionsFromRole(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { permissions } = req.body;
+      const idsToRemove = Array.from(new Set(permissions));
+
+      const updatedRole = await rolesService.removePermissionsFromRole(
+        id,
+        idsToRemove,
+      );
+      return ResponseClass.Success(res, {
+        message: "Permissions removed from role successfully",
+        data: updatedRole,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async deleteRole(req, res, next) {
     try {
       const { id } = req.params;
