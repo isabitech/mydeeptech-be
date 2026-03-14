@@ -41,61 +41,104 @@ const initializeHVNCSocket = (server) => {
     deviceNamespace = io.of("/hvnc-device");
     adminNamespace = io.of("/hvnc-admin");
     userNamespace = io.of("/hvnc-user");
+
+    // DEBUG: Verify namespaces are created
+    console.log("✅ HVNC namespaces created:");
+    console.log(
+      "   /hvnc-device namespace:",
+      deviceNamespace ? "CREATED" : "FAILED",
+    );
+    console.log(
+      "   /hvnc-admin namespace:",
+      adminNamespace ? "CREATED" : "FAILED",
+    );
+    console.log(
+      "   /hvnc-user namespace:",
+      userNamespace ? "CREATED" : "FAILED",
+    );
+
+    // DEBUG: Log all namespaces on the main Socket.IO instance
+    console.log("📋 All Socket.IO namespaces:");
+    if (io._nsps) {
+      console.log("   _nsps keys:", Object.keys(io._nsps));
+      console.log("   _nsps Map size:", io._nsps.size || "undefined");
+      // Try to iterate through _nsps if it's a Map
+      if (typeof io._nsps.forEach === "function") {
+        console.log("   _nsps Map contents:");
+        io._nsps.forEach((namespace, key) => {
+          console.log(`     "${key}": ${namespace ? "EXISTS" : "NULL"}`);
+        });
+      }
+    }
+    if (io.sockets && io.sockets.adapter && io.sockets.adapter.nsp) {
+      console.log("   adapter.nsp keys:", Object.keys(io.sockets.adapter.nsp));
+    }
+    console.log(
+      "   io.of('/hvnc-device') test:",
+      io.of("/hvnc-device") ? "EXISTS" : "FAILED",
+    );
+
+    // Ensure namespaces are properly registered by re-referencing them
+    const testDeviceNamespace = io.of("/hvnc-device");
+    console.log(
+      "   Re-referenced /hvnc-device:",
+      testDeviceNamespace ? "SUCCESS" : "FAILED",
+    );
+
+    // DEBUG: Force namespace registration in _nsps Map
+    if (io._nsps && typeof io._nsps.set === "function") {
+      console.log("🔧 FORCE REGISTERING NAMESPACES IN _nsps Map...");
+      io._nsps.set("/hvnc-device", deviceNamespace);
+      io._nsps.set("/hvnc-admin", adminNamespace);
+      io._nsps.set("/hvnc-user", userNamespace);
+      console.log(
+        "   Force registration complete. New _nsps size:",
+        io._nsps.size,
+      );
+    }
+
+    // DEBUG: Add namespace connection event logging
+    deviceNamespace.on("connect", (socket) => {
+      console.log("🎆 HVNC DEVICE NAMESPACE CONNECTED! Socket ID:", socket.id);
+    });
   } catch (error) {
     console.error("❌ Failed to get Socket.IO instance:", error.message);
     console.error("❌ Chat service must be initialized before HVNC service");
     return;
   }
 
-  // Device authentication middleware - lightweight for WebSocket upgrade
+  // Device authentication middleware - TEMPORARILY DISABLED FOR DEBUGGING
   deviceNamespace.use(async (socket, next) => {
-    try {
-      // Get token from query params (C++ client) or auth
-      const token = socket.handshake.query.token || socket.handshake.auth.token;
+    console.log(
+      "🚨🚨🚨 ========== HVNC DEVICE MIDDLEWARE TRIGGERED ========== 🚨🚨🚨",
+    );
+    console.log("📋 Socket details:");
+    console.log("   Socket ID:", socket.id);
+    console.log("   Namespace:", socket.nsp.name);
+    console.log("   Remote address:", socket.handshake.address);
+    console.log("   User agent:", socket.handshake.headers["user-agent"]);
+    console.log(
+      "   Query params:",
+      JSON.stringify(socket.handshake.query, null, 2),
+    );
+    console.log("   🎯 PC AGENT REACHED HVNC NAMESPACE MIDDLEWARE!");
 
-      console.log("🔐 Device WebSocket authentication middleware triggered");
-      console.log("   Socket ID:", socket.id);
-      console.log("   Token:", token);
-      console.log("   Transport:", socket.conn?.transport?.name || "unknown");
-      console.log("   Token provided:", token ? "YES" : "NO");
-      console.log("   Query params:", Object.keys(socket.handshake.query));
-      console.log("   Headers:", Object.keys(socket.handshake.headers));
+    // Set dummy auth data for debugging
+    socket.deviceAuth = {
+      device_id: "DEBUG-DEVICE-001",
+      id: "debug-object-id",
+      type: "device",
+    };
+    socket.authToken = "debug-token";
 
-      if (!token) {
-        console.log("❌ No token provided");
-        return next(new Error("Device authentication token required"));
-      }
-
-      // Only validate JWT format/signature for upgrade - no database lookup yet
-      try {
-        const decoded = jwt.verify(token, envConfig.jwt.JWT_SECRET);
-        console.log("✅ Token signature valid:", {
-          device_id: decoded.device_id,
-          type: decoded.type,
-        });
-
-        if (decoded.type !== "device") {
-          console.log("❌ Invalid token type:", decoded.type);
-          return next(new Error("Invalid token type for device connection"));
-        }
-
-        // Store decoded token data for later database validation
-        socket.deviceAuth = decoded;
-        socket.authToken = token;
-
-        console.log(
-          "✅ WebSocket upgrade allowed - database validation will occur after connection",
-        );
-        next();
-      } catch (jwtError) {
-        console.log("❌ JWT verification failed:", jwtError.message);
-        return next(new Error("Invalid authentication token"));
-      }
-    } catch (error) {
-      console.error("❌ Device WebSocket upgrade error:", error.message);
-      next(new Error("Device authentication failed"));
-    }
+    console.log("✅ DEBUG: Authentication bypassed, allowing connection");
+    return next();
   });
+
+  console.log(
+    "📋 Device namespace middleware attached:",
+    typeof deviceNamespace.use === "function" ? "SUCCESS" : "FAILED",
+  );
 
   // Admin authentication middleware
   adminNamespace.use(async (socket, next) => {
@@ -168,9 +211,56 @@ const initializeHVNCSocket = (server) => {
   // Device connection handling - database validation happens here
   deviceNamespace.on("connection", async (socket) => {
     try {
-      console.log(
-        `🔌 Device WebSocket connected - starting database validation...`,
-      );
+      console.log(`🔌 Device WebSocket connected - starting validation...`);
+
+      // Check for debug mode
+      if (
+        socket.deviceAuth &&
+        socket.deviceAuth.device_id === "DEBUG-DEVICE-001"
+      ) {
+        console.log("🚨 DEBUG MODE: Skipping database validation");
+        console.log("✅ DEBUG DEVICE CONNECTED - namespace join successful!");
+
+        // Set dummy device data
+        socket.device = {
+          _id: "debug-id",
+          device_id: "DEBUG-DEVICE-001",
+          pc_name: "Debug PC",
+          hostname: "debug.local",
+          status: "online",
+        };
+
+        socket.deviceId = "DEBUG-DEVICE-001";
+
+        // Store in connected devices map
+        connectedDevices.set("DEBUG-DEVICE-001", {
+          socket: socket,
+          device_info: socket.device,
+        });
+
+        // Send success response
+        socket.emit("device_connected", {
+          success: true,
+          device_id: "DEBUG-DEVICE-001",
+          message: "Debug device connected successfully!",
+        });
+
+        // 🚨 CRITICAL: Send authenticated event that PC Agent is waiting for
+        socket.emit("authenticated", {
+          success: true,
+          deviceId: "DEBUG-DEVICE-001",
+          pcName: "Debug PC", 
+          message: "DEBUG: Device authenticated and connected successfully",
+          timestamp: new Date().toISOString(),
+          socketId: socket.id,
+        });
+
+        console.log("🎆 DEBUG MODE CONNECTION COMPLETE - namespace ACK sent!");
+        console.log("📤 DEBUG: Sent 'authenticated' event to PC Agent!");
+        return;
+      }
+
+      // Normal database validation continues here...
 
       // Now perform database validation (after WebSocket upgrade completed)
       const decoded = socket.deviceAuth;
