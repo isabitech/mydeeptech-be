@@ -365,17 +365,17 @@ const initializeHVNCSocket = (server) => {
     // Handle device status updates
     socket.on("device_status", async (data) => {
       try {
-        const connectionInfo = connectedDevices.get(device.device_id);
+        const connectionInfo = connectedDevices.get(socket.device.device_id);
         if (connectionInfo) {
           connectionInfo.lastHeartbeat = new Date();
         }
 
         // Update device status in database
-        await device.updateHeartbeat(data);
+        await socket.device.updateHeartbeat(data);
 
         // Broadcast status to admins
         adminNamespace.emit("device_status_update", {
-          device_id: device.device_id,
+          device_id: socket.device.device_id,
           status: data,
           timestamp: new Date(),
         });
@@ -397,7 +397,7 @@ const initializeHVNCSocket = (server) => {
     socket.on("hubstaff_update", async (data) => {
       try {
         await HVNCActivityLog.logDeviceEvent(
-          device.device_id,
+          socket.device.device_id,
           "hubstaff_status_update",
           {
             timer_running: data.timer_running,
@@ -409,14 +409,14 @@ const initializeHVNCSocket = (server) => {
 
         // Notify admins of Hubstaff changes
         adminNamespace.emit("hubstaff_update", {
-          device_id: device.device_id,
+          device_id: socket.device.device_id,
           ...data,
           timestamp: new Date(),
         });
 
         // Update any active sessions with Hubstaff data
         const activeSessions = await HVNCSession.findActiveSessionsForDevice(
-          device.device_id,
+          socket.device.device_id,
         );
         for (const session of activeSessions) {
           await session.updateHubstaffStatus(data);
@@ -443,11 +443,11 @@ const initializeHVNCSocket = (server) => {
           {
             event,
             user_email,
-            device_id: device.device_id,
+            device_id: socket.device.device_id,
             event_data: data,
           },
           {
-            device_id: device.device_id,
+            device_id: socket.device.device_id,
             session_id,
             user_email,
           },
@@ -455,7 +455,7 @@ const initializeHVNCSocket = (server) => {
 
         // Notify admins of session events
         adminNamespace.emit("session_event", {
-          device_id: device.device_id,
+          device_id: socket.device.device_id,
           session_id,
           event,
           user_email,
@@ -518,7 +518,7 @@ const initializeHVNCSocket = (server) => {
             execution_time,
           },
           {
-            device_id: device.device_id,
+            device_id: socket.device.device_id,
             session_id: command.session_id,
             user_email: command.user_email,
             status: status === "success" ? "success" : "failure",
@@ -528,7 +528,7 @@ const initializeHVNCSocket = (server) => {
         // Notify admins of command completion
         adminNamespace.emit("command_completed", {
           command_id,
-          device_id: device.device_id,
+          device_id: socket.device.device_id,
           status,
           result: status === "success" ? result : null,
           error: status === "error" ? error : null,
@@ -554,7 +554,7 @@ const initializeHVNCSocket = (server) => {
     socket.on("screen_data", (data) => {
       // Forward screen data to admins monitoring this device
       adminNamespace.emit("screen_update", {
-        device_id: device.device_id,
+        device_id: socket.device.device_id,
         screen_data: data,
         timestamp: new Date(),
       });
@@ -563,10 +563,10 @@ const initializeHVNCSocket = (server) => {
     // Handle new screen frames from PC agent
     socket.on("screen_frame", async (frameData) => {
       try {
-        const deviceId = socket.deviceId || device.device_id;
+        const deviceId = socket.deviceId || socket.device.device_id;
 
         console.log(
-          `📺 Received screen frame from ${device.pc_name} (${frameData.data?.length || 0} bytes)`,
+          `📺 Received screen frame from ${socket.device.pc_name} (${frameData.data?.length || 0} bytes)`,
         );
 
         // Validate frame data
@@ -578,7 +578,7 @@ const initializeHVNCSocket = (server) => {
         // Create standardized frame object
         const standardFrame = {
           device_id: deviceId,
-          device_name: device.pc_name,
+          device_name: socket.device.pc_name,
           data: frameData.data, // base64 JPEG data
           format: frameData.format || "jpeg",
           timestamp: frameData.timestamp || Date.now(),
@@ -636,7 +636,7 @@ const initializeHVNCSocket = (server) => {
     socket.on("user_input_response", async (inputData) => {
       try {
         // This handles input commands sent back from PC agent to user
-        const deviceId = socket.deviceId || device.device_id;
+        const deviceId = socket.deviceId || socket.device.device_id;
 
         // Find active sessions for this device
         const deviceSessions = Array.from(activeSessions.values()).filter(
@@ -660,19 +660,19 @@ const initializeHVNCSocket = (server) => {
 
     // Handle disconnection
     socket.on("disconnect", async (reason) => {
-      console.log(`🖥️ Device disconnected: ${device.pc_name} (${reason})`);
+      console.log(`🖥️ Device disconnected: ${socket.device.pc_name} (${reason})`);
 
       // Remove from connected devices
-      connectedDevices.delete(device.device_id);
+      connectedDevices.delete(socket.device.device_id);
 
       // Update device status
-      device.status = "offline";
-      device.last_seen = new Date();
-      await device.save();
+      socket.device.status = "offline";
+      socket.device.last_seen = new Date();
+      await socket.device.save();
 
       // End any active sessions for this device
       const activeSessions = await HVNCSession.findActiveSessionsForDevice(
-        device.device_id,
+        socket.device.device_id,
       );
       for (const session of activeSessions) {
         await session.endSession("device_offline");
@@ -680,7 +680,7 @@ const initializeHVNCSocket = (server) => {
 
       // Cancel pending commands
       await HVNCCommand.cancelDeviceCommands(
-        device.device_id,
+        socket.device.device_id,
         "Device disconnected",
       );
 
@@ -688,7 +688,7 @@ const initializeHVNCSocket = (server) => {
       for (const [commandId, timeout] of activeCommands.entries()) {
         const command = await HVNCCommand.findOne({
           command_id: commandId,
-          device_id: device.device_id,
+          device_id: socket.device.device_id,
         });
         if (command) {
           clearTimeout(timeout);
@@ -698,13 +698,13 @@ const initializeHVNCSocket = (server) => {
 
       // Log disconnection
       await HVNCActivityLog.logDeviceEvent(
-        device.device_id,
+        socket.device.device_id,
         "device_disconnected",
         {
           reason,
           session_duration:
             Date.now() -
-            new Date(connectedDevices.get(device.device_id)?.connectedAt || 0),
+            new Date(connectedDevices.get(socket.device.device_id)?.connectedAt || 0),
         },
         {
           status: "info",
@@ -713,8 +713,8 @@ const initializeHVNCSocket = (server) => {
 
       // Notify admins
       adminNamespace.emit("device_offline", {
-        device_id: device.device_id,
-        pc_name: device.pc_name,
+        device_id: socket.device.device_id,
+        pc_name: socket.device.pc_name,
         reason,
         disconnected_at: new Date(),
       });
@@ -967,6 +967,19 @@ const initializeHVNCSocket = (server) => {
     socket.on("start_session", async (data) => {
       try {
         const { device_id } = data;
+        
+        console.log(`🎮 User ${user.fullName} attempting to start session with device: ${device_id}`);
+        console.log(`📊 Request data:`, data);
+        
+        // Get session_id from data or query params or generate one
+        let session_id = data.session_id || socket.handshake.query.session_id;
+        if (!session_id) {
+          // Generate a session_id if not provided
+          session_id = `sess_${user._id}_${Date.now()}`;
+          console.log(`📝 Generated session_id: ${session_id}`);
+        } else {
+          console.log(`📝 Using provided session_id: ${session_id}`);
+        }
 
         // Validate device assignment
         const activeShift = await HVNCShift.findOne({
@@ -997,6 +1010,7 @@ const initializeHVNCSocket = (server) => {
 
         // Create session
         const session = await HVNCSession.create({
+          session_id: session_id, // Add the required session_id field
           user_email: user.email,
           device_id: device_id,
           started_at: new Date(),
@@ -1007,7 +1021,7 @@ const initializeHVNCSocket = (server) => {
           },
         });
 
-        // Store active session
+        // Store active session (use session._id as Map key, but session_id for communication)
         activeSessions.set(session._id.toString(), {
           session: session,
           userSocket: socket,
@@ -1021,14 +1035,14 @@ const initializeHVNCSocket = (server) => {
 
         // Notify device about new session
         deviceConnection.socket.emit("session_started", {
-          session_id: session._id,
+          session_id: session.session_id, // Use the session_id field instead of _id
           user_email: user.email,
           user_name: user.fullName,
         });
 
         // Notify user about successful session start
         socket.emit("session_started", {
-          session_id: session._id,
+          session_id: session.session_id, // Use the session_id field instead of _id
           device_id: device_id,
           device_name: deviceConnection.device.pc_name,
           start_time: session.started_at,
@@ -1037,7 +1051,7 @@ const initializeHVNCSocket = (server) => {
 
         // Log session start
         await HVNCActivityLog.logUserEvent(user.email, "session_started", {
-          session_id: session._id,
+          session_id: session.session_id, // Use the session_id field instead of _id
           device_id: device_id,
           device_name: deviceConnection.device.pc_name,
         });
