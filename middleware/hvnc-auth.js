@@ -224,73 +224,98 @@ const authenticateUserSession = async (req, res, next) => {
   }
 };
 
-// HVNC Admin Authentication Middleware — uses main DTUser JWT
+// HVNC Admin Authentication Middleware
 const authenticateAdmin = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.startsWith('Bearer ')
-      ? authHeader.split(' ')[1]
-      : req.headers.token || req.body.token || req.query.token;
+    const token = authHeader && authHeader.startsWith('Bearer ') 
+      ? authHeader.split(' ')[1] 
+      : req.headers.token;
 
     if (!token) {
       return res.status(401).json({
         success: false,
-        error: { code: 'TOKEN_MISSING', message: 'Authentication token required' }
+        error: {
+          code: 'TOKEN_MISSING',
+          message: 'Admin authentication token required'
+        }
       });
     }
 
+    // Verify the admin token
     const decoded = jwt.verify(token, envConfig.jwt.JWT_SECRET);
-    const user = await DTUser.findById(decoded.userId);
-
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        error: { code: 'USER_NOT_FOUND', message: 'User not found' }
+    
+    // Fetch the admin user
+    const adminUser = await HVNCUser.findOne({ 
+      email: decoded.email,
+      role: { $in: ['admin', 'supervisor'] },
+      status: 'active'
+    });
+    
+    if (!adminUser || adminUser.is_account_locked) {
+      await HVNCActivityLog.logSecurityEvent('unauthorized_access_attempt', {
+        endpoint: req.path,
+        method: req.method,
+        reason: 'invalid_admin_credentials',
+        user_email: decoded.email
+      }, {
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent'],
+        severity: 'high'
       });
-    }
 
-    if (!user.isEmailVerified) {
-      return res.status(401).json({
-        success: false,
-        error: { code: 'EMAIL_NOT_VERIFIED', message: 'Email not verified' }
-      });
-    }
-
-    const isAdmin = user.role === 'admin' || user.email.endsWith('@mydeeptech.ng');
-
-    if (!isAdmin) {
       return res.status(403).json({
         success: false,
-        error: { code: 'ADMIN_ACCESS_DENIED', message: 'Admin access required' }
+        error: {
+          code: 'ADMIN_ACCESS_DENIED',
+          message: 'Admin access denied'
+        }
       });
     }
 
-    req.admin = {
-      _id: user._id,
-      email: user.email,
-      full_name: user.fullName,
-      role: 'admin',
-      userDoc: user
-    };
+    // Add admin user info to request object
+    req.admin = adminUser;
+
+    // Log admin action
+    await HVNCActivityLog.logUserEvent(adminUser.email, 'admin_action', {
+      endpoint: req.path,
+      method: req.method,
+      action_type: 'api_access'
+    }, {
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent']
+    });
 
     next();
   } catch (error) {
-    if (error.name === 'JsonWebTokenError') {
+    if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+      await HVNCActivityLog.logSecurityEvent('authentication_failed', {
+        endpoint: req.path,
+        method: req.method,
+        reason: 'invalid_admin_token',
+        error: error.message
+      }, {
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent'],
+        severity: 'high'
+      });
+
       return res.status(401).json({
         success: false,
-        error: { code: 'INVALID_TOKEN', message: 'Invalid authentication token' }
+        error: {
+          code: 'INVALID_ADMIN_TOKEN',
+          message: 'Invalid or expired admin token'
+        }
       });
     }
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({
-        success: false,
-        error: { code: 'TOKEN_EXPIRED', message: 'Token has expired' }
-      });
-    }
+
     console.error('Admin authentication error:', error);
     res.status(500).json({
       success: false,
-      error: { code: 'ADMIN_AUTH_ERROR', message: 'Admin authentication error occurred' }
+      error: {
+        code: 'ADMIN_AUTH_ERROR',
+        message: 'Admin authentication error occurred'
+      }
     });
   }
 };
@@ -298,30 +323,25 @@ const authenticateAdmin = async (req, res, next) => {
 // Permission checking middleware
 const requirePermission = (permission) => {
   return async (req, res, next) => {
-    const currentUser = req.admin || req.user;
-
-    if (!currentUser) {
+    if (!req.user) {
       return res.status(401).json({
         success: false,
-        error: { code: 'USER_NOT_AUTHENTICATED', message: 'User authentication required' }
+        error: {
+          code: 'USER_NOT_AUTHENTICATED',
+          message: 'User authentication required'
+        }
       });
     }
 
-    // DTUser admins and @mydeeptech.ng domain have all HVNC permissions
-    const hasPermission =
-      currentUser.role === 'admin' ||
-      (currentUser.email && currentUser.email.endsWith('@mydeeptech.ng'));
-
-    if (!hasPermission) {
+    if (!req.user.hasPermission(permission)) {
       await HVNCActivityLog.logSecurityEvent('unauthorized_access_attempt', {
         endpoint: req.path,
         method: req.method,
         reason: 'insufficient_permissions',
         required_permission: permission,
-        user_permissions: currentUser.permissions || [],
-        user_role: currentUser.role
+        user_permissions: req.user.permissions
       }, {
-        user_email: currentUser.email,
+        user_email: req.user.email,
         ip_address: req.ip,
         user_agent: req.headers['user-agent'],
         severity: 'medium'
