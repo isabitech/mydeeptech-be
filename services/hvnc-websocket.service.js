@@ -17,6 +17,21 @@ const connectedUsers = new Map(); // Track user connections: { user_id: socketId
 const activeCommands = new Map(); // Track pending commands: { command_id: timeout }
 const activeSessions = new Map(); // Track active user sessions: { session_id: { user, device, socket } }
 
+// Helper function to find session by either _id or session_id field
+function findActiveSession(sessionId) {
+  // Try direct lookup first (for _id.toString() keys)
+  let sessionData = activeSessions.get(sessionId);
+  if (sessionData) return sessionData;
+  
+  // Search by session_id field if direct lookup fails
+  for (const [key, data] of activeSessions.entries()) {
+    if (data.session.session_id === sessionId) {
+      return data;
+    }
+  }
+  return null;
+}
+
 /**
  * Initialize HVNC WebSocket namespaces on existing Socket.IO instance
  * @param {Object} server - HTTP server instance (for compatibility)
@@ -632,6 +647,39 @@ const initializeHVNCSocket = (server) => {
       }
     });
 
+    // Handle audio frames from PC agent → forward to active session user
+    socket.on("audio_frame", (frameData) => {
+      try {
+        if (!frameData || !frameData.data) return;
+
+        const deviceId = socket.deviceId || socket.device.device_id;
+
+        const deviceSessions = Array.from(activeSessions.values()).filter(
+          (s) => s.device.device_id === deviceId,
+        );
+
+        deviceSessions.forEach((sessionData) => {
+          try {
+            if (sessionData.userSocket && sessionData.userSocket.connected) {
+              sessionData.userSocket.emit("live_audio_frame", {
+                session_id: sessionData.session._id,
+                data:        frameData.data,
+                format:      frameData.format      || "pcm_s16le",
+                sample_rate: frameData.sample_rate || 44100,
+                channels:    frameData.channels    || 2,
+                frames:      frameData.frames      || 0,
+                timestamp:   frameData.timestamp   || Date.now(),
+              });
+            }
+          } catch (err) {
+            console.error("❌ Error forwarding audio frame:", err);
+          }
+        });
+      } catch (error) {
+        console.error("❌ Audio frame handling error:", error);
+      }
+    });
+
     // Handle user input forwarding (mouse, keyboard)
     socket.on("user_input_response", async (inputData) => {
       try {
@@ -1150,7 +1198,7 @@ const initializeHVNCSocket = (server) => {
       try {
         const { session_id } = data;
 
-        const sessionData = activeSessions.get(session_id);
+        const sessionData = findActiveSession(session_id);
         if (
           !sessionData ||
           sessionData.user._id.toString() !== user._id.toString()
@@ -1215,7 +1263,7 @@ const initializeHVNCSocket = (server) => {
       try {
         const { session_id, action, parameters } = data;
 
-        const sessionData = activeSessions.get(session_id);
+        const sessionData = findActiveSession(session_id);
         if (
           !sessionData ||
           sessionData.user._id.toString() !== user._id.toString()
@@ -1286,7 +1334,7 @@ const initializeHVNCSocket = (server) => {
           action,
         });
 
-        const sessionData = activeSessions.get(session_id);
+        const sessionData = findActiveSession(session_id);
         if (
           !sessionData ||
           sessionData.user._id.toString() !== user._id.toString()
@@ -1332,7 +1380,7 @@ const initializeHVNCSocket = (server) => {
           text,
         });
 
-        const sessionData = activeSessions.get(session_id);
+        const sessionData = findActiveSession(session_id);
         if (
           !sessionData ||
           sessionData.user._id.toString() !== user._id.toString()
@@ -1375,7 +1423,7 @@ const initializeHVNCSocket = (server) => {
       try {
         const { session_id, action, parameters } = controlData;
 
-        const sessionData = activeSessions.get(session_id);
+        const sessionData = findActiveSession(session_id);
         if (
           !sessionData ||
           sessionData.user._id.toString() !== user._id.toString()
@@ -1596,7 +1644,7 @@ function getActiveSessions() {
  * End user session by session ID
  */
 async function endUserSession(sessionId, reason = "admin_action") {
-  const sessionData = activeSessions.get(sessionId);
+  const sessionData = findActiveSession(sessionId);
   if (!sessionData) {
     return false;
   }
