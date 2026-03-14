@@ -249,7 +249,7 @@ const initializeHVNCSocket = (server) => {
         socket.emit("authenticated", {
           success: true,
           deviceId: "DEBUG-DEVICE-001",
-          pcName: "Debug PC", 
+          pcName: "Debug PC",
           message: "DEBUG: Device authenticated and connected successfully",
           timestamp: new Date().toISOString(),
           socketId: socket.id,
@@ -549,7 +549,7 @@ const initializeHVNCSocket = (server) => {
       }
     });
 
-    // Handle screen sharing events
+    // Handle screen sharing events (legacy)
     socket.on("screen_data", (data) => {
       // Forward screen data to admins monitoring this device
       adminNamespace.emit("screen_update", {
@@ -557,6 +557,104 @@ const initializeHVNCSocket = (server) => {
         screen_data: data,
         timestamp: new Date(),
       });
+    });
+
+    // Handle new screen frames from PC agent
+    socket.on("screen_frame", async (frameData) => {
+      try {
+        const deviceId = socket.deviceId || device.device_id;
+
+        console.log(
+          `📺 Received screen frame from ${device.pc_name} (${frameData.data?.length || 0} bytes)`,
+        );
+
+        // Validate frame data
+        if (!frameData || !frameData.data) {
+          console.error("❌ Invalid screen frame data received");
+          return;
+        }
+
+        // Create standardized frame object
+        const standardFrame = {
+          device_id: deviceId,
+          device_name: device.pc_name,
+          data: frameData.data, // base64 JPEG data
+          format: frameData.format || "jpeg",
+          timestamp: frameData.timestamp || Date.now(),
+          frame_id: `frame_${deviceId}_${Date.now()}`,
+          quality: frameData.quality || 70,
+          width: frameData.width || null,
+          height: frameData.height || null,
+        };
+
+        // Forward to admins (for monitoring)
+        adminNamespace.emit("live_screen_frame", standardFrame);
+
+        // Forward to users with active sessions for this device
+        const deviceSessions = Array.from(activeSessions.values()).filter(
+          (sessionData) => sessionData.device.device_id === deviceId,
+        );
+
+        if (deviceSessions.length > 0) {
+          console.log(
+            `📡 Forwarding frame to ${deviceSessions.length} active session(s)`,
+          );
+
+          deviceSessions.forEach((sessionData) => {
+            try {
+              if (sessionData.userSocket && sessionData.userSocket.connected) {
+                sessionData.userSocket.emit("live_desktop_frame", {
+                  session_id: sessionData.session._id,
+                  ...standardFrame,
+                });
+              }
+            } catch (error) {
+              console.error(
+                `❌ Error forwarding frame to user session:`,
+                error,
+              );
+            }
+          });
+        } else {
+          console.log(
+            `📺 No active sessions for device ${deviceId}, frame not forwarded to users`,
+          );
+        }
+
+        // Update device last activity
+        if (device) {
+          device.last_seen = new Date();
+          await device.save();
+        }
+      } catch (error) {
+        console.error("❌ Screen frame handling error:", error);
+      }
+    });
+
+    // Handle user input forwarding (mouse, keyboard)
+    socket.on("user_input_response", async (inputData) => {
+      try {
+        // This handles input commands sent back from PC agent to user
+        const deviceId = socket.deviceId || device.device_id;
+
+        // Find active sessions for this device
+        const deviceSessions = Array.from(activeSessions.values()).filter(
+          (sessionData) => sessionData.device.device_id === deviceId,
+        );
+
+        // Forward input response to appropriate user session
+        if (inputData.session_id) {
+          const targetSession = deviceSessions.find(
+            (s) => s.session._id.toString() === inputData.session_id,
+          );
+
+          if (targetSession && targetSession.userSocket) {
+            targetSession.userSocket.emit("input_response", inputData);
+          }
+        }
+      } catch (error) {
+        console.error("❌ User input response error:", error);
+      }
     });
 
     // Handle disconnection
@@ -1080,6 +1178,139 @@ const initializeHVNCSocket = (server) => {
         socket.emit("command_error", {
           error: "Failed to send command",
           message: error.message,
+        });
+      }
+    });
+
+    // Handle mouse input from user to device
+    socket.on("mouse_input", async (inputData) => {
+      try {
+        const { session_id, x, y, button, action, wheel_delta } = inputData;
+
+        console.log(`🖱️ Mouse input from ${user.fullName}:`, {
+          x,
+          y,
+          button,
+          action,
+        });
+
+        const sessionData = activeSessions.get(session_id);
+        if (
+          !sessionData ||
+          sessionData.user._id.toString() !== user._id.toString()
+        ) {
+          socket.emit("input_error", { error: "Invalid session for input" });
+          return;
+        }
+
+        // Forward mouse input to device
+        sessionData.deviceSocket.emit("mouse_input", {
+          session_id: session_id,
+          x: x,
+          y: y,
+          button: button, // 'left', 'right', 'middle'
+          action: action, // 'down', 'up', 'move', 'wheel'
+          wheel_delta: wheel_delta,
+          timestamp: Date.now(),
+          user: user.fullName,
+        });
+
+        // Log input activity
+        await HVNCActivityLog.logUserEvent(user.email, "mouse_input", {
+          session_id: session_id,
+          device_id: sessionData.device.device_id,
+          input_type: "mouse",
+          action: action,
+          coordinates: { x, y },
+        });
+      } catch (error) {
+        console.error("❌ Mouse input error:", error);
+        socket.emit("input_error", { error: "Failed to process mouse input" });
+      }
+    });
+
+    // Handle keyboard input from user to device
+    socket.on("keyboard_input", async (inputData) => {
+      try {
+        const { session_id, key, action, modifiers, text } = inputData;
+
+        console.log(`⌨️ Keyboard input from ${user.fullName}:`, {
+          key,
+          action,
+          text,
+        });
+
+        const sessionData = activeSessions.get(session_id);
+        if (
+          !sessionData ||
+          sessionData.user._id.toString() !== user._id.toString()
+        ) {
+          socket.emit("input_error", { error: "Invalid session for input" });
+          return;
+        }
+
+        // Forward keyboard input to device
+        sessionData.deviceSocket.emit("keyboard_input", {
+          session_id: session_id,
+          key: key, // Key code or key name
+          action: action, // 'down', 'up', 'press'
+          modifiers: modifiers || {}, // { ctrl: false, alt: false, shift: false }
+          text: text, // For character input
+          timestamp: Date.now(),
+          user: user.fullName,
+        });
+
+        // Log input activity (don't log sensitive data like passwords)
+        if (!inputData.sensitive) {
+          await HVNCActivityLog.logUserEvent(user.email, "keyboard_input", {
+            session_id: session_id,
+            device_id: sessionData.device.device_id,
+            input_type: "keyboard",
+            action: action,
+            key: key,
+          });
+        }
+      } catch (error) {
+        console.error("❌ Keyboard input error:", error);
+        socket.emit("input_error", {
+          error: "Failed to process keyboard input",
+        });
+      }
+    });
+
+    // Handle screen control commands (resolution, quality)
+    socket.on("screen_control", async (controlData) => {
+      try {
+        const { session_id, action, parameters } = controlData;
+
+        const sessionData = activeSessions.get(session_id);
+        if (
+          !sessionData ||
+          sessionData.user._id.toString() !== user._id.toString()
+        ) {
+          socket.emit("control_error", {
+            error: "Invalid session for control",
+          });
+          return;
+        }
+
+        // Forward screen control to device
+        sessionData.deviceSocket.emit("screen_control", {
+          session_id: session_id,
+          action: action, // 'set_quality', 'set_fps', 'set_resolution'
+          parameters: parameters,
+          timestamp: Date.now(),
+          user: user.fullName,
+        });
+
+        console.log(`📺 Screen control from ${user.fullName}:`, {
+          action,
+          parameters,
+        });
+      } catch (error) {
+        console.error("❌ Screen control error:", error);
+        socket.emit("control_error", {
+          error: "Failed to process screen control",
         });
       }
     });
