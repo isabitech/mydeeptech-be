@@ -1049,16 +1049,6 @@ const initializeHVNCSocket = (server) => {
           return;
         }
 
-        // Check if device is online
-        const deviceConnection = connectedDevices.get(device_id);
-        if (!deviceConnection) {
-          socket.emit("session_error", {
-            error: "Device is not online",
-            device_id,
-          });
-          return;
-        }
-
         // Create session with duplicate key error handling
         let session;
         try {
