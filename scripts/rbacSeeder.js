@@ -1,9 +1,9 @@
-require('dotenv').config();
+require("dotenv").config();
 const mongoose = require("mongoose");
 const Permission = require("../models/permissions.model");
 const Role = require("../models/roles.model");
-const dns = require('node:dns');
-dns.setServers(['8.8.8.8', '8.8.4.4']);
+const dns = require("node:dns");
+dns.setServers(["8.8.8.8", "8.8.4.4"]);
 
 // ─── 1. DEFINE ALL PERMISSIONS ────────────────────────────────────────────────
 // Format: resource:action
@@ -85,17 +85,52 @@ const ROLE_PERMISSIONS = {
   super_admin: [
     // Gets everything
     "overview:view",
-    "annotators:view", "annotators:create", "annotators:edit", "annotators:delete", "annotators:manage",
-    "assessments:view", "assessments:create", "assessments:edit", "assessments:delete", "assessments:manage",
-    "projects:view", "projects:create", "projects:edit", "projects:delete", "projects:manage",
-    "applications:view", "applications:create", "applications:edit", "applications:delete", "applications:approve", "applications:manage",
-    "payment:view", "payment:create", "payment:edit", "payment:delete", "payment:approve", "payment:manage",
-    "invoice:view", "invoice:view_own", "invoice:create", "invoice:edit", "invoice:delete", "invoice:manage",
-    "notifications:view", "notifications:manage",
-    "support_chat:view", "support_chat:manage",
-    "user_roles:view", "user_roles:manage",
-    "employees:view", "employees:create", "employees:edit", "employees:delete", "employees:manage",
-    "settings:view", "settings:manage",
+    "annotators:view",
+    "annotators:create",
+    "annotators:edit",
+    "annotators:delete",
+    "annotators:manage",
+    "assessments:view",
+    "assessments:create",
+    "assessments:edit",
+    "assessments:delete",
+    "assessments:manage",
+    "projects:view",
+    "projects:create",
+    "projects:edit",
+    "projects:delete",
+    "projects:manage",
+    "applications:view",
+    "applications:create",
+    "applications:edit",
+    "applications:delete",
+    "applications:approve",
+    "applications:manage",
+    "payment:view",
+    "payment:create",
+    "payment:edit",
+    "payment:delete",
+    "payment:approve",
+    "payment:manage",
+    "invoice:view",
+    "invoice:view_own",
+    "invoice:create",
+    "invoice:edit",
+    "invoice:delete",
+    "invoice:manage",
+    "notifications:view",
+    "notifications:manage",
+    "support_chat:view",
+    "support_chat:manage",
+    "user_roles:view",
+    "user_roles:manage",
+    "employees:view",
+    "employees:create",
+    "employees:edit",
+    "employees:delete",
+    "employees:manage",
+    "settings:view",
+    "settings:manage",
   ],
 
   executives: [
@@ -108,26 +143,38 @@ const ROLE_PERMISSIONS = {
 
   human_resources: [
     "overview:view",
-    "applications:view", "applications:approve", "applications:edit",
-    "annotators:view", "annotators:edit",
-    "assessments:view", "assessments:edit",
+    "applications:view",
+    "applications:approve",
+    "applications:edit",
+    "annotators:view",
+    "annotators:edit",
+    "assessments:view",
+    "assessments:edit",
     "employees:manage",
     "notifications:view",
   ],
 
   operations: [
     "overview:view",
-    "projects:view", "projects:create", "projects:edit",
-    "annotators:view", "annotators:edit",
-    "assessments:view", "assessments:edit",
-    "support_chat:view", "support_chat:manage",
+    "projects:view",
+    "projects:create",
+    "projects:edit",
+    "annotators:view",
+    "annotators:edit",
+    "assessments:view",
+    "assessments:edit",
+    "support_chat:view",
+    "support_chat:manage",
     "notifications:view",
   ],
 
   product_dev: [
     "overview:view",
-    "projects:view", "projects:edit",
-    "assessments:view", "assessments:create", "assessments:edit",
+    "projects:view",
+    "projects:edit",
+    "assessments:view",
+    "assessments:create",
+    "assessments:edit",
     "annotators:view",
     "support_chat:view",
     "notifications:view",
@@ -155,17 +202,25 @@ const ROLE_PERMISSIONS = {
     "notifications:view",
   ],
 
-  media: [
-    "overview:view",
-    "notifications:view",
-    "support_chat:view",
-  ],
+  media: ["overview:view", "notifications:view", "support_chat:view"],
 };
 
 // ─── 3. SEED FUNCTION ─────────────────────────────────────────────────────────
 const seedRBAC = async () => {
   try {
     console.log("🌱 Starting RBAC seed...\n");
+
+    // Safety guard: prevent accidental wipe in production
+    if (
+      process.env.NODE_ENV === "production" &&
+      process.env.CONFIRM_SEED_RBAC !== "true"
+    ) {
+      console.error(
+        "❌ Refusing to run RBAC seeder in production without explicit confirmation.\n" +
+          "   Set CONFIRM_SEED_RBAC=true to proceed.",
+      );
+      process.exit(1);
+    }
 
     // Step 1: Clear existing data
     await Permission.deleteMany({});
@@ -183,24 +238,28 @@ const seedRBAC = async () => {
     });
 
     // Step 3: Insert all roles with their resolved permission IDs
-    const roleDocs = Object.entries(ROLE_PERMISSIONS).map(([roleName, permNames]) => {
-      const resolvedIds = permNames
-        .map((name) => {
-          if (!permissionMap[name]) {
-            console.warn(`⚠️  Permission "${name}" not found for role "${roleName}"`);
-            return null;
-          }
-          return permissionMap[name];
-        })
-        .filter(Boolean);
+    const roleDocs = Object.entries(ROLE_PERMISSIONS).map(
+      ([roleName, permNames]) => {
+        const resolvedIds = permNames
+          .map((name) => {
+            if (!permissionMap[name]) {
+              console.warn(
+                `⚠️  Permission "${name}" not found for role "${roleName}"`,
+              );
+              return null;
+            }
+            return permissionMap[name];
+          })
+          .filter(Boolean);
 
-      return {
-        name: roleName,
-        description: getRoleDescription(roleName),
-        permissions: resolvedIds,
-        isActive: true,
-      };
-    });
+        return {
+          name: roleName,
+          description: getRoleDescription(roleName),
+          permissions: resolvedIds,
+          isActive: true,
+        };
+      },
+    );
 
     const insertedRoles = await Role.insertMany(roleDocs);
     console.log(`✅ Inserted ${insertedRoles.length} roles:\n`);
@@ -223,7 +282,8 @@ function getRoleDescription(roleName) {
     human_resources: "People management, hiring, and onboarding.",
     operations: "Workflow execution and delivery management.",
     product_dev: "Product performance, QA, and assessment oversight.",
-    corporate_partnerships: "Client relationship management for corporate partners.",
+    corporate_partnerships:
+      "Client relationship management for corporate partners.",
     individual_partnerships: "Independent contractor and client coordination.",
     legal: "Contracts, compliance, and legal review.",
     media: "Communications, branding, and support.",
@@ -234,7 +294,8 @@ function getRoleDescription(roleName) {
 // ─── 5. RUN ───────────────────────────────────────────────────────────────────
 // Run directly: node seeders/rbacSeeder.js
 if (require.main === module) {
-  const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/your_db";
+  const MONGO_URI =
+    process.env.MONGO_URI || "mongodb://localhost:27017/your_db";
 
   mongoose
     .connect(MONGO_URI)

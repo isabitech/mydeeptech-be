@@ -1,6 +1,10 @@
 const Permission = require("../models/permissions.model");
 
 class PermissionRepository {
+  escapeRegex(value = "") {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
   // CREATE 
   async create(data) {
     const permission = new Permission(data);
@@ -15,6 +19,59 @@ class PermissionRepository {
   //  READ 
   async findAll() {
     return await Permission.find();
+  }
+
+  async findAllPaginated(page = 1, limit = 10) {
+    const skip = (page - 1) * limit;
+
+    const [permissions, totalPermissions] = await Promise.all([
+      Permission.find().sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Permission.countDocuments(),
+    ]);
+
+    const totalPages = Math.ceil(totalPermissions / limit);
+
+    return {
+      permissions,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalPermissions,
+        permissionsPerPage: limit,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+    };
+  }
+
+  async findAllByNamePaginated(name = "", page = 1, limit = 10) {
+    const skip = (page - 1) * limit;
+    const trimmedName = name.trim();
+    const filter = trimmedName
+      ? { name: { $regex: this.escapeRegex(trimmedName), $options: "i" } }
+      : {};
+
+    const [permissions, totalPermissions] = await Promise.all([
+      Permission.find(filter).select("_id name").sort({ name: 1, createdAt: -1 }).skip(skip).limit(limit),
+      Permission.countDocuments(filter),
+    ]);
+
+    const totalPages = Math.ceil(totalPermissions / limit);
+
+    return {
+      permissions,
+      pagination: {
+        currentPage: page,
+        totalPages,
+        totalPermissions,
+        permissionsPerPage: limit,
+        hasNextPage: page < totalPages,
+        hasPreviousPage: page > 1,
+      },
+      filters: {
+        name: trimmedName,
+      },
+    };
   }
 
   async findById(id) {

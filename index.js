@@ -33,6 +33,7 @@ const chatRoute = require("./routes/chat");
 const qaRoute = require("./routes/qa");
 const domainsRoute = require("./routes/domains.routes");
 const newDomainsRoute = require("./routes/domain.routes");
+const rolesPermissionRoute = require("./routes/roles-permission.routes");
 const envConfig = require("./config/envConfig");
 const partnerInvoiceRoute = require("./routes/partnerInvoice.routes");
 const paymentRoutes = require("./routes/payment.routes");
@@ -127,6 +128,7 @@ app.use("/api/new-domain", newDomainsRoute);
 app.use("/api/partner-invoice", partnerInvoiceRoute);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/exchange-rate-by-country", exchangeRateRoutes);
+app.use("/api/roles-permission", rolesPermissionRoute);
 app.use("/api/hvnc", hvncRoutes);
 
 app.use(notFoundMiddleware);
