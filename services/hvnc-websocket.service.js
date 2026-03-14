@@ -123,6 +123,12 @@ const initializeHVNCSocket = (server) => {
         return next(new Error("Device authentication token required"));
       }
 
+      // Check if JWT secret is available
+      if (!envConfig?.jwt?.JWT_SECRET) {
+        console.error("   ❌ JWT_SECRET not configured");
+        return next(new Error("Server authentication configuration error"));
+      }
+
       // Verify JWT token
       const decoded = jwt.verify(token, envConfig.jwt.JWT_SECRET);
       console.log("   ✅ JWT decoded successfully");
@@ -146,6 +152,7 @@ const initializeHVNCSocket = (server) => {
       return next();
     } catch (error) {
       console.log("   ❌ Authentication failed:", error.message);
+      console.error("   Full error:", error);
       return next(new Error("Device authentication failed: " + error.message));
     }
   });
@@ -242,9 +249,34 @@ const initializeHVNCSocket = (server) => {
 
       console.log("🔍 Looking up device in database...");
       console.log("   Device ID from token:", decoded.device_id);
+      console.log("   Object ID from token:", decoded.id);
 
-      const device = await HVNCDevice.findById(decoded.id);
-      console.log("📊 Database lookup result:", device ? "FOUND" : "NOT FOUND");
+      // Try to find device by both ObjectId and device_id for safety
+      let device;
+      try {
+        if (decoded.id) {
+          device = await HVNCDevice.findById(decoded.id);
+        }
+
+        // If not found by ObjectId, try by device_id
+        if (!device) {
+          device = await HVNCDevice.findOne({ device_id: decoded.device_id });
+          console.log(
+            "📊 Fallback lookup by device_id:",
+            device ? "FOUND" : "NOT FOUND",
+          );
+        } else {
+          console.log(
+            "📊 Database lookup by ObjectId:",
+            device ? "FOUND" : "NOT FOUND",
+          );
+        }
+      } catch (dbError) {
+        console.error("❌ Database lookup error:", dbError.message);
+        socket.emit("auth_error", { message: "Database lookup failed" });
+        socket.disconnect();
+        return;
+      }
 
       if (!device || device.device_id !== decoded.device_id) {
         console.log("❌ Device validation failed");
@@ -303,7 +335,7 @@ const initializeHVNCSocket = (server) => {
       // Log device connection
       HVNCActivityLog.logDeviceEvent(
         device.device_id,
-        "device_connected",
+        "device_online",
         {
           socket_id: socket.id,
           connection_type: "websocket",
