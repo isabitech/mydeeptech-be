@@ -660,7 +660,9 @@ const initializeHVNCSocket = (server) => {
 
     // Handle disconnection
     socket.on("disconnect", async (reason) => {
-      console.log(`🖥️ Device disconnected: ${socket.device.pc_name} (${reason})`);
+      console.log(
+        `🖥️ Device disconnected: ${socket.device.pc_name} (${reason})`,
+      );
 
       // Remove from connected devices
       connectedDevices.delete(socket.device.device_id);
@@ -704,7 +706,9 @@ const initializeHVNCSocket = (server) => {
           reason,
           session_duration:
             Date.now() -
-            new Date(connectedDevices.get(socket.device.device_id)?.connectedAt || 0),
+            new Date(
+              connectedDevices.get(socket.device.device_id)?.connectedAt || 0,
+            ),
         },
         {
           status: "info",
@@ -967,10 +971,12 @@ const initializeHVNCSocket = (server) => {
     socket.on("start_session", async (data) => {
       try {
         const { device_id } = data;
-        
-        console.log(`🎮 User ${user.fullName} attempting to start session with device: ${device_id}`);
+
+        console.log(
+          `🎮 User ${user.fullName} attempting to start session with device: ${device_id}`,
+        );
         console.log(`📊 Request data:`, data);
-        
+
         // Get session_id from data or query params or generate one
         let session_id = data.session_id || socket.handshake.query.session_id;
         if (!session_id) {
@@ -979,6 +985,51 @@ const initializeHVNCSocket = (server) => {
           console.log(`📝 Generated session_id: ${session_id}`);
         } else {
           console.log(`📝 Using provided session_id: ${session_id}`);
+        }
+
+        // Check if session_id already exists
+        const existingSession = await HVNCSession.findOne({
+          session_id: session_id,
+        });
+        if (existingSession) {
+          console.log(`⚠️ Session ID ${session_id} already exists`);
+
+          // If it's an active session for the same user and device, reuse it
+          if (
+            existingSession.status === "active" &&
+            existingSession.user_email === user.email &&
+            existingSession.device_id === device_id
+          ) {
+            console.log(`🔄 Reusing existing active session: ${session_id}`);
+
+            // Store active session (use session._id as Map key)
+            activeSessions.set(existingSession._id.toString(), {
+              session: existingSession,
+              userSocket: socket,
+              deviceSocket: deviceConnection.socket,
+              user: user,
+              device: deviceConnection.device,
+            });
+
+            // Join session room
+            socket.join(`session_${existingSession._id}`);
+
+            // Notify user about session reuse
+            socket.emit("session_started", {
+              session_id: existingSession.session_id,
+              device_id: device_id,
+              device_name: deviceConnection.device.pc_name,
+              start_time: existingSession.started_at,
+              status: "active",
+              reused: true,
+            });
+
+            return;
+          } else {
+            // Generate a new unique session_id
+            session_id = `sess_${user._id}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+            console.log(`📝 Generated new unique session_id: ${session_id}`);
+          }
         }
 
         // Validate device assignment
@@ -1008,18 +1059,44 @@ const initializeHVNCSocket = (server) => {
           return;
         }
 
-        // Create session
-        const session = await HVNCSession.create({
-          session_id: session_id, // Add the required session_id field
-          user_email: user.email,
-          device_id: device_id,
-          started_at: new Date(),
-          status: "active",
-          client_info: {
-            connection_type: "websocket",
-            user_id: user._id,
-          },
-        });
+        // Create session with duplicate key error handling
+        let session;
+        try {
+          session = await HVNCSession.create({
+            session_id: session_id, // Add the required session_id field
+            user_email: user.email,
+            device_id: device_id,
+            started_at: new Date(),
+            status: "active",
+            client_info: {
+              connection_type: "websocket",
+              user_id: user._id,
+            },
+          });
+        } catch (error) {
+          if (error.code === 11000 && error.keyPattern?.session_id) {
+            // Handle duplicate key error by generating a new session_id
+            console.log(
+              `⚠️ Duplicate key error for session_id: ${session_id}, generating new ID`,
+            );
+            session_id = `sess_${user._id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+            session = await HVNCSession.create({
+              session_id: session_id,
+              user_email: user.email,
+              device_id: device_id,
+              started_at: new Date(),
+              status: "active",
+              client_info: {
+                connection_type: "websocket",
+                user_id: user._id,
+              },
+            });
+            console.log(`✅ Created session with new ID: ${session_id}`);
+          } else {
+            throw error; // Re-throw other errors
+          }
+        }
 
         // Store active session (use session._id as Map key, but session_id for communication)
         activeSessions.set(session._id.toString(), {
