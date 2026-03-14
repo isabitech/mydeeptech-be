@@ -27,7 +27,12 @@
     "update-qa-categories": "node scripts/updateQaStatusToThreeCategories.js",
     "hvnc:migrate": "node scripts/hvnc-migration.js",
     "hvnc:test": "node scripts/hvnc-test.js",
-    "hvnc:setup": "npm run hvnc:migrate && npm run hvnc:test"
+    "hvnc:setup": "npm run hvnc:migrate && npm run hvnc:test",
+    "hvnc:test-ws": "node test/hvnc-test.js",
+    "hvnc:test-admin": "node test/hvnc-test.js admin",
+    "hvnc:test-user": "node test/hvnc-test.js user", 
+    "hvnc:test-device": "node test/hvnc-test.js device",
+    "hvnc:tester": "echo 'Open hvnc-websocket-tester.html in your browser for interactive testing'"
   },
   "author": "Wura",
   "license": "ISC",
