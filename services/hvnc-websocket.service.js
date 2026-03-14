@@ -987,6 +987,16 @@ const initializeHVNCSocket = (server) => {
           console.log(`📝 Using provided session_id: ${session_id}`);
         }
 
+        // Check if device is online FIRST - before any session logic
+        const deviceConnection = connectedDevices.get(device_id);
+        if (!deviceConnection) {
+          socket.emit("session_error", {
+            error: "Device is not online",
+            device_id,
+          });
+          return;
+        }
+
         // Check if session_id already exists
         const existingSession = await HVNCSession.findOne({
           session_id: session_id,
@@ -1006,7 +1016,7 @@ const initializeHVNCSocket = (server) => {
             activeSessions.set(existingSession._id.toString(), {
               session: existingSession,
               userSocket: socket,
-              deviceSocket: deviceConnection.socket,
+              deviceSocket: deviceConnection.socket, // Now deviceConnection is defined
               user: user,
               device: deviceConnection.device,
             });
