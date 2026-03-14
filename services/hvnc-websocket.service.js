@@ -107,32 +107,47 @@ const initializeHVNCSocket = (server) => {
     return;
   }
 
-  // Device authentication middleware - TEMPORARILY DISABLED FOR DEBUGGING
+  // Device authentication middleware - JWT validation
   deviceNamespace.use(async (socket, next) => {
-    console.log(
-      "🚨🚨🚨 ========== HVNC DEVICE MIDDLEWARE TRIGGERED ========== 🚨🚨🚨",
-    );
-    console.log("📋 Socket details:");
-    console.log("   Socket ID:", socket.id);
-    console.log("   Namespace:", socket.nsp.name);
-    console.log("   Remote address:", socket.handshake.address);
-    console.log("   User agent:", socket.handshake.headers["user-agent"]);
-    console.log(
-      "   Query params:",
-      JSON.stringify(socket.handshake.query, null, 2),
-    );
-    console.log("   🎯 PC AGENT REACHED HVNC NAMESPACE MIDDLEWARE!");
+    try {
+      console.log("🔐 HVNC Device authentication middleware triggered");
+      console.log("   Socket ID:", socket.id);
+      console.log("   Remote address:", socket.handshake.address);
 
-    // Set dummy auth data for debugging
-    socket.deviceAuth = {
-      device_id: "DEBUG-DEVICE-001",
-      id: "debug-object-id",
-      type: "device",
-    };
-    socket.authToken = "debug-token";
+      // Get JWT token from query params
+      const token = socket.handshake.query.token;
+      console.log("   Token provided:", token ? "YES" : "NO");
 
-    console.log("✅ DEBUG: Authentication bypassed, allowing connection");
-    return next();
+      if (!token) {
+        console.log("   ❌ No token provided");
+        return next(new Error("Device authentication token required"));
+      }
+
+      // Verify JWT token
+      const decoded = jwt.verify(token, envConfig.jwt.JWT_SECRET);
+      console.log("   ✅ JWT decoded successfully");
+      console.log("   Device ID:", decoded.device_id);
+      console.log("   Token type:", decoded.type);
+
+      if (decoded.type !== "device") {
+        console.log("   ❌ Invalid token type:", decoded.type);
+        return next(new Error("Invalid device token"));
+      }
+
+      // Store auth data for connection handler
+      socket.deviceAuth = {
+        device_id: decoded.device_id,
+        id: decoded.id,
+        type: decoded.type,
+      };
+      socket.authToken = token;
+
+      console.log("   ✅ Device authenticated:", decoded.device_id);
+      return next();
+    } catch (error) {
+      console.log("   ❌ Authentication failed:", error.message);
+      return next(new Error("Device authentication failed: " + error.message));
+    }
   });
 
   console.log(
@@ -208,59 +223,13 @@ const initializeHVNCSocket = (server) => {
     }
   });
 
-  // Device connection handling - database validation happens here
+  // Device connection handling - database validation
   deviceNamespace.on("connection", async (socket) => {
     try {
       console.log(`🔌 Device WebSocket connected - starting validation...`);
+      console.log(`   Device ID from auth: ${socket.deviceAuth?.device_id}`);
 
-      // Check for debug mode
-      if (
-        socket.deviceAuth &&
-        socket.deviceAuth.device_id === "DEBUG-DEVICE-001"
-      ) {
-        console.log("🚨 DEBUG MODE: Skipping database validation");
-        console.log("✅ DEBUG DEVICE CONNECTED - namespace join successful!");
-
-        // Set dummy device data
-        socket.device = {
-          _id: "debug-id",
-          device_id: "DEBUG-DEVICE-001",
-          pc_name: "Debug PC",
-          hostname: "debug.local",
-          status: "online",
-        };
-
-        socket.deviceId = "DEBUG-DEVICE-001";
-
-        // Store in connected devices map
-        connectedDevices.set("DEBUG-DEVICE-001", {
-          socket: socket,
-          device_info: socket.device,
-        });
-
-        // Send success response
-        socket.emit("device_connected", {
-          success: true,
-          device_id: "DEBUG-DEVICE-001",
-          message: "Debug device connected successfully!",
-        });
-
-        // 🚨 CRITICAL: Send authenticated event that PC Agent is waiting for
-        socket.emit("authenticated", {
-          success: true,
-          deviceId: "DEBUG-DEVICE-001",
-          pcName: "Debug PC",
-          message: "DEBUG: Device authenticated and connected successfully",
-          timestamp: new Date().toISOString(),
-          socketId: socket.id,
-        });
-
-        console.log("🎆 DEBUG MODE CONNECTION COMPLETE - namespace ACK sent!");
-        console.log("📤 DEBUG: Sent 'authenticated' event to PC Agent!");
-        return;
-      }
-
-      // Normal database validation continues here...
+      // Perform database validation for all devices
 
       // Now perform database validation (after WebSocket upgrade completed)
       const decoded = socket.deviceAuth;

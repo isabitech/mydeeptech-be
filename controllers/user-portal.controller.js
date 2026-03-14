@@ -6,6 +6,13 @@ const HVNCActivityLog = require("../models/hvnc-activity-log.model");
 const { isDeviceConnected } = require("../services/hvnc-websocket.service");
 
 /**
+ * Check if device is connected via WebSocket
+ */
+function checkDeviceConnection(deviceId) {
+  return isDeviceConnected(deviceId);
+}
+
+/**
  * GET /api/hvnc/user/dashboard
  * Get user dashboard overview
  */
@@ -29,7 +36,7 @@ const getUserDashboard = async (req, res) => {
       }).lean();
       if (device) {
         // Check both database status and real-time WebSocket connection
-        const isConnectedViaWebSocket = isDeviceConnected(device.device_id);
+        const isConnectedViaWebSocket = checkDeviceConnection(device.device_id);
         const isOnlineInDB =
           device.last_seen > fiveMinutesAgo && device.status === "online";
         const isOnline = isConnectedViaWebSocket || isOnlineInDB;
@@ -151,7 +158,7 @@ const getUserDevices = async (req, res) => {
       }).lean();
       if (device) {
         // Check both database status and real-time WebSocket connection
-        const isConnectedViaWebSocket = isDeviceConnected(device.device_id);
+        const isConnectedViaWebSocket = checkDeviceConnection(device.device_id);
         const isOnlineInDB =
           device.last_seen > fiveMinutesAgo && device.status === "online";
         const isOnline = isConnectedViaWebSocket || isOnlineInDB;
