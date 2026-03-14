@@ -967,6 +967,19 @@ const initializeHVNCSocket = (server) => {
     socket.on("start_session", async (data) => {
       try {
         const { device_id } = data;
+        
+        console.log(`🎮 User ${user.fullName} attempting to start session with device: ${device_id}`);
+        console.log(`📊 Request data:`, data);
+        
+        // Get session_id from data or query params or generate one
+        let session_id = data.session_id || socket.handshake.query.session_id;
+        if (!session_id) {
+          // Generate a session_id if not provided
+          session_id = `sess_${user._id}_${Date.now()}`;
+          console.log(`📝 Generated session_id: ${session_id}`);
+        } else {
+          console.log(`📝 Using provided session_id: ${session_id}`);
+        }
 
         // Validate device assignment
         const activeShift = await HVNCShift.findOne({
@@ -997,6 +1010,7 @@ const initializeHVNCSocket = (server) => {
 
         // Create session
         const session = await HVNCSession.create({
+          session_id: session_id, // Add the required session_id field
           user_email: user.email,
           device_id: device_id,
           started_at: new Date(),
@@ -1007,7 +1021,7 @@ const initializeHVNCSocket = (server) => {
           },
         });
 
-        // Store active session
+        // Store active session (use session._id as Map key, but session_id for communication)
         activeSessions.set(session._id.toString(), {
           session: session,
           userSocket: socket,
@@ -1021,14 +1035,14 @@ const initializeHVNCSocket = (server) => {
 
         // Notify device about new session
         deviceConnection.socket.emit("session_started", {
-          session_id: session._id,
+          session_id: session.session_id, // Use the session_id field instead of _id
           user_email: user.email,
           user_name: user.fullName,
         });
 
         // Notify user about successful session start
         socket.emit("session_started", {
-          session_id: session._id,
+          session_id: session.session_id, // Use the session_id field instead of _id
           device_id: device_id,
           device_name: deviceConnection.device.pc_name,
           start_time: session.started_at,
@@ -1037,7 +1051,7 @@ const initializeHVNCSocket = (server) => {
 
         // Log session start
         await HVNCActivityLog.logUserEvent(user.email, "session_started", {
-          session_id: session._id,
+          session_id: session.session_id, // Use the session_id field instead of _id
           device_id: device_id,
           device_name: deviceConnection.device.pc_name,
         });
