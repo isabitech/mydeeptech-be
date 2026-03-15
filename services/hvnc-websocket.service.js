@@ -647,10 +647,11 @@ const initializeHVNCSocket = (server) => {
           height: frameData.height,
         };
 
+        // Immediate frame forwarding - no throttling for high FPS performance
         // Forward to admins (monitoring) - full frame forwarding
         adminNamespace.emit("live_screen_frame", streamFrame);
 
-        // Bulk forward to active user sessions (optimized)
+        // Bulk forward to active user sessions (optimized) - FULL FPS
         deviceSessions.forEach((sessionData) => {
           try {
             sessionData.userSocket.emit("live_desktop_frame", {
@@ -668,8 +669,8 @@ const initializeHVNCSocket = (server) => {
         // Update frame statistics for monitoring
         updateFrameStats(deviceId);
 
-        // Throttled logging: Only log every 100th frame (5 seconds at 20fps)
-        if (timestamp % 100 === 0) {
+        // Frequent logging for FPS monitoring: Log every 10th frame (0.5 seconds at 20fps)
+        if (timestamp % 10 === 0) {
           const stats = frameStatsPerDevice.get(deviceId);
           console.log(
             `📺 [${stats?.avgFps?.toFixed(1) || 0}fps] ${socket.device.pc_name}: ${frameData.data?.length || 0} bytes → ${deviceSessions.length} session(s)`,
@@ -1442,16 +1443,16 @@ const initializeHVNCSocket = (server) => {
           user: user.fullName,
         });
 
-        // Log input activity (don't log sensitive data like passwords)
-        if (!inputData.sensitive) {
-          await HVNCActivityLog.logUserEvent(user.email, "keyboard_input", {
-            session_id: session_id,
-            device_id: sessionData.device.device_id,
-            input_type: "keyboard",
-            action: action,
-            key: key,
-          });
-        }
+        // Keyboard input logging removed due to enum validation - "keyboard_input" not valid event_type
+        // if (!inputData.sensitive) {
+        //   await HVNCActivityLog.logUserEvent(user.email, "keyboard_input", {
+        //     session_id: session_id,
+        //     device_id: sessionData.device.device_id,
+        //     input_type: "keyboard",
+        //     action: action,
+        //     key: key,
+        //   });
+        // }
       } catch (error) {
         console.error("❌ Keyboard input error:", error);
         socket.emit("input_error", {
