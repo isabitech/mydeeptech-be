@@ -20,10 +20,10 @@ const websocketService = require("../services/hvnc-websocket.service");
 const {
   authenticateDevice,
   authenticateUserSession,
-  authenticateAdmin,
-  requirePermission,
   authRateLimit,
 } = require("../middleware/hvnc-auth");
+
+const { authenticateAdmin } = require("../middleware/adminAuth");
 
 const { presets: rateLimitPresets } = require("../utils/rateLimiter");
 
@@ -259,7 +259,6 @@ router.get("/streaming-stats", (req, res) => {
 router.get(
   "/admin/stats",
   authenticateAdmin,
-  requirePermission("admin_dashboard"),
   adminDashboardController.getStats,
 );
 
@@ -270,7 +269,6 @@ router.get(
 router.get(
   "/admin/devices/live",
   authenticateAdmin,
-  requirePermission("admin_dashboard"),
   adminDashboardController.getLiveDevices,
 );
 
@@ -281,7 +279,6 @@ router.get(
 router.get(
   "/admin/activity",
   authenticateAdmin,
-  requirePermission("admin_dashboard"),
   adminDashboardController.getActivity,
 );
 
@@ -292,7 +289,6 @@ router.get(
 router.get(
   "/admin/stats-legacy",
   authenticateAdmin,
-  requirePermission("admin_dashboard"),
   healthController.getSystemStatistics,
 );
 
@@ -303,7 +299,6 @@ router.get(
 router.get(
   "/admin/activity-logs",
   authenticateAdmin,
-  requirePermission("admin_dashboard"),
   healthController.getActivityLogs,
 );
 
@@ -311,88 +306,83 @@ router.get(
  * Send command to device (Admin only)
  * POST /api/hvnc/admin/commands/send
  */
-router.post(
-  "/admin/commands/send",
-  authenticateAdmin,
-  requirePermission("device_management"),
-  async (req, res) => {
-    try {
-      const {
-        device_id,
-        type,
-        action,
-        parameters,
-        session_id,
-        priority = "normal",
-      } = req.body;
+router.post("/admin/commands/send", authenticateAdmin, async (req, res) => {
+  try {
+    const {
+      device_id,
+      type,
+      action,
+      parameters,
+      session_id,
+      priority = "normal",
+    } = req.body;
 
-      const HVNCCommand = require("../models/hvnc-command.model");
-      const {
-        sendCommandToDevice,
-      } = require("../services/hvnc-websocket.service");
+    const HVNCCommand = require("../models/hvnc-command.model");
+    const {
+      sendCommandToDevice,
+    } = require("../services/hvnc-websocket.service");
 
-      // Validate required fields
-      if (!device_id || !type || !action) {
-        return res.status(400).json({
-          success: false,
-          error: "device_id, type, and action are required",
-        });
-      }
-
-      // Create command
-      const command = await HVNCCommand.createCommand({
-        device_id,
-        session_id: session_id || `admin_${req.admin._id}`,
-        user_email: req.admin.email,
-        type,
-        action,
-        parameters: parameters || {},
-        priority,
-        metadata: {
-          source: "admin_dashboard",
-          admin_user: req.admin.email,
-        },
-      });
-
-      // Send to device if connected
-      try {
-        await sendCommandToDevice(device_id, command);
-        await command.markSent();
-
-        res.json({
-          success: true,
-          command: {
-            id: command.command_id,
-            device_id,
-            type,
-            action,
-            status: "sent",
-            sent_at: new Date(),
-            expires_at: command.expires_at,
-          },
-        });
-      } catch (socketError) {
-        res.status(202).json({
-          success: true,
-          command: {
-            id: command.command_id,
-            device_id,
-            type,
-            action,
-            status: "pending",
-            message: "Command queued - device not connected",
-          },
-        });
-      }
-    } catch (error) {
-      console.error("Send command error:", error);
-      res.status(500).json({
+    // Validate required fields
+    if (!device_id || !type || !action) {
+      return res.status(400).json({
         success: false,
-        error: "Failed to send command",
+        error: "device_id, type, and action are required",
       });
     }
-  },
-);
+
+    // Create command
+    const command = await HVNCCommand.createCommand({
+      device_id,
+      session_id: session_id || `admin_${req.admin._id}`,
+      user_email: req.admin.email,
+      type,
+      action,
+      parameters: parameters || {},
+      priority,
+      metadata: {
+        source: "admin_dashboard",
+        admin_user: req.admin.email,
+      },
+    });
+
+    // Send to device if connected
+    try {
+      await sendCommandToDevice(device_id, command);
+      await command.markSent();
+
+      res.json({
+        success: true,
+        command: {
+          id: command.command_id,
+          device_id,
+          type,
+          action,
+          status: "sent",
+          sent_at: new Date(),
+          expires_at: command.expires_at,
+        },
+      });
+    } catch (socketError) {
+      res.status(202).json({
+        success: true,
+        command: {
+          id: command.command_id,
+          device_id,
+          type,
+          action,
+          status: "pending",
+          message: "Command queued - device not connected",
+        },
+      });
+    }
+  } catch (error) {
+    console.error("Send command error:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to send command",
+    });
+  }
+});
 
 // ===== ADMIN DEVICE MANAGEMENT ENDPOINTS =====
 
