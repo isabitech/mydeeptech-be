@@ -29,15 +29,24 @@ function updateFrameStats(deviceId) {
       frameCount: 0,
       lastReset: now,
       avgFps: 0,
+      lastFrameTime: now,
+      instantFps: 0,
     });
   }
 
   const stats = frameStatsPerDevice.get(deviceId);
   stats.frameCount++;
+  
+  // Calculate instantaneous FPS (time between frames)
+  const timeDiff = now - stats.lastFrameTime;
+  if (timeDiff > 0) {
+    stats.instantFps = 1000 / timeDiff; // Convert to FPS
+  }
+  stats.lastFrameTime = now;
 
-  // Calculate FPS every 5 seconds
-  if (now - stats.lastReset >= 5000) {
-    stats.avgFps = stats.frameCount / 5;
+  // Calculate rolling average FPS every 2 seconds (faster than 5 seconds)
+  if (now - stats.lastReset >= 2000) {
+    stats.avgFps = stats.frameCount / 2;
     stats.frameCount = 0;
     stats.lastReset = now;
   }
@@ -633,30 +642,16 @@ const initializeHVNCSocket = (server) => {
           return; // No active sessions, skip processing
         }
 
-        // Create streamlined frame object (minimal allocation)
-        const timestamp = frameData.timestamp || Date.now();
-        const streamFrame = {
-          device_id: deviceId,
-          device_name: socket.device.pc_name,
-          data: frameData.data,
-          format: frameData.format || "jpeg",
-          timestamp: timestamp,
-          frame_id: `${deviceId}_${timestamp}`,
-          quality: frameData.quality || 70,
-          width: frameData.width,
-          height: frameData.height,
-        };
-
-        // Immediate frame forwarding - no throttling for high FPS performance
-        // Forward to admins (monitoring) - full frame forwarding
-        adminNamespace.emit("live_screen_frame", streamFrame);
-
-        // Bulk forward to active user sessions (optimized) - FULL FPS
+        // IMMEDIATE RAW FRAME FORWARDING - NO PROCESSING DELAY
+        // Send frame data EXACTLY as received from PC agent to all user sessions
         deviceSessions.forEach((sessionData) => {
           try {
+            // Direct forwarding - no object creation overhead
             sessionData.userSocket.emit("live_desktop_frame", {
-              session_id: sessionData.session.session_id, // Use session_id field
-              ...streamFrame,
+              session_id: sessionData.session.session_id,
+              device_id: deviceId,
+              device_name: socket.device.pc_name,
+              ...frameData, // Raw frame data from PC agent
             });
           } catch (error) {
             // Silent error handling for performance
@@ -666,14 +661,22 @@ const initializeHVNCSocket = (server) => {
           }
         });
 
-        // Update frame statistics for monitoring
+        // Forward to admins (monitoring) - also raw data
+        adminNamespace.emit("live_screen_frame", {
+          device_id: deviceId,
+          device_name: socket.device.pc_name,
+          ...frameData, // Raw frame data
+        });
+
+        // Optional: Update frame statistics for monitoring (minimal overhead)
         updateFrameStats(deviceId);
 
-        // Frequent logging for FPS monitoring: Log every 10th frame (0.5 seconds at 20fps)
-        if (timestamp % 10 === 0) {
+        // Optional: Minimal logging (removed frequent calculations to avoid blocking)
+        // Real-time FPS logging: Log every 50th frame for minimal performance impact
+        if (frameData.timestamp && frameData.timestamp % 50 === 0) {
           const stats = frameStatsPerDevice.get(deviceId);
           console.log(
-            `📺 [${stats?.avgFps?.toFixed(1) || 0}fps] ${socket.device.pc_name}: ${frameData.data?.length || 0} bytes → ${deviceSessions.length} session(s)`,
+            `📺 [${stats?.avgFps?.toFixed(1) || 0}fps avg] ${socket.device.pc_name}: ${frameData.data?.length || 0} bytes → ${deviceSessions.length} session(s)`,
           );
         }
 
