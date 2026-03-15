@@ -17,12 +17,38 @@ const connectedUsers = new Map(); // Track user connections: { user_id: socketId
 const activeCommands = new Map(); // Track pending commands: { command_id: timeout }
 const activeSessions = new Map(); // Track active user sessions: { session_id: { user, device, socket } }
 
+// Performance monitoring for 20fps video streaming
+const frameStatsPerDevice = new Map(); // Track frame rates per device
+const connectionQuality = new Map(); // Track user connection quality
+
+// Helper function to update frame statistics
+function updateFrameStats(deviceId) {
+  const now = Date.now();
+  if (!frameStatsPerDevice.has(deviceId)) {
+    frameStatsPerDevice.set(deviceId, {
+      frameCount: 0,
+      lastReset: now,
+      avgFps: 0,
+    });
+  }
+
+  const stats = frameStatsPerDevice.get(deviceId);
+  stats.frameCount++;
+
+  // Calculate FPS every 5 seconds
+  if (now - stats.lastReset >= 5000) {
+    stats.avgFps = stats.frameCount / 5;
+    stats.frameCount = 0;
+    stats.lastReset = now;
+  }
+}
+
 // Helper function to find session by either _id or session_id field
 function findActiveSession(sessionId) {
   // Try direct lookup first (for _id.toString() keys)
   let sessionData = activeSessions.get(sessionId);
   if (sessionData) return sessionData;
-  
+
   // Search by session_id field if direct lookup fails
   for (const [key, data] of activeSessions.entries()) {
     if (data.session.session_id === sessionId) {
@@ -575,72 +601,78 @@ const initializeHVNCSocket = (server) => {
       });
     });
 
-    // Handle new screen frames from PC agent
+    // Handle new screen frames from PC agent - OPTIMIZED for 20fps
     socket.on("screen_frame", async (frameData) => {
       try {
         const deviceId = socket.deviceId || socket.device.device_id;
 
-        console.log(
-          `📺 Received screen frame from ${socket.device.pc_name} (${frameData.data?.length || 0} bytes)`,
-        );
-
-        // Validate frame data
-        if (!frameData || !frameData.data) {
-          console.error("❌ Invalid screen frame data received");
+        // Validate frame data (essential check only)
+        if (!frameData?.data) {
           return;
         }
 
-        // Create standardized frame object
-        const standardFrame = {
+        // Optimize: Pre-filter sessions by device (cache-friendly)
+        const deviceSessions = [];
+        for (const sessionData of activeSessions.values()) {
+          if (
+            sessionData.device.device_id === deviceId &&
+            sessionData.userSocket?.connected
+          ) {
+            deviceSessions.push(sessionData);
+          }
+        }
+
+        if (deviceSessions.length === 0) {
+          return; // No active sessions, skip processing
+        }
+
+        // Create streamlined frame object (minimal allocation)
+        const timestamp = frameData.timestamp || Date.now();
+        const streamFrame = {
           device_id: deviceId,
           device_name: socket.device.pc_name,
-          data: frameData.data, // base64 JPEG data
+          data: frameData.data,
           format: frameData.format || "jpeg",
-          timestamp: frameData.timestamp || Date.now(),
-          frame_id: `frame_${deviceId}_${Date.now()}`,
+          timestamp: timestamp,
+          frame_id: `${deviceId}_${timestamp}`,
           quality: frameData.quality || 70,
-          width: frameData.width || null,
-          height: frameData.height || null,
+          width: frameData.width,
+          height: frameData.height,
         };
 
-        // Forward to admins (for monitoring)
-        adminNamespace.emit("live_screen_frame", standardFrame);
+        // Forward to admins (monitoring) - full frame forwarding
+        adminNamespace.emit("live_screen_frame", streamFrame);
 
-        // Forward to users with active sessions for this device
-        const deviceSessions = Array.from(activeSessions.values()).filter(
-          (sessionData) => sessionData.device.device_id === deviceId,
-        );
+        // Bulk forward to active user sessions (optimized)
+        deviceSessions.forEach((sessionData) => {
+          try {
+            sessionData.userSocket.emit("live_desktop_frame", {
+              session_id: sessionData.session.session_id, // Use session_id field
+              ...streamFrame,
+            });
+          } catch (error) {
+            // Silent error handling for performance
+            console.debug(
+              `Frame forward error for session ${sessionData.session.session_id}`,
+            );
+          }
+        });
 
-        if (deviceSessions.length > 0) {
+        // Update frame statistics for monitoring
+        updateFrameStats(deviceId);
+
+        // Throttled logging: Only log every 100th frame (5 seconds at 20fps)
+        if (timestamp % 100 === 0) {
+          const stats = frameStatsPerDevice.get(deviceId);
           console.log(
-            `📡 Forwarding frame to ${deviceSessions.length} active session(s)`,
-          );
-
-          deviceSessions.forEach((sessionData) => {
-            try {
-              if (sessionData.userSocket && sessionData.userSocket.connected) {
-                sessionData.userSocket.emit("live_desktop_frame", {
-                  session_id: sessionData.session._id,
-                  ...standardFrame,
-                });
-              }
-            } catch (error) {
-              console.error(
-                `❌ Error forwarding frame to user session:`,
-                error,
-              );
-            }
-          });
-        } else {
-          console.log(
-            `📺 No active sessions for device ${deviceId}, frame not forwarded to users`,
+            `📺 [${stats?.avgFps?.toFixed(1) || 0}fps] ${socket.device.pc_name}: ${frameData.data?.length || 0} bytes → ${deviceSessions.length} session(s)`,
           );
         }
 
-        // Update device last activity
-        if (device) {
-          device.last_seen = new Date();
-          await device.save();
+        // Update device last activity (minimal overhead)
+        if (socket.device) {
+          socket.device.last_seen = new Date();
+          await socket.device.save();
         }
       } catch (error) {
         console.error("❌ Screen frame handling error:", error);
@@ -663,12 +695,12 @@ const initializeHVNCSocket = (server) => {
             if (sessionData.userSocket && sessionData.userSocket.connected) {
               sessionData.userSocket.emit("live_audio_frame", {
                 session_id: sessionData.session._id,
-                data:        frameData.data,
-                format:      frameData.format      || "pcm_s16le",
+                data: frameData.data,
+                format: frameData.format || "pcm_s16le",
                 sample_rate: frameData.sample_rate || 44100,
-                channels:    frameData.channels    || 2,
-                frames:      frameData.frames      || 0,
-                timestamp:   frameData.timestamp   || Date.now(),
+                channels: frameData.channels || 2,
+                frames: frameData.frames || 0,
+                timestamp: frameData.timestamp || Date.now(),
               });
             }
           } catch (err) {
@@ -1688,6 +1720,32 @@ async function endUserSession(sessionId, reason = "admin_action") {
 // Periodic cleanup
 setInterval(cleanupExpiredCommands, 60000); // Every minute
 
+// Performance monitoring for 20fps streaming
+const getStreamingStats = () => {
+  const stats = {};
+
+  for (const [deviceId, frameStats] of frameStatsPerDevice.entries()) {
+    const device = connectedDevices.get(deviceId);
+    stats[deviceId] = {
+      device_name: device?.device.pc_name || "Unknown",
+      current_fps: frameStats.avgFps,
+      connected: connectedDevices.has(deviceId),
+      active_sessions: Array.from(activeSessions.values()).filter(
+        (s) => s.device.device_id === deviceId,
+      ).length,
+    };
+  }
+
+  return {
+    total_devices: connectedDevices.size,
+    total_sessions: activeSessions.size,
+    total_admins: connectedAdmins.size,
+    device_stats: stats,
+    server_uptime: process.uptime(),
+    memory_usage: process.memoryUsage(),
+  };
+};
+
 module.exports = {
   initializeHVNCSocket,
   sendCommandToDevice,
@@ -1702,4 +1760,5 @@ module.exports = {
   sendConfigUpdate,
   endUserSession,
   cleanupExpiredCommands,
+  getStreamingStats, // New monitoring function
 };

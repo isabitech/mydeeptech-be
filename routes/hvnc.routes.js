@@ -13,6 +13,9 @@ const adminUserManagementController = require("../controllers/admin-user-managem
 const userPortalController = require("../controllers/user-portal.controller");
 const sessionManagementController = require("../controllers/session-management.controller");
 
+// Import services
+const websocketService = require("../services/hvnc-websocket.service");
+
 // Import middleware
 const {
   authenticateDevice,
@@ -225,6 +228,27 @@ router.post(
  * GET /api/hvnc/health
  */
 router.get("/health", healthController.hvncHealthCheck);
+
+/**
+ * 20fps streaming performance stats
+ * GET /api/hvnc/streaming-stats
+ */
+router.get("/streaming-stats", (req, res) => {
+  try {
+    const stats = websocketService.getStreamingStats();
+    res.json({
+      success: true,
+      timestamp: new Date().toISOString(),
+      data: stats,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: "Failed to get streaming stats",
+      message: error.message,
+    });
+  }
+});
 
 // ===== ADMIN ENDPOINTS =====
 
