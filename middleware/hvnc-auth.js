@@ -280,24 +280,29 @@ const authenticateAdmin = async (req, res, next) => {
     }
 
     // Verify the admin token
-    const decoded = jwt.verify(token, envConfig.jwt.JWT_SECRET);
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET || envConfig.jwt.JWT_SECRET,
+    );
 
     // Fetch the admin user
-    const adminUser = await DTUser.findOne({
-      email: decoded.email,
-      status: "active",
-    });
+    const adminUser = await DTUser.findById(decoded.userId);
 
-    // Check if user exists and has admin role OR @mydeeptech.ng email domain
-    const hasAdminRole =
-      adminUser && ["admin", "supervisor"].includes(adminUser.role);
-    const hasAdminDomain = decoded.email.endsWith("@mydeeptech.ng");
+    if (!adminUser) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: "ADMIN_NOT_FOUND",
+          message: "Admin user not found",
+        },
+      });
+    }
 
-    if (
-      !adminUser ||
-      adminUser.is_account_locked ||
-      (!hasAdminRole && !hasAdminDomain)
-    ) {
+    // Check if user has admin role OR @mydeeptech.ng email domain
+    const hasAdminRole = ["admin", "supervisor"].includes(adminUser.role);
+    const hasAdminDomain = adminUser.email.endsWith("@mydeeptech.ng");
+
+    if (adminUser.is_account_locked || (!hasAdminRole && !hasAdminDomain)) {
       await HVNCActivityLog.logSecurityEvent(
         "unauthorized_access_attempt",
         {

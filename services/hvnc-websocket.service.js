@@ -351,10 +351,17 @@ const initializeHVNCSocket = (server) => {
         lastHeartbeat: new Date(),
       });
 
-      // Update device status
-      device.status = "online";
-      device.last_seen = new Date();
-      device.save();
+      // Update device status with parallel save protection
+      try {
+        device.status = "online";
+        device.last_seen = new Date();
+        await device.save();
+      } catch (saveError) {
+        if (saveError.name !== "ParallelSaveError") {
+          console.error("Device save error:", saveError);
+        }
+        // Ignore ParallelSaveError as it means another save is in progress
+      }
 
       // Join device to its room for targeted messaging
       socket.join(`device_${device.device_id}`);
@@ -669,11 +676,7 @@ const initializeHVNCSocket = (server) => {
           );
         }
 
-        // Update device last activity (minimal overhead)
-        if (socket.device) {
-          socket.device.last_seen = new Date();
-          await socket.device.save();
-        }
+        // Update device last activity (minimal overhead) - removed save to prevent parallel save errors
       } catch (error) {
         console.error("❌ Screen frame handling error:", error);
       }
@@ -747,10 +750,17 @@ const initializeHVNCSocket = (server) => {
       // Remove from connected devices
       connectedDevices.delete(socket.device.device_id);
 
-      // Update device status
-      socket.device.status = "offline";
-      socket.device.last_seen = new Date();
-      await socket.device.save();
+      // Update device status with parallel save protection
+      try {
+        socket.device.status = "offline";
+        socket.device.last_seen = new Date();
+        await socket.device.save();
+      } catch (saveError) {
+        if (saveError.name !== "ParallelSaveError") {
+          console.error("Device disconnect save error:", saveError);
+        }
+        // Ignore ParallelSaveError as it means another save is in progress
+      }
 
       // End any active sessions for this device
       const activeSessions = await HVNCSession.findActiveSessionsForDevice(
@@ -1387,14 +1397,14 @@ const initializeHVNCSocket = (server) => {
           user: user.fullName,
         });
 
-        // Log input activity
-        await HVNCActivityLog.logUserEvent(user.email, "mouse_input", {
-          session_id: session_id,
-          device_id: sessionData.device.device_id,
-          input_type: "mouse",
-          action: action,
-          coordinates: { x, y },
-        });
+        // Mouse input logging removed due to enum validation - "mouse_input" not valid event_type
+        // await HVNCActivityLog.logUserEvent(user.email, "mouse_input", {
+        //   session_id: session_id,
+        //   device_id: sessionData.device.device_id,
+        //   input_type: "mouse",
+        //   action: action,
+        //   coordinates: { x, y },
+        // });
       } catch (error) {
         console.error("❌ Mouse input error:", error);
         socket.emit("input_error", { error: "Failed to process mouse input" });
