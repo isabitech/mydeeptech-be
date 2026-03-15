@@ -128,7 +128,6 @@ router.post(
 router.post(
   "/codes/generate",
   authenticateAdmin,
-  requirePermission("user_management"),
   accessCodeController.generateCode,
 );
 
@@ -136,12 +135,7 @@ router.post(
  * List access codes (Admin only)
  * GET /api/hvnc/codes/list
  */
-router.get(
-  "/codes/list",
-  authenticateAdmin,
-  requirePermission("user_management"),
-  accessCodeController.listCodes,
-);
+router.get("/codes/list", authenticateAdmin, accessCodeController.listCodes);
 
 /**
  * Revoke access code (Admin only)
@@ -150,7 +144,6 @@ router.get(
 router.post(
   "/codes/:code_id/revoke",
   authenticateAdmin,
-  requirePermission("user_management"),
   accessCodeController.revokeCode,
 );
 
@@ -195,7 +188,6 @@ router.get(
 router.get(
   "/sessions/active",
   authenticateAdmin,
-  requirePermission("device_management"),
   sessionController.getActiveSessions,
 );
 
@@ -206,7 +198,6 @@ router.get(
 router.post(
   "/sessions/:session_id/force-end",
   authenticateAdmin,
-  requirePermission("device_management"),
   sessionController.forceEndSession,
 );
 
@@ -217,7 +208,6 @@ router.post(
 router.post(
   "/sessions/cleanup",
   authenticateAdmin,
-  requirePermission("device_management"),
   sessionController.cleanupSessions,
 );
 
@@ -393,7 +383,6 @@ router.post("/admin/commands/send", authenticateAdmin, async (req, res) => {
 router.get(
   "/admin/devices",
   authenticateAdmin,
-  requirePermission("device_management"),
   adminDeviceManagementController.getAllDevices,
 );
 
@@ -404,7 +393,6 @@ router.get(
 router.get(
   "/admin/devices/:deviceId",
   authenticateAdmin,
-  requirePermission("device_management"),
   adminDeviceManagementController.getDeviceDetail,
 );
 
@@ -415,7 +403,6 @@ router.get(
 router.post(
   "/admin/devices",
   authenticateAdmin,
-  requirePermission("device_management"),
   adminDeviceManagementController.registerDevice,
 );
 
@@ -426,7 +413,6 @@ router.post(
 router.put(
   "/admin/devices/:deviceId",
   authenticateAdmin,
-  requirePermission("device_management"),
   adminDeviceManagementController.updateDevice,
 );
 
@@ -437,7 +423,6 @@ router.put(
 router.delete(
   "/admin/devices/:deviceId",
   authenticateAdmin,
-  requirePermission("device_management"),
   adminDeviceManagementController.deleteDevice,
 );
 
@@ -448,7 +433,6 @@ router.delete(
 router.post(
   "/admin/devices/:deviceId/access-code/generate",
   authenticateAdmin,
-  requirePermission("device_management"),
   adminDeviceManagementController.generateNewAccessCode,
 );
 
@@ -459,7 +443,6 @@ router.post(
 router.post(
   "/admin/devices/:deviceId/hubstaff/start",
   authenticateAdmin,
-  requirePermission("device_management"),
   adminDeviceManagementController.startHubstaffTimer,
 );
 
@@ -470,7 +453,6 @@ router.post(
 router.post(
   "/admin/devices/:deviceId/hubstaff/pause",
   authenticateAdmin,
-  requirePermission("device_management"),
   adminDeviceManagementController.pauseHubstaffTimer,
 );
 
@@ -483,7 +465,6 @@ router.post(
 router.get(
   "/admin/shifts",
   authenticateAdmin,
-  requirePermission("shift_management"),
   adminShiftSchedulingController.getAllShifts,
 );
 
@@ -494,7 +475,6 @@ router.get(
 router.get(
   "/admin/shifts/:shiftId",
   authenticateAdmin,
-  requirePermission("shift_management"),
   adminShiftSchedulingController.getShiftDetail,
 );
 
@@ -505,7 +485,6 @@ router.get(
 router.post(
   "/admin/shifts",
   authenticateAdmin,
-  requirePermission("shift_management"),
   adminShiftSchedulingController.createShift,
 );
 
@@ -516,7 +495,6 @@ router.post(
 router.put(
   "/admin/shifts/:shiftId",
   authenticateAdmin,
-  requirePermission("shift_management"),
   adminShiftSchedulingController.updateShift,
 );
 
@@ -527,7 +505,6 @@ router.put(
 router.delete(
   "/admin/shifts/:shiftId",
   authenticateAdmin,
-  requirePermission("shift_management"),
   adminShiftSchedulingController.deleteShift,
 );
 
@@ -538,7 +515,6 @@ router.delete(
 router.get(
   "/admin/shifts/calendar",
   authenticateAdmin,
-  requirePermission("shift_management"),
   adminShiftSchedulingController.getShiftsCalendar,
 );
 
@@ -551,7 +527,6 @@ router.get(
 router.get(
   "/admin/users",
   authenticateAdmin,
-  requirePermission("user_management"),
   adminUserManagementController.getAllUsers,
 );
 
@@ -562,7 +537,6 @@ router.get(
 router.get(
   "/admin/users/:userId",
   authenticateAdmin,
-  requirePermission("user_management"),
   adminUserManagementController.getUserDetail,
 );
 
@@ -573,7 +547,6 @@ router.get(
 router.post(
   "/admin/users",
   authenticateAdmin,
-  requirePermission("user_management"),
   adminUserManagementController.createUser,
 );
 
@@ -584,7 +557,6 @@ router.post(
 router.put(
   "/admin/users/:userId",
   authenticateAdmin,
-  requirePermission("user_management"),
   adminUserManagementController.updateUser,
 );
 
@@ -595,7 +567,6 @@ router.put(
 router.delete(
   "/admin/users/:userId",
   authenticateAdmin,
-  requirePermission("user_management"),
   adminUserManagementController.deleteUser,
 );
 
@@ -606,7 +577,6 @@ router.delete(
 router.post(
   "/admin/users/:userId/reset-password",
   authenticateAdmin,
-  requirePermission("user_management"),
   adminUserManagementController.resetUserPassword,
 );
 
@@ -617,7 +587,6 @@ router.post(
 router.post(
   "/admin/users/:userId/unlock",
   authenticateAdmin,
-  requirePermission("user_management"),
   adminUserManagementController.unlockUser,
 );
 
@@ -692,7 +661,6 @@ router.get(
 router.get(
   "/sessions/stats",
   authenticateAdmin,
-  requirePermission("admin_dashboard"),
   sessionManagementController.getSessionStats,
 );
 
@@ -703,7 +671,6 @@ router.get(
 router.post(
   "/sessions/:sessionId/force-end",
   authenticateAdmin,
-  requirePermission("device_management"),
   sessionManagementController.forceEndSession,
 );
 
