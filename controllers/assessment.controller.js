@@ -4,6 +4,7 @@ const DTUser = require('../models/dtUser.model');
 const NotificationService = require('../utils/notificationService');
 const Joi = require('joi');
 const mongoose = require('mongoose');
+const MailService = require('../services/mail-service');
 
 // Validation schema for submitting assessment (updated for section-based structure)
 const submitAssessmentSchema = Joi.object({
