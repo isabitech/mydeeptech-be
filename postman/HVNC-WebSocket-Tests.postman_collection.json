@@ -1,0 +1,310 @@
+{
+  "info": {
+    "name": "HVNC WebSocket API Tests",
+    "description": "Collection for testing HVNC WebSocket endpoints and related API calls",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwt_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url", 
+      "value": "http://localhost:4000",
+      "type": "string"
+    },
+    {
+      "key": "websocket_url",
+      "value": "ws://localhost:4000",
+      "type": "string"  
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "device_id",
+      "value": "test_device_123",
+      "type": "string"
+    },
+    {
+      "key": "session_id",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Generate Admin Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@mydeeptech.ng\",\n  \"password\": \"your_password\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.to.have.status(200)) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('jwt_token', response.token);",
+                  "    console.log('JWT Token set:', response.token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Generate User Token", 
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@test.com\",\n  \"password\": \"your_password\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "HVNC Device Management",
+      "item": [
+        {
+          "name": "Get All Devices",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/hvnc/devices",
+              "host": ["{{base_url}}"],
+              "path": ["api", "hvnc", "devices"]
+            }
+          }
+        },
+        {
+          "name": "Get Connected Devices",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/hvnc/devices/connected",
+              "host": ["{{base_url}}"],
+              "path": ["api", "hvnc", "devices", "connected"]
+            }
+          }
+        },
+        {
+          "name": "Register Device",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"device_id\": \"{{device_id}}\",\n  \"pc_name\": \"Test Device\",\n  \"hostname\": \"test-pc\",\n  \"username\": \"testuser\",\n  \"system_info\": {\n    \"os\": \"Windows 10\",\n    \"version\": \"10.0.19042\",\n    \"architecture\": \"x64\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/hvnc/devices",
+              "host": ["{{base_url}}"],
+              "path": ["api", "hvnc", "devices"]
+            }
+          }
+        },
+        {
+          "name": "Send Device Command",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw", 
+              "raw": "{\n  \"device_id\": \"{{device_id}}\",\n  \"type\": \"system\",\n  \"action\": \"get_status\",\n  \"parameters\": {},\n  \"priority\": \"normal\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/hvnc/devices/{{device_id}}/command",
+              "host": ["{{base_url}}"],
+              "path": ["api", "hvnc", "devices", "{{device_id}}", "command"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "HVNC Sessions",
+      "item": [
+        {
+          "name": "Get Active Sessions",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/hvnc/sessions/active",
+              "host": ["{{base_url}}"],
+              "path": ["api", "hvnc", "sessions", "active"]
+            }
+          }
+        },
+        {
+          "name": "Create Session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"device_id\": \"{{device_id}}\",\n  \"session_type\": \"remote_access\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/hvnc/sessions",
+              "host": ["{{base_url}}"],
+              "path": ["api", "hvnc", "sessions"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.to.have.status(201)) {",
+                  "    const response = pm.response.json();",
+                  "    pm.collectionVariables.set('session_id', response.session_id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "End Session",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/hvnc/sessions/{{session_id}}/end",
+              "host": ["{{base_url}}"],
+              "path": ["api", "hvnc", "sessions", "{{session_id}}", "end"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "WebSocket Connection Tests",
+      "item": [
+        {
+          "name": "Test WebSocket Connection (Info)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/hvnc/websocket/info",
+              "host": ["{{base_url}}"],
+              "path": ["api", "hvnc", "websocket", "info"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('WebSocket info available', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "    const response = pm.response.json();",
+                  "    pm.expect(response.path).to.eq('/hvnc/socket.io');",
+                  "    pm.expect(response.namespaces).to.include.members(['admin', 'user', 'device']);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Health Checks",
+      "item": [
+        {
+          "name": "Check HVNC Service Status",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/hvnc/health",
+              "host": ["{{base_url}}"],
+              "path": ["api", "hvnc", "health"]
+            }
+          }
+        },
+        {
+          "name": "Get WebSocket Statistics",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/hvnc/stats",
+              "host": ["{{base_url}}"],
+              "path": ["api", "hvnc", "stats"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Auto-refresh token if needed",
+          "const token = pm.collectionVariables.get('jwt_token');",
+          "if (!token) {",
+          "    console.log('No JWT token found. Please run authentication requests first.');",
+          "}"
+        ]
+      }
+    }
+  ]
+}

@@ -3,7 +3,7 @@ const HVNCShift = require('../models/hvnc-shift.model');
 const HVNCDevice = require('../models/hvnc-device.model');
 const HVNCSession = require('../models/hvnc-session.model');
 const HVNCActivityLog = require('../models/hvnc-activity-log.model');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 
 /**

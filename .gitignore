@@ -6,3 +6,5 @@ debug/
 .DS_Store
 hvnc
 exports
+examples
+frontend-components

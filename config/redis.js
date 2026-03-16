@@ -9,8 +9,8 @@ const maxRetries = 1;
 
 // Parse Redis host and port from environment
 const parseRedisConfig = () => {
-    const redisHost = envConfig.redis.REDIS_HOST || 'localhost';
-    const redisPort = envConfig.redis.REDIS_PORT || 6379;
+    const redisHost = envConfig.redis.REDIS_HOST;
+    const redisPort = envConfig.redis.REDIS_PORT;
     
     // Debug: Log what we're reading from environment
     console.log('🔍 Environment variables:');
@@ -128,7 +128,10 @@ const createRedisClient = async () => {
 // Initialize Redis connection
 const initRedis = async () => {
     try {
-        return await createRedisClient();
+        // console.log("🔄 Initializing Redis connection...");
+        await createRedisClient();
+        // console.log("✅ Redis initialization completed");
+        return;
     } catch (error) {
         console.error('❌ Failed to initialize Redis:', error.message);
         return null;

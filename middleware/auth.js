@@ -4,14 +4,17 @@ const envConfig = require('./../config/envConfig');
 
 // JWT Authentication Middleware
 const authenticateToken = async (req, res, next) => {
+
   try {
-    // Get token from Authorization header (Bearer token) or from _usrinfo format
+
+ // Get token from Authorization header (Bearer token) or from _usrinfo format
     const authHeader = req.headers.authorization;
     const token = authHeader && authHeader.startsWith('Bearer ') 
       ? authHeader.split(' ')[1] 
-      : req.headers.token || req.body.token || req.query.token;
+      : req.headers?.token || req.body?.token || req.query?.token;
 
     if (!token) {
+      console.warn('⚠️ No token provided in request');
       return res.status(401).json({
         success: false,
         message: 'Access token required. Please provide a valid JWT token.',
@@ -20,9 +23,8 @@ const authenticateToken = async (req, res, next) => {
     }
 
     // Verify the token
-    
     const decoded = jwt.verify(token, envConfig.jwt.JWT_SECRET || 'your-secret-key');
-    
+
     // Optional: Check if user still exists and is active
     const user = await DTUser.findById(decoded.userId);
     
@@ -55,7 +57,7 @@ const authenticateToken = async (req, res, next) => {
   } catch (error) {
     console.error('❌ JWT Authentication failed:', error.message);
     
-    if (error.name === 'JsonWebTokenError') {
+    if (error instanceof jwt.JsonWebTokenError || error.name === 'JsonWebTokenError') {
       return res.status(401).json({
         success: false,
         message: 'Invalid token format',
@@ -63,7 +65,7 @@ const authenticateToken = async (req, res, next) => {
       });
     }
     
-    if (error.name === 'TokenExpiredError') {
+    if (error instanceof jwt.TokenExpiredError || error.name === 'TokenExpiredError') {
       return res.status(401).json({
         success: false,
         message: 'Token has expired. Please login again.',

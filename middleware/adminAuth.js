@@ -8,7 +8,7 @@ const authenticateAdmin = async (req, res, next) => {
     const authHeader = req.headers.authorization;
     const token = authHeader && authHeader.startsWith('Bearer ') 
       ? authHeader.split(' ')[1] 
-      : req.headers.token || req.body.token || req.query.token;
+      : req.headers?.token || req.body?.token || req.query?.token;
 
     if (!token) {
       return res.status(401).json({
@@ -20,9 +20,10 @@ const authenticateAdmin = async (req, res, next) => {
 
     // Verify the token
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-    
+
     // Check if user exists
     const user = await DTUser.findById(decoded.userId);
+  
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -61,7 +62,7 @@ const authenticateAdmin = async (req, res, next) => {
   } catch (error) {
     console.error('❌ Admin authentication failed:', error.message);
     
-    if (error.name === 'JsonWebTokenError') {
+    if (error instanceof jwt.JsonWebTokenError || error.name === 'JsonWebTokenError') {
       return res.status(401).json({
         success: false,
         message: 'Invalid admin token format',
@@ -69,7 +70,7 @@ const authenticateAdmin = async (req, res, next) => {
       });
     }
     
-    if (error.name === 'TokenExpiredError') {
+    if (error instanceof jwt.TokenExpiredError || error.name === 'TokenExpiredError') {
       return res.status(401).json({
         success: false,
         message: 'Admin token has expired. Please login again.',
