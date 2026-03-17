@@ -14,6 +14,7 @@ const {
   validateUpdateRole,
   validateRoleId,
   validateRemovePermissionsFromRole,
+  validateAssignRoleToUserParams,
 } = require("../validations/rbac.validation");
 
 // Permission routes
@@ -108,6 +109,14 @@ router.delete(
   authenticateAdmin,
   validateRoleId,
   RoleController.deleteRole,
+);
+
+router.post(
+  "/role/:id/assign-user/:userId",
+  authenticateToken,
+  authenticateAdmin,
+  validateAssignRoleToUserParams,
+  RoleController.assignRoleToUser,
 );
 
 module.exports = router;
