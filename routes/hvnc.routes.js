@@ -753,6 +753,6 @@ router.post(
  * - GET /admin/hubstaff/devices (Admin device status)
  * - GET /user/hubstaff/my-sessions (User dashboard)
  */
-router.use("/hubstaff", hubstaffRoutes);
+router.use("/admin/hubstaff", hubstaffRoutes);
 
 module.exports = router;

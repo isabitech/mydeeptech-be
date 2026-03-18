@@ -81,7 +81,7 @@ router.post(
  * GET /api/hvnc/admin/hubstaff/active-sessions
  */
 router.get(
-  "/admin/active-sessions",
+  "/active-sessions",
   authenticateAdmin,
   hubstaffController.getActiveSessions,
 );
@@ -91,7 +91,7 @@ router.get(
  * GET /api/hvnc/admin/hubstaff/user-sessions/:userId
  */
 router.get(
-  "/admin/user-sessions/:userId",
+  "/user-sessions/:userId",
   authenticateAdmin,
   hubstaffController.getUserSessionsAdmin,
 );
@@ -101,7 +101,7 @@ router.get(
  * GET /api/hvnc/admin/hubstaff/device-utilization/:deviceId
  */
 router.get(
-  "/admin/device-utilization/:deviceId",
+  "/device-utilization/:deviceId",
   authenticateAdmin,
   hubstaffController.getDeviceUtilization,
 );
@@ -111,7 +111,7 @@ router.get(
  * GET /api/hvnc/admin/hubstaff/devices
  */
 router.get(
-  "/admin/devices",
+  "/devices-status",
   authenticateAdmin,
   hubstaffController.getDevicesWithHubstaffStatus,
 );
@@ -121,7 +121,7 @@ router.get(
  * GET /api/hvnc/admin/hubstaff/monthly-tracking/:year/:month
  */
 router.get(
-  "/admin/monthly-tracking/:year/:month",
+  "/monthly-tracking/:year/:month",
   authenticateAdmin,
   hubstaffController.getMonthlyUserTracking,
 );
