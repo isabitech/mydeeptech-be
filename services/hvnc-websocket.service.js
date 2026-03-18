@@ -17,6 +17,56 @@ const connectedUsers = new Map(); // Track user connections: { user_id: socketId
 const activeCommands = new Map(); // Track pending commands: { command_id: timeout }
 const activeSessions = new Map(); // Track active user sessions: { session_id: { user, device, socket } }
 
+// Performance monitoring for 20fps video streaming
+const frameStatsPerDevice = new Map(); // Track frame rates per device
+const connectionQuality = new Map(); // Track user connection quality
+
+// Helper function to update frame statistics
+function updateFrameStats(deviceId) {
+  const now = Date.now();
+  if (!frameStatsPerDevice.has(deviceId)) {
+    frameStatsPerDevice.set(deviceId, {
+      frameCount: 0,
+      lastReset: now,
+      avgFps: 0,
+      lastFrameTime: now,
+      instantFps: 0,
+    });
+  }
+
+  const stats = frameStatsPerDevice.get(deviceId);
+  stats.frameCount++;
+  
+  // Calculate instantaneous FPS (time between frames)
+  const timeDiff = now - stats.lastFrameTime;
+  if (timeDiff > 0) {
+    stats.instantFps = 1000 / timeDiff; // Convert to FPS
+  }
+  stats.lastFrameTime = now;
+
+  // Calculate rolling average FPS every 2 seconds (faster than 5 seconds)
+  if (now - stats.lastReset >= 2000) {
+    stats.avgFps = stats.frameCount / 2;
+    stats.frameCount = 0;
+    stats.lastReset = now;
+  }
+}
+
+// Helper function to find session by either _id or session_id field
+function findActiveSession(sessionId) {
+  // Try direct lookup first (for _id.toString() keys)
+  let sessionData = activeSessions.get(sessionId);
+  if (sessionData) return sessionData;
+
+  // Search by session_id field if direct lookup fails
+  for (const [key, data] of activeSessions.entries()) {
+    if (data.session.session_id === sessionId) {
+      return data;
+    }
+  }
+  return null;
+}
+
 /**
  * Initialize HVNC WebSocket namespaces on existing Socket.IO instance
  * @param {Object} server - HTTP server instance (for compatibility)
@@ -41,90 +91,126 @@ const initializeHVNCSocket = (server) => {
     deviceNamespace = io.of("/hvnc-device");
     adminNamespace = io.of("/hvnc-admin");
     userNamespace = io.of("/hvnc-user");
+
+    // DEBUG: Verify namespaces are created
+    console.log("✅ HVNC namespaces created:");
+    console.log(
+      "   /hvnc-device namespace:",
+      deviceNamespace ? "CREATED" : "FAILED",
+    );
+    console.log(
+      "   /hvnc-admin namespace:",
+      adminNamespace ? "CREATED" : "FAILED",
+    );
+    console.log(
+      "   /hvnc-user namespace:",
+      userNamespace ? "CREATED" : "FAILED",
+    );
+
+    // DEBUG: Log all namespaces on the main Socket.IO instance
+    console.log("📋 All Socket.IO namespaces:");
+    if (io._nsps) {
+      console.log("   _nsps keys:", Object.keys(io._nsps));
+      console.log("   _nsps Map size:", io._nsps.size || "undefined");
+      // Try to iterate through _nsps if it's a Map
+      if (typeof io._nsps.forEach === "function") {
+        console.log("   _nsps Map contents:");
+        io._nsps.forEach((namespace, key) => {
+          console.log(`     "${key}": ${namespace ? "EXISTS" : "NULL"}`);
+        });
+      }
+    }
+    if (io.sockets && io.sockets.adapter && io.sockets.adapter.nsp) {
+      console.log("   adapter.nsp keys:", Object.keys(io.sockets.adapter.nsp));
+    }
+    console.log(
+      "   io.of('/hvnc-device') test:",
+      io.of("/hvnc-device") ? "EXISTS" : "FAILED",
+    );
+
+    // Ensure namespaces are properly registered by re-referencing them
+    const testDeviceNamespace = io.of("/hvnc-device");
+    console.log(
+      "   Re-referenced /hvnc-device:",
+      testDeviceNamespace ? "SUCCESS" : "FAILED",
+    );
+
+    // DEBUG: Force namespace registration in _nsps Map
+    if (io._nsps && typeof io._nsps.set === "function") {
+      console.log("🔧 FORCE REGISTERING NAMESPACES IN _nsps Map...");
+      io._nsps.set("/hvnc-device", deviceNamespace);
+      io._nsps.set("/hvnc-admin", adminNamespace);
+      io._nsps.set("/hvnc-user", userNamespace);
+      console.log(
+        "   Force registration complete. New _nsps size:",
+        io._nsps.size,
+      );
+    }
+
+    // DEBUG: Add namespace connection event logging
+    deviceNamespace.on("connect", (socket) => {
+      console.log("🎆 HVNC DEVICE NAMESPACE CONNECTED! Socket ID:", socket.id);
+    });
   } catch (error) {
     console.error("❌ Failed to get Socket.IO instance:", error.message);
     console.error("❌ Chat service must be initialized before HVNC service");
     return;
   }
 
-  // Device authentication middleware
+  // Device authentication middleware - JWT validation
   deviceNamespace.use(async (socket, next) => {
     try {
-      // First check handshake for token (standard Socket.IO clients)
-      let token = socket.handshake.auth.token || socket.handshake.query.token;
+      console.log("🔐 HVNC Device authentication middleware triggered");
+      console.log("   Socket ID:", socket.id);
+      console.log("   Remote address:", socket.handshake.address);
 
-      // If no token in handshake, check for C++ client token in connect data
-      if (!token && socket.handshake.auth) {
-        // Parse token from C++ client format: "40/hvnc-device,{"token":"xyz"}"
-        const authData = socket.handshake.auth;
-        if (typeof authData === "string") {
-          try {
-            const parsed = JSON.parse(authData);
-            token = parsed.token;
-          } catch (e) {
-            // Not JSON, might be in different format
-          }
-        }
-
-        // Also check if token is directly in the auth object
-        if (!token && socket.handshake.auth.token) {
-          token = socket.handshake.auth.token;
-        }
-      }
-
-      console.log("🔐 Device authentication attempt...");
+      // Get JWT token from query params
+      const token = socket.handshake.query.token;
       console.log("   Token provided:", token ? "YES" : "NO");
-      console.log("   Handshake auth:", socket.handshake.auth);
-      console.log("   Handshake query:", socket.handshake.query);
-      console.log(
-        "   Raw token:",
-        token ? token.substring(0, 20) + "..." : "NULL",
-      );
 
       if (!token) {
-        console.log("❌ No token provided in handshake or auth data");
+        console.log("   ❌ No token provided");
         return next(new Error("Device authentication token required"));
       }
 
+      // Check if JWT secret is available
+      if (!envConfig?.jwt?.JWT_SECRET) {
+        console.error("   ❌ JWT_SECRET not configured");
+        return next(new Error("Server authentication configuration error"));
+      }
+
+      // Verify JWT token
       const decoded = jwt.verify(token, envConfig.jwt.JWT_SECRET);
-      console.log("✅ Token decoded successfully:", {
-        id: decoded.id,
-        device_id: decoded.device_id,
-        type: decoded.type,
-      });
+      console.log("   ✅ JWT decoded successfully");
+      console.log("   Device ID:", decoded.device_id);
+      console.log("   Token type:", decoded.type);
 
       if (decoded.type !== "device") {
-        console.log("❌ Invalid token type:", decoded.type);
-        return next(new Error("Invalid token type for device connection"));
+        console.log("   ❌ Invalid token type:", decoded.type);
+        return next(new Error("Invalid device token"));
       }
 
-      // Fetch device from database
-      console.log("🔍 Looking up device in database...");
-      const device = await HVNCDevice.findById(decoded.id);
-      console.log("📊 Database lookup result:", device ? "FOUND" : "NOT FOUND");
+      // Store auth data for connection handler
+      socket.deviceAuth = {
+        device_id: decoded.device_id,
+        id: decoded.id,
+        type: decoded.type,
+      };
+      socket.authToken = token;
 
-      if (!device || device.device_id !== decoded.device_id) {
-        console.log("❌ Device validation failed");
-        console.log("   Database device:", device ? device.device_id : "NULL");
-        console.log("   Token device_id:", decoded.device_id);
-        return next(new Error("Device not found or invalid"));
-      }
-
-      if (device.status === "disabled") {
-        console.log("❌ Device is disabled");
-        return next(new Error("Device is disabled"));
-      }
-
-      socket.deviceId = device.device_id;
-      socket.device = device;
-
-      console.log("✅ Device authentication successful!");
-      next();
+      console.log("   ✅ Device authenticated:", decoded.device_id);
+      return next();
     } catch (error) {
-      console.error("❌ Device WebSocket auth error:", error.message);
-      next(new Error("Device authentication failed"));
+      console.log("   ❌ Authentication failed:", error.message);
+      console.error("   Full error:", error);
+      return next(new Error("Device authentication failed: " + error.message));
     }
   });
+
+  console.log(
+    "📋 Device namespace middleware attached:",
+    typeof deviceNamespace.use === "function" ? "SUCCESS" : "FAILED",
+  );
 
   // Admin authentication middleware
   adminNamespace.use(async (socket, next) => {
@@ -194,77 +280,159 @@ const initializeHVNCSocket = (server) => {
     }
   });
 
-  // Device connection handling
-  deviceNamespace.on("connection", (socket) => {
-    const device = socket.device;
-    console.log(`🖥️ Device connected: ${device.pc_name} (${device.device_id})`);
+  // Device connection handling - database validation
+  deviceNamespace.on("connection", async (socket) => {
+    try {
+      console.log(`🔌 Device WebSocket connected - starting validation...`);
+      console.log(`   Device ID from auth: ${socket.deviceAuth?.device_id}`);
 
-    // Store device connection
-    connectedDevices.set(device.device_id, {
-      socket: socket,
-      device: device,
-      connectedAt: new Date(),
-      lastHeartbeat: new Date(),
-    });
+      // Perform database validation for all devices
 
-    // Update device status
-    device.status = "online";
-    device.last_seen = new Date();
-    device.save();
+      // Now perform database validation (after WebSocket upgrade completed)
+      const decoded = socket.deviceAuth;
+      if (!decoded) {
+        console.log("❌ No auth data stored during upgrade");
+        socket.emit("auth_error", { message: "Authentication data missing" });
+        socket.disconnect();
+        return;
+      }
 
-    // Join device to its room for targeted messaging
-    socket.join(`device_${device.device_id}`);
+      console.log("🔍 Looking up device in database...");
+      console.log("   Device ID from token:", decoded.device_id);
+      console.log("   Object ID from token:", decoded.id);
 
-    // ✅ Send authentication success confirmation to PC agent
-    socket.emit("authenticated", {
-      success: true,
-      deviceId: device.device_id,
-      pcName: device.pc_name,
-      message: "Device authenticated and connected successfully",
-      timestamp: new Date().toISOString(),
-      socketId: socket.id,
-    });
+      // Try to find device by both ObjectId and device_id for safety
+      let device;
+      try {
+        if (decoded.id) {
+          device = await HVNCDevice.findById(decoded.id);
+        }
 
-    console.log(`📤 Sent 'authenticated' event to device ${device.device_id}`);
+        // If not found by ObjectId, try by device_id
+        if (!device) {
+          device = await HVNCDevice.findOne({ device_id: decoded.device_id });
+          console.log(
+            "📊 Fallback lookup by device_id:",
+            device ? "FOUND" : "NOT FOUND",
+          );
+        } else {
+          console.log(
+            "📊 Database lookup by ObjectId:",
+            device ? "FOUND" : "NOT FOUND",
+          );
+        }
+      } catch (dbError) {
+        console.error("❌ Database lookup error:", dbError.message);
+        socket.emit("auth_error", { message: "Database lookup failed" });
+        socket.disconnect();
+        return;
+      }
 
-    // Log device connection
-    HVNCActivityLog.logDeviceEvent(
-      device.device_id,
-      "device_connected",
-      {
-        socket_id: socket.id,
-        connection_type: "websocket",
+      if (!device || device.device_id !== decoded.device_id) {
+        console.log("❌ Device validation failed");
+        console.log("   Database device:", device ? device.device_id : "NULL");
+        console.log("   Token device_id:", decoded.device_id);
+        socket.emit("auth_error", { message: "Device not found or invalid" });
+        socket.disconnect();
+        return;
+      }
+
+      if (device.status === "disabled") {
+        console.log("❌ Device is disabled");
+        socket.emit("auth_error", { message: "Device is disabled" });
+        socket.disconnect();
+        return;
+      }
+
+      // Authentication successful - complete setup
+      socket.deviceId = device.device_id;
+      socket.device = device;
+
+      console.log(
+        `✅ Device fully authenticated: ${device.pc_name} (${device.device_id})`,
+      );
+
+      // Store device connection
+      connectedDevices.set(device.device_id, {
+        socket: socket,
+        device: device,
+        connectedAt: new Date(),
+        lastHeartbeat: new Date(),
+      });
+
+      // Update device status with parallel save protection
+      try {
+        device.status = "online";
+        device.last_seen = new Date();
+        await device.save();
+      } catch (saveError) {
+        if (saveError.name !== "ParallelSaveError") {
+          console.error("Device save error:", saveError);
+        }
+        // Ignore ParallelSaveError as it means another save is in progress
+      }
+
+      // Join device to its room for targeted messaging
+      socket.join(`device_${device.device_id}`);
+
+      // ✅ Send authentication success confirmation to PC agent
+      socket.emit("authenticated", {
+        success: true,
+        deviceId: device.device_id,
+        pcName: device.pc_name,
+        message: "Device authenticated and connected successfully",
+        timestamp: new Date().toISOString(),
+        socketId: socket.id,
+      });
+
+      console.log(
+        `📤 Sent 'authenticated' event to device ${device.device_id}`,
+      );
+
+      // Log device connection
+      HVNCActivityLog.logDeviceEvent(
+        device.device_id,
+        "device_online",
+        {
+          socket_id: socket.id,
+          connection_type: "websocket",
+          pc_name: device.pc_name,
+        },
+        {
+          status: "success",
+          ip_address: socket.handshake.address,
+        },
+      );
+
+      // Notify admins of device connection
+      adminNamespace.emit("device_online", {
+        device_id: device.device_id,
         pc_name: device.pc_name,
-      },
-      {
-        status: "success",
+        hostname: device.hostname,
+        connected_at: new Date(),
         ip_address: socket.handshake.address,
-      },
-    );
-
-    // Notify admins of device connection
-    adminNamespace.emit("device_online", {
-      device_id: device.device_id,
-      pc_name: device.pc_name,
-      hostname: device.hostname,
-      connected_at: new Date(),
-      ip_address: socket.handshake.address,
-    });
+      });
+    } catch (error) {
+      console.error(`❌ Device database validation error:`, error.message);
+      socket.emit("connect_error", { message: "Database validation failed" });
+      socket.disconnect();
+      return;
+    }
 
     // Handle device status updates
     socket.on("device_status", async (data) => {
       try {
-        const connectionInfo = connectedDevices.get(device.device_id);
+        const connectionInfo = connectedDevices.get(socket.device.device_id);
         if (connectionInfo) {
           connectionInfo.lastHeartbeat = new Date();
         }
 
         // Update device status in database
-        await device.updateHeartbeat(data);
+        await socket.device.updateHeartbeat(data);
 
         // Broadcast status to admins
         adminNamespace.emit("device_status_update", {
-          device_id: device.device_id,
+          device_id: socket.device.device_id,
           status: data,
           timestamp: new Date(),
         });
@@ -286,7 +454,7 @@ const initializeHVNCSocket = (server) => {
     socket.on("hubstaff_update", async (data) => {
       try {
         await HVNCActivityLog.logDeviceEvent(
-          device.device_id,
+          socket.device.device_id,
           "hubstaff_status_update",
           {
             timer_running: data.timer_running,
@@ -298,14 +466,14 @@ const initializeHVNCSocket = (server) => {
 
         // Notify admins of Hubstaff changes
         adminNamespace.emit("hubstaff_update", {
-          device_id: device.device_id,
+          device_id: socket.device.device_id,
           ...data,
           timestamp: new Date(),
         });
 
         // Update any active sessions with Hubstaff data
         const activeSessions = await HVNCSession.findActiveSessionsForDevice(
-          device.device_id,
+          socket.device.device_id,
         );
         for (const session of activeSessions) {
           await session.updateHubstaffStatus(data);
@@ -332,11 +500,11 @@ const initializeHVNCSocket = (server) => {
           {
             event,
             user_email,
-            device_id: device.device_id,
+            device_id: socket.device.device_id,
             event_data: data,
           },
           {
-            device_id: device.device_id,
+            device_id: socket.device.device_id,
             session_id,
             user_email,
           },
@@ -344,7 +512,7 @@ const initializeHVNCSocket = (server) => {
 
         // Notify admins of session events
         adminNamespace.emit("session_event", {
-          device_id: device.device_id,
+          device_id: socket.device.device_id,
           session_id,
           event,
           user_email,
@@ -407,7 +575,7 @@ const initializeHVNCSocket = (server) => {
             execution_time,
           },
           {
-            device_id: device.device_id,
+            device_id: socket.device.device_id,
             session_id: command.session_id,
             user_email: command.user_email,
             status: status === "success" ? "success" : "failure",
@@ -417,7 +585,7 @@ const initializeHVNCSocket = (server) => {
         // Notify admins of command completion
         adminNamespace.emit("command_completed", {
           command_id,
-          device_id: device.device_id,
+          device_id: socket.device.device_id,
           status,
           result: status === "success" ? result : null,
           error: status === "error" ? error : null,
@@ -439,31 +607,168 @@ const initializeHVNCSocket = (server) => {
       }
     });
 
-    // Handle screen sharing events
+    // Handle screen sharing events (legacy)
     socket.on("screen_data", (data) => {
       // Forward screen data to admins monitoring this device
       adminNamespace.emit("screen_update", {
-        device_id: device.device_id,
+        device_id: socket.device.device_id,
         screen_data: data,
         timestamp: new Date(),
       });
     });
 
+    // Handle new screen frames from PC agent - OPTIMIZED for 20fps
+    socket.on("screen_frame", async (frameData) => {
+      try {
+        const deviceId = socket.deviceId || socket.device.device_id;
+
+        // Validate frame data (essential check only)
+        if (!frameData?.data) {
+          return;
+        }
+
+        // Optimize: Pre-filter sessions by device (cache-friendly)
+        const deviceSessions = [];
+        for (const sessionData of activeSessions.values()) {
+          if (
+            sessionData.device.device_id === deviceId &&
+            sessionData.userSocket?.connected
+          ) {
+            deviceSessions.push(sessionData);
+          }
+        }
+
+        if (deviceSessions.length === 0) {
+          return; // No active sessions, skip processing
+        }
+
+        // IMMEDIATE RAW FRAME FORWARDING - NO PROCESSING DELAY
+        // Send frame data EXACTLY as received from PC agent to all user sessions
+        deviceSessions.forEach((sessionData) => {
+          try {
+            // Direct forwarding - no object creation overhead
+            sessionData.userSocket.emit("live_desktop_frame", {
+              session_id: sessionData.session.session_id,
+              device_id: deviceId,
+              device_name: socket.device.pc_name,
+              ...frameData, // Raw frame data from PC agent
+            });
+          } catch (error) {
+            // Silent error handling for performance
+            console.debug(
+              `Frame forward error for session ${sessionData.session.session_id}`,
+            );
+          }
+        });
+
+        // Forward to admins (monitoring) - also raw data
+        adminNamespace.emit("live_screen_frame", {
+          device_id: deviceId,
+          device_name: socket.device.pc_name,
+          ...frameData, // Raw frame data
+        });
+
+        // Optional: Update frame statistics for monitoring (minimal overhead)
+        updateFrameStats(deviceId);
+
+        // Optional: Minimal logging (removed frequent calculations to avoid blocking)
+        // Real-time FPS logging: Log every 50th frame for minimal performance impact
+        if (frameData.timestamp && frameData.timestamp % 50 === 0) {
+          const stats = frameStatsPerDevice.get(deviceId);
+          console.log(
+            `📺 [${stats?.avgFps?.toFixed(1) || 0}fps avg] ${socket.device.pc_name}: ${frameData.data?.length || 0} bytes → ${deviceSessions.length} session(s)`,
+          );
+        }
+
+        // Update device last activity (minimal overhead) - removed save to prevent parallel save errors
+      } catch (error) {
+        console.error("❌ Screen frame handling error:", error);
+      }
+    });
+
+    // Handle audio frames from PC agent → forward to active session user
+    socket.on("audio_frame", (frameData) => {
+      try {
+        if (!frameData || !frameData.data) return;
+
+        const deviceId = socket.deviceId || socket.device.device_id;
+
+        const deviceSessions = Array.from(activeSessions.values()).filter(
+          (s) => s.device.device_id === deviceId,
+        );
+
+        deviceSessions.forEach((sessionData) => {
+          try {
+            if (sessionData.userSocket && sessionData.userSocket.connected) {
+              sessionData.userSocket.emit("live_audio_frame", {
+                session_id: sessionData.session._id,
+                data: frameData.data,
+                format: frameData.format || "pcm_s16le",
+                sample_rate: frameData.sample_rate || 44100,
+                channels: frameData.channels || 2,
+                frames: frameData.frames || 0,
+                timestamp: frameData.timestamp || Date.now(),
+              });
+            }
+          } catch (err) {
+            console.error("❌ Error forwarding audio frame:", err);
+          }
+        });
+      } catch (error) {
+        console.error("❌ Audio frame handling error:", error);
+      }
+    });
+
+    // Handle user input forwarding (mouse, keyboard)
+    socket.on("user_input_response", async (inputData) => {
+      try {
+        // This handles input commands sent back from PC agent to user
+        const deviceId = socket.deviceId || socket.device.device_id;
+
+        // Find active sessions for this device
+        const deviceSessions = Array.from(activeSessions.values()).filter(
+          (sessionData) => sessionData.device.device_id === deviceId,
+        );
+
+        // Forward input response to appropriate user session
+        if (inputData.session_id) {
+          const targetSession = deviceSessions.find(
+            (s) => s.session._id.toString() === inputData.session_id,
+          );
+
+          if (targetSession && targetSession.userSocket) {
+            targetSession.userSocket.emit("input_response", inputData);
+          }
+        }
+      } catch (error) {
+        console.error("❌ User input response error:", error);
+      }
+    });
+
     // Handle disconnection
     socket.on("disconnect", async (reason) => {
-      console.log(`🖥️ Device disconnected: ${device.pc_name} (${reason})`);
+      console.log(
+        `🖥️ Device disconnected: ${socket.device.pc_name} (${reason})`,
+      );
 
       // Remove from connected devices
-      connectedDevices.delete(device.device_id);
+      connectedDevices.delete(socket.device.device_id);
 
-      // Update device status
-      device.status = "offline";
-      device.last_seen = new Date();
-      await device.save();
+      // Update device status with parallel save protection
+      try {
+        socket.device.status = "offline";
+        socket.device.last_seen = new Date();
+        await socket.device.save();
+      } catch (saveError) {
+        if (saveError.name !== "ParallelSaveError") {
+          console.error("Device disconnect save error:", saveError);
+        }
+        // Ignore ParallelSaveError as it means another save is in progress
+      }
 
       // End any active sessions for this device
       const activeSessions = await HVNCSession.findActiveSessionsForDevice(
-        device.device_id,
+        socket.device.device_id,
       );
       for (const session of activeSessions) {
         await session.endSession("device_offline");
@@ -471,7 +776,7 @@ const initializeHVNCSocket = (server) => {
 
       // Cancel pending commands
       await HVNCCommand.cancelDeviceCommands(
-        device.device_id,
+        socket.device.device_id,
         "Device disconnected",
       );
 
@@ -479,7 +784,7 @@ const initializeHVNCSocket = (server) => {
       for (const [commandId, timeout] of activeCommands.entries()) {
         const command = await HVNCCommand.findOne({
           command_id: commandId,
-          device_id: device.device_id,
+          device_id: socket.device.device_id,
         });
         if (command) {
           clearTimeout(timeout);
@@ -489,13 +794,15 @@ const initializeHVNCSocket = (server) => {
 
       // Log disconnection
       await HVNCActivityLog.logDeviceEvent(
-        device.device_id,
+        socket.device.device_id,
         "device_disconnected",
         {
           reason,
           session_duration:
             Date.now() -
-            new Date(connectedDevices.get(device.device_id)?.connectedAt || 0),
+            new Date(
+              connectedDevices.get(socket.device.device_id)?.connectedAt || 0,
+            ),
         },
         {
           status: "info",
@@ -504,8 +811,8 @@ const initializeHVNCSocket = (server) => {
 
       // Notify admins
       adminNamespace.emit("device_offline", {
-        device_id: device.device_id,
-        pc_name: device.pc_name,
+        device_id: socket.device.device_id,
+        pc_name: socket.device.pc_name,
         reason,
         disconnected_at: new Date(),
       });
@@ -759,6 +1066,76 @@ const initializeHVNCSocket = (server) => {
       try {
         const { device_id } = data;
 
+        console.log(
+          `🎮 User ${user.fullName} attempting to start session with device: ${device_id}`,
+        );
+        console.log(`📊 Request data:`, data);
+
+        // Get session_id from data or query params or generate one
+        let session_id = data.session_id || socket.handshake.query.session_id;
+        if (!session_id) {
+          // Generate a session_id if not provided
+          session_id = `sess_${user._id}_${Date.now()}`;
+          console.log(`📝 Generated session_id: ${session_id}`);
+        } else {
+          console.log(`📝 Using provided session_id: ${session_id}`);
+        }
+
+        // Check if device is online FIRST - before any session logic
+        const deviceConnection = connectedDevices.get(device_id);
+        if (!deviceConnection) {
+          socket.emit("session_error", {
+            error: "Device is not online",
+            device_id,
+          });
+          return;
+        }
+
+        // Check if session_id already exists
+        const existingSession = await HVNCSession.findOne({
+          session_id: session_id,
+        });
+        if (existingSession) {
+          console.log(`⚠️ Session ID ${session_id} already exists`);
+
+          // If it's an active session for the same user and device, reuse it
+          if (
+            existingSession.status === "active" &&
+            existingSession.user_email === user.email &&
+            existingSession.device_id === device_id
+          ) {
+            console.log(`🔄 Reusing existing active session: ${session_id}`);
+
+            // Store active session (use session._id as Map key)
+            activeSessions.set(existingSession._id.toString(), {
+              session: existingSession,
+              userSocket: socket,
+              deviceSocket: deviceConnection.socket, // Now deviceConnection is defined
+              user: user,
+              device: deviceConnection.device,
+            });
+
+            // Join session room
+            socket.join(`session_${existingSession._id}`);
+
+            // Notify user about session reuse
+            socket.emit("session_started", {
+              session_id: existingSession.session_id,
+              device_id: device_id,
+              device_name: deviceConnection.device.pc_name,
+              start_time: existingSession.started_at,
+              status: "active",
+              reused: true,
+            });
+
+            return;
+          } else {
+            // Generate a new unique session_id
+            session_id = `sess_${user._id}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+            console.log(`📝 Generated new unique session_id: ${session_id}`);
+          }
+        }
+
         // Validate device assignment
         const activeShift = await HVNCShift.findOne({
           user_email: user.email,
@@ -776,29 +1153,46 @@ const initializeHVNCSocket = (server) => {
           return;
         }
 
-        // Check if device is online
-        const deviceConnection = connectedDevices.get(device_id);
-        if (!deviceConnection) {
-          socket.emit("session_error", {
-            error: "Device is not online",
-            device_id,
+        // Create session with duplicate key error handling
+        let session;
+        try {
+          session = await HVNCSession.create({
+            session_id: session_id, // Add the required session_id field
+            user_email: user.email,
+            device_id: device_id,
+            started_at: new Date(),
+            status: "active",
+            client_info: {
+              connection_type: "websocket",
+              user_id: user._id,
+            },
           });
-          return;
+        } catch (error) {
+          if (error.code === 11000 && error.keyPattern?.session_id) {
+            // Handle duplicate key error by generating a new session_id
+            console.log(
+              `⚠️ Duplicate key error for session_id: ${session_id}, generating new ID`,
+            );
+            session_id = `sess_${user._id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+            session = await HVNCSession.create({
+              session_id: session_id,
+              user_email: user.email,
+              device_id: device_id,
+              started_at: new Date(),
+              status: "active",
+              client_info: {
+                connection_type: "websocket",
+                user_id: user._id,
+              },
+            });
+            console.log(`✅ Created session with new ID: ${session_id}`);
+          } else {
+            throw error; // Re-throw other errors
+          }
         }
 
-        // Create session
-        const session = await HVNCSession.create({
-          user_email: user.email,
-          device_id: device_id,
-          started_at: new Date(),
-          status: "active",
-          client_info: {
-            connection_type: "websocket",
-            user_id: user._id,
-          },
-        });
-
-        // Store active session
+        // Store active session (use session._id as Map key, but session_id for communication)
         activeSessions.set(session._id.toString(), {
           session: session,
           userSocket: socket,
@@ -812,14 +1206,14 @@ const initializeHVNCSocket = (server) => {
 
         // Notify device about new session
         deviceConnection.socket.emit("session_started", {
-          session_id: session._id,
+          session_id: session.session_id, // Use the session_id field instead of _id
           user_email: user.email,
           user_name: user.fullName,
         });
 
         // Notify user about successful session start
         socket.emit("session_started", {
-          session_id: session._id,
+          session_id: session.session_id, // Use the session_id field instead of _id
           device_id: device_id,
           device_name: deviceConnection.device.pc_name,
           start_time: session.started_at,
@@ -828,7 +1222,7 @@ const initializeHVNCSocket = (server) => {
 
         // Log session start
         await HVNCActivityLog.logUserEvent(user.email, "session_started", {
-          session_id: session._id,
+          session_id: session.session_id, // Use the session_id field instead of _id
           device_id: device_id,
           device_name: deviceConnection.device.pc_name,
         });
@@ -850,7 +1244,7 @@ const initializeHVNCSocket = (server) => {
       try {
         const { session_id } = data;
 
-        const sessionData = activeSessions.get(session_id);
+        const sessionData = findActiveSession(session_id);
         if (
           !sessionData ||
           sessionData.user._id.toString() !== user._id.toString()
@@ -915,7 +1309,7 @@ const initializeHVNCSocket = (server) => {
       try {
         const { session_id, action, parameters } = data;
 
-        const sessionData = activeSessions.get(session_id);
+        const sessionData = findActiveSession(session_id);
         if (
           !sessionData ||
           sessionData.user._id.toString() !== user._id.toString()
@@ -970,6 +1364,139 @@ const initializeHVNCSocket = (server) => {
         socket.emit("command_error", {
           error: "Failed to send command",
           message: error.message,
+        });
+      }
+    });
+
+    // Handle mouse input from user to device
+    socket.on("mouse_input", async (inputData) => {
+      try {
+        const { session_id, x, y, button, action, wheel_delta } = inputData;
+
+        console.log(`🖱️ Mouse input from ${user.fullName}:`, {
+          x,
+          y,
+          button,
+          action,
+        });
+
+        const sessionData = findActiveSession(session_id);
+        if (
+          !sessionData ||
+          sessionData.user._id.toString() !== user._id.toString()
+        ) {
+          socket.emit("input_error", { error: "Invalid session for input" });
+          return;
+        }
+
+        // Forward mouse input to device
+        sessionData.deviceSocket.emit("mouse_input", {
+          session_id: session_id,
+          x: x,
+          y: y,
+          button: button, // 'left', 'right', 'middle'
+          action: action, // 'down', 'up', 'move', 'wheel'
+          wheel_delta: wheel_delta,
+          timestamp: Date.now(),
+          user: user.fullName,
+        });
+
+        // Mouse input logging removed due to enum validation - "mouse_input" not valid event_type
+        // await HVNCActivityLog.logUserEvent(user.email, "mouse_input", {
+        //   session_id: session_id,
+        //   device_id: sessionData.device.device_id,
+        //   input_type: "mouse",
+        //   action: action,
+        //   coordinates: { x, y },
+        // });
+      } catch (error) {
+        console.error("❌ Mouse input error:", error);
+        socket.emit("input_error", { error: "Failed to process mouse input" });
+      }
+    });
+
+    // Handle keyboard input from user to device
+    socket.on("keyboard_input", async (inputData) => {
+      try {
+        const { session_id, key, action, modifiers, text } = inputData;
+
+        console.log(`⌨️ Keyboard input from ${user.fullName}:`, {
+          key,
+          action,
+          text,
+        });
+
+        const sessionData = findActiveSession(session_id);
+        if (
+          !sessionData ||
+          sessionData.user._id.toString() !== user._id.toString()
+        ) {
+          socket.emit("input_error", { error: "Invalid session for input" });
+          return;
+        }
+
+        // Forward keyboard input to device
+        sessionData.deviceSocket.emit("keyboard_input", {
+          session_id: session_id,
+          key: key, // Key code or key name
+          action: action, // 'down', 'up', 'press'
+          modifiers: modifiers || {}, // { ctrl: false, alt: false, shift: false }
+          text: text, // For character input
+          timestamp: Date.now(),
+          user: user.fullName,
+        });
+
+        // Keyboard input logging removed due to enum validation - "keyboard_input" not valid event_type
+        // if (!inputData.sensitive) {
+        //   await HVNCActivityLog.logUserEvent(user.email, "keyboard_input", {
+        //     session_id: session_id,
+        //     device_id: sessionData.device.device_id,
+        //     input_type: "keyboard",
+        //     action: action,
+        //     key: key,
+        //   });
+        // }
+      } catch (error) {
+        console.error("❌ Keyboard input error:", error);
+        socket.emit("input_error", {
+          error: "Failed to process keyboard input",
+        });
+      }
+    });
+
+    // Handle screen control commands (resolution, quality)
+    socket.on("screen_control", async (controlData) => {
+      try {
+        const { session_id, action, parameters } = controlData;
+
+        const sessionData = findActiveSession(session_id);
+        if (
+          !sessionData ||
+          sessionData.user._id.toString() !== user._id.toString()
+        ) {
+          socket.emit("control_error", {
+            error: "Invalid session for control",
+          });
+          return;
+        }
+
+        // Forward screen control to device
+        sessionData.deviceSocket.emit("screen_control", {
+          session_id: session_id,
+          action: action, // 'set_quality', 'set_fps', 'set_resolution'
+          parameters: parameters,
+          timestamp: Date.now(),
+          user: user.fullName,
+        });
+
+        console.log(`📺 Screen control from ${user.fullName}:`, {
+          action,
+          parameters,
+        });
+      } catch (error) {
+        console.error("❌ Screen control error:", error);
+        socket.emit("control_error", {
+          error: "Failed to process screen control",
         });
       }
     });
@@ -1163,7 +1690,7 @@ function getActiveSessions() {
  * End user session by session ID
  */
 async function endUserSession(sessionId, reason = "admin_action") {
-  const sessionData = activeSessions.get(sessionId);
+  const sessionData = findActiveSession(sessionId);
   if (!sessionData) {
     return false;
   }
@@ -1207,6 +1734,32 @@ async function endUserSession(sessionId, reason = "admin_action") {
 // Periodic cleanup
 setInterval(cleanupExpiredCommands, 60000); // Every minute
 
+// Performance monitoring for 20fps streaming
+const getStreamingStats = () => {
+  const stats = {};
+
+  for (const [deviceId, frameStats] of frameStatsPerDevice.entries()) {
+    const device = connectedDevices.get(deviceId);
+    stats[deviceId] = {
+      device_name: device?.device.pc_name || "Unknown",
+      current_fps: frameStats.avgFps,
+      connected: connectedDevices.has(deviceId),
+      active_sessions: Array.from(activeSessions.values()).filter(
+        (s) => s.device.device_id === deviceId,
+      ).length,
+    };
+  }
+
+  return {
+    total_devices: connectedDevices.size,
+    total_sessions: activeSessions.size,
+    total_admins: connectedAdmins.size,
+    device_stats: stats,
+    server_uptime: process.uptime(),
+    memory_usage: process.memoryUsage(),
+  };
+};
+
 module.exports = {
   initializeHVNCSocket,
   sendCommandToDevice,
@@ -1221,4 +1774,5 @@ module.exports = {
   sendConfigUpdate,
   endUserSession,
   cleanupExpiredCommands,
+  getStreamingStats, // New monitoring function
 };

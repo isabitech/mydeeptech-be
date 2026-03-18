@@ -63,6 +63,26 @@ app.get("/health", healthCheck);
 // Middleware
 app.use(cors(corsOptions));
 
+// Add detailed Socket.IO request debugging before other middleware
+app.use((req, res, next) => {
+  if (req.url.startsWith("/socket.io")) {
+    console.log("🌐 ========== HTTP REQUEST TO SOCKET.IO ==========");
+    console.log("   Method:", req.method);
+    console.log("   URL:", req.url);
+    console.log("   Headers:", JSON.stringify(req.headers, null, 2));
+    console.log("   Query:", JSON.stringify(req.query, null, 2));
+    console.log(
+      "   Is WebSocket upgrade?",
+      req.headers.upgrade === "websocket",
+    );
+    console.log("   Connection header:", req.headers.connection);
+    console.log("   User agent:", req.headers["user-agent"]);
+    console.log("   Remote address:", req.connection?.remoteAddress || req.ip);
+    console.log("");
+  }
+  next();
+});
+
 // Handle webhook routes with raw body (BEFORE express.json())
 app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
 

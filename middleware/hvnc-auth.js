@@ -1,105 +1,122 @@
-const jwt = require('jsonwebtoken');
-const DTUser = require('../models/dtUser.model');
-const HVNCDevice = require('../models/hvnc-device.model');
-const HVNCSession = require('../models/hvnc-session.model');
-const HVNCActivityLog = require('../models/hvnc-activity-log.model');
-const envConfig = require('../config/envConfig');
+const jwt = require("jsonwebtoken");
+const DTUser = require("../models/dtUser.model");
+const HVNCDevice = require("../models/hvnc-device.model");
+const HVNCSession = require("../models/hvnc-session.model");
+const HVNCActivityLog = require("../models/hvnc-activity-log.model");
+const envConfig = require("../config/envConfig");
 
 // HVNC Device Authentication Middleware
 const authenticateDevice = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.startsWith('Bearer ') 
-      ? authHeader.split(' ')[1] 
-      : req.headers.token || req.body.token || req.query.token;
+    const token =
+      authHeader && authHeader.startsWith("Bearer ")
+        ? authHeader.split(" ")[1]
+        : req.headers.token || req.body.token || req.query.token;
 
     if (!token) {
-      await HVNCActivityLog.logSecurityEvent('unauthorized_access_attempt', {
-        endpoint: req.path,
-        method: req.method,
-        reason: 'missing_device_token'
-      }, {
-        ip_address: req.ip,
-        user_agent: req.headers['user-agent'],
-        severity: 'medium'
-      });
+      await HVNCActivityLog.logSecurityEvent(
+        "unauthorized_access_attempt",
+        {
+          endpoint: req.path,
+          method: req.method,
+          reason: "missing_device_token",
+        },
+        {
+          ip_address: req.ip,
+          user_agent: req.headers["user-agent"],
+          severity: "medium",
+        },
+      );
 
       return res.status(401).json({
         success: false,
         error: {
-          code: 'TOKEN_MISSING',
-          message: 'Device authentication token required'
-        }
+          code: "TOKEN_MISSING",
+          message: "Device authentication token required",
+        },
       });
     }
 
     // Verify the device token
     const decoded = jwt.verify(token, envConfig.jwt.JWT_SECRET);
-    
-    if (decoded.type !== 'device') {
-      await HVNCActivityLog.logSecurityEvent('unauthorized_access_attempt', {
-        endpoint: req.path,
-        method: req.method,
-        reason: 'invalid_token_type',
-        token_type: decoded.type
-      }, {
-        ip_address: req.ip,
-        user_agent: req.headers['user-agent'],
-        severity: 'high'
-      });
+
+    if (decoded.type !== "device") {
+      await HVNCActivityLog.logSecurityEvent(
+        "unauthorized_access_attempt",
+        {
+          endpoint: req.path,
+          method: req.method,
+          reason: "invalid_token_type",
+          token_type: decoded.type,
+        },
+        {
+          ip_address: req.ip,
+          user_agent: req.headers["user-agent"],
+          severity: "high",
+        },
+      );
 
       return res.status(401).json({
         success: false,
         error: {
-          code: 'INVALID_TOKEN_TYPE',
-          message: 'Invalid token type for device authentication'
-        }
+          code: "INVALID_TOKEN_TYPE",
+          message: "Invalid token type for device authentication",
+        },
       });
     }
 
     // Fetch the device from database
     const device = await HVNCDevice.findById(decoded.id);
-    
+
     if (!device || device.device_id !== decoded.device_id) {
-      await HVNCActivityLog.logSecurityEvent('unauthorized_access_attempt', {
-        endpoint: req.path,
-        method: req.method,
-        reason: 'device_not_found',
-        device_id: decoded.device_id
-      }, {
-        ip_address: req.ip,
-        user_agent: req.headers['user-agent'],
-        severity: 'high'
-      });
+      await HVNCActivityLog.logSecurityEvent(
+        "unauthorized_access_attempt",
+        {
+          endpoint: req.path,
+          method: req.method,
+          reason: "device_not_found",
+          device_id: decoded.device_id,
+        },
+        {
+          ip_address: req.ip,
+          user_agent: req.headers["user-agent"],
+          severity: "high",
+        },
+      );
 
       return res.status(401).json({
         success: false,
         error: {
-          code: 'DEVICE_NOT_FOUND',
-          message: 'Device not found or invalid device token'
-        }
+          code: "DEVICE_NOT_FOUND",
+          message: "Device not found or invalid device token",
+        },
       });
     }
 
-    if (device.status === 'disabled') {
-      await HVNCActivityLog.logSecurityEvent('unauthorized_access_attempt', {
-        endpoint: req.path,
-        method: req.method,
-        reason: 'device_disabled',
-        device_id: device.device_id
-      }, {
-        device_id: device.device_id,
-        ip_address: req.ip,
-        user_agent: req.headers['user-agent'],
-        severity: 'medium'
-      });
+    if (device.status === "disabled") {
+      await HVNCActivityLog.logSecurityEvent(
+        "unauthorized_access_attempt",
+        {
+          endpoint: req.path,
+          method: req.method,
+          reason: "device_disabled",
+          device_id: device.device_id,
+        },
+        {
+          device_id: device.device_id,
+          ip_address: req.ip,
+          user_agent: req.headers["user-agent"],
+          severity: "medium",
+        },
+      );
 
       return res.status(403).json({
         success: false,
         error: {
-          code: 'DEVICE_DISABLED',
-          message: 'Device is disabled'
-        }
+          code: "DEVICE_DISABLED",
+          message: "Device is disabled",
+        },
       });
     }
 
@@ -108,55 +125,64 @@ const authenticateDevice = async (req, res, next) => {
     req.deviceToken = decoded;
 
     // Log successful device authentication
-    await HVNCActivityLog.logDeviceEvent(device.device_id, 'device_heartbeat', {
-      endpoint: req.path,
-      method: req.method,
-      authenticated: true
-    }, {
-      ip_address: req.ip,
-      user_agent: req.headers['user-agent']
-    });
+    await HVNCActivityLog.logDeviceEvent(
+      device.device_id,
+      "device_heartbeat",
+      {
+        endpoint: req.path,
+        method: req.method,
+        authenticated: true,
+      },
+      {
+        ip_address: req.ip,
+        user_agent: req.headers["user-agent"],
+      },
+    );
 
     next();
   } catch (error) {
-    if (error.name === 'JsonWebTokenError') {
-      await HVNCActivityLog.logSecurityEvent('authentication_failed', {
-        endpoint: req.path,
-        method: req.method,
-        reason: 'invalid_jwt_token',
-        error: error.message
-      }, {
-        ip_address: req.ip,
-        user_agent: req.headers['user-agent'],
-        severity: 'high'
-      });
+    if (error.name === "JsonWebTokenError") {
+      await HVNCActivityLog.logSecurityEvent(
+        "authentication_failed",
+        {
+          endpoint: req.path,
+          method: req.method,
+          reason: "invalid_jwt_token",
+          error: error.message,
+        },
+        {
+          ip_address: req.ip,
+          user_agent: req.headers["user-agent"],
+          severity: "high",
+        },
+      );
 
       return res.status(401).json({
         success: false,
         error: {
-          code: 'INVALID_TOKEN',
-          message: 'Invalid authentication token'
-        }
+          code: "INVALID_TOKEN",
+          message: "Invalid authentication token",
+        },
       });
     }
 
-    if (error.name === 'TokenExpiredError') {
+    if (error.name === "TokenExpiredError") {
       return res.status(401).json({
         success: false,
         error: {
-          code: 'TOKEN_EXPIRED',
-          message: 'Authentication token has expired'
-        }
+          code: "TOKEN_EXPIRED",
+          message: "Authentication token has expired",
+        },
       });
     }
 
-    console.error('Device authentication error:', error);
+    console.error("Device authentication error:", error);
     res.status(500).json({
       success: false,
       error: {
-        code: 'AUTH_ERROR',
-        message: 'Authentication error occurred'
-      }
+        code: "AUTH_ERROR",
+        message: "Authentication error occurred",
+      },
     });
   }
 };
@@ -165,14 +191,18 @@ const authenticateDevice = async (req, res, next) => {
 const authenticateUserSession = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.startsWith('Bearer ')
-      ? authHeader.split(' ')[1]
-      : req.headers.token || req.body.token || req.query.token;
+    const token =
+      authHeader && authHeader.startsWith("Bearer ")
+        ? authHeader.split(" ")[1]
+        : req.headers.token || req.body.token || req.query.token;
 
     if (!token) {
       return res.status(401).json({
         success: false,
-        error: { code: 'TOKEN_MISSING', message: 'Authentication token required' }
+        error: {
+          code: "TOKEN_MISSING",
+          message: "Authentication token required",
+        },
       });
     }
 
@@ -182,14 +212,14 @@ const authenticateUserSession = async (req, res, next) => {
     if (!user) {
       return res.status(401).json({
         success: false,
-        error: { code: 'USER_NOT_FOUND', message: 'User not found' }
+        error: { code: "USER_NOT_FOUND", message: "User not found" },
       });
     }
 
     if (!user.isEmailVerified) {
       return res.status(401).json({
         success: false,
-        error: { code: 'EMAIL_NOT_VERIFIED', message: 'Email not verified' }
+        error: { code: "EMAIL_NOT_VERIFIED", message: "Email not verified" },
       });
     }
 
@@ -199,98 +229,159 @@ const authenticateUserSession = async (req, res, next) => {
       email: user.email,
       fullName: user.fullName,
       role: user.role,
-      userDoc: user
+      userDoc: user,
     };
 
     next();
   } catch (error) {
-    if (error.name === 'JsonWebTokenError') {
+    if (error.name === "JsonWebTokenError") {
       return res.status(401).json({
         success: false,
-        error: { code: 'INVALID_TOKEN', message: 'Invalid authentication token' }
+        error: {
+          code: "INVALID_TOKEN",
+          message: "Invalid authentication token",
+        },
       });
     }
-    if (error.name === 'TokenExpiredError') {
+    if (error.name === "TokenExpiredError") {
       return res.status(401).json({
         success: false,
-        error: { code: 'TOKEN_EXPIRED', message: 'Token has expired' }
+        error: { code: "TOKEN_EXPIRED", message: "Token has expired" },
       });
     }
-    console.error('User session authentication error:', error);
+    console.error("User session authentication error:", error);
     res.status(500).json({
       success: false,
-      error: { code: 'SESSION_AUTH_ERROR', message: 'Authentication error occurred' }
+      error: {
+        code: "SESSION_AUTH_ERROR",
+        message: "Authentication error occurred",
+      },
     });
   }
 };
 
-// HVNC Admin Authentication Middleware — uses main DTUser JWT
+// HVNC Admin Authentication Middleware
 const authenticateAdmin = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.startsWith('Bearer ')
-      ? authHeader.split(' ')[1]
-      : req.headers.token || req.body.token || req.query.token;
+    const token =
+      authHeader && authHeader.startsWith("Bearer ")
+        ? authHeader.split(" ")[1]
+        : req.headers.token;
 
     if (!token) {
       return res.status(401).json({
         success: false,
-        error: { code: 'TOKEN_MISSING', message: 'Authentication token required' }
+        error: {
+          code: "TOKEN_MISSING",
+          message: "Admin authentication token required",
+        },
       });
     }
 
-    const decoded = jwt.verify(token, envConfig.jwt.JWT_SECRET);
-    const user = await DTUser.findById(decoded.userId);
+    // Verify the admin token
+    const decoded = jwt.verify(
+      token,
+      process.env.JWT_SECRET || envConfig.jwt.JWT_SECRET,
+    );
 
-    if (!user) {
+    // Fetch the admin user
+    const adminUser = await DTUser.findById(decoded.userId);
+
+    if (!adminUser) {
       return res.status(401).json({
         success: false,
-        error: { code: 'USER_NOT_FOUND', message: 'User not found' }
+        error: {
+          code: "ADMIN_NOT_FOUND",
+          message: "Admin user not found",
+        },
       });
     }
 
-    if (!user.isEmailVerified) {
-      return res.status(401).json({
-        success: false,
-        error: { code: 'EMAIL_NOT_VERIFIED', message: 'Email not verified' }
-      });
-    }
+    // Check if user has admin role OR @mydeeptech.ng email domain
+    const hasAdminRole = ["admin", "supervisor"].includes(adminUser.role);
+    const hasAdminDomain = adminUser.email.endsWith("@mydeeptech.ng");
 
-    const isAdmin = user.role === 'admin' || user.email.endsWith('@mydeeptech.ng');
+    if (adminUser.is_account_locked || (!hasAdminRole && !hasAdminDomain)) {
+      await HVNCActivityLog.logSecurityEvent(
+        "unauthorized_access_attempt",
+        {
+          endpoint: req.path,
+          method: req.method,
+          reason: "invalid_admin_credentials",
+          user_email: decoded.email,
+        },
+        {
+          ip_address: req.ip,
+          user_agent: req.headers["user-agent"],
+          severity: "high",
+        },
+      );
 
-    if (!isAdmin) {
       return res.status(403).json({
         success: false,
-        error: { code: 'ADMIN_ACCESS_DENIED', message: 'Admin access required' }
+        error: {
+          code: "ADMIN_ACCESS_DENIED",
+          message: "Admin access denied",
+        },
       });
     }
 
-    req.admin = {
-      _id: user._id,
-      email: user.email,
-      full_name: user.fullName,
-      role: 'admin',
-      userDoc: user
-    };
+    // Add admin user info to request object
+    req.admin = adminUser;
+
+    // Log admin action
+    await HVNCActivityLog.logUserEvent(
+      adminUser.email,
+      "admin_action",
+      {
+        endpoint: req.path,
+        method: req.method,
+        action_type: "api_access",
+      },
+      {
+        ip_address: req.ip,
+        user_agent: req.headers["user-agent"],
+      },
+    );
 
     next();
   } catch (error) {
-    if (error.name === 'JsonWebTokenError') {
+    if (
+      error.name === "JsonWebTokenError" ||
+      error.name === "TokenExpiredError"
+    ) {
+      await HVNCActivityLog.logSecurityEvent(
+        "authentication_failed",
+        {
+          endpoint: req.path,
+          method: req.method,
+          reason: "invalid_admin_token",
+          error: error.message,
+        },
+        {
+          ip_address: req.ip,
+          user_agent: req.headers["user-agent"],
+          severity: "high",
+        },
+      );
+
       return res.status(401).json({
         success: false,
-        error: { code: 'INVALID_TOKEN', message: 'Invalid authentication token' }
+        error: {
+          code: "INVALID_ADMIN_TOKEN",
+          message: "Invalid or expired admin token",
+        },
       });
     }
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({
-        success: false,
-        error: { code: 'TOKEN_EXPIRED', message: 'Token has expired' }
-      });
-    }
-    console.error('Admin authentication error:', error);
+
+    console.error("Admin authentication error:", error);
     res.status(500).json({
       success: false,
-      error: { code: 'ADMIN_AUTH_ERROR', message: 'Admin authentication error occurred' }
+      error: {
+        code: "ADMIN_AUTH_ERROR",
+        message: "Admin authentication error occurred",
+      },
     });
   }
 };
@@ -298,41 +389,40 @@ const authenticateAdmin = async (req, res, next) => {
 // Permission checking middleware
 const requirePermission = (permission) => {
   return async (req, res, next) => {
-    const currentUser = req.admin || req.user;
-
-    if (!currentUser) {
+    if (!req.user) {
       return res.status(401).json({
         success: false,
-        error: { code: 'USER_NOT_AUTHENTICATED', message: 'User authentication required' }
+        error: {
+          code: "USER_NOT_AUTHENTICATED",
+          message: "User authentication required",
+        },
       });
     }
 
-    // DTUser admins and @mydeeptech.ng domain have all HVNC permissions
-    const hasPermission =
-      currentUser.role === 'admin' ||
-      (currentUser.email && currentUser.email.endsWith('@mydeeptech.ng'));
-
-    if (!hasPermission) {
-      await HVNCActivityLog.logSecurityEvent('unauthorized_access_attempt', {
-        endpoint: req.path,
-        method: req.method,
-        reason: 'insufficient_permissions',
-        required_permission: permission,
-        user_permissions: currentUser.permissions || [],
-        user_role: currentUser.role
-      }, {
-        user_email: currentUser.email,
-        ip_address: req.ip,
-        user_agent: req.headers['user-agent'],
-        severity: 'medium'
-      });
+    if (!req.user.hasPermission(permission)) {
+      await HVNCActivityLog.logSecurityEvent(
+        "unauthorized_access_attempt",
+        {
+          endpoint: req.path,
+          method: req.method,
+          reason: "insufficient_permissions",
+          required_permission: permission,
+          user_permissions: req.user.permissions,
+        },
+        {
+          user_email: req.user.email,
+          ip_address: req.ip,
+          user_agent: req.headers["user-agent"],
+          severity: "medium",
+        },
+      );
 
       return res.status(403).json({
         success: false,
         error: {
-          code: 'INSUFFICIENT_PERMISSIONS',
-          message: `Permission '${permission}' required for this action`
-        }
+          code: "INSUFFICIENT_PERMISSIONS",
+          message: `Permission '${permission}' required for this action`,
+        },
       });
     }
 
@@ -341,7 +431,7 @@ const requirePermission = (permission) => {
 };
 
 // Rate limiting middleware for auth endpoints
-const { rateLimiter } = require('../utils/rateLimiter');
+const { rateLimiter } = require("../utils/rateLimiter");
 
 const authRateLimit = rateLimiter({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -349,22 +439,26 @@ const authRateLimit = rateLimiter({
   message: {
     success: false,
     error: {
-      code: 'RATE_LIMIT_EXCEEDED',
-      message: 'Too many authentication attempts, please try again later'
-    }
+      code: "RATE_LIMIT_EXCEEDED",
+      message: "Too many authentication attempts, please try again later",
+    },
   },
   skipSuccessfulRequests: true,
   onLimitReached: async (req) => {
-    await HVNCActivityLog.logSecurityEvent('rate_limit_exceeded', {
-      endpoint: req.path,
-      method: req.method,
-      limit_type: 'authentication'
-    }, {
-      ip_address: req.ip,
-      user_agent: req.headers['user-agent'],
-      severity: 'high'
-    });
-  }
+    await HVNCActivityLog.logSecurityEvent(
+      "rate_limit_exceeded",
+      {
+        endpoint: req.path,
+        method: req.method,
+        limit_type: "authentication",
+      },
+      {
+        ip_address: req.ip,
+        user_agent: req.headers["user-agent"],
+        severity: "high",
+      },
+    );
+  },
 });
 
 // Combined device authentication with rate limiting
@@ -376,5 +470,5 @@ module.exports = {
   authenticateAdmin,
   requirePermission,
   authRateLimit,
-  authenticateDeviceWithRateLimit
+  authenticateDeviceWithRateLimit,
 };

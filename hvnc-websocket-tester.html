@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>HVNC WebSocket Tester</title>
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+</head>
+<body>
+    <h1>HVNC WebSocket Tester</h1>
+    
+    <div>
+        <h3>Connection Config</h3>
+        <label>Server URL:</label>
+        <input type="text" id="serverUrl" value="http://localhost:4000" style="width: 300px;"><br><br>
+        
+        <label>JWT Token:</label>
+        <input type="text" id="jwtToken" placeholder="Your JWT token here" style="width: 300px;"><br><br>
+        
+        <label>Namespace:</label>
+        <select id="namespace">
+            <option value="admin">Admin (/hvnc-admin)</option>
+            <option value="user">User (/hvnc-user)</option>
+            <option value="device">Device (/hvnc-device)</option>
+        </select><br><br>
+        
+        <button onclick="connect()">Connect</button>
+        <button onclick="disconnect()">Disconnect</button>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <div>
+        <h3>Test Commands</h3>
+        <button onclick="getDevices()" id="getDevicesBtn" disabled>Get Devices (Admin)</button>
+        <button onclick="sendCommand()" id="sendCommandBtn" disabled>Send Command (Admin)</button>
+        <button onclick="getAssignedDevices()" id="getAssignedBtn" disabled>Get Assigned Devices (User)</button>
+        <button onclick="startSession()" id="startSessionBtn" disabled>Start Session (User)</button>
+        <button onclick="sendDeviceStatus()" id="deviceStatusBtn" disabled>Send Status (Device)</button>
+    </div>
+
+    <div>
+        <h3>Connection Status</h3>
+        <div id="status">Not connected</div>
+    </div>
+
+    <div>
+        <h3>Event Log</h3>
+        <div id="log" style="height: 400px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; font-family: monospace; background: #f5f5f5;"></div>
+    </div>
+
+    <script>
+        let socket = null;
+        let currentNamespace = null;
+
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? 'red' : type === 'success' ? 'green' : type === 'warning' ? 'orange' : 'black';
+            logDiv.innerHTML += `<div style="color: ${color};">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateStatus(status, color = 'black') {
+            document.getElementById('status').innerHTML = `<span style="color: ${color};">${status}</span>`;
+        }
+
+        function updateButtons() {
+            const connected = socket && socket.connected;
+            const isAdmin = currentNamespace === 'admin';
+            const isUser = currentNamespace === 'user';
+            const isDevice = currentNamespace === 'device';
+
+            document.getElementById('getDevicesBtn').disabled = !(connected && isAdmin);
+            document.getElementById('sendCommandBtn').disabled = !(connected && isAdmin);
+            document.getElementById('getAssignedBtn').disabled = !(connected && isUser);
+            document.getElementById('startSessionBtn').disabled = !(connected && isUser);
+            document.getElementById('deviceStatusBtn').disabled = !(connected && isDevice);
+        }
+
+        function connect() {
+            const serverUrl = document.getElementById('serverUrl').value;
+            const token = document.getElementById('jwtToken').value;
+            const namespace = document.getElementById('namespace').value;
+
+            if (!token) {
+                alert('Please enter a JWT token');
+                return;
+            }
+
+            if (socket) {
+                socket.disconnect();
+            }
+
+            currentNamespace = namespace;
+            const namespaceUrl = `${serverUrl}/hvnc-${namespace}`;
+
+            log(`Connecting to ${namespaceUrl}...`);
+            updateStatus('Connecting...', 'orange');
+
+            socket = io(namespaceUrl, {
+                path: '/hvnc/socket.io',
+                auth: { token: token },
+                query: { 
+                    namespace: namespace,
+                    timestamp: Date.now()
+                },
+                transports: ['websocket', 'polling'],
+                timeout: 30000
+            });
+
+            // Connection events
+            socket.on('connect', () => {
+                log(`✅ Connected to ${namespace} namespace`, 'success');
+                log(`Socket ID: ${socket.id}`, 'info');
+                updateStatus('Connected', 'green');
+                updateButtons();
+            });
+
+            socket.on('connect_error', (error) => {
+                log(`❌ Connection failed: ${error.message}`, 'error');
+                updateStatus('Connection failed', 'red');
+                updateButtons();
+            });
+
+            socket.on('disconnect', (reason) => {
+                log(`🔌 Disconnected: ${reason}`, 'warning');
+                updateStatus('Disconnected', 'red');
+                updateButtons();
+            });
+
+            // Admin namespace events
+            if (namespace === 'admin') {
+                socket.on('device_states', (data) => {
+                    log(`📊 Device states received: ${JSON.stringify(data, null, 2)}`);
+                });
+
+                socket.on('device_online', (data) => {
+                    log(`🟢 Device online: ${JSON.stringify(data, null, 2)}`, 'success');
+                });
+
+                socket.on('device_offline', (data) => {
+                    log(`🔴 Device offline: ${JSON.stringify(data, null, 2)}`, 'warning');
+                });
+
+                socket.on('device_status_update', (data) => {
+                    log(`📈 Device status: ${JSON.stringify(data, null, 2)}`);
+                });
+
+                socket.on('command_sent', (data) => {
+                    log(`⚡ Command sent: ${JSON.stringify(data, null, 2)}`, 'success');
+                });
+
+                socket.on('command_error', (data) => {
+                    log(`❌ Command error: ${JSON.stringify(data, null, 2)}`, 'error');
+                });
+            }
+
+            // User namespace events
+            if (namespace === 'user') {
+                socket.on('assigned_devices', (data) => {
+                    log(`📱 Assigned devices: ${JSON.stringify(data, null, 2)}`);
+                });
+
+                socket.on('session_started', (data) => {
+                    log(`🚀 Session started: ${JSON.stringify(data, null, 2)}`, 'success');
+                });
+
+                socket.on('session_error', (data) => {
+                    log(`❌ Session error: ${JSON.stringify(data, null, 2)}`, 'error');
+                });
+
+                socket.on('session_ended', (data) => {
+                    log(`🏁 Session ended: ${JSON.stringify(data, null, 2)}`, 'warning');
+                });
+            }
+
+            // Device namespace events
+            if (namespace === 'device') {
+                socket.on('command', (data) => {
+                    log(`📝 Command received: ${JSON.stringify(data, null, 2)}`);
+                });
+
+                socket.on('session_started', (data) => {
+                    log(`🎮 Session started: ${JSON.stringify(data, null, 2)}`, 'success');
+                });
+
+                socket.on('session_ended', (data) => {
+                    log(`🛑 Session ended: ${JSON.stringify(data, null, 2)}`, 'warning');
+                });
+
+                socket.on('status_ack', (data) => {
+                    log(`✅ Status acknowledged: ${JSON.stringify(data, null, 2)}`);
+                });
+            }
+
+            // General error handling
+            socket.on('error', (error) => {
+                log(`💥 Socket error: ${JSON.stringify(error, null, 2)}`, 'error');
+            });
+        }
+
+        function disconnect() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+                currentNamespace = null;
+                updateStatus('Disconnected', 'red');
+                updateButtons();
+                log('Disconnected by user');
+            }
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        // Admin functions
+        function getDevices() {
+            if (socket && currentNamespace === 'admin') {
+                log('📡 Requesting device list...');
+                socket.emit('get_devices');
+            }
+        }
+
+        function sendCommand() {
+            if (socket && currentNamespace === 'admin') {
+                const deviceId = prompt('Enter device ID:');
+                if (deviceId) {
+                    const command = {
+                        device_id: deviceId,
+                        type: 'system',
+                        action: 'get_status',
+                        parameters: {},
+                        priority: 'normal'
+                    };
+                    log(`⚡ Sending command: ${JSON.stringify(command, null, 2)}`);
+                    socket.emit('send_command', command);
+                }
+            }
+        }
+
+        // User functions
+        function getAssignedDevices() {
+            if (socket && currentNamespace === 'user') {
+                log('📡 Requesting assigned devices...');
+                socket.emit('get_assigned_devices');
+            }
+        }
+
+        function startSession() {
+            if (socket && currentNamespace === 'user') {
+                const deviceId = prompt('Enter device ID:');
+                if (deviceId) {
+                    log(`🚀 Starting session with device: ${deviceId}`);
+                    socket.emit('start_session', { device_id: deviceId });
+                }
+            }
+        }
+
+        // Device functions  
+        function sendDeviceStatus() {
+            if (socket && currentNamespace === 'device') {
+                const status = {
+                    cpu_usage: Math.floor(Math.random() * 100),
+                    memory_usage: Math.floor(Math.random() * 100),
+                    disk_usage: Math.floor(Math.random() * 100),
+                    screen_resolution: '1920x1080',
+                    active_windows: ['Chrome', 'VS Code', 'Terminal'],
+                    last_activity: new Date()
+                };
+                log(`📊 Sending device status: ${JSON.stringify(status, null, 2)}`);
+                socket.emit('device_status', status);
+            }
+        }
+
+        // Initialize button states
+        updateButtons();
+    </script>
+</body>
+</html>
