@@ -36,7 +36,7 @@ function updateFrameStats(deviceId) {
 
   const stats = frameStatsPerDevice.get(deviceId);
   stats.frameCount++;
-  
+
   // Calculate instantaneous FPS (time between frames)
   const timeDiff = now - stats.lastFrameTime;
   if (timeDiff > 0) {
