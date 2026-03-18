@@ -482,6 +482,7 @@ const generateNewAccessCode = async (req, res) => {
 const startHubstaffTimer = async (req, res) => {
   try {
     const { deviceId } = req.params;
+    const { projectId, taskName } = req.body; // Optional parameters
 
     const device = await HVNCDevice.findById(deviceId);
     if (!device) {
@@ -491,9 +492,47 @@ const startHubstaffTimer = async (req, res) => {
       });
     }
 
+    // Send WebSocket command to PC Agent first
+    const HVNCCommand = require('../models/hvnc-command.model');
+    const { sendCommandToDeviceAndWait } = require('../services/hvnc-websocket.service');
+    
+    let commandResponse = null;
+    try {
+      // Create command for PC Agent
+      const command = await HVNCCommand.createCommand({
+        device_id: device.device_id,
+        session_id: `admin_hubstaff_${req.admin?._id || 'unknown'}`,
+        user_email: req.admin?.email || 'admin',
+        type: 'hubstaff',
+        action: 'hubstaff_start',
+        parameters: { projectId, taskName },
+        priority: 'high',
+        timeout_seconds: 30,
+        metadata: {
+          source: 'admin_dashboard',
+          admin_user: req.admin?.email || 'admin',
+          action_type: 'hubstaff_control'
+        }
+      });
+
+      // Send to PC Agent via WebSocket and wait for response
+      console.log(`🚀 Sending Hubstaff start command to device: ${device.device_id}`);
+      commandResponse = await sendCommandToDeviceAndWait(device.device_id, command, 30000);
+      console.log(`✅ Hubstaff start confirmed by device: ${device.device_id}`);
+
+    } catch (wsError) {
+      console.error('❌ Failed to send WebSocket command or get response:', wsError.message);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to communicate with PC Agent',
+        message: wsError.message,
+        deviceStatus: 'Device may be offline or unresponsive'
+      });
+    }
+
     const startedAt = new Date();
 
-    // Update device Hubstaff status
+    // Update device Hubstaff status in database
     if (!device.system_info) {
       device.system_info = {};
     }
@@ -503,16 +542,23 @@ const startHubstaffTimer = async (req, res) => {
 
     // Log Hubstaff start
     await HVNCActivityLog.logDeviceEvent(device.device_id, 'hubstaff_timer_started', {
-      started_by: req.admin?.email || 'admin'
+      started_by: req.admin?.email || 'admin',
+      projectId,
+      taskName
     }, {
       ip_address: req.ip,
       user_agent: req.headers['user-agent']
     });
 
     res.json({
+      success: true,
       deviceId: device._id,
       hubstaffRunning: true,
-      startedAt: startedAt.toISOString()
+      startedAt: startedAt.toISOString(),
+      commandSent: true,
+      pcAgentResponse: commandResponse,
+      parameters: { projectId, taskName },
+      message: 'Hubstaff timer started successfully on PC Agent'
     });
 
   } catch (error) {
@@ -537,6 +583,44 @@ const pauseHubstaffTimer = async (req, res) => {
       return res.status(404).json({
         success: false,
         error: 'Device not found'
+      });
+    }
+
+    // Send WebSocket command to PC Agent first
+    const HVNCCommand = require('../models/hvnc-command.model');
+    const { sendCommandToDeviceAndWait } = require('../services/hvnc-websocket.service');
+    
+    let commandResponse = null;
+    try {
+      // Create command for PC Agent
+      const command = await HVNCCommand.createCommand({
+        device_id: device.device_id,
+        session_id: `admin_hubstaff_${req.admin?._id || 'unknown'}`,
+        user_email: req.admin?.email || 'admin',
+        type: 'hubstaff',
+        action: 'hubstaff_pause',
+        parameters: {},
+        priority: 'high',
+        timeout_seconds: 30,
+        metadata: {
+          source: 'admin_dashboard',
+          admin_user: req.admin?.email || 'admin',
+          action_type: 'hubstaff_control'
+        }
+      });
+
+      // Send to PC Agent via WebSocket and wait for response
+      console.log(`⏸️ Sending Hubstaff pause command to device: ${device.device_id}`);
+      commandResponse = await sendCommandToDeviceAndWait(device.device_id, command, 30000);
+      console.log(`✅ Hubstaff pause confirmed by device: ${device.device_id}`);
+
+    } catch (wsError) {
+      console.error('❌ Failed to send WebSocket command or get response:', wsError.message);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to communicate with PC Agent',
+        message: wsError.message,
+        deviceStatus: 'Device may be offline or unresponsive'
       });
     }
 
@@ -568,6 +652,30 @@ const pauseHubstaffTimer = async (req, res) => {
     await HVNCActivityLog.logDeviceEvent(device.device_id, 'hubstaff_timer_paused', {
       paused_by: req.admin?.email || 'admin',
       elapsed_time: elapsed
+    }, {
+      ip_address: req.ip,
+      user_agent: req.headers['user-agent']
+    });
+
+    res.json({
+      success: true,
+      deviceId: device._id,
+      hubstaffRunning: false,
+      pausedAt: pausedAt.toISOString(),
+      elapsedTime: elapsed,
+      commandSent: true,
+      pcAgentResponse: commandResponse,
+      message: 'Hubstaff timer paused successfully on PC Agent'
+    });
+
+  } catch (error) {
+    console.error('Pause Hubstaff timer error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to pause Hubstaff timer'
+    });
+  }
+};
     }, {
       ip_address: req.ip,
       user_agent: req.headers['user-agent']
