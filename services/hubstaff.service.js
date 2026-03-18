@@ -3,6 +3,7 @@ const HubstaffDeviceTimer = require("../models/hubstaffDeviceTimer.model");
 const DTUser = require("../models/dtUser.model");
 const HVNCSession = require("../models/hvnc-session.model");
 const HVNCShift = require("../models/hvnc-shift.model");
+const HVNCDevice = require("../models/hvnc-device.model");
 
 class HubstaffService {
   /**
@@ -154,6 +155,7 @@ class HubstaffService {
 
   /**
    * Get all active sessions across devices
+   * Only includes users who are assigned to the devices they're working on
    */
   async getActiveSessions() {
     try {
@@ -177,6 +179,19 @@ class HubstaffService {
             ? deviceTimer.totalElapsedSeconds - session.hubstaffStartOffset
             : 0;
 
+          // Check if user has valid device assignment
+          const deviceAssignment = await HVNCShift.findOne({
+            device_id: session.deviceId,
+            user_email: session.userId.email,
+            status: "active",
+            $or: [{ end_date: null }, { end_date: { $gte: new Date() } }],
+          }).lean();
+
+          // Get device name from HVNCDevice
+          const device = await HVNCDevice.findOne({
+            device_id: session.deviceId,
+          }).lean();
+
           return {
             ...session,
             deviceTimer: deviceTimer
@@ -186,6 +201,18 @@ class HubstaffService {
                 }
               : null,
             currentDuration: this.formatDuration(currentDuration),
+            hasValidAssignment: !!deviceAssignment,
+            deviceName: device
+              ? device.pc_name
+              : `HVNC-${session.deviceId.slice(-3)}`,
+            assignmentDetails: deviceAssignment
+              ? {
+                  shiftId: deviceAssignment._id,
+                  startTime: deviceAssignment.start_time,
+                  endTime: deviceAssignment.end_time,
+                  assignedDays: deviceAssignment.assigned_days,
+                }
+              : null,
           };
         }),
       );

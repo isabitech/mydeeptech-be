@@ -67,16 +67,23 @@ class HubstaffController {
   }
 
   /**
+  /**
    * Get all active Hubstaff sessions (Admin only)
+   * Only returns sessions for users with valid device assignments
    * GET /api/hvnc/admin/hubstaff/active-sessions
    */
   async getActiveSessions(req, res) {
     try {
       const activeSessions = await hubstaffService.getActiveSessions();
 
-      const formattedSessions = activeSessions.map((session) => ({
+      // Filter to only include sessions with valid device assignments
+      const validSessions = activeSessions.filter(
+        (session) => session.hasValidAssignment,
+      );
+
+      const formattedSessions = validSessions.map((session) => ({
         deviceId: session.deviceId,
-        deviceName: `HVNC-${session.deviceId.slice(-3)}`, // Simple device naming
+        deviceName: session.deviceName,
         currentUser: {
           userId: session.userId._id,
           firstName: session.userId.firstName,
@@ -93,11 +100,21 @@ class HubstaffController {
           totalElapsed: "00:00:00",
           isActive: false,
         },
+        deviceAssignment: session.assignmentDetails,
+        hasValidAssignment: session.hasValidAssignment,
       }));
 
       res.status(200).json({
         success: true,
         data: formattedSessions,
+        summary: {
+          totalActiveSessions: formattedSessions.length,
+          devicesInUse: [...new Set(formattedSessions.map((s) => s.deviceId))]
+            .length,
+          activeUsers: [
+            ...new Set(formattedSessions.map((s) => s.currentUser.userId)),
+          ].length,
+        },
       });
     } catch (error) {
       console.error("❌ Error getting active sessions:", error);
