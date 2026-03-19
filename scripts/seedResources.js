@@ -10,60 +10,131 @@ dns.setServers(["8.8.8.8", "8.8.4.4"]);
 
 const Resource = require("../models/resource.model");
 
-const RESOURCE_ITEMS = [
-  { key: "overview", sortOrder: 1 },
-  { key: "annotators", sortOrder: 2 },
-  { key: "assessments", sortOrder: 3 },
-  { key: "projects", sortOrder: 4 },
-  { key: "applications", sortOrder: 5 },
-  { key: "payment", sortOrder: 6 },
-  { key: "invoice", sortOrder: 7 },
-  { key: "notifications", sortOrder: 8 },
-  { key: "support_chat", sortOrder: 9 },
-  { key: "user_roles", sortOrder: 10 },
-  { key: "employees", sortOrder: 11 },
-  { key: "settings", sortOrder: 12 },
-  { key: "roles", sortOrder: 1, parentKey: "user_roles" },
-  { key: "permissions", sortOrder: 2, parentKey: "user_roles" },
+const FRONTEND_MENU = [
+  {
+    key: "overview",
+    label: "Overview",
+    icon: "HomeOutlined",
+    resource: "overview",
+    path: "/overview",
+  },
+  {
+    key: "annotators",
+    label: "Annotators",
+    icon: "UserOutlined",
+    resource: "annotators",
+    path: "/annotators",
+  },
+  {
+    key: "assessments",
+    label: "Assessments",
+    icon: "BookOutlined",
+    resource: "assessments",
+    path: "/assessments",
+  },
+  {
+    key: "projects",
+    label: "Projects",
+    icon: "CodeSandboxOutlined",
+    resource: "projects",
+    path: "/projects",
+  },
+  {
+    key: "applications",
+    label: "Applications",
+    icon: "InboxOutlined",
+    resource: "applications",
+    path: "/applications",
+  },
+  {
+    key: "payment",
+    label: "Payment",
+    icon: "WalletOutlined",
+    resource: "payment",
+    path: "/payments",
+  },
+  {
+    key: "invoice",
+    label: "Invoice",
+    icon: "WalletOutlined",
+    resource: "invoice",
+    path: "/invoices",
+  },
+  {
+    key: "partner-invoice",
+    label: "Partners Invoice",
+    icon: "FileTextOutlined",
+    resource: "invoice",
+    path: "/partner-invoices",
+  },
+  {
+    key: "notifications",
+    label: "Notifications",
+    icon: "BellOutlined",
+    resource: "notifications",
+    path: "/notifications",
+  },
+  {
+    key: "chat",
+    label: "Support Chat",
+    icon: "MessageOutlined",
+    resource: "support_chat",
+    path: "/chat",
+  },
+  {
+    key: "users",
+    label: "User Roles",
+    icon: "UserOutlined",
+    resource: "user_roles",
+    path: "/users",
+  },
+  {
+    key: "employees",
+    label: "Employees Mgt",
+    icon: "UserOutlined",
+    resource: "employees",
+    path: "/employees",
+  },
+  {
+    key: "rbac",
+    label: "Roles & Permissions",
+    icon: "SafetyOutlined",
+    resource: "roles",
+    path: "/rbac",
+  },
+  {
+    key: "settings",
+    label: "Settings",
+    icon: "SettingOutlined",
+    resource: "settings",
+    path: "/settings",
+  },
 ];
 
-function toTitle(value) {
-  return value
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
-
-function toRoute(value) {
-  return `/admin/${value.replace(/_/g, "-")}`;
-}
-
-function toIcon(value) {
-  return value.replace(/_/g, "-");
-}
-
-function toResourceKey(value) {
+function normalizeResource(value) {
   return value.trim().toLowerCase().replace(/-/g, "_");
 }
 
-async function upsertResource(item, parentId = null) {
-  const title = toTitle(item.key);
-  const link = toRoute(item.key);
-  const icon = toIcon(item.key);
-  const resourceKey = toResourceKey(item.key);
+function normalizeKey(value) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_");
+}
 
+async function upsertResource(menuItem, resourceKey, sortOrder) {
   const payload = {
-    title,
-    link,
-    description: `${title} sidebar resource`,
-    icon,
+    title: menuItem.label,
+    link: menuItem.path,
+    description: `${menuItem.label} sidebar resource`,
+    icon: menuItem.icon,
     resourceKey,
-    parent: parentId,
-    sortOrder: Number(item.sortOrder) || 0,
+    parent: null,
+    sortOrder,
     isPublished: true,
   };
 
-  const existing = await Resource.findOne({ link });
+  const existing = await Resource.findOne({ link: payload.link });
 
   if (existing) {
     await Resource.updateOne({ _id: existing._id }, { $set: payload });
@@ -71,7 +142,7 @@ async function upsertResource(item, parentId = null) {
       status: "updated",
       id: existing._id.toString(),
       objectId: existing._id,
-      key: item.key,
+      key: menuItem.key,
     };
   }
 
@@ -80,7 +151,7 @@ async function upsertResource(item, parentId = null) {
     status: "created",
     id: created._id.toString(),
     objectId: created._id,
-    key: item.key,
+    key: menuItem.key,
   };
 }
 
@@ -117,27 +188,25 @@ async function seedResources() {
   try {
     let createdCount = 0;
     let updatedCount = 0;
-    const seededByKey = new Map();
+    const resourceKeyUsage = new Map();
 
-    for (const item of RESOURCE_ITEMS) {
-      let parentId = null;
+    for (const [index, item] of FRONTEND_MENU.entries()) {
+      const normalizedResource = normalizeResource(item.resource);
+      let finalResourceKey = normalizedResource;
 
-      if (item.parentKey) {
-        const seededParent = seededByKey.get(item.parentKey);
-        if (seededParent) {
-          parentId = seededParent;
-        } else {
-          const parent = await Resource.findOne({
-            link: toRoute(item.parentKey),
-          }).select("_id");
-          parentId = parent?._id || null;
-        }
+      if (resourceKeyUsage.has(normalizedResource)) {
+        // Prevent resourceKey collisions when menu shares the same resource (e.g., invoice variants).
+        finalResourceKey = `${normalizedResource}__${normalizeKey(item.key)}`;
       }
 
-      const result = await upsertResource(item, parentId);
+      resourceKeyUsage.set(
+        normalizedResource,
+        (resourceKeyUsage.get(normalizedResource) || 0) + 1,
+      );
+
+      const result = await upsertResource(item, finalResourceKey, index + 1);
       if (result.status === "created") createdCount += 1;
       if (result.status === "updated") updatedCount += 1;
-      seededByKey.set(result.key, result.objectId);
       console.log(
         `- ${result.status.toUpperCase()}: ${result.key} (${result.id})`,
       );
@@ -146,7 +215,7 @@ async function seedResources() {
     console.log("\nResource seeding completed.");
     console.log(`Created: ${createdCount}`);
     console.log(`Updated: ${updatedCount}`);
-    console.log(`Total processed: ${RESOURCE_ITEMS.length}`);
+    console.log(`Total processed: ${FRONTEND_MENU.length}`);
   } finally {
     await mongoose.disconnect();
   }

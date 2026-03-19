@@ -47,6 +47,7 @@ class ResourceService {
         },
       })
       .lean();
+    // console.log(user.role_permission.permissions);
 
     if (!user || !user.role_permission) {
       return new Set();
@@ -256,14 +257,50 @@ class ResourceService {
     sortBy = "latest",
   ) {
     const allowedKeys = await this.getAllowedResourceKeysForUser(userId);
-    const resources = allowedKeys.has(ALL_RESOURCES_WILDCARD)
-      ? await this.getAllResources(showUnpublished, sortBy)
-      : await resourceRepository.findAllowedByResourceKeys(
-          [...allowedKeys],
-          showUnpublished,
-          sortBy,
-        );
-    return this.buildHierarchy(resources, sortBy);
+    const normalizedKeys = new Set(
+      [...allowedKeys]
+        .map((key) => String(key).trim().toLowerCase().replace(/-/g, "_"))
+        .filter(Boolean)
+    );
+    const iconCandidates = new Set();
+    const titleCandidates = new Set();
+    for (const key of normalizedKeys) {
+      iconCandidates.add(key);
+      iconCandidates.add(key.replace(/_/g, "-"));
+      titleCandidates.add(key.replace(/_/g, ""));
+    }
+
+    const allResources = await this.getAllResources(showUnpublished, sortBy);
+    const roots = this.buildHierarchy(allResources, sortBy);
+
+    const filterTree = (nodes, isAncestorAllowed) => {
+      const result = [];
+      for (const node of nodes) {
+        const rKey = node.resourceKey ? String(node.resourceKey).toLowerCase() : "";
+        const icon = node.icon ? String(node.icon).toLowerCase() : "";
+        const titleKey = node.title ? String(node.title).toLowerCase().replace(/\s+/g, '_') : "";
+        const rawTitleKey = node.title ? String(node.title).toLowerCase().replace(/\s+/g, '') : "";
+
+        const isSelfAllowed =
+          normalizedKeys.has(rKey) ||
+          iconCandidates.has(icon) ||
+          normalizedKeys.has(titleKey) ||
+          titleCandidates.has(rawTitleKey);
+
+        const isAllowedSoFar = isAncestorAllowed || isSelfAllowed;
+        const filteredChildren = filterTree(node.children || [], isAllowedSoFar);
+
+        if (isAllowedSoFar || filteredChildren.length > 0) {
+          result.push({
+            ...node,
+            children: filteredChildren,
+          });
+        }
+      }
+      return result;
+    };
+
+    return filterTree(roots, false);
   }
 
   // ─── UPDATE ───────────────────────────────────────────────
@@ -288,10 +325,10 @@ class ResourceService {
         ...(data.parent !== undefined ? { parent: data.parent || null } : {}),
         ...(data.sortOrder !== undefined
           ? {
-              sortOrder: Number.isFinite(Number(data.sortOrder))
-                ? Number(data.sortOrder)
-                : 0,
-            }
+            sortOrder: Number.isFinite(Number(data.sortOrder))
+              ? Number(data.sortOrder)
+              : 0,
+          }
           : {}),
         ...(data.isPublished !== undefined
           ? { isPublished: data.isPublished }
@@ -322,9 +359,9 @@ class ResourceService {
       if (parentChanged) {
         finalSortOrder = hasExplicitSortOrder
           ? Math.min(
-              Math.max(1, requestedSortOrder),
-              targetSiblingsWithoutCurrent.length + 1,
-            )
+            Math.max(1, requestedSortOrder),
+            targetSiblingsWithoutCurrent.length + 1,
+          )
           : targetSiblingsWithoutCurrent.length + 1;
       } else if (hasExplicitSortOrder) {
         finalSortOrder = Math.min(
