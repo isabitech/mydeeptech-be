@@ -5,7 +5,7 @@ class PermissionRepository {
     return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 
-  // CREATE 
+  // CREATE
   async create(data) {
     const permission = new Permission(data);
     return await permission.save();
@@ -16,7 +16,7 @@ class PermissionRepository {
     return await Permission.insertMany(permissionsArray, { ordered: false });
   }
 
-  //  READ 
+  //  READ
   async findAll() {
     return await Permission.find();
   }
@@ -52,7 +52,11 @@ class PermissionRepository {
       : {};
 
     const [permissions, totalPermissions] = await Promise.all([
-      Permission.find(filter).select("_id name").sort({ name: 1, createdAt: -1 }).skip(skip).limit(limit),
+      Permission.find(filter)
+        .select("_id name")
+        .sort({ name: 1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
       Permission.countDocuments(filter),
     ]);
 
@@ -96,23 +100,25 @@ class PermissionRepository {
     return await Permission.find({ _id: { $in: ids } });
   }
 
-  //  UPDATE 
+  //  UPDATE
   async update(id, data) {
     return await Permission.findByIdAndUpdate(
       id,
       { $set: data },
-      { new: true }
+      { new: true },
     );
   }
 
-  //  DELETE 
+  //  DELETE
   async delete(id) {
     return await Permission.findByIdAndDelete(id);
   }
 
-  //  HELPERS  
+  //  HELPERS
   async exists(name) {
-    const permission = await Permission.findOne({ name: name.toLowerCase().trim() });
+    const permission = await Permission.findOne({
+      name: name.toLowerCase().trim(),
+    });
     return !!permission;
   }
 }

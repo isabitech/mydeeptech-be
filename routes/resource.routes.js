@@ -1,0 +1,83 @@
+const express = require("express");
+const router = express.Router();
+const resourceController = require("../controllers/resource.controller");
+const {
+  validateCreateResource,
+  validateUpdateResource,
+  validateResourceId,
+  validateGetAllResourcesQuery,
+  validateSearchResourceQuery,
+} = require("../validations/resource.validation");
+
+const { authenticateToken } = require("../middleware/auth");
+const { authenticateAdmin } = require("../middleware/adminAuth");
+
+// Create a new resource
+router.post(
+  "/",
+  authenticateToken,
+  authenticateAdmin,
+  validateCreateResource,
+  resourceController.createResource,
+);
+// Get all resources (with optional ?all=true to include unpublished)
+router.get(
+  "/",
+  authenticateToken,
+  authenticateAdmin,
+  validateGetAllResourcesQuery,
+  resourceController.getAllResources,
+);
+
+// Get sidebar resources as allowed for authenticated user
+router.get(
+  "/me/allowed",
+  authenticateToken,
+  resourceController.getMyAllowedResources,
+);
+
+// Search published resources
+router.get(
+  "/search",
+  authenticateToken,
+  validateSearchResourceQuery,
+  resourceController.searchResources,
+);
+
+// Get a single resource by id
+router.get(
+  "/:id",
+  authenticateToken,
+  validateResourceId,
+  resourceController.getResourceById,
+);
+
+// Update a resource
+router.put(
+  "/:id",
+  authenticateToken,
+  authenticateAdmin,
+  validateResourceId,
+  validateUpdateResource,
+  resourceController.updateResource,
+);
+
+// Toggle publish state
+router.patch(
+  "/:id/toggle-publish",
+  authenticateToken,
+  authenticateAdmin,
+  validateResourceId,
+  resourceController.togglePublish,
+);
+
+// Delete a resource
+router.delete(
+  "/:id",
+  authenticateToken,
+  authenticateAdmin,
+  validateResourceId,
+  resourceController.deleteResource,
+);
+
+module.exports = router;

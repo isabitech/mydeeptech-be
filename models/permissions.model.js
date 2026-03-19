@@ -37,31 +37,38 @@ const permissionSchema = new mongoose.Schema(
       ],
       required: true,
     },
+    resources: {
+      type: mongoose.Schema.Types.ObjectId,
+      refPath: "Resource",
+      default: null, // null means it applies to all records of that resource
+    },
     action: {
       type: String,
       trim: true,
       lowercase: true,
       enum: [
-        "view",       // read access
-        "view_own",   // read only own records (individual partners)
-        "create",     // create new records
-        "edit",       // update existing records
-        "delete",     // remove records
-        "approve",    // approve/reject records
-        "manage",     // full CRUD — supersets all above
+        "view", // read access
+        "view_own", // read only own records (individual partners)
+        "create", // create new records
+        "edit", // update existing records
+        "delete", // remove records
+        "approve", // approve/reject records
+        "manage", // full CRUD — supersets all above
       ],
       required: true,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 permissionSchema.post("findOneAndDelete", async function (doc) {
   if (doc) {
-    await mongoose.model("Role").updateMany(
-      { permissions: doc._id },
-      { $pull: { permissions: doc._id } }
-    );
+    await mongoose
+      .model("Role")
+      .updateMany(
+        { permissions: doc._id },
+        { $pull: { permissions: doc._id } },
+      );
     console.log(`🧹 Removed permission ${doc._id} from all roles`);
   }
 });

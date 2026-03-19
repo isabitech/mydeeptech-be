@@ -130,6 +130,18 @@ class RoleController {
       next(error);
     }
   }
+  async assignRoleToUser(req, res, next) {
+    try {
+      const { id: roleId, userId } = req.params;
+      const updatedUser = await rolesService.assignRoleToUser(roleId, userId);
+      return ResponseClass.Success(res, {
+        message: "Role assigned to user successfully",
+        data: updatedUser,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new RoleController();

@@ -1,4 +1,5 @@
 const Role = require("../models/roles.model");
+const DTUser = require("../models/dtUser.model");
 
 class RoleRepository {
   //  CREATE
@@ -125,6 +126,21 @@ class RoleRepository {
     ).populate({
       path: "permissions",
       select: "name resource action -_id",
+    });
+  }
+
+  async assignToUser(roleId, userId) {
+    return await DTUser.findByIdAndUpdate(
+      userId,
+      { $set: { role_permission: roleId } },
+      { new: true },
+    ).populate({
+      path: "role_permission",
+      select: "name description isActive permissions",
+      populate: {
+        path: "permissions",
+        select: "name resource action",
+      },
     });
   }
 

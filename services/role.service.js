@@ -139,6 +139,16 @@ class RoleService {
       (p) => p.name === permissionName.toLowerCase(),
     );
   }
+
+  async assignRoleToUser(roleId, userId) {
+    const role = await roleRepository.findById(roleId);
+    if (!role) throw new Error("Role not found");
+
+    const updatedUser = await roleRepository.assignToUser(roleId, userId);
+    if (!updatedUser) throw new Error("User not found");
+
+    return updatedUser;
+  }
 }
 
 module.exports = new RoleService();
