@@ -2644,7 +2644,6 @@ const verifyAdminOTP = async (req, res) => {
 // Admin Login
 const adminLogin = async (req, res) => {
   try {
-    console.log("🔐 Admin login attempt for:", req.body.email);
 
     // 1️⃣ Validate request data
     const { error } = dtUserLoginSchema.validate(req.body);
@@ -2686,12 +2685,8 @@ const adminLogin = async (req, res) => {
         message: "Invalid credentials or account not verified"
       });
     }
-    console.log("🔍 Admin raw data:", JSON.stringify({
-      role_permission: admin.role_permission || 'admin is a mess',
-      role: admin.role,
-    }, null, 2));
 
-    // 3️⃣ Verify password
+    // Verify password
     const isPasswordValid = await bcrypt.compare(password, admin.password);
     if (!isPasswordValid) {
       return res.status(401).json({
@@ -2700,7 +2695,7 @@ const adminLogin = async (req, res) => {
       });
     }
 
-    // 4️⃣ Generate JWT token
+    // Generate JWT token
     const token = jwt.sign(
       {
         userId: admin._id,

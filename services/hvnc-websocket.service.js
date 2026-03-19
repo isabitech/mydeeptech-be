@@ -15,6 +15,7 @@ const connectedDevices = new Map(); // Track online devices: { device_id: { sock
 const connectedAdmins = new Map(); // Track admin connections: { admin_id: socketId }
 const connectedUsers = new Map(); // Track user connections: { user_id: socketId }
 const activeCommands = new Map(); // Track pending commands: { command_id: timeout }
+const pendingCommandPromises = new Map(); // Track promises waiting for command responses
 const activeSessions = new Map(); // Track active user sessions: { session_id: { user, device, socket } }
 
 // Performance monitoring for 20fps video streaming
@@ -36,7 +37,7 @@ function updateFrameStats(deviceId) {
 
   const stats = frameStatsPerDevice.get(deviceId);
   stats.frameCount++;
-  
+
   // Calculate instantaneous FPS (time between frames)
   const timeDiff = now - stats.lastFrameTime;
   if (timeDiff > 0) {
@@ -489,6 +490,68 @@ const initializeHVNCSocket = (server) => {
       }
     });
 
+    // Handle command responses from PC Agent
+    socket.on("command_response", async (responseData) => {
+      try {
+        const { command_id, status, result, error, timestamp } = responseData;
+
+        console.log(`📥 Command response received: ${command_id} - ${status}`);
+
+        // Find pending promise for this command
+        const pendingPromise = pendingCommandPromises.get(command_id);
+        if (pendingPromise) {
+          // Clear timeout
+          clearTimeout(pendingPromise.timeout);
+
+          // Remove from tracking
+          pendingCommandPromises.delete(command_id);
+          activeCommands.delete(command_id);
+
+          // Update command in database
+          try {
+            const command = await HVNCCommand.findOne({ command_id });
+            if (command) {
+              if (status === "completed") {
+                await command.markCompleted(result);
+              } else {
+                await command.markFailed(error || "Unknown error");
+              }
+            }
+          } catch (dbError) {
+            console.warn("Failed to update command in database:", dbError);
+          }
+
+          // Resolve or reject the promise
+          if (status === "completed") {
+            pendingPromise.resolve({
+              success: true,
+              result,
+              timestamp,
+              command_id,
+            });
+          } else {
+            pendingPromise.reject(new Error(error || "Command failed"));
+          }
+
+          // Notify admins of command completion
+          adminNamespace.emit("command_completed", {
+            command_id,
+            device_id: socket.device.device_id,
+            status,
+            result: status === "completed" ? result : null,
+            error: status === "failed" ? error : null,
+            timestamp,
+          });
+        } else {
+          console.warn(
+            `⚠️ Received response for unknown command: ${command_id}`,
+          );
+        }
+      } catch (error) {
+        console.error("Command response handling error:", error);
+      }
+    });
+
     // Handle session events
     socket.on("session_event", async (data) => {
       try {
@@ -780,7 +843,7 @@ const initializeHVNCSocket = (server) => {
         "Device disconnected",
       );
 
-      // Clear any active command timeouts
+      // Clear any active command timeouts and reject pending promises
       for (const [commandId, timeout] of activeCommands.entries()) {
         const command = await HVNCCommand.findOne({
           command_id: commandId,
@@ -789,6 +852,14 @@ const initializeHVNCSocket = (server) => {
         if (command) {
           clearTimeout(timeout);
           activeCommands.delete(commandId);
+
+          // Reject pending promises for this device's commands
+          const pendingPromise = pendingCommandPromises.get(commandId);
+          if (pendingPromise) {
+            clearTimeout(pendingPromise.timeout);
+            pendingPromise.reject(new Error(`Device disconnected: ${reason}`));
+            pendingCommandPromises.delete(commandId);
+          }
         }
       }
 
@@ -1548,6 +1619,62 @@ const initializeHVNCSocket = (server) => {
 };
 
 /**
+ * Send command to device and wait for response
+ */
+async function sendCommandToDeviceAndWait(
+  deviceId,
+  command,
+  timeoutMs = 30000,
+) {
+  const deviceConnection = connectedDevices.get(deviceId);
+  if (!deviceConnection) {
+    throw new Error("Device not connected");
+  }
+
+  // Create promise to wait for response
+  const responsePromise = new Promise((resolve, reject) => {
+    // Set up timeout
+    const timeout = setTimeout(() => {
+      pendingCommandPromises.delete(command.command_id);
+      activeCommands.delete(command.command_id);
+      reject(
+        new Error(
+          `Command timeout: No response from device after ${timeoutMs}ms`,
+        ),
+      );
+    }, timeoutMs);
+
+    // Store promise resolvers
+    pendingCommandPromises.set(command.command_id, {
+      resolve,
+      reject,
+      timeout,
+    });
+
+    // Set timeout for command cleanup
+    activeCommands.set(command.command_id, timeout);
+  });
+
+  // Send command to device
+  deviceConnection.socket.emit("command", {
+    id: command.command_id,
+    type: command.type,
+    action: command.action,
+    parameters: command.parameters,
+    priority: command.priority,
+    timeout_seconds: command.timeout_seconds,
+    session_id: command.session_id,
+  });
+
+  console.log(
+    `📤 Command sent to device ${deviceId}: ${command.action} (${command.command_id})`,
+  );
+
+  // Wait for response
+  return responsePromise;
+}
+
+/**
  * Send command to device
  */
 async function sendCommandToDevice(deviceId, command) {
@@ -1763,6 +1890,7 @@ const getStreamingStats = () => {
 module.exports = {
   initializeHVNCSocket,
   sendCommandToDevice,
+  sendCommandToDeviceAndWait, // New function for waiting for responses
   broadcastToAdmins,
   notifyAdmin,
   notifyUser,

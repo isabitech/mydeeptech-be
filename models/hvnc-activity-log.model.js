@@ -48,8 +48,10 @@ const hvncActivityLogSchema = new mongoose.Schema(
 
         // Hubstaff events
         "hubstaff_timer_start",
+        "hubstaff_timer_started", // Added missing enum value
         "hubstaff_timer_stop",
         "hubstaff_timer_pause",
+        "hubstaff_timer_paused", // Added missing enum value
         "hubstaff_project_change",
         "hubstaff_status_update",
 

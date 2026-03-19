@@ -341,26 +341,44 @@ setInterval(() => {
 ```javascript
 // Respond to commands from admin/user
 socket.on('command', async (commandData) => {
-  const { id, action, parameters, session_id } = commandData;
+  const { id, action, parameters, session_id, type } = commandData;
   
   try {
     let result;
     
-    switch (action) {
-      case 'screenshot':
-        result = await takeScreenshot();
-        break;
-      case 'mouse_click':
-        result = await simulateMouseClick(parameters.x, parameters.y);
-        break;
-      case 'keyboard_input':
-        result = await simulateKeyboardInput(parameters.text);
-        break;
-      case 'open_application':
-        result = await openApplication(parameters.app_path);
-        break;
-      default:
-        throw new Error(`Unknown command: ${action}`);
+    // Handle Hubstaff commands
+    if (type === 'hubstaff') {
+      switch (action) {
+        case 'hubstaff_start':
+          result = await handleHubstaffStart(parameters);
+          break;
+        case 'hubstaff_pause':
+          result = await handleHubstaffPause(parameters);
+          break;
+        case 'hubstaff_stop':
+          result = await handleHubstaffStop(parameters);
+          break;
+        default:
+          throw new Error(`Unknown Hubstaff command: ${action}`);
+      }
+    } else {
+      // Handle other command types
+      switch (action) {
+        case 'screenshot':
+          result = await takeScreenshot();
+          break;
+        case 'mouse_click':
+          result = await simulateMouseClick(parameters.x, parameters.y);
+          break;
+        case 'keyboard_input':
+          result = await simulateKeyboardInput(parameters.text);
+          break;
+        case 'open_application':
+          result = await openApplication(parameters.app_path);
+          break;
+        default:
+          throw new Error(`Unknown command: ${action}`);
+      }
     }
     
     // Send success response
@@ -383,6 +401,39 @@ socket.on('command', async (commandData) => {
     });
   }
 });
+
+// Example Hubstaff handlers
+async function handleHubstaffStart(parameters) {
+  const { projectId, taskName } = parameters || {};
+  
+  // Your implementation here:
+  // - Start Hubstaff desktop application
+  // - Begin time tracking
+  // - Set project/task if provided
+  
+  console.log('🚀 Starting Hubstaff timer...');
+  
+  return {
+    success: true,
+    action: 'hubstaff_started',
+    projectId,
+    taskName,
+    timestamp: new Date().toISOString()
+  };
+}
+
+async function handleHubstaffPause(parameters) {
+  // Your implementation here:
+  // - Pause Hubstaff timer
+  
+  console.log('⏸️ Pausing Hubstaff timer...');
+  
+  return {
+    success: true,
+    action: 'hubstaff_paused',
+    timestamp: new Date().toISOString()
+  };
+}
 ```
 
 ### **4. Session Events**
@@ -489,6 +540,9 @@ socket.on('config_update', (config) => {
 | `close_application` | `{process_name}` | Close application |
 | `file_upload` | `{file_data, path}` | Upload file to device |
 | `file_download` | `{file_path}` | Download file from device |
+| `hubstaff_start` | `{projectId?, taskName?}` | **Start Hubstaff timer** |
+| `hubstaff_pause` | None | **Pause Hubstaff timer** |
+| `hubstaff_stop` | None | **Stop Hubstaff timer** |
 
 ### **Command Implementation Example**
 ```javascript
