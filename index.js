@@ -39,6 +39,7 @@ const partnerInvoiceRoute = require("./routes/partnerInvoice.routes");
 const paymentRoutes = require("./routes/payment.routes");
 const exchangeRateRoutes = require("./routes/exchangeRate.routes");
 const hvncRoutes = require("./routes/hvnc.routes");
+const assessmentReviewRoute = require("./routes/assessmentreview.routes");
 const resourceRoutes = require("./routes/resource.routes");
 const { healthCheck } = require("./controllers/health-check.controller");
 const { corsOptions } = require("./utils/cors-options.utils");
@@ -132,6 +133,7 @@ app.use("/api/exchange-rate-by-country", exchangeRateRoutes);
 app.use("/api/roles-permission", rolesPermissionRoute);
 app.use("/api/hvnc", hvncRoutes);
 app.use("/api/resources", resourceRoutes);
+app.use("/api/assessment-reviews", assessmentReviewRoute);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
