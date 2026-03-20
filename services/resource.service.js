@@ -257,6 +257,11 @@ class ResourceService {
     sortBy = "latest",
   ) {
     const allowedKeys = await this.getAllowedResourceKeysForUser(userId);
+
+    if (allowedKeys.has(ALL_RESOURCES_WILDCARD)) {
+      return await this.getAllResourcesHierarchy(showUnpublished, sortBy);
+    }
+
     const normalizedKeys = new Set(
       [...allowedKeys]
         .map((key) => String(key).trim().toLowerCase().replace(/-/g, "_"))
