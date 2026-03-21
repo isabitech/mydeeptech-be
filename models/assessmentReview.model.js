@@ -78,6 +78,27 @@ const assessmentReviewSchema = new mongoose.Schema(
       max: 7,
       default: null,
     },
+    reviewerComments: {
+      type: String,
+      trim: true,
+      default: null,
+    },
+      reviewStatus: {
+      type: String,
+      enum: ["Pending", "Reviewed"],
+      default: "Pending",
+    },
+    reviewRating: {
+      type: Number,
+      min: 1,
+      max: 7,
+      default: null,
+    },
+    reviewerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "DTUser",
+      default: null,
+    }
   },
   {
     timestamps: true,

@@ -18,6 +18,13 @@ const {
 } = require("../validations/rbac.validation");
 
 // Permission routes
+router.get(
+  "/permission/options",
+  authenticateToken,
+  authenticateAdmin,
+  PermissionController.getPermissionOptions,
+);
+
 router.post(
   "/permission/create",
   authenticateToken,

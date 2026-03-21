@@ -60,6 +60,19 @@ class PermissionService {
     return await PermissionRepository.findAllByNamePaginated(name, page, limit);
   }
 
+  async getPermissionOptions() {
+    const { ACTIONS } = require("../config/resources");
+    const ResourceService = require("./resource.service");
+    
+    // Fetch all published resources strictly adhering to the service layer pattern
+    const dbResources = await ResourceService.getAllResources(false);
+
+    return {
+      actions: Object.values(ACTIONS),
+      resources: dbResources.map(r => ({ label: r.title, value: r.resourceKey })),
+    };
+  }
+
   //  UPDATE 
   async updatePermission(id, data) {
     const permission = await PermissionRepository.findById(id);

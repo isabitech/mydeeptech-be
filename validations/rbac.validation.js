@@ -36,22 +36,6 @@ const removePermissionsFromRoleSchema = Joi.object({
 // ─────────────────────────────────────────────
 //  PERMISSION SCHEMAS
 // ─────────────────────────────────────────────
-const RESOURCES = [
-  "overview",
-  "annotators",
-  "assessments",
-  "projects",
-  "applications",
-  "payment",
-  "invoice",
-  "notifications",
-  "support_chat",
-  "user_roles",
-  "employees",
-  "settings",
-  "roles",
-  "permissions",
-];
 
 const ACTIONS = [
   "view",
@@ -62,7 +46,6 @@ const ACTIONS = [
   "approve",
   "manage",
 ];
-
 const permissionConsistencyValidator = (value, helpers) => {
   const { name, resource, action } = value || {};
   if (
@@ -95,10 +78,10 @@ const createPermissionSchema = Joi.object({
   resource: Joi.string()
     .trim()
     .lowercase()
-    .valid(...RESOURCES)
+    .pattern(/^[a-z0-9_]+$/)
     .required()
     .messages({
-      "any.only": `Resource must be one of: ${RESOURCES.join(", ")}`,
+      "string.pattern.base": "Resource must only contain lowercase letters, numbers, and underscores (e.g. 'custom_page')",
       "any.required": "Resource is required",
     }),
   action: Joi.string()
@@ -133,10 +116,10 @@ const updatePermissionSchema = Joi.object({
   resource: Joi.string()
     .trim()
     .lowercase()
-    .valid(...RESOURCES)
+    .pattern(/^[a-z0-9_]+$/)
     .optional()
     .messages({
-      "any.only": `Resource must be one of: ${RESOURCES.join(", ")}`,
+      "string.pattern.base": "Resource must only contain lowercase letters, numbers, and underscores (e.g. 'custom_page')",
     }),
   action: Joi.string()
     .trim()

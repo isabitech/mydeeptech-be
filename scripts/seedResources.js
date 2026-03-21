@@ -10,106 +10,7 @@ dns.setServers(["8.8.8.8", "8.8.4.4"]);
 
 const Resource = require("../models/resource.model");
 
-const FRONTEND_MENU = [
-  {
-    key: "overview",
-    label: "Overview",
-    icon: "HomeOutlined",
-    resource: "overview",
-    path: "/overview",
-  },
-  {
-    key: "annotators",
-    label: "Annotators",
-    icon: "UserOutlined",
-    resource: "annotators",
-    path: "/annotators",
-  },
-  {
-    key: "assessments",
-    label: "Assessments",
-    icon: "BookOutlined",
-    resource: "assessments",
-    path: "/assessments",
-  },
-  {
-    key: "projects",
-    label: "Projects",
-    icon: "CodeSandboxOutlined",
-    resource: "projects",
-    path: "/projects",
-  },
-  {
-    key: "applications",
-    label: "Applications",
-    icon: "InboxOutlined",
-    resource: "applications",
-    path: "/applications",
-  },
-  {
-    key: "payment",
-    label: "Payment",
-    icon: "WalletOutlined",
-    resource: "payment",
-    path: "/payments",
-  },
-  {
-    key: "invoice",
-    label: "Invoice",
-    icon: "WalletOutlined",
-    resource: "invoice",
-    path: "/invoices",
-  },
-  {
-    key: "partner-invoice",
-    label: "Partners Invoice",
-    icon: "FileTextOutlined",
-    resource: "invoice",
-    path: "/partner-invoices",
-  },
-  {
-    key: "notifications",
-    label: "Notifications",
-    icon: "BellOutlined",
-    resource: "notifications",
-    path: "/notifications",
-  },
-  {
-    key: "chat",
-    label: "Support Chat",
-    icon: "MessageOutlined",
-    resource: "support_chat",
-    path: "/chat",
-  },
-  {
-    key: "users",
-    label: "User Roles",
-    icon: "UserOutlined",
-    resource: "user_roles",
-    path: "/users",
-  },
-  {
-    key: "employees",
-    label: "Employees Mgt",
-    icon: "UserOutlined",
-    resource: "employees",
-    path: "/employees",
-  },
-  {
-    key: "rbac",
-    label: "Roles & Permissions",
-    icon: "SafetyOutlined",
-    resource: "roles",
-    path: "/rbac",
-  },
-  {
-    key: "settings",
-    label: "Settings",
-    icon: "SettingOutlined",
-    resource: "settings",
-    path: "/settings",
-  },
-];
+const { RESOURCE_DEFINITIONS } = require("../config/resources");
 
 function normalizeResource(value) {
   return value.trim().toLowerCase().replace(/-/g, "_");
@@ -190,7 +91,7 @@ async function seedResources() {
     let updatedCount = 0;
     const resourceKeyUsage = new Map();
 
-    for (const [index, item] of FRONTEND_MENU.entries()) {
+    for (const [index, item] of RESOURCE_DEFINITIONS.entries()) {
       const normalizedResource = normalizeResource(item.resource);
       let finalResourceKey = normalizedResource;
 
@@ -215,7 +116,7 @@ async function seedResources() {
     console.log("\nResource seeding completed.");
     console.log(`Created: ${createdCount}`);
     console.log(`Updated: ${updatedCount}`);
-    console.log(`Total processed: ${FRONTEND_MENU.length}`);
+    console.log(`Total processed: ${RESOURCE_DEFINITIONS.length}`);
   } finally {
     await mongoose.disconnect();
   }

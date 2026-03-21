@@ -21,6 +21,19 @@ class PermissionController {
     }
   }
 
+  async getPermissionOptions(req, res, next) {
+    try {
+      const options = await PermissionService.getPermissionOptions();
+
+      return ResponseClass.Success(res, {
+        message: "Permission options fetched successfully",
+        data: options,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async createManyPermissions(req, res, next) {
     try {
       const { permissions } = req.body;

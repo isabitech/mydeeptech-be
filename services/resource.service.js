@@ -202,6 +202,25 @@ class ResourceService {
       );
 
       await session.commitTransaction();
+
+      // Automatically generate all permissions for the new resource once it is successfully created
+      try {
+        const { ACTIONS } = require("../config/resources");
+        const PermissionService = require("./permission.service");
+        
+        const generatedPermissions = Object.values(ACTIONS).map(actionKey => ({
+          name: `${created.resourceKey}:${actionKey}`,
+          description: `Can ${actionKey} ${created.title}`,
+          resource: created.resourceKey,
+          action: actionKey
+        }));
+        
+        await PermissionService.createManyPermissions(generatedPermissions);
+      } catch (permissionError) {
+        // Silently catch permission seeding errors so the primary resource creation doesn't crash the user's request.
+        console.warn(`[Warning] Failed to auto-generate some permissions for resource ${created.resourceKey}:`, permissionError.message);
+      }
+
       return created;
     } catch (error) {
       await session.abortTransaction();

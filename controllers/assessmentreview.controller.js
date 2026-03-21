@@ -127,7 +127,26 @@ class AssessmentReviewController {
         ...(req.body.instructionClarityRating !== undefined && {
           instructionClarityRating: req.body.instructionClarityRating,
         }),
+        ...(req.body.reviewerComments !== undefined && {
+          reviewerComments: req.body.reviewerComments,
+        }),
+        ...(req.body.reviewStatus !== undefined && {
+          reviewStatus: req.body.reviewStatus,
+        }),
+        ...(req.body.reviewRating !== undefined && {
+          reviewRating: req.body.reviewRating,
+        }),
       };
+
+      // Automatically assign the authenticated user's ID as the reviewer
+      if (
+        req.body.reviewerComments !== undefined ||
+        req.body.reviewStatus !== undefined ||
+        req.body.reviewRating !== undefined
+      ) {
+        payload.reviewerId = req.user?.userId;
+      }
+
       const submission = await AssessmentReviewService.updateSubmission(
         req.params.id,
         payload,
