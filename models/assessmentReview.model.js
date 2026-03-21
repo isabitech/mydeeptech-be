@@ -83,7 +83,7 @@ const assessmentReviewSchema = new mongoose.Schema(
       trim: true,
       default: null,
     },
-      reviewStatus: {
+    reviewStatus: {
       type: String,
       enum: ["Pending", "Reviewed"],
       default: "Pending",
@@ -98,7 +98,7 @@ const assessmentReviewSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "DTUser",
       default: null,
-    }
+    },
   },
   {
     timestamps: true,

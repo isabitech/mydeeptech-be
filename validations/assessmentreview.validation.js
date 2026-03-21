@@ -184,20 +184,31 @@ const updateSubmissionSchema = Joi.object({
       "number.max": "Rating must be between 1 and 7",
     }),
 
-  reviewerComments: Joi.string().trim().max(2000).optional().allow(null).messages({
-    "string.max": "Reviewer comments must not exceed 2000 characters",
-  }),
+  reviewerComments: Joi.string()
+    .trim()
+    .max(2000)
+    .optional()
+    .allow(null)
+    .messages({
+      "string.max": "Reviewer comments must not exceed 2000 characters",
+    }),
 
   reviewStatus: Joi.string().valid("Pending", "Reviewed").optional().messages({
     "any.only": "Review status must be either 'Pending' or 'Reviewed'",
   }),
 
-  reviewRating: Joi.number().integer().min(1).max(7).optional().allow(null).messages({
-    "number.base": "reviewRating must be a number",
-    "number.integer": "reviewRating must be an integer",
-    "number.min": "Rating must be between 1 and 7",
-    "number.max": "Rating must be between 1 and 7",
-  }),
+  reviewRating: Joi.number()
+    .integer()
+    .min(1)
+    .max(7)
+    .optional()
+    .allow(null)
+    .messages({
+      "number.base": "reviewRating must be a number",
+      "number.integer": "reviewRating must be an integer",
+      "number.min": "Rating must be between 1 and 7",
+      "number.max": "Rating must be between 1 and 7",
+    }),
 })
   .min(1)
   .messages({
