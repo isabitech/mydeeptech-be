@@ -1169,7 +1169,7 @@ const getAllAdminUsers = async (req, res) => {
       });
     }
 
-    console.log('🔍 Admin users filter:', JSON.stringify(filter, null, 2));
+    // console.log('🔍 Admin users filter:', JSON.stringify(filter, null, 2));
 
     // Get admin users with pagination
     const adminUsers = await DTUser.find(filter)
@@ -1182,7 +1182,7 @@ const getAllAdminUsers = async (req, res) => {
     // Get total count for pagination
     const totalAdminUsers = await DTUser.countDocuments(filter);
 
-    console.log(`✅ Found ${adminUsers.length} admin users (${totalAdminUsers} total)`);
+    // console.log(`✅ Found ${adminUsers.length} admin users (${totalAdminUsers} total)`);
 
     // Get role/status summary for admin users
     const roleSummary = await DTUser.aggregate([
