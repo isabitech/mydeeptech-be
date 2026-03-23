@@ -564,7 +564,7 @@ const dtUserLogin = async (req, res) => {
         microTaskerStatus: user.microTaskerStatus,
         qaStatus: user.qaStatus,
         resultLink: user.resultLink,
-        assessmentSubmission: !!user.assessmentSubmission, // Ensure boolean value
+        isAssessmentSubmitted: !!user.assessmentSubmission, // Ensure boolean value
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       },

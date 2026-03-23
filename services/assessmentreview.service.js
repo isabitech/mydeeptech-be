@@ -19,14 +19,15 @@ class AssessmentReviewService {
   }
 
   async getAllSubmissions({ page, limit, sort }) {
-    const { items, total } = await assessmentReviewRepository.findAllPaginated({
-      page,
-      limit,
-      sort,
-    });
+    const { assessmentReviews, total } =
+      await assessmentReviewRepository.findAllPaginated({
+        page,
+        limit,
+        sort,
+      });
 
     return {
-      items,
+      assessmentReviews,
       total,
       page,
       limit,
@@ -35,7 +36,7 @@ class AssessmentReviewService {
   }
 
   async getSubmissionsByUserId({ userId, page, limit, sort }) {
-    const { items, total } =
+    const { assessmentReviews, total } =
       await assessmentReviewRepository.findByUserIdPaginated({
         userId,
         page,
@@ -44,7 +45,7 @@ class AssessmentReviewService {
       });
 
     return {
-      items,
+      assessmentReviews,
       total,
       page,
       limit,

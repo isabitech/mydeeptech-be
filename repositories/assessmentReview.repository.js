@@ -10,18 +10,18 @@ class AssessmentReviewRepository {
   async findAllPaginated({ page, limit, sort }) {
     const skip = (page - 1) * limit;
 
-    const [items, total] = await Promise.all([
+    const [assessmentReviews, total] = await Promise.all([
       AssessmentReview.find().sort(sort).skip(skip).limit(limit).lean(),
       AssessmentReview.countDocuments(),
     ]);
 
-    return { items, total };
+    return { assessmentReviews, total };
   }
 
   async findByUserIdPaginated({ userId, page, limit, sort }) {
     const skip = (page - 1) * limit;
 
-    const [items, total] = await Promise.all([
+    const [assessmentReviews, total] = await Promise.all([
       AssessmentReview.find({ userId })
         .sort(sort)
         .skip(skip)
@@ -30,7 +30,7 @@ class AssessmentReviewRepository {
       AssessmentReview.countDocuments({ userId }),
     ]);
 
-    return { items, total };
+    return { assessmentReviews, total };
   }
 
   async findById(id) {

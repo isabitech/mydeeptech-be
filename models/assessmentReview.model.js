@@ -106,9 +106,6 @@ const assessmentReviewSchema = new mongoose.Schema(
   },
 );
 
-// Enforce one submission per user at the database level
-assessmentReviewSchema.index({ userId: 1 }, { unique: true });
-
 const AssessmentReview = mongoose.model(
   "AssessmentReview",
   assessmentReviewSchema,

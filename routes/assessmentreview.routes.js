@@ -30,7 +30,7 @@ router.get(
   validateSubmissionId,
   assessmentReviewController.getById,
 );
-router.put(
+router.patch(
   "/:id",
   authenticateToken,
   validateSubmissionId,
