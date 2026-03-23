@@ -1309,7 +1309,7 @@ const getAllAdminUsers = async (req, res) => {
       });
     }
 
-    console.log("🔍 Admin users filter:", JSON.stringify(filter, null, 2));
+    // console.log('🔍 Admin users filter:', JSON.stringify(filter, null, 2));
 
     // Get admin users with pagination
     const adminUsers = await DTUser.find(filter)
@@ -1325,10 +1325,7 @@ const getAllAdminUsers = async (req, res) => {
     console.log(
       `✅ Found ${adminUsers.length} admin users (${totalAdminUsers} total)`,
     );
-
-    // Get role/status summary for admin users
     const roleSummary = await DTUser.aggregate([
-      { $match: filter },
       {
         $group: {
           _id: {
