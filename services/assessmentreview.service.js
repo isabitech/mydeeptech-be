@@ -1,17 +1,21 @@
 const assessmentReviewRepository = require("../repositories/assessmentReview.repository");
+const DTUser = require("../models/dtUser.model");
 
 class AssessmentReviewService {
   async createSubmission(data) {
-    // const existing = await assessmentReviewRepository.findByEmail(
-    //   data.emailAddress,
-    // );
-    // if (existing) {
-    //   const error = new Error("A submission with this email already exists.");
-    //   error.statusCode = 409;
-    //   throw error;
-    // }
-
-    return await assessmentReviewRepository.create(data);
+    const existing = await assessmentReviewRepository.findByUserId(data.userId);
+    if (existing) {
+      const error = new Error("A submission with this user ID already exists.");
+      error.statusCode = 409;
+      throw error;
+    }
+    const assessmentSubmission = await assessmentReviewRepository.create(data);
+    if (assessmentSubmission) {
+      await DTUser.findByIdAndUpdate(data.userId, {
+        assessmentSubmission: true,
+      });
+    }
+    return assessmentSubmission;
   }
 
   async getAllSubmissions({ page, limit, sort }) {

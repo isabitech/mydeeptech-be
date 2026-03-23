@@ -6,6 +6,7 @@ const assessmentReviewSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "DTUser",
       required: true,
+      unique: true,
     },
     fullName: {
       type: String,
@@ -104,6 +105,9 @@ const assessmentReviewSchema = new mongoose.Schema(
     timestamps: true,
   },
 );
+
+// Enforce one submission per user at the database level
+assessmentReviewSchema.index({ userId: 1 }, { unique: true });
 
 const AssessmentReview = mongoose.model(
   "AssessmentReview",

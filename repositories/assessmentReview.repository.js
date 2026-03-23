@@ -43,6 +43,12 @@ class AssessmentReviewRepository {
     }).lean();
   }
 
+  async findByUserId(userId) {
+    return await AssessmentReview.find({
+      userId: userId,
+    }).lean();
+  }
+
   async update(id, data) {
     return await AssessmentReview.findByIdAndUpdate(id, data, {
       new: true,

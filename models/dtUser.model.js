@@ -1,64 +1,71 @@
 const mongoose = require("mongoose");
 const { RoleType } = require("../utils/role");
+const { boolean } = require("joi");
 
 const dtUserSchema = new mongoose.Schema(
   {
     // Basic registration fields
     fullName: {
       type: String,
-      required: true
+      required: true,
     },
     phone: {
       type: String,
-      required: true
+      required: true,
     },
     email: {
       type: String,
       required: true,
-      unique: true
+      unique: true,
     },
     role: {
       type: String,
       required: "Role name is required",
-      enum: [RoleType.USER, RoleType.ADMIN, RoleType.ANNOTATOR, RoleType.MODERATOR, RoleType.QA_REVIEWER],
-      default: RoleType.USER
+      enum: [
+        RoleType.USER,
+        RoleType.ADMIN,
+        RoleType.ANNOTATOR,
+        RoleType.MODERATOR,
+        RoleType.QA_REVIEWER,
+      ],
+      default: RoleType.USER,
     },
     domains: {
       type: [String],
-      default: []
+      default: [],
     },
     socialsFollowed: {
       type: [String],
-      default: []
+      default: [],
     },
     consent: {
       type: Boolean,
-      required: true
+      required: true,
     },
 
     // Authentication fields
     password: {
       type: String,
-      default: null
+      default: null,
     },
     hasSetPassword: {
       type: Boolean,
-      default: false
+      default: false,
     },
     isEmailVerified: { type: Boolean, default: false },
 
     // Password reset fields
     passwordResetToken: {
       type: String,
-      default: null
+      default: null,
     },
     passwordResetExpires: {
       type: Date,
-      default: null
+      default: null,
     },
     passwordResetAttempts: {
       type: Number,
-      default: 0
+      default: 0,
     },
 
     // Default statuses
@@ -79,48 +86,64 @@ const dtUserSchema = new mongoose.Schema(
     },
     multimediaAssessmentStatus: {
       type: String,
-      enum: ["not_started", "in_progress", "submitted", "under_review", "passed", "failed"],
+      enum: [
+        "not_started",
+        "in_progress",
+        "submitted",
+        "under_review",
+        "passed",
+        "failed",
+      ],
       default: "not_started",
     },
     // Spidey High-Discipline Assessment Status (integrates with existing system)
     spideyAssessmentStatus: {
       type: String,
-      enum: ["not_started", "in_progress", "submitted", "under_review", "passed", "failed"],
+      enum: [
+        "not_started",
+        "in_progress",
+        "submitted",
+        "under_review",
+        "passed",
+        "failed",
+      ],
       default: "not_started",
     },
     resultLink: { type: String, default: "" },
 
     // Result submissions and storage
-    resultSubmissions: [{
-      originalResultLink: { type: String, default: '' }, // Empty for direct uploads
-      cloudinaryResultData: {
-        publicId: { type: String, required: true },
-        url: { type: String, required: true },
-        optimizedUrl: { type: String, default: "" },
-        thumbnailUrl: { type: String, default: "" },
-        originalName: { type: String, default: "" },
-        size: { type: Number, default: 0 },
-        format: { type: String, default: "" }
+    resultSubmissions: [
+      {
+        originalResultLink: { type: String, default: "" }, // Empty for direct uploads
+        cloudinaryResultData: {
+          publicId: { type: String, required: true },
+          url: { type: String, required: true },
+          optimizedUrl: { type: String, default: "" },
+          thumbnailUrl: { type: String, default: "" },
+          originalName: { type: String, default: "" },
+          size: { type: Number, default: 0 },
+          format: { type: String, default: "" },
+        },
+        submissionDate: { type: Date, default: Date.now },
+        projectId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "AnnotationProject",
+          default: null,
+        },
+        taskId: { type: String, default: "" }, // For future task tracking
+        status: {
+          type: String,
+          enum: ["pending", "processing", "stored", "failed"],
+          default: "pending",
+        },
+        uploadMethod: {
+          type: String,
+          enum: ["url_submission", "direct_upload"],
+          default: "direct_upload",
+        },
+        notes: { type: String, default: "" },
       },
-      submissionDate: { type: Date, default: Date.now },
-      projectId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "AnnotationProject",
-        default: null
-      },
-      taskId: { type: String, default: "" }, // For future task tracking
-      status: {
-        type: String,
-        enum: ["pending", "processing", "stored", "failed"],
-        default: "pending"
-      },
-      uploadMethod: {
-        type: String,
-        enum: ["url_submission", "direct_upload"],
-        default: "direct_upload"
-      },
-      notes: { type: String, default: "" }
-    }],
+    ],
 
     // Extended profile information
     personal_info: {
@@ -130,8 +153,8 @@ const dtUserSchema = new mongoose.Schema(
       preferred_communication_channel: {
         type: String,
         enum: ["email", "phone", "whatsapp", "telegram", "slack", ""],
-        default: ""
-      }
+        default: "",
+      },
     },
 
     payment_info: {
@@ -143,13 +166,13 @@ const dtUserSchema = new mongoose.Schema(
       payment_method: {
         type: String,
         enum: ["bank_transfer", "paypal", "crypto", "mobile_money", ""],
-        default: ""
+        default: "",
       },
       payment_currency: {
         type: String,
         enum: ["USD", "EUR", "GBP", "NGN", "KES", "GHS", ""],
-        default: ""
-      }
+        default: "",
+      },
     },
 
     professional_background: {
@@ -158,20 +181,55 @@ const dtUserSchema = new mongoose.Schema(
       annotation_experience_types: {
         type: [String],
         default: [],
-        enum: ["text_annotation", "image_annotation", "audio_annotation", "video_annotation", "data_labeling", "content_moderation", "transcription", "translation"]
-      }
+        enum: [
+          "text_annotation",
+          "image_annotation",
+          "audio_annotation",
+          "video_annotation",
+          "data_labeling",
+          "content_moderation",
+          "transcription",
+          "translation",
+        ],
+      },
     },
 
     tool_experience: {
       type: [String],
       default: [],
-      enum: ["labelbox", "scale_ai", "cvat", "e2f", "appen", "clickworker", "mechanical_turk", "toloka", "remotasks", "annotator_tools", "custom_platforms"]
+      enum: [
+        "labelbox",
+        "scale_ai",
+        "cvat",
+        "e2f",
+        "appen",
+        "clickworker",
+        "mechanical_turk",
+        "toloka",
+        "remotasks",
+        "annotator_tools",
+        "custom_platforms",
+      ],
     },
 
     annotation_skills: {
       type: [String],
       default: [],
-      enum: ["text_annotation", "image_annotation", "video_annotation", "audio_annotation", "sentiment_analysis", "entity_recognition", "classification", "object_detection", "semantic_segmentation", "transcription", "translation", "content_moderation", "data_entry"]
+      enum: [
+        "text_annotation",
+        "image_annotation",
+        "video_annotation",
+        "audio_annotation",
+        "sentiment_analysis",
+        "entity_recognition",
+        "classification",
+        "object_detection",
+        "semantic_segmentation",
+        "transcription",
+        "translation",
+        "content_moderation",
+        "data_entry",
+      ],
     },
 
     language_proficiency: {
@@ -180,25 +238,25 @@ const dtUserSchema = new mongoose.Schema(
       english_fluency_level: {
         type: String,
         enum: ["basic", "intermediate", "advanced", "native", ""],
-        default: ""
-      }
+        default: "",
+      },
     },
 
     system_info: {
       device_type: {
         type: String,
         enum: ["desktop", "laptop", "tablet", "mobile", ""],
-        default: ""
+        default: "",
       },
       operating_system: {
         type: String,
         enum: ["windows", "macos", "linux", "android", "ios", ""],
-        default: ""
+        default: "",
       },
       internet_speed_mbps: { type: Number, default: 0 },
       power_backup: { type: Boolean, default: false },
       has_webcam: { type: Boolean, default: false },
-      has_microphone: { type: Boolean, default: false }
+      has_microphone: { type: Boolean, default: false },
     },
 
     project_preferences: {
@@ -206,15 +264,15 @@ const dtUserSchema = new mongoose.Schema(
       availability_type: {
         type: String,
         enum: ["full_time", "part_time", "project_based", "flexible", ""],
-        default: ""
+        default: "",
       },
-      nda_signed: { type: Boolean, default: false }
+      nda_signed: { type: Boolean, default: false },
     },
 
     attachments: {
       resume_url: { type: String, default: "" },
       id_document_url: { type: String, default: "" },
-      work_samples_url: { type: [String], default: [] }
+      work_samples_url: { type: [String], default: [] },
     },
 
     // Profile picture and media
@@ -222,15 +280,20 @@ const dtUserSchema = new mongoose.Schema(
       publicId: { type: String, default: "" },
       url: { type: String, default: "" },
       thumbnail: { type: String, default: "" },
-      optimizedUrl: { type: String, default: "" }
+      optimizedUrl: { type: String, default: "" },
     },
     role_permission: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Role',
+      ref: "Role",
       default: null,
     },
+    assessmentSubmission: {
+      type: Boolean,
+      default: false,
+    },
   },
-  { timestamps: true }
+
+  { timestamps: true },
 );
 
 dtUserSchema.pre("findOneAndDelete", async function (next) {

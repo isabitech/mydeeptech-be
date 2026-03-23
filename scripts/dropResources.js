@@ -42,7 +42,8 @@ async function dropResourcesCollection() {
   await connectDatabase();
 
   try {
-    const collectionName = "resources";
+    // Mongoose will pluralize and lowercase the model name; default is "assessmentreviews"
+    const collectionName = "assessmentreviews";
     const db = mongoose.connection.db;
 
     const existing = await db
@@ -50,12 +51,14 @@ async function dropResourcesCollection() {
       .toArray();
 
     if (existing.length === 0) {
-      console.log('Collection "resources" does not exist. Nothing to drop.');
+      console.log(
+        'Collection "assessmentreviews" does not exist. Nothing to drop.',
+      );
       return;
     }
 
     await db.dropCollection(collectionName);
-    console.log('Collection "resources" dropped successfully.');
+    console.log('Collection "assessmentreviews" dropped successfully.');
   } finally {
     await mongoose.disconnect();
   }
