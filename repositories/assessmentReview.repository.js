@@ -44,9 +44,8 @@ class AssessmentReviewRepository {
   }
 
   async findByUserId(userId) {
-    return await AssessmentReview.find({
-      userId: userId,
-    }).lean();
+    // Return a single submission to allow simple existence checks
+    return await AssessmentReview.findOne({ userId }).lean();
   }
 
   async update(id, data) {
