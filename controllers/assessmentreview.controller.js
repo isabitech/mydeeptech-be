@@ -127,8 +127,8 @@ class AssessmentReviewController {
         ...(req.body.instructionClarityRating !== undefined && {
           instructionClarityRating: req.body.instructionClarityRating,
         }),
-        ...(req.body.reviewerComments !== undefined && {
-          reviewerComments: req.body.reviewerComments,
+        ...(req.body.reviewerComment !== undefined && {
+          reviewerComment: req.body.reviewerComment,
         }),
         ...(req.body.reviewStatus !== undefined && {
           reviewStatus: req.body.reviewStatus,
@@ -140,7 +140,7 @@ class AssessmentReviewController {
 
       // Automatically assign the authenticated user's ID as the reviewer
       if (
-        req.body.reviewerComments !== undefined ||
+        req.body.reviewerComment !== undefined ||
         req.body.reviewStatus !== undefined ||
         req.body.reviewRating !== undefined
       ) {
