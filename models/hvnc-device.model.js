@@ -66,7 +66,6 @@ const hvncDeviceSchema = new mongoose.Schema(
     last_seen: {
       type: Date,
       default: Date.now,
-      index: true,
     },
     auth_token_hash: {
       type: String,
