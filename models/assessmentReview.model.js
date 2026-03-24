@@ -79,7 +79,7 @@ const assessmentReviewSchema = new mongoose.Schema(
       max: 7,
       default: null,
     },
-    reviewerComments: {
+    reviewerComment: {
       type: String,
       trim: true,
       default: null,
