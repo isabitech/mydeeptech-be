@@ -65,11 +65,11 @@ const createPermissionSchema = Joi.object({
   name: Joi.string()
     .trim()
     .lowercase()
-    .pattern(/^[a-z_]+:[a-z_]+$/)
+    .pattern(/^[a-z0-9_ &]+:[a-z_]+$/)
     .required()
     .messages({
       "string.pattern.base":
-        "Permission name must follow the format resource:action (e.g. projects:view)",
+        "Permission name must follow the format resource:action (e.g. projects:view or roles & permissions:view)",
       "any.required": "Permission name is required",
     }),
   description: Joi.string().trim().max(300).optional().messages({
@@ -78,10 +78,10 @@ const createPermissionSchema = Joi.object({
   resource: Joi.string()
     .trim()
     .lowercase()
-    .pattern(/^[a-z0-9_]+$/)
+    .pattern(/^[a-z0-9_ &]+$/)
     .required()
     .messages({
-      "string.pattern.base": "Resource must only contain lowercase letters, numbers, and underscores (e.g. 'custom_page')",
+      "string.pattern.base": "Resource may include lowercase letters, numbers, underscores, spaces, and ampersands (e.g. 'roles & permissions')",
       "any.required": "Resource is required",
     }),
   action: Joi.string()
@@ -104,11 +104,11 @@ const updatePermissionSchema = Joi.object({
   name: Joi.string()
     .trim()
     .lowercase()
-    .pattern(/^[a-z_]+:[a-z_]+$/)
+    .pattern(/^[a-z0-9_ &]+:[a-z_]+$/)
     .optional()
     .messages({
       "string.pattern.base":
-        "Permission name must follow the format resource:action (e.g. projects:view)",
+        "Permission name must follow the format resource:action (e.g. projects:view or roles & permissions:view)",
     }),
   description: Joi.string().trim().max(300).optional().messages({
     "string.max": "Description must not exceed 300 characters",
@@ -116,10 +116,10 @@ const updatePermissionSchema = Joi.object({
   resource: Joi.string()
     .trim()
     .lowercase()
-    .pattern(/^[a-z0-9_]+$/)
+    .pattern(/^[a-z0-9_ &]+$/)
     .optional()
     .messages({
-      "string.pattern.base": "Resource must only contain lowercase letters, numbers, and underscores (e.g. 'custom_page')",
+      "string.pattern.base": "Resource may include lowercase letters, numbers, underscores, spaces, and ampersands (e.g. 'roles & permissions')",
     }),
   action: Joi.string()
     .trim()
