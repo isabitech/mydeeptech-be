@@ -153,7 +153,6 @@ const hvncActivityLogSchema = new mongoose.Schema(
     },
     correlation_id: {
       type: String,
-      index: true,
     },
     tags: [String],
     is_flagged: {
