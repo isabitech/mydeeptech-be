@@ -15,6 +15,7 @@ const connectedDevices = new Map(); // Track online devices: { device_id: { sock
 const connectedAdmins = new Map(); // Track admin connections: { admin_id: socketId }
 const connectedUsers = new Map(); // Track user connections: { user_id: socketId }
 const activeCommands = new Map(); // Track pending commands: { command_id: timeout }
+const pendingCommandPromises = new Map(); // Track promises waiting for command responses
 const activeSessions = new Map(); // Track active user sessions: { session_id: { user, device, socket } }
 
 // Performance monitoring for 20fps video streaming
@@ -36,7 +37,7 @@ function updateFrameStats(deviceId) {
 
   const stats = frameStatsPerDevice.get(deviceId);
   stats.frameCount++;
-  
+
   // Calculate instantaneous FPS (time between frames)
   const timeDiff = now - stats.lastFrameTime;
   if (timeDiff > 0) {
@@ -93,58 +94,58 @@ const initializeHVNCSocket = (server) => {
     userNamespace = io.of("/hvnc-user");
 
     // DEBUG: Verify namespaces are created
-    console.log("✅ HVNC namespaces created:");
-    console.log(
-      "   /hvnc-device namespace:",
-      deviceNamespace ? "CREATED" : "FAILED",
-    );
-    console.log(
-      "   /hvnc-admin namespace:",
-      adminNamespace ? "CREATED" : "FAILED",
-    );
-    console.log(
-      "   /hvnc-user namespace:",
-      userNamespace ? "CREATED" : "FAILED",
-    );
+    // console.log("✅ HVNC namespaces created:");
+    // console.log(
+    //   "   /hvnc-device namespace:",
+    //   deviceNamespace ? "CREATED" : "FAILED",
+    // );
+    // console.log(
+    //   "   /hvnc-admin namespace:",
+    //   adminNamespace ? "CREATED" : "FAILED",
+    // );
+    // console.log(
+    //   "   /hvnc-user namespace:",
+    //   userNamespace ? "CREATED" : "FAILED",
+    // );
 
     // DEBUG: Log all namespaces on the main Socket.IO instance
     console.log("📋 All Socket.IO namespaces:");
     if (io._nsps) {
-      console.log("   _nsps keys:", Object.keys(io._nsps));
-      console.log("   _nsps Map size:", io._nsps.size || "undefined");
+      // console.log("   _nsps keys:", Object.keys(io._nsps));
+      // console.log("   _nsps Map size:", io._nsps.size || "undefined");
       // Try to iterate through _nsps if it's a Map
       if (typeof io._nsps.forEach === "function") {
-        console.log("   _nsps Map contents:");
+        // console.log("   _nsps Map contents:");
         io._nsps.forEach((namespace, key) => {
           console.log(`     "${key}": ${namespace ? "EXISTS" : "NULL"}`);
         });
       }
     }
     if (io.sockets && io.sockets.adapter && io.sockets.adapter.nsp) {
-      console.log("   adapter.nsp keys:", Object.keys(io.sockets.adapter.nsp));
+      // console.log("   adapter.nsp keys:", Object.keys(io.sockets.adapter.nsp));
     }
-    console.log(
-      "   io.of('/hvnc-device') test:",
-      io.of("/hvnc-device") ? "EXISTS" : "FAILED",
-    );
+    // console.log(
+    //   "   io.of('/hvnc-device') test:",
+    //   io.of("/hvnc-device") ? "EXISTS" : "FAILED",
+    // );
 
     // Ensure namespaces are properly registered by re-referencing them
     const testDeviceNamespace = io.of("/hvnc-device");
-    console.log(
-      "   Re-referenced /hvnc-device:",
-      testDeviceNamespace ? "SUCCESS" : "FAILED",
-    );
+    // console.log(
+    //   "   Re-referenced /hvnc-device:",
+    //   testDeviceNamespace ? "SUCCESS" : "FAILED",
+    // );
 
     // DEBUG: Force namespace registration in _nsps Map
     if (io._nsps && typeof io._nsps.set === "function") {
-      console.log("🔧 FORCE REGISTERING NAMESPACES IN _nsps Map...");
+      // console.log("🔧 FORCE REGISTERING NAMESPACES IN _nsps Map...");
       io._nsps.set("/hvnc-device", deviceNamespace);
       io._nsps.set("/hvnc-admin", adminNamespace);
       io._nsps.set("/hvnc-user", userNamespace);
-      console.log(
-        "   Force registration complete. New _nsps size:",
-        io._nsps.size,
-      );
+      // console.log(
+      //   "   Force registration complete. New _nsps size:",
+      //   io._nsps.size,
+      // );
     }
 
     // DEBUG: Add namespace connection event logging
@@ -160,33 +161,33 @@ const initializeHVNCSocket = (server) => {
   // Device authentication middleware - JWT validation
   deviceNamespace.use(async (socket, next) => {
     try {
-      console.log("🔐 HVNC Device authentication middleware triggered");
-      console.log("   Socket ID:", socket.id);
-      console.log("   Remote address:", socket.handshake.address);
+      // console.log("🔐 HVNC Device authentication middleware triggered");
+      // console.log("   Socket ID:", socket.id);
+      // console.log("   Remote address:", socket.handshake.address);
 
       // Get JWT token from query params
       const token = socket.handshake.query.token;
-      console.log("   Token provided:", token ? "YES" : "NO");
+      // console.log("   Token provided:", token ? "YES" : "NO");
 
       if (!token) {
-        console.log("   ❌ No token provided");
+        // console.log("   ❌ No token provided");
         return next(new Error("Device authentication token required"));
       }
 
       // Check if JWT secret is available
       if (!envConfig?.jwt?.JWT_SECRET) {
-        console.error("   ❌ JWT_SECRET not configured");
+        // console.error("   ❌ JWT_SECRET not configured");
         return next(new Error("Server authentication configuration error"));
       }
 
       // Verify JWT token
       const decoded = jwt.verify(token, envConfig.jwt.JWT_SECRET);
-      console.log("   ✅ JWT decoded successfully");
-      console.log("   Device ID:", decoded.device_id);
-      console.log("   Token type:", decoded.type);
+      // console.log("   ✅ JWT decoded successfully");
+      // console.log("   Device ID:", decoded.device_id);
+      // console.log("   Token type:", decoded.type);
 
       if (decoded.type !== "device") {
-        console.log("   ❌ Invalid token type:", decoded.type);
+        // console.log("   ❌ Invalid token type:", decoded.type);
         return next(new Error("Invalid device token"));
       }
 
@@ -198,7 +199,7 @@ const initializeHVNCSocket = (server) => {
       };
       socket.authToken = token;
 
-      console.log("   ✅ Device authenticated:", decoded.device_id);
+      // console.log("   ✅ Device authenticated:", decoded.device_id);
       return next();
     } catch (error) {
       console.log("   ❌ Authentication failed:", error.message);
@@ -207,10 +208,10 @@ const initializeHVNCSocket = (server) => {
     }
   });
 
-  console.log(
-    "📋 Device namespace middleware attached:",
-    typeof deviceNamespace.use === "function" ? "SUCCESS" : "FAILED",
-  );
+  // console.log(
+  //   "📋 Device namespace middleware attached:",
+  //   typeof deviceNamespace.use === "function" ? "SUCCESS" : "FAILED",
+  // );
 
   // Admin authentication middleware
   adminNamespace.use(async (socket, next) => {
@@ -283,8 +284,8 @@ const initializeHVNCSocket = (server) => {
   // Device connection handling - database validation
   deviceNamespace.on("connection", async (socket) => {
     try {
-      console.log(`🔌 Device WebSocket connected - starting validation...`);
-      console.log(`   Device ID from auth: ${socket.deviceAuth?.device_id}`);
+      // console.log(`🔌 Device WebSocket connected - starting validation...`);
+      // console.log(`   Device ID from auth: ${socket.deviceAuth?.device_id}`);
 
       // Perform database validation for all devices
 
@@ -297,9 +298,9 @@ const initializeHVNCSocket = (server) => {
         return;
       }
 
-      console.log("🔍 Looking up device in database...");
-      console.log("   Device ID from token:", decoded.device_id);
-      console.log("   Object ID from token:", decoded.id);
+      // console.log("🔍 Looking up device in database...");
+      // console.log("   Device ID from token:", decoded.device_id);
+      // console.log("   Object ID from token:", decoded.id);
 
       // Try to find device by both ObjectId and device_id for safety
       let device;
@@ -311,15 +312,15 @@ const initializeHVNCSocket = (server) => {
         // If not found by ObjectId, try by device_id
         if (!device) {
           device = await HVNCDevice.findOne({ device_id: decoded.device_id });
-          console.log(
-            "📊 Fallback lookup by device_id:",
-            device ? "FOUND" : "NOT FOUND",
-          );
+          // console.log(
+          //   "📊 Fallback lookup by device_id:",
+          //   device ? "FOUND" : "NOT FOUND",
+          // );
         } else {
-          console.log(
-            "📊 Database lookup by ObjectId:",
-            device ? "FOUND" : "NOT FOUND",
-          );
+          // console.log(
+          //   "📊 Database lookup by ObjectId:",
+          //   device ? "FOUND" : "NOT FOUND",
+          // );
         }
       } catch (dbError) {
         console.error("❌ Database lookup error:", dbError.message);
@@ -329,9 +330,9 @@ const initializeHVNCSocket = (server) => {
       }
 
       if (!device || device.device_id !== decoded.device_id) {
-        console.log("❌ Device validation failed");
-        console.log("   Database device:", device ? device.device_id : "NULL");
-        console.log("   Token device_id:", decoded.device_id);
+        // console.log("❌ Device validation failed");
+        // console.log("   Database device:", device ? device.device_id : "NULL");
+        // console.log("   Token device_id:", decoded.device_id);
         socket.emit("auth_error", { message: "Device not found or invalid" });
         socket.disconnect();
         return;
@@ -348,9 +349,9 @@ const initializeHVNCSocket = (server) => {
       socket.deviceId = device.device_id;
       socket.device = device;
 
-      console.log(
-        `✅ Device fully authenticated: ${device.pc_name} (${device.device_id})`,
-      );
+      // console.log(
+      //   `✅ Device fully authenticated: ${device.pc_name} (${device.device_id})`,
+      // );
 
       // Store device connection
       connectedDevices.set(device.device_id, {
@@ -385,9 +386,9 @@ const initializeHVNCSocket = (server) => {
         socketId: socket.id,
       });
 
-      console.log(
-        `📤 Sent 'authenticated' event to device ${device.device_id}`,
-      );
+      // console.log(
+      //   `📤 Sent 'authenticated' event to device ${device.device_id}`,
+      // );
 
       // Log device connection
       HVNCActivityLog.logDeviceEvent(
@@ -486,6 +487,68 @@ const initializeHVNCSocket = (server) => {
           success: false,
           error: error.message,
         });
+      }
+    });
+
+    // Handle command responses from PC Agent
+    socket.on("command_response", async (responseData) => {
+      try {
+        const { command_id, status, result, error, timestamp } = responseData;
+
+        console.log(`📥 Command response received: ${command_id} - ${status}`);
+
+        // Find pending promise for this command
+        const pendingPromise = pendingCommandPromises.get(command_id);
+        if (pendingPromise) {
+          // Clear timeout
+          clearTimeout(pendingPromise.timeout);
+
+          // Remove from tracking
+          pendingCommandPromises.delete(command_id);
+          activeCommands.delete(command_id);
+
+          // Update command in database
+          try {
+            const command = await HVNCCommand.findOne({ command_id });
+            if (command) {
+              if (status === "completed") {
+                await command.markCompleted(result);
+              } else {
+                await command.markFailed(error || "Unknown error");
+              }
+            }
+          } catch (dbError) {
+            console.warn("Failed to update command in database:", dbError);
+          }
+
+          // Resolve or reject the promise
+          if (status === "completed") {
+            pendingPromise.resolve({
+              success: true,
+              result,
+              timestamp,
+              command_id,
+            });
+          } else {
+            pendingPromise.reject(new Error(error || "Command failed"));
+          }
+
+          // Notify admins of command completion
+          adminNamespace.emit("command_completed", {
+            command_id,
+            device_id: socket.device.device_id,
+            status,
+            result: status === "completed" ? result : null,
+            error: status === "failed" ? error : null,
+            timestamp,
+          });
+        } else {
+          console.warn(
+            `⚠️ Received response for unknown command: ${command_id}`,
+          );
+        }
+      } catch (error) {
+        console.error("Command response handling error:", error);
       }
     });
 
@@ -780,7 +843,7 @@ const initializeHVNCSocket = (server) => {
         "Device disconnected",
       );
 
-      // Clear any active command timeouts
+      // Clear any active command timeouts and reject pending promises
       for (const [commandId, timeout] of activeCommands.entries()) {
         const command = await HVNCCommand.findOne({
           command_id: commandId,
@@ -789,6 +852,14 @@ const initializeHVNCSocket = (server) => {
         if (command) {
           clearTimeout(timeout);
           activeCommands.delete(commandId);
+
+          // Reject pending promises for this device's commands
+          const pendingPromise = pendingCommandPromises.get(commandId);
+          if (pendingPromise) {
+            clearTimeout(pendingPromise.timeout);
+            pendingPromise.reject(new Error(`Device disconnected: ${reason}`));
+            pendingCommandPromises.delete(commandId);
+          }
         }
       }
 
@@ -1548,6 +1619,62 @@ const initializeHVNCSocket = (server) => {
 };
 
 /**
+ * Send command to device and wait for response
+ */
+async function sendCommandToDeviceAndWait(
+  deviceId,
+  command,
+  timeoutMs = 30000,
+) {
+  const deviceConnection = connectedDevices.get(deviceId);
+  if (!deviceConnection) {
+    throw new Error("Device not connected");
+  }
+
+  // Create promise to wait for response
+  const responsePromise = new Promise((resolve, reject) => {
+    // Set up timeout
+    const timeout = setTimeout(() => {
+      pendingCommandPromises.delete(command.command_id);
+      activeCommands.delete(command.command_id);
+      reject(
+        new Error(
+          `Command timeout: No response from device after ${timeoutMs}ms`,
+        ),
+      );
+    }, timeoutMs);
+
+    // Store promise resolvers
+    pendingCommandPromises.set(command.command_id, {
+      resolve,
+      reject,
+      timeout,
+    });
+
+    // Set timeout for command cleanup
+    activeCommands.set(command.command_id, timeout);
+  });
+
+  // Send command to device
+  deviceConnection.socket.emit("command", {
+    id: command.command_id,
+    type: command.type,
+    action: command.action,
+    parameters: command.parameters,
+    priority: command.priority,
+    timeout_seconds: command.timeout_seconds,
+    session_id: command.session_id,
+  });
+
+  console.log(
+    `📤 Command sent to device ${deviceId}: ${command.action} (${command.command_id})`,
+  );
+
+  // Wait for response
+  return responsePromise;
+}
+
+/**
  * Send command to device
  */
 async function sendCommandToDevice(deviceId, command) {
@@ -1763,6 +1890,7 @@ const getStreamingStats = () => {
 module.exports = {
   initializeHVNCSocket,
   sendCommandToDevice,
+  sendCommandToDeviceAndWait, // New function for waiting for responses
   broadcastToAdmins,
   notifyAdmin,
   notifyUser,

@@ -9,9 +9,12 @@ const healthController = require("../controllers/hvnc-health.controller");
 const adminDashboardController = require("../controllers/admin-dashboard.controller");
 const adminDeviceManagementController = require("../controllers/admin-device-management.controller");
 const adminShiftSchedulingController = require("../controllers/admin-shift-scheduling.controller");
-const adminUserManagementController = require("../controllers/admin-user-management.controller");
+const enhancedAdminUserManagementController = require("../controllers/enhanced-admin-user-management.controller");
 const userPortalController = require("../controllers/user-portal.controller");
 const sessionManagementController = require("../controllers/session-management.controller");
+
+// Import Hubstaff routes
+const hubstaffRoutes = require("./hubstaff.routes");
 
 // Import services
 const websocketService = require("../services/hvnc-websocket.service");
@@ -521,73 +524,137 @@ router.get(
 // ===== ADMIN USER MANAGEMENT ENDPOINTS =====
 
 /**
- * Get all users for management (Admin only)
+ * Get all users for management (Admin only) - Enhanced with device assignments
  * GET /api/hvnc/admin/users
  */
 router.get(
   "/admin/users",
   authenticateAdmin,
-  adminUserManagementController.getAllUsers,
+  enhancedAdminUserManagementController.getAllUsers,
 );
 
 /**
- * Get user details (Admin only)
+ * Get user details (Admin only) - Enhanced with device assignments
  * GET /api/hvnc/admin/users/:userId
  */
 router.get(
   "/admin/users/:userId",
   authenticateAdmin,
-  adminUserManagementController.getUserDetail,
+  enhancedAdminUserManagementController.getUserDetail,
 );
 
 /**
- * Create new user (Admin only)
+ * Create new user (Admin only) - Enhanced DTUser creation
  * POST /api/hvnc/admin/users
  */
 router.post(
   "/admin/users",
   authenticateAdmin,
-  adminUserManagementController.createUser,
+  enhancedAdminUserManagementController.createUser,
 );
 
 /**
- * Update user (Admin only)
+ * Update user (Admin only) - Enhanced DTUser updates
  * PUT /api/hvnc/admin/users/:userId
  */
 router.put(
   "/admin/users/:userId",
   authenticateAdmin,
-  adminUserManagementController.updateUser,
+  enhancedAdminUserManagementController.updateUser,
 );
 
 /**
- * Delete user (Admin only)
+ * Delete user (Admin only) - Enhanced with cleanup
  * DELETE /api/hvnc/admin/users/:userId
  */
 router.delete(
   "/admin/users/:userId",
   authenticateAdmin,
-  adminUserManagementController.deleteUser,
+  enhancedAdminUserManagementController.deleteUser,
 );
 
 /**
- * Reset user password (Admin only)
+ * Reset user password (Admin only) - Enhanced password reset
  * POST /api/hvnc/admin/users/:userId/reset-password
  */
 router.post(
   "/admin/users/:userId/reset-password",
   authenticateAdmin,
-  adminUserManagementController.resetUserPassword,
+  enhancedAdminUserManagementController.resetUserPassword,
 );
 
 /**
- * Unlock user account (Admin only)
- * POST /api/hvnc/admin/users/:userId/unlock
+ * Toggle user account lock status (Admin only) - Enhanced lock/unlock
+ * POST /api/hvnc/admin/users/:userId/toggle-lock
  */
 router.post(
-  "/admin/users/:userId/unlock",
+  "/admin/users/:userId/toggle-lock",
   authenticateAdmin,
-  adminUserManagementController.unlockUser,
+  enhancedAdminUserManagementController.toggleUserLock,
+);
+
+// ===== NEW DEVICE ASSIGNMENT ENDPOINTS =====
+
+/**
+ * Assign device to user (Admin only)
+ * POST /api/hvnc/admin/users/:userId/assign-device
+ */
+router.post(
+  "/admin/users/:userId/assign-device",
+  authenticateAdmin,
+  enhancedAdminUserManagementController.assignDeviceToUser,
+);
+
+/**
+ * Remove device assignment from user (Admin only)
+ * DELETE /api/hvnc/admin/users/:userId/device-assignments/:shiftId
+ */
+router.delete(
+  "/admin/users/:userId/device-assignments/:shiftId",
+  authenticateAdmin,
+  enhancedAdminUserManagementController.removeDeviceFromUser,
+);
+
+/**
+ * Get user session history (Admin only)
+ * GET /api/hvnc/admin/users/:userId/sessions
+ */
+router.get(
+  "/admin/users/:userId/sessions",
+  authenticateAdmin,
+  enhancedAdminUserManagementController.getUserSessions,
+);
+
+// ===== DEVICE MULTI-USER ASSIGNMENT ENDPOINTS =====
+
+/**
+ * Get all users assigned to a device (Admin only)
+ * GET /api/hvnc/admin/devices/:deviceId/users
+ */
+router.get(
+  "/admin/devices/:deviceId/users",
+  authenticateAdmin,
+  enhancedAdminUserManagementController.getDeviceUsers,
+);
+
+/**
+ * Assign multiple users to a device (Admin only)
+ * POST /api/hvnc/admin/devices/:deviceId/assign-multiple-users
+ */
+router.post(
+  "/admin/devices/:deviceId/assign-multiple-users",
+  authenticateAdmin,
+  enhancedAdminUserManagementController.assignMultipleUsersToDevice,
+);
+
+/**
+ * Get device schedule with all time slots (Admin only)
+ * GET /api/hvnc/admin/devices/:deviceId/schedule
+ */
+router.get(
+  "/admin/devices/:deviceId/schedule",
+  authenticateAdmin,
+  enhancedAdminUserManagementController.getDeviceSchedule,
 );
 
 // ===== USER PORTAL ENDPOINTS =====
@@ -673,5 +740,19 @@ router.post(
   authenticateAdmin,
   sessionManagementController.forceEndSession,
 );
+
+// ===== HUBSTAFF TIME TRACKING ENDPOINTS =====
+
+/**
+ * Hubstaff integration routes
+ * Includes:
+ * - POST /hubstaff/timer-update (PC Agent endpoint)
+ * - GET /admin/hubstaff/active-sessions (Admin monitoring)
+ * - GET /admin/hubstaff/user-sessions/:userId (Admin user history)
+ * - GET /admin/hubstaff/device-utilization/:deviceId (Admin analytics)
+ * - GET /admin/hubstaff/devices (Admin device status)
+ * - GET /user/hubstaff/my-sessions (User dashboard)
+ */
+router.use("/admin/hubstaff", hubstaffRoutes);
 
 module.exports = router;

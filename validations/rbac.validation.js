@@ -16,6 +16,15 @@ const mongoIdParamSchema = Joi.object({
   }),
 });
 
+const assignRoleToUserParamSchema = Joi.object({
+  id: mongoIdSchema.required().messages({
+    "any.required": "Role ID is required",
+  }),
+  userId: mongoIdSchema.required().messages({
+    "any.required": "User ID is required",
+  }),
+});
+
 const removePermissionsFromRoleSchema = Joi.object({
   permissions: Joi.array().items(mongoIdSchema).min(1).required().messages({
     "array.base": "permissions must be an array of permission IDs",
@@ -27,22 +36,6 @@ const removePermissionsFromRoleSchema = Joi.object({
 // ─────────────────────────────────────────────
 //  PERMISSION SCHEMAS
 // ─────────────────────────────────────────────
-const RESOURCES = [
-  "overview",
-  "annotators",
-  "assessments",
-  "projects",
-  "applications",
-  "payment",
-  "invoice",
-  "notifications",
-  "support_chat",
-  "user_roles",
-  "employees",
-  "settings",
-  "roles",
-  "permissions",
-];
 
 const ACTIONS = [
   "view",
@@ -53,7 +46,6 @@ const ACTIONS = [
   "approve",
   "manage",
 ];
-
 const permissionConsistencyValidator = (value, helpers) => {
   const { name, resource, action } = value || {};
   if (
@@ -73,11 +65,11 @@ const createPermissionSchema = Joi.object({
   name: Joi.string()
     .trim()
     .lowercase()
-    .pattern(/^[a-z_]+:[a-z_]+$/)
+    .pattern(/^[a-z0-9_ &]+:[a-z_]+$/)
     .required()
     .messages({
       "string.pattern.base":
-        "Permission name must follow the format resource:action (e.g. projects:view)",
+        "Permission name must follow the format resource:action (e.g. projects:view or roles & permissions:view)",
       "any.required": "Permission name is required",
     }),
   description: Joi.string().trim().max(300).optional().messages({
@@ -86,10 +78,10 @@ const createPermissionSchema = Joi.object({
   resource: Joi.string()
     .trim()
     .lowercase()
-    .valid(...RESOURCES)
+    .pattern(/^[a-z0-9_ &]+$/)
     .required()
     .messages({
-      "any.only": `Resource must be one of: ${RESOURCES.join(", ")}`,
+      "string.pattern.base": "Resource may include lowercase letters, numbers, underscores, spaces, and ampersands (e.g. 'roles & permissions')",
       "any.required": "Resource is required",
     }),
   action: Joi.string()
@@ -112,11 +104,11 @@ const updatePermissionSchema = Joi.object({
   name: Joi.string()
     .trim()
     .lowercase()
-    .pattern(/^[a-z_]+:[a-z_]+$/)
+    .pattern(/^[a-z0-9_ &]+:[a-z_]+$/)
     .optional()
     .messages({
       "string.pattern.base":
-        "Permission name must follow the format resource:action (e.g. projects:view)",
+        "Permission name must follow the format resource:action (e.g. projects:view or roles & permissions:view)",
     }),
   description: Joi.string().trim().max(300).optional().messages({
     "string.max": "Description must not exceed 300 characters",
@@ -124,10 +116,10 @@ const updatePermissionSchema = Joi.object({
   resource: Joi.string()
     .trim()
     .lowercase()
-    .valid(...RESOURCES)
+    .pattern(/^[a-z0-9_ &]+$/)
     .optional()
     .messages({
-      "any.only": `Resource must be one of: ${RESOURCES.join(", ")}`,
+      "string.pattern.base": "Resource may include lowercase letters, numbers, underscores, spaces, and ampersands (e.g. 'roles & permissions')",
     }),
   action: Joi.string()
     .trim()
@@ -197,6 +189,7 @@ module.exports = {
   createRoleSchema,
   updateRoleSchema,
   mongoIdParamSchema,
+  assignRoleToUserParamSchema,
 
   // Permission middleware
   validateCreatePermission: validateSchema(createPermissionSchema),
@@ -209,5 +202,9 @@ module.exports = {
   validateRoleId: validateSchema(mongoIdParamSchema, "params"),
   validateRemovePermissionsFromRole: validateSchema(
     removePermissionsFromRoleSchema,
+  ),
+  validateAssignRoleToUserParams: validateSchema(
+    assignRoleToUserParamSchema,
+    "params",
   ),
 };
