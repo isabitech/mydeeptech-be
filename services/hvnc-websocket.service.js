@@ -94,58 +94,58 @@ const initializeHVNCSocket = (server) => {
     userNamespace = io.of("/hvnc-user");
 
     // DEBUG: Verify namespaces are created
-    console.log("✅ HVNC namespaces created:");
-    console.log(
-      "   /hvnc-device namespace:",
-      deviceNamespace ? "CREATED" : "FAILED",
-    );
-    console.log(
-      "   /hvnc-admin namespace:",
-      adminNamespace ? "CREATED" : "FAILED",
-    );
-    console.log(
-      "   /hvnc-user namespace:",
-      userNamespace ? "CREATED" : "FAILED",
-    );
+    // console.log("✅ HVNC namespaces created:");
+    // console.log(
+    //   "   /hvnc-device namespace:",
+    //   deviceNamespace ? "CREATED" : "FAILED",
+    // );
+    // console.log(
+    //   "   /hvnc-admin namespace:",
+    //   adminNamespace ? "CREATED" : "FAILED",
+    // );
+    // console.log(
+    //   "   /hvnc-user namespace:",
+    //   userNamespace ? "CREATED" : "FAILED",
+    // );
 
     // DEBUG: Log all namespaces on the main Socket.IO instance
     console.log("📋 All Socket.IO namespaces:");
     if (io._nsps) {
-      console.log("   _nsps keys:", Object.keys(io._nsps));
-      console.log("   _nsps Map size:", io._nsps.size || "undefined");
+      // console.log("   _nsps keys:", Object.keys(io._nsps));
+      // console.log("   _nsps Map size:", io._nsps.size || "undefined");
       // Try to iterate through _nsps if it's a Map
       if (typeof io._nsps.forEach === "function") {
-        console.log("   _nsps Map contents:");
+        // console.log("   _nsps Map contents:");
         io._nsps.forEach((namespace, key) => {
           console.log(`     "${key}": ${namespace ? "EXISTS" : "NULL"}`);
         });
       }
     }
     if (io.sockets && io.sockets.adapter && io.sockets.adapter.nsp) {
-      console.log("   adapter.nsp keys:", Object.keys(io.sockets.adapter.nsp));
+      // console.log("   adapter.nsp keys:", Object.keys(io.sockets.adapter.nsp));
     }
-    console.log(
-      "   io.of('/hvnc-device') test:",
-      io.of("/hvnc-device") ? "EXISTS" : "FAILED",
-    );
+    // console.log(
+    //   "   io.of('/hvnc-device') test:",
+    //   io.of("/hvnc-device") ? "EXISTS" : "FAILED",
+    // );
 
     // Ensure namespaces are properly registered by re-referencing them
     const testDeviceNamespace = io.of("/hvnc-device");
-    console.log(
-      "   Re-referenced /hvnc-device:",
-      testDeviceNamespace ? "SUCCESS" : "FAILED",
-    );
+    // console.log(
+    //   "   Re-referenced /hvnc-device:",
+    //   testDeviceNamespace ? "SUCCESS" : "FAILED",
+    // );
 
     // DEBUG: Force namespace registration in _nsps Map
     if (io._nsps && typeof io._nsps.set === "function") {
-      console.log("🔧 FORCE REGISTERING NAMESPACES IN _nsps Map...");
+      // console.log("🔧 FORCE REGISTERING NAMESPACES IN _nsps Map...");
       io._nsps.set("/hvnc-device", deviceNamespace);
       io._nsps.set("/hvnc-admin", adminNamespace);
       io._nsps.set("/hvnc-user", userNamespace);
-      console.log(
-        "   Force registration complete. New _nsps size:",
-        io._nsps.size,
-      );
+      // console.log(
+      //   "   Force registration complete. New _nsps size:",
+      //   io._nsps.size,
+      // );
     }
 
     // DEBUG: Add namespace connection event logging
@@ -161,33 +161,33 @@ const initializeHVNCSocket = (server) => {
   // Device authentication middleware - JWT validation
   deviceNamespace.use(async (socket, next) => {
     try {
-      console.log("🔐 HVNC Device authentication middleware triggered");
-      console.log("   Socket ID:", socket.id);
-      console.log("   Remote address:", socket.handshake.address);
+      // console.log("🔐 HVNC Device authentication middleware triggered");
+      // console.log("   Socket ID:", socket.id);
+      // console.log("   Remote address:", socket.handshake.address);
 
       // Get JWT token from query params
       const token = socket.handshake.query.token;
-      console.log("   Token provided:", token ? "YES" : "NO");
+      // console.log("   Token provided:", token ? "YES" : "NO");
 
       if (!token) {
-        console.log("   ❌ No token provided");
+        // console.log("   ❌ No token provided");
         return next(new Error("Device authentication token required"));
       }
 
       // Check if JWT secret is available
       if (!envConfig?.jwt?.JWT_SECRET) {
-        console.error("   ❌ JWT_SECRET not configured");
+        // console.error("   ❌ JWT_SECRET not configured");
         return next(new Error("Server authentication configuration error"));
       }
 
       // Verify JWT token
       const decoded = jwt.verify(token, envConfig.jwt.JWT_SECRET);
-      console.log("   ✅ JWT decoded successfully");
-      console.log("   Device ID:", decoded.device_id);
-      console.log("   Token type:", decoded.type);
+      // console.log("   ✅ JWT decoded successfully");
+      // console.log("   Device ID:", decoded.device_id);
+      // console.log("   Token type:", decoded.type);
 
       if (decoded.type !== "device") {
-        console.log("   ❌ Invalid token type:", decoded.type);
+        // console.log("   ❌ Invalid token type:", decoded.type);
         return next(new Error("Invalid device token"));
       }
 
@@ -199,7 +199,7 @@ const initializeHVNCSocket = (server) => {
       };
       socket.authToken = token;
 
-      console.log("   ✅ Device authenticated:", decoded.device_id);
+      // console.log("   ✅ Device authenticated:", decoded.device_id);
       return next();
     } catch (error) {
       console.log("   ❌ Authentication failed:", error.message);
@@ -208,10 +208,10 @@ const initializeHVNCSocket = (server) => {
     }
   });
 
-  console.log(
-    "📋 Device namespace middleware attached:",
-    typeof deviceNamespace.use === "function" ? "SUCCESS" : "FAILED",
-  );
+  // console.log(
+  //   "📋 Device namespace middleware attached:",
+  //   typeof deviceNamespace.use === "function" ? "SUCCESS" : "FAILED",
+  // );
 
   // Admin authentication middleware
   adminNamespace.use(async (socket, next) => {
@@ -284,8 +284,8 @@ const initializeHVNCSocket = (server) => {
   // Device connection handling - database validation
   deviceNamespace.on("connection", async (socket) => {
     try {
-      console.log(`🔌 Device WebSocket connected - starting validation...`);
-      console.log(`   Device ID from auth: ${socket.deviceAuth?.device_id}`);
+      // console.log(`🔌 Device WebSocket connected - starting validation...`);
+      // console.log(`   Device ID from auth: ${socket.deviceAuth?.device_id}`);
 
       // Perform database validation for all devices
 
@@ -298,9 +298,9 @@ const initializeHVNCSocket = (server) => {
         return;
       }
 
-      console.log("🔍 Looking up device in database...");
-      console.log("   Device ID from token:", decoded.device_id);
-      console.log("   Object ID from token:", decoded.id);
+      // console.log("🔍 Looking up device in database...");
+      // console.log("   Device ID from token:", decoded.device_id);
+      // console.log("   Object ID from token:", decoded.id);
 
       // Try to find device by both ObjectId and device_id for safety
       let device;
@@ -312,15 +312,15 @@ const initializeHVNCSocket = (server) => {
         // If not found by ObjectId, try by device_id
         if (!device) {
           device = await HVNCDevice.findOne({ device_id: decoded.device_id });
-          console.log(
-            "📊 Fallback lookup by device_id:",
-            device ? "FOUND" : "NOT FOUND",
-          );
+          // console.log(
+          //   "📊 Fallback lookup by device_id:",
+          //   device ? "FOUND" : "NOT FOUND",
+          // );
         } else {
-          console.log(
-            "📊 Database lookup by ObjectId:",
-            device ? "FOUND" : "NOT FOUND",
-          );
+          // console.log(
+          //   "📊 Database lookup by ObjectId:",
+          //   device ? "FOUND" : "NOT FOUND",
+          // );
         }
       } catch (dbError) {
         console.error("❌ Database lookup error:", dbError.message);
@@ -330,9 +330,9 @@ const initializeHVNCSocket = (server) => {
       }
 
       if (!device || device.device_id !== decoded.device_id) {
-        console.log("❌ Device validation failed");
-        console.log("   Database device:", device ? device.device_id : "NULL");
-        console.log("   Token device_id:", decoded.device_id);
+        // console.log("❌ Device validation failed");
+        // console.log("   Database device:", device ? device.device_id : "NULL");
+        // console.log("   Token device_id:", decoded.device_id);
         socket.emit("auth_error", { message: "Device not found or invalid" });
         socket.disconnect();
         return;
@@ -349,9 +349,9 @@ const initializeHVNCSocket = (server) => {
       socket.deviceId = device.device_id;
       socket.device = device;
 
-      console.log(
-        `✅ Device fully authenticated: ${device.pc_name} (${device.device_id})`,
-      );
+      // console.log(
+      //   `✅ Device fully authenticated: ${device.pc_name} (${device.device_id})`,
+      // );
 
       // Store device connection
       connectedDevices.set(device.device_id, {
@@ -386,9 +386,9 @@ const initializeHVNCSocket = (server) => {
         socketId: socket.id,
       });
 
-      console.log(
-        `📤 Sent 'authenticated' event to device ${device.device_id}`,
-      );
+      // console.log(
+      //   `📤 Sent 'authenticated' event to device ${device.device_id}`,
+      // );
 
       // Log device connection
       HVNCActivityLog.logDeviceEvent(
