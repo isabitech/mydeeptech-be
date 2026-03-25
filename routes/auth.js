@@ -28,7 +28,8 @@ const {
   getUserResultSubmissions, 
   uploadIdDocument, 
   uploadResume, 
-  getProjectGuidelines 
+  getProjectGuidelines, 
+  me
 } = require("../controllers/dtUser.controller.js");
 const { authenticateToken, authorizeProfileAccess } = require('../middleware/auth.js');
 
@@ -86,6 +87,7 @@ router.post("/createDTuser", createDTUser);
 router.get("/verifyDTusermail/:id", verifyEmail);
 router.post("/setupPassword", setupPassword);
 router.post("/dtUserLogin", dtUserLogin);
+router.get("/me", authenticateToken, me);
 router.post("/resendVerificationEmail", resendVerificationEmail);
 router.get("/dtUserProfile/:userId", authenticateToken, authorizeProfileAccess, getDTUserProfile);
 router.patch("/dtUserProfile/:userId", authenticateToken, authorizeProfileAccess, updateDTUserProfile);
