@@ -4,7 +4,7 @@ const DTUser = require("../models/dtUser.model");
 const Role = require("../models/roles.model");
 const dns = require("node:dns");
 dns.setServers(["8.8.8.8", "8.8.4.4"]);
-
+const email = "shina_bedev@mydeeptech.ng";
 const assignSuperAdmin = async (email) => {
   try {
     console.log(`\n🚀 Starting super_admin assignment for: ${email}`);

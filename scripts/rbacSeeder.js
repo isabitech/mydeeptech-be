@@ -13,7 +13,7 @@ const PERMISSIONS = SYSTEM_PERMISSIONS;
 
 // ─── 2. DEFINE ROLES WITH THEIR PERMISSION SETS ───────────────────────────────
 const ROLE_PERMISSIONS = {
-  super_admin: SYSTEM_PERMISSIONS.map(p => p.name),
+  super_admin: SYSTEM_PERMISSIONS.map((p) => p.name),
 
   executives: [
     "overview:view",
@@ -176,8 +176,15 @@ function getRoleDescription(roleName) {
 // ─── 5. RUN ───────────────────────────────────────────────────────────────────
 // Run directly: node seeders/rbacSeeder.js
 if (require.main === module) {
-  const MONGO_URI =
-    process.env.MONGO_URI || "mongodb://localhost:27017/your_db";
+  const mongoUri = process.env.MONGO_URI;
+  const directMongoUri =
+    process.env.MONGO_URI_DIRECT || process.env.MONGODB_URI;
+
+  if (!mongoUri && !directMongoUri) {
+    throw new Error("MONGO_URI is missing in environment variables");
+  }
+
+  const MONGO_URI = mongoUri || directMongoUri;
 
   mongoose
     .connect(MONGO_URI)

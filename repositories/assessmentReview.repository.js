@@ -7,13 +7,39 @@ class AssessmentReviewRepository {
     return await submission.save();
   }
 
-  async findAllPaginated({ page, limit, sort }) {
+  async findAllPaginated({ page, limit, sort, search }) {
+    const filter = {};
+
+    if (search) {
+      filter.$or = [
+        { fullName: { $regex: search, $options: "i" } },
+        { emailAddress: { $regex: search, $options: "i" } },
+        { googleDriveLink: { $regex: search, $options: "i" } },
+      ];
+    }
+
     const skip = (page - 1) * limit;
 
-    const [assessmentReviews, total] = await Promise.all([
-      AssessmentReview.find().sort(sort).skip(skip).limit(limit).lean(),
-      AssessmentReview.countDocuments(),
+    const [assessmentReviewsRaw, total] = await Promise.all([
+      AssessmentReview.find(filter)
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+        .populate({ path: "userId", select: "attachments.resume_url" })
+        .lean(),
+      AssessmentReview.countDocuments(filter),
     ]);
+
+    const assessmentReviews = assessmentReviewsRaw.map((review) => {
+      const resumeUrl = review?.userId?.attachments?.resume_url || "";
+      const normalizedUserId = review?.userId?._id || review.userId;
+
+      return {
+        ...review,
+        userId: normalizedUserId,
+        resume_url: resumeUrl,
+      };
+    });
 
     return { assessmentReviews, total };
   }
@@ -21,14 +47,26 @@ class AssessmentReviewRepository {
   async findByUserIdPaginated({ userId, page, limit, sort }) {
     const skip = (page - 1) * limit;
 
-    const [assessmentReviews, total] = await Promise.all([
+    const [assessmentReviewsRaw, total] = await Promise.all([
       AssessmentReview.find({ userId })
         .sort(sort)
         .skip(skip)
         .limit(limit)
+        .populate({ path: "userId", select: "attachments.resume_url" })
         .lean(),
       AssessmentReview.countDocuments({ userId }),
     ]);
+
+    const assessmentReviews = assessmentReviewsRaw.map((review) => {
+      const resumeUrl = review?.userId?.attachments?.resume_url || "";
+      const normalizedUserId = review?.userId?._id || review.userId;
+
+      return {
+        ...review,
+        userId: normalizedUserId,
+        resume_url: resumeUrl,
+      };
+    });
 
     return { assessmentReviews, total };
   }
