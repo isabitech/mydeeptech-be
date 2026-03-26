@@ -109,10 +109,10 @@ class AssessmentReviewController {
         ...(req.body.submissionStatus && {
           submissionStatus: req.body.submissionStatus,
         }),
-        ...(req.body.englishTestScore && {
+        ...(req.body.englishTestScore !== undefined && {
           englishTestScore: req.body.englishTestScore,
         }),
-        ...(req.body.problemSolvingScore && {
+        ...(req.body.problemSolvingScore !== undefined && {
           problemSolvingScore: req.body.problemSolvingScore,
         }),
         ...(req.body.googleDriveLink && {

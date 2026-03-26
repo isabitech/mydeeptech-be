@@ -190,15 +190,15 @@ const updateSubmissionSchema = Joi.object({
     }),
   }).optional(),
 
-  englishTestScore: Joi.string().trim().min(1).max(20).optional().messages({
-    "string.min": "English test score is required",
-    "string.max": "English test score must not exceed 20 characters",
-  }),
+  englishTestScore: Joi.alternatives()
+    .try(Joi.string().trim().max(20), Joi.number())
+    .optional()
+    .allow("", null),
 
-  problemSolvingScore: Joi.string().trim().min(1).max(20).optional().messages({
-    "string.min": "Problem solving score is required",
-    "string.max": "Problem solving score must not exceed 20 characters",
-  }),
+  problemSolvingScore: Joi.alternatives()
+    .try(Joi.string().trim().max(20), Joi.number())
+    .optional()
+    .allow("", null),
 
   googleDriveLink: Joi.string().trim().uri().max(500).optional().messages({
     "string.uri": "Please provide a valid Google Drive link",
@@ -279,7 +279,6 @@ const updateSubmissionSchema = Joi.object({
   })
     .optional()
     .allow(null)
-    .custom(validateReviewRating, "band alignment check")
     .messages({
       "object.base": "reviewRating must be an object",
       "any.custom": "{{#message}}",
