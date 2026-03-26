@@ -45,11 +45,20 @@ const pickDefined = (source, allowedKeys) => {
   return output;
 };
 
-const applyReviewScoring = (payload, body) => {
-  const hasEnglishScore = body.englishTestScore !== undefined;
-  const hasProblemScore = body.problemSolvingScore !== undefined;
-  const englishScore = Number(body.englishTestScore);
-  const problemScore = Number(body.problemSolvingScore);
+const applyReviewScoring = (payload, body, existingSubmission) => {
+  const resolvedEnglishScore =
+    body.englishTestScore !== undefined
+      ? Number(body.englishTestScore)
+      : existingSubmission?.englishTestScore;
+  const resolvedProblemScore =
+    body.problemSolvingScore !== undefined
+      ? Number(body.problemSolvingScore)
+      : existingSubmission?.problemSolvingScore;
+
+  const hasEnglishScore = resolvedEnglishScore !== undefined;
+  const hasProblemScore = resolvedProblemScore !== undefined;
+  const englishScore = Number(resolvedEnglishScore);
+  const problemScore = Number(resolvedProblemScore);
   const scoresAreFinite =
     Number.isFinite(englishScore) && Number.isFinite(problemScore);
 
@@ -201,7 +210,7 @@ class AssessmentReviewService {
     return await assessmentReviewRepository.update(id, data);
   }
 
-  buildUpdatePayload(body, reviewerId) {
+  buildUpdatePayload(body, reviewerId, existingSubmission) {
     const payload = {
       ...pickDefined(body, UPDATE_FIELDS),
     };
@@ -212,12 +221,19 @@ class AssessmentReviewService {
 
     payload.reviewStatus = "Reviewed";
 
-    return applyReviewScoring(payload, body);
+    return applyReviewScoring(payload, body, existingSubmission);
   }
 
   async updateSubmissionFromRequest({ id, body, reviewerId }) {
-    const payload = this.buildUpdatePayload(body, reviewerId);
-    return this.updateSubmission(id, payload);
+    const submission = await assessmentReviewRepository.findById(id);
+    if (!submission) {
+      const error = new Error("Submission not found.");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const payload = this.buildUpdatePayload(body, reviewerId, submission);
+    return assessmentReviewRepository.update(id, payload);
   }
 
   async deleteSubmission(id) {
