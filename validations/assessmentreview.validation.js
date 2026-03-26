@@ -16,13 +16,6 @@ function validateReviewRating(value, helpers) {
 
   const { grade, score, level } = value;
 
-  // If grade/level is provided, score must be present to validate band alignment.
-  if ((grade || level) && (score === undefined || score === null)) {
-    return helpers.error("any.custom", {
-      message: "score is required when grade or level is provided",
-    });
-  }
-
   // If score is provided, ensure it sits in a defined band and other fields align.
   if (score !== undefined && score !== null) {
     const band = BRITISH_COUNCIL_BANDS.find(
@@ -190,15 +183,17 @@ const updateSubmissionSchema = Joi.object({
     }),
   }).optional(),
 
-  englishTestScore: Joi.alternatives()
-    .try(Joi.string().trim().max(20), Joi.number())
-    .optional()
-    .allow("", null),
+  englishTestScore: Joi.number().min(0).max(599).optional().messages({
+    "number.base": "English test score must be a number",
+    "number.min": "English test score must be at least 0",
+    "number.max": "English test score must not exceed 599",
+  }),
 
-  problemSolvingScore: Joi.alternatives()
-    .try(Joi.string().trim().max(20), Joi.number())
-    .optional()
-    .allow("", null),
+  problemSolvingScore: Joi.number().min(0).max(599).optional().messages({
+    "number.base": "Problem solving score must be a number",
+    "number.min": "Problem solving score must be at least 0",
+    "number.max": "Problem solving score must not exceed 599",
+  }),
 
   googleDriveLink: Joi.string().trim().uri().max(500).optional().messages({
     "string.uri": "Please provide a valid Google Drive link",
@@ -281,7 +276,6 @@ const updateSubmissionSchema = Joi.object({
     .allow(null)
     .messages({
       "object.base": "reviewRating must be an object",
-      "any.custom": "{{#message}}",
     }),
 })
   .min(1)
