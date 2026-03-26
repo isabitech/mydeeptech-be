@@ -111,42 +111,35 @@ class AssessmentReviewController {
 
   async update(req, res, next) {
     try {
+      const {
+        fullName,
+        emailAddress,
+        dateOfSubmission,
+        timeOfSubmission,
+        submissionStatus,
+        englishTestScore,
+        problemSolvingScore,
+        googleDriveLink,
+        encounteredIssues,
+        issueDescription,
+        instructionClarityRating,
+        reviewerComment,
+        reviewRating,
+      } = req.body;
       const payload = {
-        ...(req.body.fullName && { fullName: req.body.fullName }),
-        ...(req.body.emailAddress && { emailAddress: req.body.emailAddress }),
-        ...(req.body.dateOfSubmission && {
-          dateOfSubmission: req.body.dateOfSubmission,
-        }),
-        ...(req.body.timeOfSubmission && {
-          timeOfSubmission: req.body.timeOfSubmission,
-        }),
-        ...(req.body.submissionStatus && {
-          submissionStatus: req.body.submissionStatus,
-        }),
-        ...(req.body.englishTestScore !== undefined && {
-          englishTestScore: req.body.englishTestScore,
-        }),
-        ...(req.body.problemSolvingScore !== undefined && {
-          problemSolvingScore: req.body.problemSolvingScore,
-        }),
-        ...(req.body.googleDriveLink && {
-          googleDriveLink: req.body.googleDriveLink,
-        }),
-        ...(req.body.encounteredIssues !== undefined && {
-          encounteredIssues: req.body.encounteredIssues,
-        }),
-        ...(req.body.issueDescription !== undefined && {
-          issueDescription: req.body.issueDescription,
-        }),
-        ...(req.body.instructionClarityRating !== undefined && {
-          instructionClarityRating: req.body.instructionClarityRating,
-        }),
-        ...(req.body.reviewerComment !== undefined && {
-          reviewerComment: req.body.reviewerComment,
-        }),
-        ...(req.body.reviewRating !== undefined && {
-          reviewRating: req.body.reviewRating,
-        }),
+        ...(fullName && { fullName }),
+        ...(emailAddress && { emailAddress }),
+        ...(dateOfSubmission && { dateOfSubmission }),
+        ...(timeOfSubmission && { timeOfSubmission }),
+        ...(submissionStatus && { submissionStatus }),
+        ...(englishTestScore && { englishTestScore }),
+        ...(problemSolvingScore && { problemSolvingScore }),
+        ...(googleDriveLink && { googleDriveLink }),
+        ...(encounteredIssues && { encounteredIssues }),
+        ...(issueDescription && { issueDescription }),
+        ...(instructionClarityRating && { instructionClarityRating }),
+        ...(reviewerComment && { reviewerComment }),
+        ...(reviewRating && { reviewRating }),
       };
 
       // Automatically assign the authenticated user's ID as the reviewer
