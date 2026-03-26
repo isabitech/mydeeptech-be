@@ -18,12 +18,13 @@ class AssessmentReviewService {
     return assessmentSubmission;
   }
 
-  async getAllSubmissions({ page, limit, sort }) {
+  async getAllSubmissions({ page, limit, sort, search }) {
     const { assessmentReviews, total } =
       await assessmentReviewRepository.findAllPaginated({
         page,
         limit,
         sort,
+        search,
       });
 
     return {

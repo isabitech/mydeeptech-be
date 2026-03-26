@@ -7,17 +7,27 @@ class AssessmentReviewRepository {
     return await submission.save();
   }
 
-  async findAllPaginated({ page, limit, sort }) {
+  async findAllPaginated({ page, limit, sort, search }) {
+    const filter = {};
+
+    if (search) {
+      filter.$or = [
+        { fullName: { $regex: search, $options: "i" } },
+        { emailAddress: { $regex: search, $options: "i" } },
+        { googleDriveLink: { $regex: search, $options: "i" } },
+      ];
+    }
+
     const skip = (page - 1) * limit;
 
     const [assessmentReviewsRaw, total] = await Promise.all([
-      AssessmentReview.find()
+      AssessmentReview.find(filter)
         .sort(sort)
         .skip(skip)
         .limit(limit)
         .populate({ path: "userId", select: "attachments.resume_url" })
         .lean(),
-      AssessmentReview.countDocuments(),
+      AssessmentReview.countDocuments(filter),
     ]);
 
     const assessmentReviews = assessmentReviewsRaw.map((review) => {

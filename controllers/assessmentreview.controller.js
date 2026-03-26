@@ -56,10 +56,15 @@ class AssessmentReviewController {
       const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
       const limitRaw = parseInt(req.query.limit, 10) || 20;
       const limit = Math.min(Math.max(limitRaw, 1), 100);
+      const search =
+        typeof req.query.search === "string" && req.query.search.trim()
+          ? req.query.search.trim()
+          : undefined;
       const submissions = await AssessmentReviewService.getAllSubmissions({
         page,
         limit,
         sort: { createdAt: -1 },
+        search,
       });
       return ResponseClass.Success(res, {
         message: "Submissions fetched successfully",
