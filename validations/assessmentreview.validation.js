@@ -239,41 +239,45 @@ const updateSubmissionSchema = Joi.object({
       "string.max": "Reviewer comment must not exceed 2000 characters",
     }),
 
-
-  reviewRating: Joi.object({
-    grade: Joi.string()
-      .valid("Pre-A1", "A1", "A2", "B1", "B2", "C1")
-      .optional()
-      .allow(null)
-      .messages({
-        "any.only": "grade must be one of: Pre-A1, A1, A2, B1, B2, C1",
+  reviewRating: Joi.alternatives()
+    .try(
+      Joi.string().valid("Pre-A1", "A1", "A2", "B1", "B2", "C1").messages({
+        "any.only": "reviewRating must be one of: Pre-A1, A1, A2, B1, B2, C1",
       }),
-    score: Joi.number().min(0).max(599).optional().allow(null).messages({
-      "number.base": "score must be a number",
-      "number.min": "score must be between 0 and 599",
-      "number.max": "score must be between 0 and 599",
-    }),
-    level: Joi.string()
-      .valid(
-        "Beginner",
-        "Elementary",
-        "Pre Intermediate",
-        "Intermediate",
-        "Upper Intermediate",
-        "Advanced",
-      )
-      .optional()
-      .allow(null)
-      .messages({
-        "any.only":
-          "level must be one of: Beginner, Elementary, Pre Intermediate, Intermediate, Upper Intermediate, Advanced",
+      Joi.object({
+        grade: Joi.string()
+          .valid("Pre-A1", "A1", "A2", "B1", "B2", "C1")
+          .optional()
+          .allow(null)
+          .messages({
+            "any.only": "grade must be one of: Pre-A1, A1, A2, B1, B2, C1",
+          }),
+        score: Joi.number().min(0).max(599).optional().allow(null).messages({
+          "number.base": "score must be a number",
+          "number.min": "score must be between 0 and 599",
+          "number.max": "score must be between 0 and 599",
+        }),
+        level: Joi.string()
+          .valid(
+            "Beginner",
+            "Elementary",
+            "Pre Intermediate",
+            "Intermediate",
+            "Upper Intermediate",
+            "Advanced",
+          )
+          .optional()
+          .allow(null)
+          .messages({
+            "any.only":
+              "level must be one of: Beginner, Elementary, Pre Intermediate, Intermediate, Upper Intermediate, Advanced",
+          }),
+      }).messages({
+        "object.base": "reviewRating must be an object",
       }),
-  })
+    )
     .optional()
-    .allow(null)
-    .messages({
-      "object.base": "reviewRating must be an object",
-    }),
+    .allow(null),
 })
   .min(1)
   .messages({

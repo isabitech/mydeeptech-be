@@ -1,15 +1,6 @@
 const AssessmentReviewService = require("../services/assessmentreview.service");
 const ResponseClass = require("../utils/response-handler");
 
-const BRITISH_COUNCIL_BANDS = [
-  { grade: "Pre-A1", level: "Beginner", min: 0, max: 99 },
-  { grade: "A1", level: "Elementary", min: 100, max: 199 },
-  { grade: "A2", level: "Pre Intermediate", min: 200, max: 299 },
-  { grade: "B1", level: "Intermediate", min: 300, max: 399 },
-  { grade: "B2", level: "Upper Intermediate", min: 400, max: 499 },
-  { grade: "C1", level: "Advanced", min: 500, max: 599 },
-];
-
 class AssessmentReviewController {
   async create(req, res, next) {
     try {
@@ -111,70 +102,12 @@ class AssessmentReviewController {
 
   async update(req, res, next) {
     try {
-      const {
-        fullName,
-        emailAddress,
-        dateOfSubmission,
-        timeOfSubmission,
-        submissionStatus,
-        englishTestScore,
-        problemSolvingScore,
-        googleDriveLink,
-        encounteredIssues,
-        issueDescription,
-        instructionClarityRating,
-        reviewerComment,
-        reviewRating,
-      } = req.body;
-      const payload = {
-        ...(fullName && { fullName }),
-        ...(emailAddress && { emailAddress }),
-        ...(dateOfSubmission && { dateOfSubmission }),
-        ...(timeOfSubmission && { timeOfSubmission }),
-        ...(submissionStatus && { submissionStatus }),
-        ...(englishTestScore && { englishTestScore }),
-        ...(problemSolvingScore && { problemSolvingScore }),
-        ...(googleDriveLink && { googleDriveLink }),
-        ...(encounteredIssues && { encounteredIssues }),
-        ...(issueDescription && { issueDescription }),
-        ...(instructionClarityRating && { instructionClarityRating }),
-        ...(reviewerComment && { reviewerComment }),
-        ...(reviewRating && { reviewRating }),
-      };
-
-      // Automatically assign the authenticated user's ID as the reviewer
-      if (
-        req.body.reviewerComment !== undefined ||
-        req.body.reviewRating !== undefined
-      ) {
-        payload.reviewerId = req.user?.userId;
-      }
-
-      payload.reviewStatus = "Reviewed";
-      // If both component scores are present, compute total and attach to reviewRating
-      const hasEnglishScore = req.body.englishTestScore !== undefined;
-      const hasProblemScore = req.body.problemSolvingScore !== undefined;
-      if (hasEnglishScore && hasProblemScore) {
-        const englishScore = Number(req.body.englishTestScore);
-        const problemScore = Number(req.body.problemSolvingScore);
-        if (Number.isFinite(englishScore) && Number.isFinite(problemScore)) {
-          const totalScore = englishScore + problemScore;
-          const band = BRITISH_COUNCIL_BANDS.find(
-            (b) => totalScore >= b.min && totalScore <= b.max,
-          );
-
-          payload.reviewRating = {
-            ...(payload.reviewRating || {}),
-            score: totalScore,
-            ...(band ? { grade: band.grade, level: band.level } : {}),
-          };
-        }
-      }
-
-      const submission = await AssessmentReviewService.updateSubmission(
-        req.params.id,
-        payload,
-      );
+      const submission =
+        await AssessmentReviewService.updateSubmissionFromRequest({
+          id: req.params.id,
+          body: req.body,
+          reviewerId: req.user?.userId,
+        });
       return ResponseClass.Success(res, {
         message: "Submission updated successfully",
         data: submission,
