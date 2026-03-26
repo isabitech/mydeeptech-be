@@ -239,9 +239,6 @@ const updateSubmissionSchema = Joi.object({
       "string.max": "Reviewer comment must not exceed 2000 characters",
     }),
 
-  reviewStatus: Joi.string().valid("Pending", "Reviewed").optional().messages({
-    "any.only": "Review status must be either 'Pending' or 'Reviewed'",
-  }),
 
   reviewRating: Joi.object({
     grade: Joi.string()

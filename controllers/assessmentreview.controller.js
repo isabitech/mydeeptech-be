@@ -139,9 +139,6 @@ class AssessmentReviewController {
         ...(req.body.reviewerComment !== undefined && {
           reviewerComment: req.body.reviewerComment,
         }),
-        ...(req.body.reviewStatus !== undefined && {
-          reviewStatus: req.body.reviewStatus,
-        }),
         ...(req.body.reviewRating !== undefined && {
           reviewRating: req.body.reviewRating,
         }),
@@ -150,12 +147,12 @@ class AssessmentReviewController {
       // Automatically assign the authenticated user's ID as the reviewer
       if (
         req.body.reviewerComment !== undefined ||
-        req.body.reviewStatus !== undefined ||
         req.body.reviewRating !== undefined
       ) {
         payload.reviewerId = req.user?.userId;
       }
 
+      payload.reviewStatus = "Reviewed";
       // If both component scores are present, compute total and attach to reviewRating
       const hasEnglishScore = req.body.englishTestScore !== undefined;
       const hasProblemScore = req.body.problemSolvingScore !== undefined;
