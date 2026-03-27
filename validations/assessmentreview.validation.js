@@ -234,7 +234,7 @@ const updateSubmissionSchema = Joi.object({
     .trim()
     .max(2000)
     .optional()
-    .allow(null)
+    .allow(null, '')
     .messages({
       "string.max": "Reviewer comment must not exceed 2000 characters",
     }),

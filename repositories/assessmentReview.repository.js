@@ -26,6 +26,7 @@ class AssessmentReviewRepository {
         .skip(skip)
         .limit(limit)
         .populate({ path: "userId", select: "attachments.resume_url" })
+        .populate({ path: "reviewerId", select: "fullName email role" })
         .lean(),
       AssessmentReview.countDocuments(filter),
     ]);
@@ -53,6 +54,7 @@ class AssessmentReviewRepository {
         .skip(skip)
         .limit(limit)
         .populate({ path: "userId", select: "attachments.resume_url" })
+        .populate({ path: "reviewerId", select: "fullName email role" })
         .lean(),
       AssessmentReview.countDocuments({ userId }),
     ]);
@@ -72,7 +74,9 @@ class AssessmentReviewRepository {
   }
 
   async findById(id) {
-    return await AssessmentReview.findById(id).lean();
+    return await AssessmentReview.findById(id)
+      .populate({ path: "reviewerId", select: "fullName email role" })
+      .lean();
   }
 
   async findByEmail(email) {
@@ -90,7 +94,9 @@ class AssessmentReviewRepository {
     return await AssessmentReview.findByIdAndUpdate(id, data, {
       new: true,
       runValidators: true,
-    }).lean();
+    })
+      .populate({ path: "reviewerId", select: "fullName email role" })
+      .lean();
   }
 
   async delete(id) {

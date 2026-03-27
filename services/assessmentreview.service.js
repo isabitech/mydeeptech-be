@@ -67,24 +67,15 @@ const applyReviewScoring = (payload, body, existingSubmission) => {
       ? englishScore + problemScore
       : undefined;
 
-  // Honor explicit reviewRating if provided, but override score with computed total when available.
+  // Honor explicit reviewRating if provided
   if (body.reviewRating !== undefined) {
     if (typeof body.reviewRating === "string") {
       const preset = REVIEW_RATING_PRESETS[body.reviewRating];
-      const band =
-        totalScore !== undefined
-          ? BRITISH_COUNCIL_BANDS.find(
-              (b) => totalScore >= b.min && totalScore <= b.max,
-            )
-          : undefined;
 
       payload.reviewRating = {
         ...(preset
           ? { grade: preset.grade, level: preset.level }
           : { grade: body.reviewRating }),
-        ...(band && totalScore !== undefined
-          ? { grade: band.grade, level: band.level }
-          : {}),
         ...(totalScore !== undefined
           ? { score: totalScore }
           : preset
@@ -98,19 +89,10 @@ const applyReviewScoring = (payload, body, existingSubmission) => {
       const preset = body.reviewRating.grade
         ? REVIEW_RATING_PRESETS[body.reviewRating.grade]
         : undefined;
-      const band =
-        totalScore !== undefined
-          ? BRITISH_COUNCIL_BANDS.find(
-              (b) => totalScore >= b.min && totalScore <= b.max,
-            )
-          : undefined;
 
       payload.reviewRating = {
         ...body.reviewRating,
         ...(preset ? { level: preset.level } : {}),
-        ...(band && totalScore !== undefined
-          ? { grade: band.grade, level: band.level }
-          : {}),
         ...(totalScore !== undefined
           ? { score: totalScore }
           : preset
@@ -121,14 +103,17 @@ const applyReviewScoring = (payload, body, existingSubmission) => {
     }
   }
 
+  // Only auto-calculate reviewRating if:
+  // 1. No existing reviewRating exists in the database, AND
+  // 2. We have valid total score to calculate from
   if (totalScore === undefined) return payload;
+  if (existingSubmission?.reviewRating) return payload; // Preserve existing rating if it exists
 
   const band = BRITISH_COUNCIL_BANDS.find(
     (b) => totalScore >= b.min && totalScore <= b.max,
   );
 
   payload.reviewRating = {
-    ...(payload.reviewRating || {}),
     score: totalScore,
     ...(band ? { grade: band.grade, level: band.level } : {}),
   };

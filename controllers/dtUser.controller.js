@@ -2963,7 +2963,8 @@ const adminLogin = async (req, res) => {
     if (!email.endsWith("@mydeeptech.ng")) {
       return res.status(400).json({
         success: false,
-        message: "Admin login is restricted to @mydeeptech.ng domain",
+        // message: "Admin login is restricted to @mydeeptech.ng domain",
+        message: "Invalid credentials or account not verified",
       });
     }
 
@@ -2995,7 +2996,7 @@ const adminLogin = async (req, res) => {
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
-        message: "Invalid credentials",
+        message: "Invalid credentials or account not verified",
       });
     }
 
