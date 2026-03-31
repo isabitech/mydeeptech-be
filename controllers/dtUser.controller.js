@@ -550,6 +550,7 @@ const dtUserLogin = async (req, res) => {
         id: user._id,
         fullName: user.fullName,
         email: user.email,
+        role: user.role,
         phone: user.phone,
         domains: user.domains,
         socialsFollowed: user.socialsFollowed,
@@ -611,6 +612,7 @@ const me = async (req, res) => {
         fullName: user.fullName,
         email: user.email,
         phone: user.phone,
+        role: user.role,
         domains: user.domains,
         socialsFollowed: user.socialsFollowed,
         consent: user.consent,
@@ -2963,7 +2965,8 @@ const adminLogin = async (req, res) => {
     if (!email.endsWith("@mydeeptech.ng")) {
       return res.status(400).json({
         success: false,
-        message: "Admin login is restricted to @mydeeptech.ng domain",
+        // message: "Admin login is restricted to @mydeeptech.ng domain",
+        message: "Invalid credentials or account not verified",
       });
     }
 
@@ -2995,7 +2998,7 @@ const adminLogin = async (req, res) => {
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
-        message: "Invalid credentials",
+        message: "Invalid credentials or account not verified",
       });
     }
 
