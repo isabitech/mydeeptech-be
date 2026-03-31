@@ -210,6 +210,7 @@ const resetPassword = async (req, res) => {
  */
 const dtUserForgotPassword = async (req, res) => {
   try {
+  
     const { email } = req.body;
 
     if (!email) {
