@@ -31,14 +31,10 @@ const MailService = require("../services/mail-service/mail-service");
 // Function to send verification emails to all unverified users
 const sendVerificationEmailsToUnverifiedUsers = async (req, res) => {
   try {
-    console.log("🔍 Starting bulk verification email process...");
-
     // Find all users with unverified emails
     const unverifiedUsers = await DTUser.find({ isEmailVerified: false })
       .select("fullName email isEmailVerified _id")
       .sort({ createdAt: -1 });
-
-    console.log(`📊 Found ${unverifiedUsers.length} unverified users`);
 
     if (unverifiedUsers.length === 0) {
       return res.status(200).json({
@@ -60,10 +56,6 @@ const sendVerificationEmailsToUnverifiedUsers = async (req, res) => {
     // Process each unverified user
     for (const user of unverifiedUsers) {
       try {
-        console.log(
-          `📧 Sending verification email to: ${user.fullName} (${user.email})`,
-        );
-
         // Send verification email with timeout
         const emailPromise = Promise.race([
           MailService.sendVerificationEmail(
@@ -78,10 +70,6 @@ const sendVerificationEmailsToUnverifiedUsers = async (req, res) => {
 
         await emailPromise;
         emailsSent++;
-
-        console.log(
-          `✅ Email sent successfully to: ${user.fullName} (${user.email}) - isEmailVerified: ${user.isEmailVerified}`,
-        );
 
         processedUsers.push({
           name: user.fullName,

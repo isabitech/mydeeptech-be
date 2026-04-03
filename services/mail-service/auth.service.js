@@ -5,7 +5,7 @@ class AuthMailService extends BaseMailService {
 
     static async sendVerificationEmail(recipientEmail, recipientName, userId) {
         console.log(`Preparing to send verification email to ${recipientEmail} for user ID: ${userId}`);
-        const FRONTEND_URL = envConfig.NODE_ENV === 'production' ? 'https://mydeeptech.ng' : 'http://localhost:5173';
+        const FRONTEND_URL = envConfig.FRONTEND_URL;
         const verificationUrl = `${FRONTEND_URL}/verify-email/${userId}?email=${encodeURIComponent(recipientEmail)}`;
         let htmlTemplate = this.getMailTemplate('sendVerificationEmail');
         const username = recipientEmail.split("@")[0];
@@ -39,7 +39,7 @@ class AuthMailService extends BaseMailService {
     }
 
     static async sendPasswordResetEmail(recipientEmail, recipientName, resetToken) {
-        const FRONTEND_URL = envConfig.NODE_ENV === 'production' ? 'https://mydeeptech.ng' : 'http://localhost:5173';
+       const FRONTEND_URL = envConfig.FRONTEND_URL;
         const resetUrl = `${FRONTEND_URL}/reset-password/${resetToken}?email=${encodeURIComponent(recipientEmail)}`;
         let htmlTemplate = this.getMailTemplate('sendPasswordResetEmail');
         const username = recipientEmail.split("@")[0];
@@ -60,8 +60,9 @@ class AuthMailService extends BaseMailService {
     static async sendPasswordResetEmailWithType(recipientEmail, recipientName, resetToken, userType = 'dtuser') {
         console.log(`Preparing to send password reset email to ${recipientEmail} for ${userType}`);
         let htmlTemplate = this.getMailTemplate('sendPasswordResetEmail');
-        
-        const FRONTEND_URL = envConfig.NODE_ENV === 'production' ? 'https://mydeeptech.ng' : 'http://localhost:5173';
+
+        const FRONTEND_URL = envConfig.FRONTEND_URL;
+
         const resetUrl = userType === 'dtuser' 
             ? `${FRONTEND_URL}/reset-password?token=${resetToken}&type=dtuser`
             : `${FRONTEND_URL}/reset-password?token=${resetToken}&type=user`;

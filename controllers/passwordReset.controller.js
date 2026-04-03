@@ -273,8 +273,6 @@ const dtUserForgotPassword = async (req, res) => {
         'dtuser'
       );
 
-      console.log(`🔐 Password reset token generated for DTUser: ${dtUser.email}`);
-
       res.status(200).json({
         success: true,
         message: 'Password reset link has been sent to your email address.',

@@ -386,6 +386,10 @@ const getAnnotationProjectDetails = async (req, res) => {
       recentApplicationsPipeline,
     );
 
+    const correctApprovedAnnotators = await ProjectApplication.aggregate(buildSearchPipeline('approved', 'reviewedAt'));
+
+    console.log("correctApprovedAnnotators", JSON.stringify(correctApprovedAnnotators, null, 2));
+
     // Get annotators with search filters
     const approvedAnnotators = await ProjectApplication.aggregate(
       buildSearchPipeline("approved", "reviewedAt"),
