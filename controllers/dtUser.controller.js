@@ -527,8 +527,6 @@ const dtUserLogin = async (req, res) => {
       });
     }
 
-    console.log(`✅ Successful login for user: ${email}`);
-
     // Generate JWT token
     const token = jwt.sign(
       {
@@ -539,8 +537,6 @@ const dtUserLogin = async (req, res) => {
       envConfig.jwt.JWT_SECRET || "your-secret-key", // Use environment variable for production
       { expiresIn: "7d" }, // Token expires in 7 days
     );
-
-    console.log(`🎟️ JWT token generated for user: ${email}`);
 
     // Return user data with JWT token in frontend-expected format
     res.status(200).json({
@@ -554,6 +550,7 @@ const dtUserLogin = async (req, res) => {
         id: user._id,
         fullName: user.fullName,
         email: user.email,
+        role: user.role,
         phone: user.phone,
         domains: user.domains,
         socialsFollowed: user.socialsFollowed,
@@ -578,6 +575,62 @@ const dtUserLogin = async (req, res) => {
     });
   }
 };
+
+const me = async (req, res) => {
+
+  const { email } = req.user;
+
+  const user = await DTUser.findOne({ email });
+
+  if(!user) {
+    return res.status(404).json({
+      success: false,
+      message: "User not found",
+    });
+  }
+
+      // Generate JWT token
+    const token = jwt.sign(
+      {
+        userId: user._id,
+        email: user.email,
+        fullName: user.fullName,
+      },
+      envConfig.jwt.JWT_SECRET || "your-secret-key", // Use environment variable for production
+      { expiresIn: "7d" }, // Token expires in 7 days
+    );
+
+   res.status(200).json({
+      success: true,
+      message: "User records fetched successfully",
+      _usrinfo: {
+        data: token, // Token stored in the format frontend expects for sessionStorage
+      },
+      token: token, // Also include token directly for backwards compatibility
+      user: {
+        id: user._id,
+        fullName: user.fullName,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        domains: user.domains,
+        socialsFollowed: user.socialsFollowed,
+        consent: user.consent,
+        isEmailVerified: user.isEmailVerified,
+        hasSetPassword: user.hasSetPassword,
+        annotatorStatus: user.annotatorStatus,
+        microTaskerStatus: user.microTaskerStatus,
+        qaStatus: user.qaStatus,
+        resultLink: user.resultLink,
+        isAssessmentSubmitted: !!user.assessmentSubmission, // Ensure boolean value
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      },
+    });
+
+}
+
+
 
 // Get DTUser profile by userId
 const getDTUserProfile = async (req, res) => {
@@ -2912,7 +2965,8 @@ const adminLogin = async (req, res) => {
     if (!email.endsWith("@mydeeptech.ng")) {
       return res.status(400).json({
         success: false,
-        message: "Admin login is restricted to @mydeeptech.ng domain",
+        // message: "Admin login is restricted to @mydeeptech.ng domain",
+        message: "Invalid credentials or account not verified",
       });
     }
 
@@ -2944,7 +2998,7 @@ const adminLogin = async (req, res) => {
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
-        message: "Invalid credentials",
+        message: "Invalid credentials or account not verified",
       });
     }
 
@@ -3339,7 +3393,7 @@ const applyToProject = async (req, res) => {
   try {
     const { projectId } = req.params;
     const userId = req.user.userId;
-    console.log(`📝 User ${req.user.email} applying to project: ${projectId}`);
+    // console.log(`📝 User ${req.user.email} applying to project: ${projectId}`);
 
     // Check if user is an approved annotator
     const user = await DTUser.findById(userId);
@@ -3351,9 +3405,9 @@ const applyToProject = async (req, res) => {
     });
 
     if (!user || user.annotatorStatus !== "approved") {
-      console.log(
-        `❌ User ${req.user.email} access denied - Status: ${user?.annotatorStatus || "unknown"}`,
-      );
+      // console.log(
+      //   `❌ User ${req.user.email} access denied - Status: ${user?.annotatorStatus || "unknown"}`,
+      // );
       return res.status(403).json({
         success: false,
         message:
@@ -3366,9 +3420,9 @@ const applyToProject = async (req, res) => {
       !user.attachments?.resume_url ||
       user.attachments.resume_url.trim() === ""
     ) {
-      console.log(
-        `❌ User ${req.user.email} application denied - No resume uploaded`,
-      );
+      // console.log(
+      //   `❌ User ${req.user.email} application denied - No resume uploaded`,
+      // );
       return res.status(400).json({
         success: false,
         message: "Please upload your resume in your profile section",
@@ -3380,9 +3434,9 @@ const applyToProject = async (req, res) => {
       });
     }
 
-    console.log(
-      `✅ User ${req.user.email} approved for project application with resume: ${user.attachments.resume_url}`,
-    );
+    // console.log(
+    //   `✅ User ${req.user.email} approved for project application with resume: ${user.attachments.resume_url}`,
+    // );
 
     // Check if project exists and is available
 
@@ -3451,15 +3505,15 @@ const applyToProject = async (req, res) => {
 
     if (requiresAssessment) {
       // Check user's multimedia assessment status
-      console.log(
-        `🎯 Project requires multimedia assessment. User status: ${user.multimediaAssessmentStatus}`,
-      );
+      // console.log(
+      //   `🎯 Project requires multimedia assessment. User status: ${user.multimediaAssessmentStatus}`,
+      // );
 
       if (user.multimediaAssessmentStatus === "approved") {
         // User already passed assessment, proceed normally
-        console.log(
-          `✅ User ${user.email} already approved for multimedia assessment`,
-        );
+        // console.log(
+        //   `✅ User ${user.email} already approved for multimedia assessment`,
+        // );
       } else if (user.multimediaAssessmentStatus === "failed") {
         // Check if 24-hour cooldown has passed
         const cooldownHours = 24;
@@ -5279,6 +5333,7 @@ const updateUserRole = async (req, res) => {
 };
 
 module.exports = {
+  me,
   createDTUser,
   createDTUserWithBackgroundEmail,
   verifyEmail,

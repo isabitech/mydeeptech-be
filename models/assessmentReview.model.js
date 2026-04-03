@@ -90,10 +90,29 @@ const assessmentReviewSchema = new mongoose.Schema(
       default: "Pending",
     },
     reviewRating: {
-      type: Number,
-      min: 1,
-      max: 7,
-      default: null,
+      grade: {
+        type: String,
+        enum: ["Pre-A1", "A1", "A2", "B1", "B2", "C1"],
+        default: null,
+      },
+      score: {
+        type: Number,
+        min: 0,
+        max: 599,
+        default: null,
+      },
+      level: {
+        type: String,
+        enum: [
+          "Beginner",
+          "Elementary",
+          "Pre Intermediate",
+          "Intermediate",
+          "Upper Intermediate",
+          "Advanced",
+        ],
+        default: null,
+      },
     },
     reviewerId: {
       type: mongoose.Schema.Types.ObjectId,
