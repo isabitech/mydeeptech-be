@@ -107,8 +107,16 @@ router.get(
 router.get("/roles", authenticateAdmin, userController.getRoles);
 
 // Project Management Routes
-router.post("/projects", authenticateAdmin, annotationProjectController.createAnnotationProject);
-router.get("/projects", authenticateAdmin, annotationProjectController.getAllAnnotationProjects);
+router.post(
+  "/projects",
+  authenticateAdmin,
+  annotationProjectController.createAnnotationProject,
+);
+router.get(
+  "/projects",
+  authenticateAdmin,
+  annotationProjectController.getAllAnnotationProjects,
+);
 router.get(
   "/projects/:projectId",
   authenticateAdmin,
@@ -248,7 +256,11 @@ router.post(
 router.delete("/invoices/:invoiceId", authenticateAdmin, deleteInvoice);
 
 // Notification Management Routes
-router.get("/notifications", authenticateAdmin, notificationController.getAdminNotifications);
+router.get(
+  "/notifications",
+  authenticateAdmin,
+  notificationController.getAdminNotifications,
+);
 router.post(
   "/notifications",
   authenticateAdmin,
@@ -269,7 +281,11 @@ router.post(
   authenticateAdmin,
   notificationController.createAnnouncement,
 );
-router.get("/notifications/stats", authenticateAdmin, notificationController.getNotificationStats);
+router.get(
+  "/notifications/stats",
+  authenticateAdmin,
+  notificationController.getNotificationStats,
+);
 router.delete(
   "/notifications/cleanup",
   authenticateAdmin,
@@ -287,7 +303,11 @@ router.post(
 );
 
 // Assessment Management Routes
-router.get("/assessments", authenticateAdmin, assessmentController.getAdminAssessments);
+router.get(
+  "/assessments",
+  authenticateAdmin,
+  assessmentController.getAdminAssessments,
+);
 router.get(
   "/assessments/overview",
   authenticateAdmin,

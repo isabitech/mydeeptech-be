@@ -2,18 +2,21 @@ const dtUserService = require("../services/dtUser.service");
 const AnnotationProjectService = require("../services/annotationProject.service");
 const AnnotationProjectRepository = require("../repositories/annotationProject.repository");
 
-const annotationProjectService = new AnnotationProjectService(new AnnotationProjectRepository());
+const annotationProjectService = new AnnotationProjectService(
+  new AnnotationProjectRepository(),
+);
 
 // Function to send verification emails to all unverified users
 const sendVerificationEmailsToUnverifiedUsers = async (req, res) => {
   try {
-    const result = await dtUserService.sendVerificationEmailsToUnverifiedUsers();
+    const result =
+      await dtUserService.sendVerificationEmailsToUnverifiedUsers();
 
     if (res) {
       res.status(200).json({
         success: true,
         message: `Bulk verification emails processed. ${result.emailsSent} sent, ${result.emailsFailed} failed.`,
-        data: result
+        data: result,
       });
     }
     return result;
@@ -41,10 +44,11 @@ const createDTUser = async (req, res) => {
 
     if (result.emailSent === false) {
       return res.status(201).json({
-        message: "User created successfully. However, there was an issue sending the verification email. Please contact support.",
+        message:
+          "User created successfully. However, there was an issue sending the verification email. Please contact support.",
         user: result.user,
         emailSent: false,
-        emailError: result.emailError
+        emailError: result.emailError,
       });
     }
 
@@ -64,15 +68,18 @@ const createDTUser = async (req, res) => {
 // Option 2: Background email sending (recommended for production)
 const createDTUserWithBackgroundEmail = async (req, res) => {
   try {
-    const result = await dtUserService.createDTUserWithBackgroundEmail(req.body);
+    const result = await dtUserService.createDTUserWithBackgroundEmail(
+      req.body,
+    );
 
     if (result.status === 400) {
       return res.status(400).json({ message: result.message });
     }
 
     res.status(201).json({
-      message: "User created successfully. Verification email will be sent shortly.",
-      user: result.user
+      message:
+        "User created successfully. Verification email will be sent shortly.",
+      user: result.user,
     });
   } catch (error) {
     console.error("❌ Error creating user:", error);
@@ -86,19 +93,29 @@ const createDTUserWithBackgroundEmail = async (req, res) => {
 // Email verification function
 const verifyEmail = async (req, res) => {
   try {
-    const result = await dtUserService.verifyEmail(req.params.id, req.query.email);
+    const result = await dtUserService.verifyEmail(
+      req.params.id,
+      req.query.email,
+    );
 
     if (result.status === 404) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
     if (result.status === 400) {
-      return res.status(400).json({ success: false, message: "Invalid verification link" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid verification link" });
     }
 
     const { user, reason } = result;
     res.status(200).json({
       success: true,
-      message: reason === "already_verified" ? "Email is already verified" : "Email verified successfully!",
+      message:
+        reason === "already_verified"
+          ? "Email is already verified"
+          : "Email verified successfully!",
       user: {
         id: user._id,
         fullName: user.fullName,
@@ -123,12 +140,29 @@ const setupPassword = async (req, res) => {
 
     if (result.status === 400) {
       // if (result.reason === "validation") return res.status(400).json({ success: false, message: result.message });
-      if (result.reason === "email_mismatch") return res.status(400).json({ success: false, message: "Invalid request" });
-      if (result.reason === "not_verified") return res.status(400).json({ success: false, message: "Email must be verified before setting up password" });
-      if (result.reason === "already_set") return res.status(400).json({ success: false, message: "Password has already been set. Use login instead." });
+      if (result.reason === "email_mismatch")
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid request" });
+      if (result.reason === "not_verified")
+        return res
+          .status(400)
+          .json({
+            success: false,
+            message: "Email must be verified before setting up password",
+          });
+      if (result.reason === "already_set")
+        return res
+          .status(400)
+          .json({
+            success: false,
+            message: "Password has already been set. Use login instead.",
+          });
     }
     if (result.status === 404) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     const { user } = result;
@@ -170,14 +204,16 @@ const dtUserLogin = async (req, res) => {
       if (result.reason === "verify_resend_success") {
         return res.status(400).json({
           success: false,
-          message: "Please verify your email first. A new verification email has been sent to your inbox.",
+          message:
+            "Please verify your email first. A new verification email has been sent to your inbox.",
           emailResent: true,
         });
       }
       if (result.reason === "verify_resend_fail") {
         return res.status(400).json({
           success: false,
-          message: "Please verify your email first. Unable to resend verification email at this time.",
+          message:
+            "Please verify your email first. Unable to resend verification email at this time.",
           emailResent: false,
         });
       }
@@ -190,11 +226,15 @@ const dtUserLogin = async (req, res) => {
         });
       }
       if (result.reason === "invalid_credentials") {
-        return res.status(400).json({ success: false, message: "Invalid credentials" });
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid credentials" });
       }
     }
     if (result.status === 404) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     const { user, token } = result;
@@ -238,7 +278,9 @@ const me = async (req, res) => {
     const result = await dtUserService.me(req.user.email);
 
     if (result.status === 404) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     const { user, token } = result;
@@ -277,15 +319,15 @@ const me = async (req, res) => {
   }
 };
 
-
-
 // Get DTUser profile by userId
 const getDTUserProfile = async (req, res) => {
   try {
     const result = await dtUserService.getDTUserProfile(req.params.userId);
 
     if (result.status === 404) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     const { user } = result;
@@ -308,8 +350,10 @@ const getDTUserProfile = async (req, res) => {
         phoneNumber: user.phone,
         country: user.personal_info?.country || "",
         timeZone: user.personal_info?.time_zone || "",
-        availableHoursPerWeek: user.personal_info?.available_hours_per_week || 0,
-        preferredCommunicationChannel: user.personal_info?.preferred_communication_channel || "",
+        availableHoursPerWeek:
+          user.personal_info?.available_hours_per_week || 0,
+        preferredCommunicationChannel:
+          user.personal_info?.preferred_communication_channel || "",
       },
       paymentInfo: {
         accountName: user.payment_info?.account_name || "",
@@ -322,15 +366,18 @@ const getDTUserProfile = async (req, res) => {
       },
       professionalBackground: {
         educationField: user.professional_background?.education_field || "",
-        yearsOfExperience: user.professional_background?.years_of_experience || 0,
-        annotationExperienceTypes: user.professional_background?.annotation_experience_types || [],
+        yearsOfExperience:
+          user.professional_background?.years_of_experience || 0,
+        annotationExperienceTypes:
+          user.professional_background?.annotation_experience_types || [],
       },
       toolExperience: user.tool_experience || [],
       annotationSkills: user.annotation_skills || [],
       languageProficiency: {
         primaryLanguage: user.language_proficiency?.primary_language || "",
         otherLanguages: user.language_proficiency?.other_languages || [],
-        englishFluencyLevel: user.language_proficiency?.english_fluency_level || "",
+        englishFluencyLevel:
+          user.language_proficiency?.english_fluency_level || "",
       },
       systemInfo: {
         deviceType: user.system_info?.device_type || "",
@@ -341,7 +388,8 @@ const getDTUserProfile = async (req, res) => {
         hasMicrophone: user.system_info?.has_microphone || false,
       },
       projectPreferences: {
-        domainsOfInterest: user.project_preferences?.domains_of_interest || user.domains || [],
+        domainsOfInterest:
+          user.project_preferences?.domains_of_interest || user.domains || [],
         availabilityType: user.project_preferences?.availability_type || "",
         ndaSigned: user.project_preferences?.nda_signed || false,
       },
@@ -380,9 +428,8 @@ const updateDTUserProfile = async (req, res) => {
     const result = await dtUserService.updateDTUserProfile({
       userId: req.params.userId,
       requesterId: req.user.userId,
-      body: req.body
+      body: req.body,
     });
-
 
     if (result.status === 400) {
       return res.status(400).json({ success: false, message: result.message });
@@ -405,7 +452,9 @@ const updateDTUserProfile = async (req, res) => {
       }
     }
     if (result.status === 404) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     res.status(200).json({
@@ -433,25 +482,37 @@ const resetDTUserPassword = async (req, res) => {
 
     if (result.status === 400) {
       if (result.reason === "validation") {
-        return res.status(400).json({ success: false, message: result.message });
+        return res
+          .status(400)
+          .json({ success: false, message: result.message });
       }
       if (result.reason === "no_password") {
         return res.status(400).json({
           success: false,
-          message: "No password is currently set. Please use the setup password endpoint instead.",
+          message:
+            "No password is currently set. Please use the setup password endpoint instead.",
           requiresPasswordSetup: true,
         });
       }
       if (result.reason === "invalid_old_password") {
-        return res.status(400).json({ success: false, message: "Current password is incorrect" });
+        return res
+          .status(400)
+          .json({ success: false, message: "Current password is incorrect" });
       }
       if (result.reason === "same_password") {
-        return res.status(400).json({ success: false, message: "New password must be different from current password" });
+        return res
+          .status(400)
+          .json({
+            success: false,
+            message: "New password must be different from current password",
+          });
       }
     }
 
     if (result.status === 404) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     const { user } = result;
@@ -612,7 +673,9 @@ const approveAnnotator = async (req, res) => {
     }
 
     if (result.status === 404) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     const { user, previousStatus, newStatus } = result;
@@ -627,7 +690,8 @@ const approveAnnotator = async (req, res) => {
         newStatus: newStatus,
         annotatorStatus: user.annotatorStatus,
         microTaskerStatus: user.microTaskerStatus,
-        emailNotificationSent: newStatus === "approved" || newStatus === "rejected",
+        emailNotificationSent:
+          newStatus === "approved" || newStatus === "rejected",
         updatedAt: user.updatedAt,
         updatedBy: req.admin.email,
       },
@@ -686,7 +750,9 @@ const approveUserForQA = async (req, res) => {
 
     if (result.status === 400) {
       if (result.reason === "invalid_id") {
-        return res.status(400).json({ success: false, message: "Invalid user ID format" });
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid user ID format" });
       }
       if (result.reason === "already_approved") {
         return res.status(400).json({
@@ -703,7 +769,9 @@ const approveUserForQA = async (req, res) => {
     }
 
     if (result.status === 404) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     const { user, previousQAStatus } = result;
@@ -741,7 +809,9 @@ const rejectUserForQA = async (req, res) => {
 
     if (result.status === 400) {
       if (result.reason === "invalid_id") {
-        return res.status(400).json({ success: false, message: "Invalid user ID format" });
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid user ID format" });
       }
       if (result.reason === "already_rejected") {
         return res.status(400).json({
@@ -758,7 +828,9 @@ const rejectUserForQA = async (req, res) => {
     }
 
     if (result.status === 404) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     const { user, previousQAStatus } = result;
@@ -788,7 +860,6 @@ const rejectUserForQA = async (req, res) => {
   }
 };
 
-
 // Admin function: Reject annotator (dedicated endpoint)
 const rejectAnnotator = async (req, res) => {
   try {
@@ -797,7 +868,9 @@ const rejectAnnotator = async (req, res) => {
     });
 
     if (result.status === 404) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     const { user, previousStatus } = result;
@@ -833,7 +906,9 @@ const getDTUserAdmin = async (req, res) => {
     const result = await dtUserService.getDTUserAdmin(req.params.userId);
 
     if (result.status === 404) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     res.status(200).json({
@@ -860,12 +935,15 @@ const requestAdminVerification = async (req, res) => {
 
     if (result.status === 400) {
       if (result.reason === "validation") {
-        return res.status(400).json({ success: false, message: result.message });
+        return res
+          .status(400)
+          .json({ success: false, message: result.message });
       }
       if (result.reason === "invalid_admin_email") {
         return res.status(400).json({
           success: false,
-          message: "Admin email must end with @mydeeptech.ng or be in approved admin list",
+          message:
+            "Admin email must end with @mydeeptech.ng or be in approved admin list",
           code: "INVALID_ADMIN_EMAIL",
         });
       }
@@ -917,7 +995,9 @@ const confirmAdminVerification = async (req, res) => {
 
     if (result.status === 400) {
       if (result.reason === "validation") {
-        return res.status(400).json({ success: false, message: result.message });
+        return res
+          .status(400)
+          .json({ success: false, message: result.message });
       }
       if (result.reason === "verification_expired") {
         return res.status(400).json({
@@ -955,7 +1035,8 @@ const confirmAdminVerification = async (req, res) => {
     if (result.status === 429) {
       return res.status(429).json({
         success: false,
-        message: "Too many verification attempts. Please request a new verification code.",
+        message:
+          "Too many verification attempts. Please request a new verification code.",
         code: "TOO_MANY_ATTEMPTS",
       });
     }
@@ -963,7 +1044,8 @@ const confirmAdminVerification = async (req, res) => {
     const newAdmin = result.admin;
     res.status(201).json({
       success: true,
-      message: "Admin account created successfully! Please check your email for the OTP code to verify your account.",
+      message:
+        "Admin account created successfully! Please check your email for the OTP code to verify your account.",
       otpVerificationRequired: true,
       admin: {
         id: newAdmin._id,
@@ -996,12 +1078,15 @@ const createAdmin = async (req, res) => {
 
     if (result.status === 400) {
       if (result.reason === "validation") {
-        return res.status(400).json({ success: false, message: result.message });
+        return res
+          .status(400)
+          .json({ success: false, message: result.message });
       }
       if (result.reason === "invalid_admin_email") {
         return res.status(400).json({
           success: false,
-          message: "Admin email must end with @mydeeptech.ng or be in approved admin list",
+          message:
+            "Admin email must end with @mydeeptech.ng or be in approved admin list",
           code: "INVALID_ADMIN_EMAIL",
         });
       }
@@ -1026,7 +1111,8 @@ const createAdmin = async (req, res) => {
     const newAdmin = result.admin;
     res.status(201).json({
       success: true,
-      message: "Admin account created successfully! Please check your email for the OTP code to verify your account.",
+      message:
+        "Admin account created successfully! Please check your email for the OTP code to verify your account.",
       otpVerificationRequired: true,
       admin: {
         id: newAdmin._id,
@@ -1210,11 +1296,19 @@ const resendVerificationEmail = async (req, res) => {
     const result = await dtUserService.resendVerificationEmail(req.body.email);
 
     if (result.status === 400) {
-      if (result.reason === "email_required") return res.status(400).json({ success: false, message: "Email is required" });
-      if (result.reason === "already_verified") return res.status(400).json({ success: false, message: "Email is already verified" });
+      if (result.reason === "email_required")
+        return res
+          .status(400)
+          .json({ success: false, message: "Email is required" });
+      if (result.reason === "already_verified")
+        return res
+          .status(400)
+          .json({ success: false, message: "Email is already verified" });
     }
     if (result.status === 404) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     const { emailPromise, user } = result;
@@ -1222,11 +1316,15 @@ const resendVerificationEmail = async (req, res) => {
       await emailPromise;
       res.status(200).json({
         success: true,
-        message: "Verification email sent successfully. Please check your inbox.",
+        message:
+          "Verification email sent successfully. Please check your inbox.",
         emailSent: true,
       });
     } catch (emailError) {
-      console.error(`❌ Failed to resend verification email to ${user.email}:`, emailError.message);
+      console.error(
+        `❌ Failed to resend verification email to ${user.email}:`,
+        emailError.message,
+      );
       res.status(500).json({
         success: false,
         message: "Failed to send verification email. Please try again later.",
@@ -1244,7 +1342,6 @@ const resendVerificationEmail = async (req, res) => {
   }
 };
 
-
 // DTUser function: Get available projects (only for approved annotators)
 const getAvailableProjects = async (req, res) => {
   try {
@@ -1252,15 +1349,22 @@ const getAvailableProjects = async (req, res) => {
     const result = await dtUserService.getAvailableProjects(userId, req.query);
 
     if (result.status === 404) {
-      return res.status(404).json({ success: false, message: "User not found." });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found." });
     }
     if (result.status === 403) {
-      return res.status(403).json({ success: false, message: "Access denied. Only approved annotators can view projects." });
+      return res
+        .status(403)
+        .json({
+          success: false,
+          message: "Access denied. Only approved annotators can view projects.",
+        });
     }
     res.status(200).json({
       success: true,
       message: `Found ${result.data.projects.length} projects`,
-      data: result.data
+      data: result.data,
     });
   } catch (error) {
     console.error("❌ Error fetching projects:", error);
@@ -1272,21 +1376,26 @@ const getAvailableProjects = async (req, res) => {
   }
 };
 
-
 // DTUser function: Apply to a project
 const applyToProject = async (req, res) => {
   try {
     const { projectId } = req.params;
     const userId = req.user.userId || req.userId;
-    const application = await annotationProjectService.applyToProject(userId, projectId, req.body);
+    const application = await annotationProjectService.applyToProject(
+      userId,
+      projectId,
+      req.body,
+    );
     let responseMessage = "Application submitted successfully";
     let additionalData = {};
     if (application.status === "assessment_required") {
-      responseMessage = "Application submitted. Please check your email for assessment instructions.";
+      responseMessage =
+        "Application submitted. Please check your email for assessment instructions.";
       additionalData = {
         assessmentRequired: true,
         assessmentStatus: "invitation_sent",
-        message: "You must complete the multimedia assessment before your application can be reviewed.",
+        message:
+          "You must complete the multimedia assessment before your application can be reviewed.",
       };
     }
     res.status(201).json({
@@ -1302,7 +1411,8 @@ const applyToProject = async (req, res) => {
     if (error.message === "not_approved") {
       return res.status(403).json({
         success: false,
-        message: "Access denied. Only approved annotators can apply to projects.",
+        message:
+          "Access denied. Only approved annotators can apply to projects.",
       });
     }
     if (error.message === "resume_required") {
@@ -1476,11 +1586,18 @@ const getInvoiceDetails = async (req, res) => {
     });
 
     if (result.status === 400) {
-      return res.status(400).json({ success: false, message: "Invalid invoice ID" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid invoice ID" });
     }
 
     if (result.status === 404) {
-      return res.status(404).json({ success: false, message: "Invoice not found or access denied" });
+      return res
+        .status(404)
+        .json({
+          success: false,
+          message: "Invoice not found or access denied",
+        });
     }
 
     res.status(200).json({
@@ -1527,7 +1644,9 @@ const getDTUserDashboard = async (req, res) => {
     });
 
     if (result.status === 404) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     res.status(200).json({
@@ -1550,7 +1669,11 @@ const manuallyAddUserToProject = async (req, res) => {
     const { userId, projectId } = req.body;
     const adminId = req.admin.userId;
 
-    const result = await annotationProjectService.manuallyAddUserToProject(projectId, userId, adminId);
+    const result = await annotationProjectService.manuallyAddUserToProject(
+      projectId,
+      userId,
+      adminId,
+    );
 
     res.status(200).json({
       success: true,
@@ -1565,9 +1688,21 @@ const manuallyAddUserToProject = async (req, res) => {
       },
     });
   } catch (error) {
-    if (error.message === "user_not_found") return res.status(404).json({ success: false, message: "User not found" });
-    if (error.message === "project_not_found") return res.status(404).json({ success: false, message: "Project not found" });
-    if (error.message === "already_approved") return res.status(400).json({ success: false, message: "User is already approved for this project" });
+    if (error.message === "user_not_found")
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    if (error.message === "project_not_found")
+      return res
+        .status(404)
+        .json({ success: false, message: "Project not found" });
+    if (error.message === "already_approved")
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "User is already approved for this project",
+        });
 
     console.error("❌ Error manually adding user to project:", error);
     res.status(500).json({
@@ -1598,7 +1733,9 @@ const submitResultWithCloudinary = async (req, res) => {
     }
 
     if (result.status === 404) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     res.status(200).json({
@@ -1616,7 +1753,6 @@ const submitResultWithCloudinary = async (req, res) => {
   }
 };
 
-
 // Upload ID Document and store in user profile
 const uploadIdDocument = async (req, res) => {
   try {
@@ -1633,7 +1769,9 @@ const uploadIdDocument = async (req, res) => {
     }
 
     if (result.status === 404) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     res.status(200).json({
@@ -1651,7 +1789,6 @@ const uploadIdDocument = async (req, res) => {
   }
 };
 
-
 // Upload Resume and store in user profile
 const uploadResume = async (req, res) => {
   try {
@@ -1668,7 +1805,9 @@ const uploadResume = async (req, res) => {
     }
 
     if (result.status === 404) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     res.status(200).json({
@@ -1686,7 +1825,6 @@ const uploadResume = async (req, res) => {
   }
 };
 
-
 // Get all result submissions for a user
 const getUserResultSubmissions = async (req, res) => {
   try {
@@ -1696,7 +1834,9 @@ const getUserResultSubmissions = async (req, res) => {
     });
 
     if (result.status === 404) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     res.status(200).json({
@@ -1714,7 +1854,6 @@ const getUserResultSubmissions = async (req, res) => {
   }
 };
 
-
 // Get project guidelines for approved annotators only
 const getProjectGuidelines = async (req, res) => {
   try {
@@ -1728,13 +1867,19 @@ const getProjectGuidelines = async (req, res) => {
       });
     }
 
-    const result = await annotationProjectService.getProjectGuidelines(projectId, userId);
+    const result = await annotationProjectService.getProjectGuidelines(
+      projectId,
+      userId,
+    );
 
     res.status(200).json({
       ...result,
     });
   } catch (error) {
-    if (error.message === "project_not_found") return res.status(404).json({ success: false, message: "Project not found" });
+    if (error.message === "project_not_found")
+      return res
+        .status(404)
+        .json({ success: false, message: "Project not found" });
 
     console.error("❌ Error getting project guidelines:", error);
     res.status(500).json({
@@ -1744,7 +1889,6 @@ const getProjectGuidelines = async (req, res) => {
     });
   }
 };
-
 
 // Admin function: Get all users for role management
 const getAllUsersForRoleManagement = async (req, res) => {
@@ -1771,7 +1915,6 @@ const getAllUsersForRoleManagement = async (req, res) => {
   }
 };
 
-
 // Admin function: Update user role
 const updateUserRole = async (req, res) => {
   try {
@@ -1781,11 +1924,15 @@ const updateUserRole = async (req, res) => {
     const result = await dtUserService.updateUserRole({ userId, role, reason });
 
     if (result.status === 400) {
-      return res.status(400).json({ success: false, message: "Invalid role specified" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid role specified" });
     }
 
     if (result.status === 404) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     res.status(200).json({
@@ -1803,7 +1950,6 @@ const updateUserRole = async (req, res) => {
     });
   }
 };
-
 
 module.exports = {
   me,

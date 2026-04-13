@@ -12,6 +12,33 @@ const {
 const { authenticateToken } = require("../middleware/auth");
 const { authenticateAdmin } = require("../middleware/adminAuth");
 
+// Combined middleware to support both user and admin authentication
+const authenticateUserOrAdmin = (req, res, next) => {
+  // Try admin authentication first
+  authenticateAdmin(req, res, (adminErr) => {
+    if (!adminErr) {
+      // Admin auth succeeded, set req.user from req.admin for consistency
+      req.user = req.admin;
+      return next();
+    }
+    
+    // Admin auth failed, try regular user authentication
+    authenticateToken(req, res, (userErr) => {
+      if (!userErr) {
+        // User auth succeeded
+        return next();
+      }
+      
+      // Both failed, return the user auth error (more descriptive)
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required. Please provide a valid user or admin token.',
+        code: 'AUTH_REQUIRED'
+      });
+    });
+  });
+};
+
 // Create a new resource
 router.post(
   "/",
@@ -32,7 +59,7 @@ router.get(
 // Get sidebar resources as allowed for authenticated user
 router.get(
   "/me/allowed",
-  authenticateToken,
+  authenticateUserOrAdmin,
   resourceController.getMyAllowedResources,
 );
 

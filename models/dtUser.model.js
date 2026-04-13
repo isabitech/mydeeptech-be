@@ -237,7 +237,7 @@ const dtUserSchema = new mongoose.Schema(
       other_languages: { type: [String], default: [] },
       english_fluency_level: {
         type: String,
-        enum: ["basic", "intermediate", "advanced", "native", ""],
+        enum: ["basic", "intermediate", "advanced", "fluent", "native", ""],
         default: "",
       },
     },

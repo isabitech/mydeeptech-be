@@ -10,15 +10,34 @@ const annotationProjectService = new AnnotationProjectService(new AnnotationProj
 const createProjectSchema = Joi.object({
   projectName: Joi.string().trim().max(200).required(),
   projectDescription: Joi.string().trim().max(2000).required(),
-  projectCategory: Joi.string().valid(
-    "Text Annotation", "Image Annotation", "Audio Annotation", "Video Annotation",
-    "Data Labeling", "Content Moderation", "Transcription", "Translation",
-    "Sentiment Analysis", "Entity Recognition", "Classification", "Object Detection",
-    "Semantic Segmentation", "Survey Research", "Data Entry", "Quality Assurance", "Other"
-  ).required(),
+  projectCategory: Joi.string()
+    .valid(
+      "Text Annotation",
+      "Image Annotation",
+      "Audio Annotation",
+      "Video Annotation",
+      "Data Labeling",
+      "Content Moderation",
+      "Transcription",
+      "Translation",
+      "Sentiment Analysis",
+      "Entity Recognition",
+      "Classification",
+      "Object Detection",
+      "Semantic Segmentation",
+      "Survey Research",
+      "Data Entry",
+      "Quality Assurance",
+      "Other",
+    )
+    .required(),
   payRate: Joi.number().min(0).required(),
-  payRateCurrency: Joi.string().valid("USD", "EUR", "GBP", "NGN", "KES", "GHS").default("USD"),
-  payRateType: Joi.string().valid("per_task", "per_hour", "per_project", "per_annotation").default("per_task"),
+  payRateCurrency: Joi.string()
+    .valid("USD", "EUR", "GBP", "NGN", "KES", "GHS")
+    .default("USD"),
+  payRateType: Joi.string()
+    .valid("per_task", "per_hour", "per_project", "per_annotation")
+    .default("per_task"),
   maxAnnotators: Joi.number().min(1).allow(null).optional(),
   deadline: Joi.date().greater('now').default(() => {
     const today = new Date();
@@ -26,9 +45,13 @@ const createProjectSchema = Joi.object({
     return today;
   }),
   estimatedDuration: Joi.string().max(100).required(),
-  difficultyLevel: Joi.string().valid("beginner", "intermediate", "advanced", "expert").required(),
+  difficultyLevel: Joi.string()
+    .valid("beginner", "intermediate", "advanced", "expert")
+    .required(),
   requiredSkills: Joi.array().items(Joi.string()).default([]),
-  minimumExperience: Joi.string().valid("none", "beginner", "intermediate", "advanced").required(),
+  minimumExperience: Joi.string()
+    .valid("none", "beginner", "intermediate", "advanced")
+    .required(),
   languageRequirements: Joi.array().items(Joi.string()).default([]),
   tags: Joi.array().items(Joi.string()).default([]),
   applicationDeadline: Joi.date().greater('now').default(() => {

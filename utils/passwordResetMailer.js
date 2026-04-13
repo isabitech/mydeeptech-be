@@ -1,3 +1,4 @@
+const envConfig = require('../config/envConfig');
 const { sendEmail } = require('./brevoSMTP');
 const dotenv = require('dotenv');
 dotenv.config();
@@ -11,10 +12,11 @@ dotenv.config();
  * @param {string} userType - 'user' or 'dtuser'
  */
 const sendPasswordResetEmail = async (email, name, resetToken, userType = 'user') => {
+    const FRONTEND_URL = envConfig.FRONTEND_URL;
   try {
     const resetUrl = userType === 'dtuser' 
-      ? `${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/reset-password?token=${resetToken}&type=dtuser`
-      : `${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/reset-password?token=${resetToken}&type=user`;
+      ? `${FRONTEND_URL}/reset-password?token=${resetToken}&type=dtuser`
+      : `${FRONTEND_URL}/reset-password?token=${resetToken}&type=user`;
 
     const htmlContent = `
         <!DOCTYPE html>
@@ -245,10 +247,11 @@ https://mydeeptech.ng
  * @param {string} userType - 'user' or 'dtuser'
  */
 const sendPasswordResetConfirmationEmail = async (email, name, userType = 'user') => {
+    const FRONTEND_URL = envConfig.FRONTEND_URL;
   try {
     const loginUrl = userType === 'dtuser' 
-      ? `${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/dtuser/login`
-      : `${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/login`;
+      ? `${FRONTEND_URL}/dtuser/login`
+      : `${FRONTEND_URL}/login`;
 
     const htmlContent = `
         <!DOCTYPE html>
