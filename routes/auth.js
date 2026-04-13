@@ -1,5 +1,5 @@
 const express = require('express');
-const { signup, login, getAllUsers, getUsers, updateUserRole, getUserById, getRoles, getRoleStatistics } = require('../controllers/user.js'); // Ensure this path is correct
+const { signup, login, getAllUsers, getUsers, getUserById, getRoles, getRoleStatistics } = require('../controllers/user.js'); // Ensure this path is correct
 const { createProject, getProject, updateProject, deleteProject } = require('../controllers/project.js')
 const { createTask, getTask, getAllTasks, assignTask} = require('../controllers/task.js')
 const {validateVisitor} = require('../controllers/validateuser.js')

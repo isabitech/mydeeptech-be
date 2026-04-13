@@ -39,7 +39,7 @@ class AuthMailService extends BaseMailService {
     }
 
     static async sendPasswordResetEmail(recipientEmail, recipientName, resetToken) {
-       const FRONTEND_URL = envConfig.FRONTEND_URL;
+        const FRONTEND_URL = envConfig.FRONTEND_URL;
         const resetUrl = `${FRONTEND_URL}/reset-password/${resetToken}?email=${encodeURIComponent(recipientEmail)}`;
         let htmlTemplate = this.getMailTemplate('sendPasswordResetEmail');
         const username = recipientEmail.split("@")[0];
