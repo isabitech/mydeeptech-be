@@ -519,6 +519,21 @@ hvncCommandSchema.statics.cancelDeviceCommands = function (deviceId, reason) {
     },
   );
 };
+ 
+hvncCommandSchema.statics.cancelSessionCommands = function (sessionId, reason) {
+  return this.updateMany(
+    {
+      session_id: sessionId,
+      status: { $in: ["pending", "sent", "acknowledged", "executing"] },
+    },
+    {
+      status: "cancelled",
+      completed_at: new Date(),
+      error_message: reason || "Session commands cancelled",
+      error_code: "SESSION_CANCELLED",
+    },
+  );
+};
 
 hvncCommandSchema.statics.cleanupOldCommands = function (daysOld = 30) {
   const cutoffDate = new Date(Date.now() - daysOld * 24 * 60 * 60 * 1000);

@@ -10,6 +10,17 @@ const signupSchema = Joi.object({
     phone: Joi.string().required()
 });
 
+const resendVerificationEmailSchema = Joi.object({
+    email: Joi.string().email().required(),
+});
+
+const idSchema = Joi.object({
+    id: Joi.string().regex(/^[0-9a-fA-F]{24}$/).required().messages({
+        'string.pattern.base': 'ID must be a valid MongoDB ObjectId'
+    })
+});
+
+
 // Login validation schema
 const loginSchema = Joi.object({
     email: Joi.string().email().required(),
@@ -31,28 +42,28 @@ const projectSchema = Joi.object({
 
 const taskSchema = Joi.object({
     taskLink: Joi.string().uri({ scheme: ['http', 'https'] }) // Validates URLs with http/https
-    .required()
-    .messages({
-        'string.base': 'URL must be a string.',
-        'string.uri': 'Invalid URL format.',
-        'any.required': 'URL is required.',
-    }),
+        .required()
+        .messages({
+            'string.base': 'URL must be a string.',
+            'string.uri': 'Invalid URL format.',
+            'any.required': 'URL is required.',
+        }),
     taskGuidelineLink: Joi.string().uri({ scheme: ['http', 'https'] }) // Validates URLs with http/https
-    .required()
-    .messages({
-        'string.base': 'URL must be a string.',
-        'string.uri': 'Invalid URL format.',
-        'any.required': 'URL is required.',
-    }),
+        .required()
+        .messages({
+            'string.base': 'URL must be a string.',
+            'string.uri': 'Invalid URL format.',
+            'any.required': 'URL is required.',
+        }),
     taskName: Joi.string().min(4).required(),
     createdBy: Joi.string().min(4).required(),
     dueDate: Joi.date()
-    .greater('now') // Ensure the date is in the future
-    .required() // Ensure the field is mandatory
-    .messages({
-        'date.greater': 'Due date must be in the future', // Custom error message for invalid due date
-        'any.required': 'Due date is required', // Custom error message for missing due date
-    }),
+        .greater('now') // Ensure the date is in the future
+        .required() // Ensure the field is mandatory
+        .messages({
+            'date.greater': 'Due date must be in the future', // Custom error message for invalid due date
+            'any.required': 'Due date is required', // Custom error message for missing due date
+        }),
 });
 const taskAssignmentSchema = Joi.object({
     taskId: Joi.string().min(5).required(),
@@ -102,21 +113,21 @@ const dtUserProfileUpdateSchema = Joi.object({
         educationField: Joi.string().max(100).allow(''),
         yearsOfExperience: Joi.number().min(0).max(50),
         annotationExperienceTypes: Joi.array().items(
-            Joi.string().valid('text_annotation', 'image_annotation', 'audio_annotation', 'video_annotation', 
-                              'data_labeling', 'content_moderation', 'transcription', 'translation')
+            Joi.string().valid('text_annotation', 'image_annotation', 'audio_annotation', 'video_annotation',
+                'data_labeling', 'content_moderation', 'transcription', 'translation')
         )
     }).optional(),
 
     // Tool experience updates
     toolExperience: Joi.array().items(
-        Joi.string().valid('labelbox', 'scale_ai', 'cvat', 'e2f', 'appen', 'clickworker', 'mechanical_turk', 
-                          'toloka', 'remotasks', 'annotator_tools', 'custom_platforms')
+        Joi.string().valid('labelbox', 'scale_ai', 'cvat', 'e2f', 'appen', 'clickworker', 'mechanical_turk',
+            'toloka', 'remotasks', 'annotator_tools', 'custom_platforms')
     ).optional(),
 
     // Annotation skills updates
     annotationSkills: Joi.array().items(
-        Joi.string().valid('text_annotation', 'image_annotation', 'video_annotation', 'audio_annotation', 'sentiment_analysis', 'entity_recognition', 'classification', 'object_detection', 
-                          'semantic_segmentation', 'transcription', 'translation', 'content_moderation', 'data_entry')
+        Joi.string().valid('text_annotation', 'image_annotation', 'video_annotation', 'audio_annotation', 'sentiment_analysis', 'entity_recognition', 'classification', 'object_detection',
+            'semantic_segmentation', 'transcription', 'translation', 'content_moderation', 'data_entry')
     ).optional(),
 
     // Language proficiency updates
@@ -194,13 +205,13 @@ const dtUserPasswordResetSchema = Joi.object({
         })
 });
 
-module.exports = { 
-    signupSchema, 
-    loginSchema, 
-    projectSchema, 
-    taskSchema, 
-    taskAssignmentSchema, 
-    dtUserPasswordSchema, 
+module.exports = {
+    signupSchema,
+    loginSchema,
+    projectSchema,
+    taskSchema,
+    taskAssignmentSchema,
+    dtUserPasswordSchema,
     dtUserLoginSchema,
     dtUserProfileUpdateSchema,
     adminCreateSchema,

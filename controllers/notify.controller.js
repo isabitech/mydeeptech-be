@@ -61,7 +61,7 @@ class NotifyController {
 
         const userId = req.userId || req.user?.userId;
         const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 20;
+        const limit = parseInt(req.query.limit) || 10;
         const skip = (page - 1) * limit;
 
         console.log(`📥 User ${userId} requesting notifications - page ${page}, limit ${limit}`);

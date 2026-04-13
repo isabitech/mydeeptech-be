@@ -157,7 +157,7 @@ const revokeAccessCode = async (req, res) => {
 const getUsageHistory = async (req, res) => {
     try {
         const { code } = req.params;
-        const limit = parseInt(req.query.limit) || 50;
+        const limit = parseInt(req.query.limit) || 10;
         
         const requestContext = {
             user: {

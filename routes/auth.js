@@ -1,114 +1,82 @@
 const express = require('express');
-const { signup, login, getAllUsers, getUsers, updateUserRole, getUserById, getRoles, getRoleStatistics } = require('../controllers/user.js'); // Ensure this path is correct
-const { createProject, getProject, updateProject, deleteProject } = require('../controllers/project.js')
-const { createTask, getTask, getAllTasks, assignTask} = require('../controllers/task.js')
-const {validateVisitor} = require('../controllers/validateuser.js')
-const { 
-  createDTUser, 
-  verifyEmail, 
-  submitResult, 
-  updateUserStatus,
-  // manuallyAddUserToProject,
-  setupPassword, 
-  dtUserLogin, 
-  getDTUserProfile, 
-  updateDTUserProfile, 
-  resetDTUserPassword, 
-  resendVerificationEmail, 
-  getAvailableProjects, 
-  applyToProject, 
-  getUserActiveProjects, 
-  getUserInvoices, 
-  getUnpaidInvoices, 
-  getPaidInvoices, 
-  getInvoiceDetails, 
-  getInvoiceDashboard, 
-  getDTUserDashboard, 
-  submitResultWithCloudinary, 
-  getUserResultSubmissions, 
-  uploadIdDocument, 
-  uploadResume, 
-  getProjectGuidelines, 
-  me
-} = require("../controllers/dtUser.controller.js");
+const userController = require('../controllers/user.js'); // Ensure this path is correct
+const projectController = require('../controllers/project.js')
+const taskController = require('../controllers/task.js')
+const { validateVisitor } = require('../controllers/validateuser.js')
+const dtUserController = require("../controllers/dtUser.controller.js");
 const { authenticateToken, authorizeProfileAccess } = require('../middleware/auth.js');
-
+const { dtUserLoginSchema, dtUserPasswordResetSchema, dtUserPasswordSchema, dtUserPasswordResetSchema, } = require('../utils/authValidator.js')
+const validateRequest = require('../middleware/validate-request.middleware');
 // Import password reset controllers
-const { 
-  forgotPassword, 
-  resetPassword, 
-  dtUserForgotPassword, 
-  dtUserResetPassword, 
-  verifyResetToken 
-} = require('../controllers/passwordReset.controller.js');
+const passwordResetController = require('../controllers/passwordReset.controller.js');
 
 // Import Cloudinary upload middleware for result submissions
 const { resultFileUpload, idDocumentUpload, resumeUpload } = require('../config/cloudinary');
 
 const router = express.Router()
 
-router.post('/signup', signup);
-router.post('/login', login);
+router.post('/signup', userController.signup);
+router.post('/login', userController.login);
 
 // ======================
 // PASSWORD RESET ROUTES  
 // ======================
 
 // Regular User Password Reset
-router.post('/forgot-password', forgotPassword);
-router.post('/reset-password', resetPassword);
+router.post('/forgot-password', passwordResetController.forgotPassword);
+router.post('/reset-password', passwordResetController.resetPassword);
 
 // DTUser Password Reset
-router.post('/dtuser-forgot-password', dtUserForgotPassword);
-router.post('/dtuser-reset-password', dtUserResetPassword);
+router.post('/dtuser-forgot-password', passwordResetController.dtUserForgotPassword);
+router.post('/dtuser-reset-password', passwordResetController.dtUserResetPassword);
 
 // Token verification (optional - for frontend validation)
-router.get('/verify-reset-token/:token', verifyResetToken);
+router.get('/verify-reset-token/:token', passwordResetController.verifyResetToken);
 
 // ======================
 // OTHER AUTH ROUTES
 // ======================
 
-router.get('/getAllUsers', getAllUsers);
-router.get('/getUsers', getUsers);
-router.get('/users/:userId', getUserById);
-router.get('/roles', getRoles);
-router.get('/roles/statistics', getRoleStatistics);
-router.post('/createProject', createProject);
-router.get('/getProject', getProject);
-router.put('/updateProject/:id', updateProject);
-router.delete('/deleteProject/:id', deleteProject);
-router.post('/createTasks', createTask);
-router.get('/getTask/:id', getTask);
-router.get('/getAllTasks', getAllTasks);
-router.post('/assignTask', assignTask);
+router.get('/getAllUsers', userController.getAllUsers);
+router.get('/getUsers', userController.getUsers);
+router.get('/users/:userId', userController.getUserById);
+router.get('/roles', userController.getRoles);
+router.get('/roles/statistics', userController.getRoleStatistics);
+router.post('/createProject', projectController.createProject);
+router.get('/getProject', projectController.getProject);
+router.put('/updateProject/:id', projectController.updateProject);
+router.delete('/deleteProject/:id', projectController.deleteProject);
+router.post('/createTasks', taskController.createTask);
+router.get('/getTask/:id', taskController.getTask);
+router.get('/getAllTasks', taskController.getAllTasks);
+router.post('/assignTask', taskController.assignTask);
 router.post('/emailValidation', validateVisitor);
-router.post("/createDTuser", createDTUser);
-router.get("/verifyDTusermail/:id", verifyEmail);
-router.post("/setupPassword", setupPassword);
-router.post("/dtUserLogin", dtUserLogin);
-router.get("/me", authenticateToken, me);
-router.post("/resendVerificationEmail", resendVerificationEmail);
-router.get("/dtUserProfile/:userId", authenticateToken, authorizeProfileAccess, getDTUserProfile);
-router.patch("/dtUserProfile/:userId", authenticateToken, authorizeProfileAccess, updateDTUserProfile);
-router.patch("/dtUserResetPassword", authenticateToken, resetDTUserPassword);
+router.post("/createDTuser", validateRequest({ body: signupSchema }), dtUserController.createDTUser);
+router.get("/verifyDTusermail/:id", validateRequest({ params: idSchema, query: resendVerificationEmailSchema }), dtUserController.verifyEmail);
+router.post("/setupPassword", validateRequest({ body: dtUserPasswordSchema }), dtUserController.setupPassword);
+router.post("/dtUserLogin", validateRequest({ body: loginSchema }), dtUserController.dtUserLogin);
+router.get("/me", authenticateToken, dtUserController.me);
+router.post("/resendVerificationEmail", validateRequest({ body: resendVerificationEmailSchema }), dtUserController.resendVerificationEmail);
+router.get("/dtUserProfile/:userId", authenticateToken, authorizeProfileAccess, validateRequest({ params: idSchema }), dtUserController.getDTUserProfile);
+router.patch("/dtUserProfile/:userId", authenticateToken, authorizeProfileAccess, validateRequest({ params: idSchema, body: dtUserProfileUpdateSchema }), dtUserController.updateDTUserProfile);
+router.patch("/dtUserResetPassword", authenticateToken, validateRequest({ body: dtUserPasswordResetSchema }), dtUserController.resetDTUserPassword);
 
 // Project routes for DTUsers (approved annotators only)
-router.get("/projects", authenticateToken, getAvailableProjects);
+router.get("/projects", authenticateToken, dtUserController.getAvailableProjects);
 // router.post("/projects/manually-apply", dtUserController.manuallyAddUserToProject);
-router.post("/projects/:projectId/apply", authenticateToken, applyToProject);
-router.get("/projects/:projectId/guidelines", authenticateToken, getProjectGuidelines);
-router.get("/activeProjects/:userId", authenticateToken, getUserActiveProjects);
+router.post("/projects/:projectId/apply", authenticateToken, dtUserController.applyToProject);
+router.get("/projects/:projectId/guidelines", authenticateToken, dtUserController.getProjectGuidelines);
+router.get("/activeProjects/:userId", authenticateToken, dtUserController.getUserActiveProjects);
 
 // DTUser Invoice Routes
-router.get('/invoices', authenticateToken, getUserInvoices);
-router.get('/invoices/unpaid', authenticateToken, getUnpaidInvoices);
-router.get('/invoices/paid', authenticateToken, getPaidInvoices);
-router.get('/invoices/dashboard', authenticateToken, getInvoiceDashboard);
-router.get('/invoices/:invoiceId', authenticateToken, getInvoiceDetails);
+router.get('/invoices', authenticateToken, dtUserController.getUserInvoices);
+router.get('/invoices/unpaid', authenticateToken, dtUserController.getUnpaidInvoices);
+router.get('/invoices/paid', authenticateToken, dtUserController.getPaidInvoices);
+router.get('/invoices/dashboard', authenticateToken, dtUserController.getInvoiceDashboard);
+router.get('/invoices/:invoiceId', authenticateToken, dtUserController.getInvoiceDetails);
 
 // DTUser Dashboard Route - Personal overview for authenticated DTUsers
-router.get('/dashboard', authenticateToken, getDTUserDashboard);
+router.get('/dashboard', authenticateToken, dtUserController.getDTUserDashboard);
 
 // DTUser Result Submission Routes (NEW) - flexible field names
 router.post('/submit-result', authenticateToken, (req, res, next) => {
@@ -143,9 +111,9 @@ router.post('/submit-result', authenticateToken, (req, res, next) => {
     // Proceed to the controller
     next();
   });
-}, submitResultWithCloudinary);
+}, dtUserController.submitResultWithCloudinary);
 
-router.get('/result-submissions', authenticateToken, getUserResultSubmissions);
+router.get('/result-submissions', authenticateToken, dtUserController.getUserResultSubmissions);
 
 // Upload ID Document Route - adds to profile information
 router.post('/upload-id-document', authenticateToken, (req, res, next) => {
@@ -182,7 +150,7 @@ router.post('/upload-id-document', authenticateToken, (req, res, next) => {
     // Proceed to the controller
     next();
   });
-}, uploadIdDocument);
+}, dtUserController.uploadIdDocument);
 
 // Upload Resume Route - adds to profile information  
 router.post('/upload-resume', authenticateToken, (req, res, next) => {
@@ -216,7 +184,7 @@ router.post('/upload-resume', authenticateToken, (req, res, next) => {
     // Proceed to the controller
     next();
   });
-}, uploadResume);
+}, dtUserController.uploadResume);
 
 // Debug endpoint to test file upload (temporary)
 router.post('/debug-upload', authenticateToken, (req, res) => {
@@ -225,7 +193,7 @@ router.post('/debug-upload', authenticateToken, (req, res) => {
   console.log('Body keys:', Object.keys(req.body));
   console.log('Files:', req.files);
   console.log('File:', req.file);
-  
+
   res.json({
     success: true,
     message: 'Debug endpoint - check server logs for details',
