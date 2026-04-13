@@ -139,7 +139,7 @@ const applyReviewScoring = (payload, body, existingSubmission) => {
   if (existingSubmission?.reviewRating) return payload;
 
   const band = BRITISH_COUNCIL_BANDS.find(
-    (b) => totalScore >= b.min && totalScore <= b.max
+    (b) => totalScore >= b.min && totalScore <= b.max,
   );
 
   payload.reviewRating = {
@@ -158,15 +158,12 @@ class AssessmentReviewService {
     const existing = await assessmentReviewRepository.findByUserId(data.userId);
 
     if (existing) {
-      const error = new Error(
-        "A submission with this user ID already exists."
-      );
+      const error = new Error("A submission with this user ID already exists.");
       error.statusCode = 409;
       throw error;
     }
 
-    const assessmentSubmission =
-      await assessmentReviewRepository.create(data);
+    const assessmentSubmission = await assessmentReviewRepository.create(data);
 
     if (assessmentSubmission) {
       await DTUser.findByIdAndUpdate(data.userId, {
@@ -180,13 +177,24 @@ class AssessmentReviewService {
   /**
    * Get all submissions (paginated)
    */
-  async getAllSubmissions({ page, limit, sort, search }) {
+  async getAllSubmissions({
+    page,
+    limit,
+    sort,
+    search,
+    scoreFilter,
+    minScore,
+    maxScore,
+  }) {
     const { assessmentReviews, total } =
       await assessmentReviewRepository.findAllPaginated({
         page,
         limit,
         sort,
         search,
+        scoreFilter,
+        minScore,
+        maxScore,
       });
 
     return {
@@ -257,10 +265,7 @@ class AssessmentReviewService {
       ...pickDefined(body, UPDATE_FIELDS),
     };
 
-    if (
-      body.reviewerComment !== undefined ||
-      body.reviewRating !== undefined
-    ) {
+    if (body.reviewerComment !== undefined || body.reviewRating !== undefined) {
       payload.reviewerId = reviewerId;
     }
 
@@ -281,11 +286,7 @@ class AssessmentReviewService {
       throw error;
     }
 
-    const payload = this.buildUpdatePayload(
-      body,
-      reviewerId,
-      submission
-    );
+    const payload = this.buildUpdatePayload(body, reviewerId, submission);
 
     return assessmentReviewRepository.update(id, payload);
   }
