@@ -7,6 +7,7 @@ const bcrypt = require('bcrypt');
 // Signup controller
 const signup = async (req, res) => {
   try {
+
     const { error } = signupSchema.validate(req.body);
     if (error) return res.status(400).json({ message: error.details[0].message });
 

@@ -1,3 +1,4 @@
+const envConfig = require('../config/envConfig');
 const { sendEmail } = require('./brevoSMTP');
 const dotenv = require('dotenv');
 dotenv.config();
@@ -74,7 +75,7 @@ const sendTicketCreationEmail = async (userEmail, ticket) => {
                 </ul>
                 
                 <div style="text-align: center; margin: 30px 0;">
-                    <a href="${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/dashboard/support" class="btn">
+                    <a href="${envConfig.FRONTEND_URL || 'https://mydeeptech.ng'}/dashboard/support" class="btn">
                         View Ticket in Dashboard
                     </a>
                 </div>
@@ -220,7 +221,7 @@ const sendTicketStatusUpdateEmail = async (userEmail, ticket, oldStatus, newStat
                     <p style="color: #155724; margin-bottom: 15px;">
                         How was your support experience? Your feedback helps us serve you better.
                     </p>
-                    <a href="${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/dashboard/support/rate/${ticket._id}" 
+                    <a href="${envConfig.FRONTEND_URL || 'https://mydeeptech.ng'}/dashboard/support/rate/${ticket._id}" 
                        style="background: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
                         Rate Your Experience
                     </a>
@@ -228,7 +229,7 @@ const sendTicketStatusUpdateEmail = async (userEmail, ticket, oldStatus, newStat
                 ` : ''}
                 
                 <div style="text-align: center; margin: 30px 0;">
-                    <a href="${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/dashboard/support/${ticket._id}" class="btn">
+                    <a href="${envConfig.FRONTEND_URL || 'https://mydeeptech.ng'}/dashboard/support/${ticket._id}" class="btn">
                         View Ticket Details
                     </a>
                 </div>
@@ -263,7 +264,7 @@ ${statusMessage}
 Next Steps:
 ${nextSteps}
 
-View your ticket: ${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/dashboard/support/${ticket._id}
+View your ticket: ${envConfig.FRONTEND_URL || 'https://mydeeptech.ng'}/dashboard/support/${ticket._id}
 
 Need help? Reply to this email or contact support@mydeeptech.ng
 
@@ -534,7 +535,7 @@ const sendOfflineAgentNotification = async (supportEmail, ticket, user) => {
                 ` : ''}
 
                 <div style="text-align: center; margin: 30px 0;">
-                    <a href="${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/admin/support/chat/${ticket._id}" 
+                    <a href="${envConfig.FRONTEND_URL || 'https://mydeeptech.ng'}/admin/support/chat/${ticket._id}" 
                        class="action-button">
                         🚀 JOIN CHAT NOW
                     </a>
@@ -579,8 +580,8 @@ ACTION REQUIRED:
 - Join chat to assist customer
 - Customer is waiting for real-time support
 
-Login: ${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/admin/login
-Direct Chat: ${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/admin/support/chat/${ticket._id}
+Login: ${envConfig.FRONTEND_URL || 'https://mydeeptech.ng'}/admin/login
+Direct Chat: ${envConfig.FRONTEND_URL || 'https://mydeeptech.ng'}/admin/support/chat/${ticket._id}
 
 MyDeepTech Support System
     `;
@@ -666,7 +667,7 @@ const sendAdminReplyNotificationEmail = async (userEmail, ticket, adminReply) =>
                 </p>
                 
                 <div style="text-align: center; margin: 30px 0;">
-                    <a href="${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/dashboard/support/chat/${ticket._id}" class="btn">
+                    <a href="${envConfig.FRONTEND_URL || 'https://mydeeptech.ng'}/dashboard/support/chat/${ticket._id}" class="btn">
                         💬 Continue Chat
                     </a>
                 </div>
@@ -682,7 +683,7 @@ const sendAdminReplyNotificationEmail = async (userEmail, ticket, adminReply) =>
             <div class="footer">
                 <p style="margin: 0 0 10px 0; color: #333;"><strong>📞 Need More Help?</strong></p>
                 <p style="margin: 5px 0;">
-                    💬 Continue chatting: <a href="${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/dashboard/support/chat/${ticket._id}" style="color: #28a745;">Live Chat</a><br>
+                    💬 Continue chatting: <a href="${envConfig.FRONTEND_URL || 'https://mydeeptech.ng'}/dashboard/support/chat/${ticket._id}" style="color: #28a745;">Live Chat</a><br>
                     📧 Email: <a href="mailto:support@mydeeptech.ng" style="color: #28a745;">support@mydeeptech.ng</a>
                 </p>
                 
@@ -708,7 +709,7 @@ From: ${adminReply.senderName || 'Support Team'}
 Time: ${new Date(adminReply.timestamp).toLocaleString()}
 Message: "${adminReply.message}"
 
-Continue the conversation: ${process.env.FRONTEND_URL || 'https://mydeeptech.ng'}/dashboard/support/chat/${ticket._id}
+Continue the conversation: ${envConfig.FRONTEND_URL || 'https://mydeeptech.ng'}/dashboard/support/chat/${ticket._id}
 
 Note: You'll receive at most one email notification per day for chat replies.
 For real-time chat, use the live chat feature on our website.

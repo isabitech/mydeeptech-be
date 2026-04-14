@@ -1,5 +1,5 @@
 const express = require('express');
-const { signup, login, getAllUsers, getUsers, updateUserRole, getUserById, getRoles, getRoleStatistics } = require('../controllers/user.js'); // Ensure this path is correct
+const { signup, login, getAllUsers, getUsers, getUserById, getRoles, getRoleStatistics } = require('../controllers/user.js'); // Ensure this path is correct
 const { createProject, getProject, updateProject, deleteProject } = require('../controllers/project.js')
 const { createTask, getTask, getAllTasks, assignTask} = require('../controllers/task.js')
 const {validateVisitor} = require('../controllers/validateuser.js')
@@ -29,7 +29,9 @@ const {
   uploadIdDocument, 
   uploadResume, 
   getProjectGuidelines, 
-  me
+  me,
+  getSopAcceptanceStatus,
+  recordSopAcceptance
 } = require("../controllers/dtUser.controller.js");
 const { authenticateToken, authorizeProfileAccess } = require('../middleware/auth.js');
 
@@ -106,6 +108,10 @@ router.get('/invoices/unpaid', authenticateToken, getUnpaidInvoices);
 router.get('/invoices/paid', authenticateToken, getPaidInvoices);
 router.get('/invoices/dashboard', authenticateToken, getInvoiceDashboard);
 router.get('/invoices/:invoiceId', authenticateToken, getInvoiceDetails);
+
+// SOP (Standard Operating Procedure) Routes
+router.get('/sop-acceptance/status', authenticateToken, getSopAcceptanceStatus);
+router.post('/sop-acceptance', authenticateToken, recordSopAcceptance);
 
 // DTUser Dashboard Route - Personal overview for authenticated DTUsers
 router.get('/dashboard', authenticateToken, getDTUserDashboard);

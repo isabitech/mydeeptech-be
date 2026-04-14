@@ -54,11 +54,38 @@ class ResourceController {
   // GET /resources/me/allowed
   async getMyAllowedResources(req, res, next) {
     try {
+      const userId = req.user?.userId;
+      
+      if (!userId) {
+        return res.status(400).json({
+          success: false,
+          message: "User ID not found in request",
+          code: 'USER_ID_MISSING'
+        });
+      }
+
+      // Check if user is legacy admin without proper role_permission
+      const user = req.user?.userDoc;
+      const isLegacyAdmin = user?.role === 'admin' && !user?.role_permission;
+      
+      if (isLegacyAdmin) {
+        console.log(`🔧 Legacy admin detected: ${user.email}. Returning all resources.`);
+        // Return all published resources for legacy admin users
+        const allResources = await resourceService.getAllResourcesHierarchy(false, "custom");
+        return res.status(200).json({
+          success: true,
+          message: "Sidebar resources fetched successfully (legacy admin bypass)",
+          count: allResources.length,
+          data: allResources,
+        });
+      }
+
       const resources = await resourceService.getResourcesForUserHierarchy(
-        req.user?.userId,
+        userId,
         false,
         "custom",
       );
+      
       return res.status(200).json({
         success: true,
         message: "Sidebar resources fetched successfully",
@@ -66,6 +93,7 @@ class ResourceController {
         data: resources,
       });
     } catch (error) {
+      console.error("❌ Error fetching allowed resources:", error);
       next(error);
     }
   }

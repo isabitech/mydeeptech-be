@@ -88,13 +88,11 @@ const checkQaStatusDistribution = async () => {
       }
     ]);
 
-    console.log('📊 QA Status Distribution:');
     distribution.forEach(item => {
       console.log(`   ${item._id || 'null/undefined'}: ${item.count} users`);
     });
 
     const totalUsers = await DTUser.countDocuments();
-    console.log(`📊 Total users: ${totalUsers}`);
 
   } catch (error) {
     console.error('❌ Error checking distribution:', error);

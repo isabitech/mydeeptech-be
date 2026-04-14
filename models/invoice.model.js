@@ -273,7 +273,7 @@ invoiceSchema.statics.getInvoiceStats = async function(dtUserId, adminId = null)
       : adminId;
   }
   
-  console.log(`🔍 Invoice stats match condition:`, matchCondition);
+  // console.log(`🔍 Invoice stats match condition:`, matchCondition);
   
   const stats = await this.aggregate([
     { $match: matchCondition },
@@ -327,7 +327,7 @@ invoiceSchema.statics.getInvoiceStats = async function(dtUserId, adminId = null)
     overdueCount: 0
   };
   
-  console.log(`📈 Final stats result:`, result);
+  // console.log(`📈 Final stats result:`, result);
   return result;
 };
 

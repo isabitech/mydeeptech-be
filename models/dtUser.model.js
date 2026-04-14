@@ -237,7 +237,7 @@ const dtUserSchema = new mongoose.Schema(
       other_languages: { type: [String], default: [] },
       english_fluency_level: {
         type: String,
-        enum: ["basic", "intermediate", "advanced", "native", ""],
+        enum: ["basic", "intermediate", "advanced", "fluent", "native", ""],
         default: "",
       },
     },
@@ -290,6 +290,12 @@ const dtUserSchema = new mongoose.Schema(
     assessmentSubmission: {
       type: Boolean,
       default: false,
+    },
+
+    // SOP (Standard Operating Procedure) acceptance tracking
+    sop_acceptance: {
+      has_accepted: { type: Boolean, default: false },
+      accepted_at: { type: Date, default: null },
     },
   },
 
