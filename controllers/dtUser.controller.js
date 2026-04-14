@@ -27,6 +27,7 @@ const adminVerificationStore = require("../utils/adminVerificationStore");
 const envConfig = require("../config/envConfig");
 const { RoleType } = require("../utils/role");
 const MailService = require("../services/mail-service/mail-service");
+const DomainToUserService = require("../services/domain-to-user.service");
 
 // Function to send verification emails to all unverified users
 const sendVerificationEmailsToUnverifiedUsers = async (req, res) => {
@@ -151,8 +152,20 @@ const sendVerificationEmailsToUnverifiedUsers = async (req, res) => {
 // Option 1: Send email with timeout (current implementation)
 const createDTUser = async (req, res) => {
   try {
-    const { fullName, phone, email, domains, socialsFollowed, consent } =
-      req.body;
+
+    const { fullName, phone, email, country, domains, socialsFollowed, consent } = req.body;
+
+    const domainIds = domains.map((domain) => domain.id);
+    const domainNames = domains.map((domain) => domain.name);
+
+    if(!domainIds || domainIds.length === 0) {
+        return res.status(500).json({
+        status: false,
+        user: null,
+        message: "Domain IDs are required",
+        error: "Domain IDs are required",
+      });
+    }
 
     // 1️⃣ Check if user already exists
     const existing = await DTUser.findOne({ email });
@@ -167,13 +180,28 @@ const createDTUser = async (req, res) => {
       fullName,
       phone,
       email,
-      domains,
+      domains: domainNames,
       socialsFollowed,
       consent,
+      personal_info: {
+        country: country || "", // Store the full country name (e.g., "Nigeria", "United States", "Kenya")
+      },
     });
 
     // 3️⃣ Save user to database
     const savedUser = await newUser.save();
+
+    if(!savedUser) {
+      return res.status(500).json({
+        status: false,
+        user: null,
+        message: "Server error",
+        error: "Server error",
+      });
+    }
+
+    // Map domain to user after creation
+    await DomainToUserService.assignMultipleDomainsToUser(savedUser._id, domainIds);
 
     // 4️⃣ Send verification email asynchronously with timeout
     // FIXED: Use only one email service to prevent conflicts
@@ -191,9 +219,6 @@ const createDTUser = async (req, res) => {
 
     try {
       await emailPromise;
-      console.log(
-        `✅ Verification email sent successfully to ${savedUser.email}`,
-      );
 
       res.status(201).json({
         message: "User created successfully. Verification email sent.",
@@ -223,9 +248,8 @@ const createDTUser = async (req, res) => {
 // Option 2: Background email sending (recommended for production)
 const createDTUserWithBackgroundEmail = async (req, res) => {
   try {
-    const { fullName, phone, email, domains, socialsFollowed, consent } =
-      req.body;
-
+    const { fullName, phone, email, country, domains, socialsFollowed, consent } = req.body;
+    const domainNames = domains.map((domain) => domain.name);
     // 1️⃣ Check if user already exists
     const existing = await DTUser.findOne({ email });
     if (existing) {
@@ -239,9 +263,12 @@ const createDTUserWithBackgroundEmail = async (req, res) => {
       fullName,
       phone,
       email,
-      domains,
+      domains: domainNames,
       socialsFollowed,
       consent,
+      personal_info: {
+        country: country || "", // Store the full country name (e.g., "Nigeria", "United States", "Kenya")
+      },
     });
 
     // 3️⃣ Save user to database
@@ -252,8 +279,7 @@ const createDTUserWithBackgroundEmail = async (req, res) => {
 
     // 5️⃣ Respond immediately without waiting for email
     res.status(201).json({
-      message:
-        "User created successfully. Verification email will be sent shortly.",
+      message: "User created successfully. Verification email will be sent shortly.",
       user: savedUser,
     });
   } catch (error) {
@@ -270,11 +296,6 @@ const verifyEmail = async (req, res) => {
   try {
     const { id } = req.params;
     const { email } = req.query;
-
-    console.log(
-      `🔍 Attempting to verify email for user ID: ${id}, email: ${email}`,
-    );
-
     // Find user by ID and email for extra security
     const user = await DTUser.findById(id);
 
@@ -315,8 +336,6 @@ const verifyEmail = async (req, res) => {
     // Update user verification status
     user.isEmailVerified = true;
     await user.save();
-
-    console.log(`✅ Email successfully verified for user: ${email}`);
 
     res.status(200).json({
       success: true,
@@ -403,8 +422,6 @@ const setupPassword = async (req, res) => {
     user.password = hashedPassword;
     user.hasSetPassword = true;
     await user.save();
-
-    console.log(`✅ Password successfully set for user: ${email}`);
 
     res.status(200).json({
       success: true,
@@ -637,8 +654,6 @@ const getDTUserProfile = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    console.log(`📋 Fetching profile for user ID: ${userId}`);
-
     // Find user by ID
     const user = await DTUser.findById(userId);
 
@@ -649,8 +664,6 @@ const getDTUserProfile = async (req, res) => {
         message: "User not found",
       });
     }
-
-    console.log(`✅ Profile found for user: ${user.email}`);
 
     // Structure the response in camelCase format with all requested fields
     const profileData = {
@@ -693,8 +706,7 @@ const getDTUserProfile = async (req, res) => {
         educationField: user.professional_background?.education_field || "",
         yearsOfExperience:
           user.professional_background?.years_of_experience || 0,
-        annotationExperienceTypes:
-          user.professional_background?.annotation_experience_types || [],
+        annotationExperienceTypes: user.professional_background?.annotation_experience_types || [],
       },
       toolExperience: user.tool_experience || [],
       annotationSkills: user.annotation_skills || [],
@@ -1229,6 +1241,7 @@ const getAllDTUsers = async (req, res) => {
       verified,
       hasPassword,
       search,
+      country,
     } = req.query;
 
     // Build filter object
@@ -1262,6 +1275,21 @@ const getAllDTUsers = async (req, res) => {
         { email: { $regex: search, $options: "i" } },
         { phone: { $regex: search, $options: "i" } },
       ];
+    }
+
+    // Filter by country if provided
+    if (country) {
+      if (country.toLowerCase() === "unknown") {
+        // Handle "Unknown" country - users without country info
+        filter.$or = [
+          { "personal_info.country": { $exists: false } },
+          { "personal_info.country": null },
+          { "personal_info.country": "" },
+        ];
+      } else {
+        // Filter by specific country (case-insensitive)
+        filter["personal_info.country"] = { $regex: `^${country}$`, $options: "i" };
+      }
     }
 
     // Calculate pagination
@@ -5332,6 +5360,103 @@ const updateUserRole = async (req, res) => {
   }
 };
 
+// SOP (Standard Operating Procedure) acceptance tracking 
+
+/**
+ * Check if user has accepted the SOP
+ * GET /api/auth/sop-acceptance/status
+ */
+const getSopAcceptanceStatus = async (req, res) => {
+  try {
+
+    const { userId } = req.user;
+
+    const user = await DTUser.findById(userId).select('sop_acceptance fullName email _id');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+        data: null,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "SOP acceptance status retrieved successfully",
+      data: {
+        has_accepted: user.sop_acceptance?.has_accepted || false,
+        accepted_at: user.sop_acceptance?.accepted_at || null,
+        user: {
+          userId: user._id,
+          name: user.fullName,
+          email: user.email,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error getting SOP acceptance status:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get SOP acceptance status",
+      error: error.message || "Unknown error",
+      data: null,
+    });
+  }
+};
+
+/**
+ * Record user's acceptance of the SOP
+ * POST /api/auth/sop-acceptance
+ */
+const recordSopAcceptance = async (req, res) => {
+  try {
+
+    const { userId } = req.user;
+    
+    const user = await DTUser.findByIdAndUpdate(
+      userId, 
+      {
+        $set: {
+          'sop_acceptance.has_accepted': true,
+          'sop_acceptance.accepted_at': new Date(),
+        }
+      },
+      { new: true }
+    ).select('sop_acceptance fullName email _id');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+        data: null,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "SOP acceptance recorded successfully",
+      data: {
+        has_accepted: user.sop_acceptance.has_accepted,
+        accepted_at: user.sop_acceptance.accepted_at,
+        user: {
+          userId: user._id,
+          name: user.fullName,
+          email: user.email,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error recording SOP acceptance:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to record SOP acceptance",
+      error: error.message || "Unknown error",
+      data: null,
+    });
+  }
+};
+
 module.exports = {
   me,
   createDTUser,
@@ -5376,4 +5501,6 @@ module.exports = {
   getAllUsersForRoleManagement,
   updateUserRole,
   manuallyAddUserToProject,
+  getSopAcceptanceStatus,
+  recordSopAcceptance,
 };

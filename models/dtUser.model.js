@@ -291,6 +291,12 @@ const dtUserSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+
+    // SOP (Standard Operating Procedure) acceptance tracking
+    sop_acceptance: {
+      has_accepted: { type: Boolean, default: false },
+      accepted_at: { type: Date, default: null },
+    },
   },
 
   { timestamps: true },
