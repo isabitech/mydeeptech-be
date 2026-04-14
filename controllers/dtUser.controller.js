@@ -1244,6 +1244,8 @@ const getAllDTUsers = async (req, res) => {
       country,
     } = req.query;
 
+    console.log(`🔍 Filters - Status: ${status}, Verified: ${verified}, HasPassword: ${hasPassword}, Search: ${search}, Country: ${country}`);
+
     // Build filter object
     const filter = {};
 
@@ -1322,6 +1324,29 @@ const getAllDTUsers = async (req, res) => {
     console.log(
       `✅ Retrieved ${users.length} DTUsers (Page ${page}/${totalPages})`,
     );
+
+    console.log("ASSESSMENT DEBUG::", JSON.stringify(
+      {
+    data: {
+        users: users,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: totalPages,
+          totalUsers: totalUsers,
+          usersPerPage: parseInt(limit),
+          hasNextPage: parseInt(page) < totalPages,
+          hasPreviousPage: parseInt(page) > 1,
+        },
+        summary: {
+          totalUsers: totalUsers,
+          statusBreakdown: statusSummary.reduce((acc, item) => {
+            acc[item._id] = item.count;
+            return acc;
+          }, {}),
+          filters: filter,
+        },
+      },
+      }, null, 2));
 
     res.status(200).json({
       success: true,
@@ -2110,11 +2135,6 @@ const getAllQAUsers = async (req, res) => {
     statusCounts.forEach((status) => {
       counts[status._id] = status.count;
     });
-
-    console.log(
-      `✅ Retrieved ${qaUsers.length} QA users (page ${page}, total: ${totalUsers})`,
-    );
-    console.log(`📊 Status distribution:`, counts);
 
     // Return paginated results
     res.status(200).json({
