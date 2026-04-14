@@ -1942,6 +1942,8 @@ const getAdminDashboard = async (req, res) => {
       },
     };
 
+    console.log(`📊 Dashboard generated for admin ${req.admin.email}`);
+
     res.status(200).json({
       success: true,
       data: dashboardData,
