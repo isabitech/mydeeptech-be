@@ -51,12 +51,40 @@ class AssessmentReviewController {
         typeof req.query.search === "string" && req.query.search.trim()
           ? req.query.search.trim()
           : undefined;
+      const scoreFilter =
+        typeof req.query.scoreFilter === "string"
+          ? req.query.scoreFilter.toLowerCase()
+          : undefined;
+
+      // ✅ NEW: scoreRange parsing
+      let minScore, maxScore;
+
+      if (typeof req.query.scoreRange === "string") {
+        const parts = req.query.scoreRange.split("-");
+
+        if (parts.length === 2) {
+          minScore = Number(parts[0]);
+          maxScore = Number(parts[1]);
+
+          if (isNaN(minScore) || isNaN(maxScore)) {
+            return res.status(400).json({
+              success: false,
+              message: "Range must be in format min-max (e.g. 50-80)",
+            });
+          }
+        }
+      }
+
       const submissions = await AssessmentReviewService.getAllSubmissions({
         page,
         limit,
         sort: { createdAt: -1 },
         search,
+        scoreFilter,
+        minScore,
+        maxScore,
       });
+
       return ResponseClass.Success(res, {
         message: "Submissions fetched successfully",
         data: submissions,

@@ -1,6 +1,9 @@
 const assessmentReviewRepository = require("../repositories/assessmentReview.repository");
 const DTUser = require("../models/dtUser.model");
 
+/**
+ * British Council grading bands
+ */
 const BRITISH_COUNCIL_BANDS = [
   { grade: "Pre-A1", level: "Beginner", min: 0, max: 99 },
   { grade: "A1", level: "Elementary", min: 100, max: 199 },
@@ -10,6 +13,9 @@ const BRITISH_COUNCIL_BANDS = [
   { grade: "C1", level: "Advanced", min: 500, max: 599 },
 ];
 
+/**
+ * Preset ratings for quick lookup
+ */
 const REVIEW_RATING_PRESETS = {
   "Pre-A1": { score: 99, grade: "Pre-A1", level: "Beginner" },
   A1: { score: 199, grade: "A1", level: "Elementary" },
@@ -19,6 +25,9 @@ const REVIEW_RATING_PRESETS = {
   C1: { score: 599, grade: "C1", level: "Advanced" },
 };
 
+/**
+ * Allowed fields for update
+ */
 const UPDATE_FIELDS = [
   "fullName",
   "emailAddress",
@@ -35,21 +44,30 @@ const UPDATE_FIELDS = [
   "reviewRating",
 ];
 
+/**
+ * Utility: pick only defined fields
+ */
 const pickDefined = (source, allowedKeys) => {
   const output = {};
+
   allowedKeys.forEach((key) => {
     if (source[key] !== undefined) {
       output[key] = source[key];
     }
   });
+
   return output;
 };
 
+/**
+ * Core scoring logic
+ */
 const applyReviewScoring = (payload, body, existingSubmission) => {
   const resolvedEnglishScore =
     body.englishTestScore !== undefined
       ? Number(body.englishTestScore)
       : existingSubmission?.englishTestScore;
+
   const resolvedProblemScore =
     body.problemSolvingScore !== undefined
       ? Number(body.problemSolvingScore)
@@ -57,8 +75,10 @@ const applyReviewScoring = (payload, body, existingSubmission) => {
 
   const hasEnglishScore = resolvedEnglishScore !== undefined;
   const hasProblemScore = resolvedProblemScore !== undefined;
+
   const englishScore = Number(resolvedEnglishScore);
   const problemScore = Number(resolvedProblemScore);
+
   const scoresAreFinite =
     Number.isFinite(englishScore) && Number.isFinite(problemScore);
 
@@ -67,8 +87,11 @@ const applyReviewScoring = (payload, body, existingSubmission) => {
       ? englishScore + problemScore
       : undefined;
 
-  // Honor explicit reviewRating if provided
+  /**
+   * 1. Respect explicitly provided reviewRating
+   */
   if (body.reviewRating !== undefined) {
+    // Case: string rating (e.g. "A1")
     if (typeof body.reviewRating === "string") {
       const preset = REVIEW_RATING_PRESETS[body.reviewRating];
 
@@ -76,15 +99,18 @@ const applyReviewScoring = (payload, body, existingSubmission) => {
         ...(preset
           ? { grade: preset.grade, level: preset.level }
           : { grade: body.reviewRating }),
+
         ...(totalScore !== undefined
           ? { score: totalScore }
           : preset
             ? { score: preset.score }
             : {}),
       };
+
       return payload;
     }
 
+    // Case: object rating
     if (body.reviewRating && typeof body.reviewRating === "object") {
       const preset = body.reviewRating.grade
         ? REVIEW_RATING_PRESETS[body.reviewRating.grade]
@@ -99,15 +125,18 @@ const applyReviewScoring = (payload, body, existingSubmission) => {
             ? { score: preset.score }
             : {}),
       };
+
       return payload;
     }
   }
 
-  // Only auto-calculate reviewRating if:
-  // 1. No existing reviewRating exists in the database, AND
-  // 2. We have valid total score to calculate from
+  /**
+   * 2. Auto-calculate only if:
+   * - totalScore exists
+   * - no existing reviewRating
+   */
   if (totalScore === undefined) return payload;
-  if (existingSubmission?.reviewRating) return payload; // Preserve existing rating if it exists
+  if (existingSubmission?.reviewRating) return payload;
 
   const band = BRITISH_COUNCIL_BANDS.find(
     (b) => totalScore >= b.min && totalScore <= b.max,
@@ -122,29 +151,50 @@ const applyReviewScoring = (payload, body, existingSubmission) => {
 };
 
 class AssessmentReviewService {
+  /**
+   * Create submission
+   */
   async createSubmission(data) {
     const existing = await assessmentReviewRepository.findByUserId(data.userId);
+
     if (existing) {
       const error = new Error("A submission with this user ID already exists.");
       error.statusCode = 409;
       throw error;
     }
+
     const assessmentSubmission = await assessmentReviewRepository.create(data);
+
     if (assessmentSubmission) {
       await DTUser.findByIdAndUpdate(data.userId, {
         assessmentSubmission: true,
       });
     }
+
     return assessmentSubmission;
   }
 
-  async getAllSubmissions({ page, limit, sort, search }) {
+  /**
+   * Get all submissions (paginated)
+   */
+  async getAllSubmissions({
+    page,
+    limit,
+    sort,
+    search,
+    scoreFilter,
+    minScore,
+    maxScore,
+  }) {
     const { assessmentReviews, total } =
       await assessmentReviewRepository.findAllPaginated({
         page,
         limit,
         sort,
         search,
+        scoreFilter,
+        minScore,
+        maxScore,
       });
 
     return {
@@ -156,6 +206,9 @@ class AssessmentReviewService {
     };
   }
 
+  /**
+   * Get submissions by user (paginated)
+   */
   async getSubmissionsByUserId({ userId, page, limit, sort }) {
     const { assessmentReviews, total } =
       await assessmentReviewRepository.findByUserIdPaginated({
@@ -174,27 +227,39 @@ class AssessmentReviewService {
     };
   }
 
+  /**
+   * Get single submission
+   */
   async getSubmissionById(id) {
     const submission = await assessmentReviewRepository.findById(id);
+
     if (!submission) {
       const error = new Error("Submission not found.");
       error.statusCode = 404;
       throw error;
     }
+
     return submission;
   }
 
+  /**
+   * Update submission directly
+   */
   async updateSubmission(id, data) {
     const submission = await assessmentReviewRepository.findById(id);
+
     if (!submission) {
       const error = new Error("Submission not found.");
       error.statusCode = 404;
       throw error;
     }
 
-    return await assessmentReviewRepository.update(id, data);
+    return assessmentReviewRepository.update(id, data);
   }
 
+  /**
+   * Build update payload
+   */
   buildUpdatePayload(body, reviewerId, existingSubmission) {
     const payload = {
       ...pickDefined(body, UPDATE_FIELDS),
@@ -209,8 +274,12 @@ class AssessmentReviewService {
     return applyReviewScoring(payload, body, existingSubmission);
   }
 
+  /**
+   * Update submission via request
+   */
   async updateSubmissionFromRequest({ id, body, reviewerId }) {
     const submission = await assessmentReviewRepository.findById(id);
+
     if (!submission) {
       const error = new Error("Submission not found.");
       error.statusCode = 404;
@@ -218,11 +287,16 @@ class AssessmentReviewService {
     }
 
     const payload = this.buildUpdatePayload(body, reviewerId, submission);
+
     return assessmentReviewRepository.update(id, payload);
   }
 
+  /**
+   * Delete submission
+   */
   async deleteSubmission(id) {
     const submission = await assessmentReviewRepository.findById(id);
+
     if (!submission) {
       const error = new Error("Submission not found.");
       error.statusCode = 404;
@@ -230,6 +304,7 @@ class AssessmentReviewService {
     }
 
     await assessmentReviewRepository.delete(id);
+
     return { message: "Submission deleted successfully." };
   }
 }
