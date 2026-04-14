@@ -32,10 +32,14 @@ const DomainToUserService = require("../services/domain-to-user.service");
 // Function to send verification emails to all unverified users
 const sendVerificationEmailsToUnverifiedUsers = async (req, res) => {
   try {
+    console.log("🔍 Starting bulk verification email process...");
+
     // Find all users with unverified emails
     const unverifiedUsers = await DTUser.find({ isEmailVerified: false })
       .select("fullName email isEmailVerified _id")
       .sort({ createdAt: -1 });
+
+    console.log(`📊 Found ${unverifiedUsers.length} unverified users`);
 
     if (unverifiedUsers.length === 0) {
       return res.status(200).json({
@@ -57,6 +61,10 @@ const sendVerificationEmailsToUnverifiedUsers = async (req, res) => {
     // Process each unverified user
     for (const user of unverifiedUsers) {
       try {
+        console.log(
+          `📧 Sending verification email to: ${user.fullName} (${user.email})`,
+        );
+
         // Send verification email with timeout
         const emailPromise = Promise.race([
           MailService.sendVerificationEmail(
@@ -71,6 +79,10 @@ const sendVerificationEmailsToUnverifiedUsers = async (req, res) => {
 
         await emailPromise;
         emailsSent++;
+
+        console.log(
+          `✅ Email sent successfully to: ${user.fullName} (${user.email}) - isEmailVerified: ${user.isEmailVerified}`,
+        );
 
         processedUsers.push({
           name: user.fullName,
@@ -580,7 +592,6 @@ const dtUserLogin = async (req, res) => {
     });
   }
 };
-
 
 const me = async (req, res) => {
 
@@ -1186,6 +1197,8 @@ const getDTUser = async (req, res) => {
       });
     }
 
+    console.log(`✅ Retrieved DTUser details for: ${user.email}`);
+
     res.status(200).json({
       success: true,
       message: "User details retrieved successfully",
@@ -1230,6 +1243,8 @@ const getAllDTUsers = async (req, res) => {
       search,
       country,
     } = req.query;
+
+    console.log(`🔍 Filters - Status: ${status}, Verified: ${verified}, HasPassword: ${hasPassword}, Search: ${search}, Country: ${country}`);
 
     // Build filter object
     const filter = {};
@@ -1305,6 +1320,33 @@ const getAllDTUsers = async (req, res) => {
       },
       { $group: { _id: "$annotatorStatus", count: { $sum: 1 } } },
     ]);
+
+    console.log(
+      `✅ Retrieved ${users.length} DTUsers (Page ${page}/${totalPages})`,
+    );
+
+    console.log("ASSESSMENT DEBUG::", JSON.stringify(
+      {
+    data: {
+        users: users,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: totalPages,
+          totalUsers: totalUsers,
+          usersPerPage: parseInt(limit),
+          hasNextPage: parseInt(page) < totalPages,
+          hasPreviousPage: parseInt(page) > 1,
+        },
+        summary: {
+          totalUsers: totalUsers,
+          statusBreakdown: statusSummary.reduce((acc, item) => {
+            acc[item._id] = item.count;
+            return acc;
+          }, {}),
+          filters: filter,
+        },
+      },
+      }, null, 2));
 
     res.status(200).json({
       success: true,
@@ -1386,7 +1428,9 @@ const getAllAdminUsers = async (req, res) => {
     // Get total count for pagination
     const totalAdminUsers = await DTUser.countDocuments(filter);
 
-
+    console.log(
+      `✅ Found ${adminUsers.length} admin users (${totalAdminUsers} total)`,
+    );
     const roleSummary = await DTUser.aggregate([
       {
         $group: {
@@ -1450,6 +1494,8 @@ const getAllAdminUsers = async (req, res) => {
 // Admin function: Get comprehensive admin dashboard overview
 const getAdminDashboard = async (req, res) => {
   try {
+    console.log(`📊 Admin ${req.admin.email} requesting dashboard overview`);
+
     const currentDate = new Date();
 
     const thirtyDaysAgo = new Date();
@@ -1917,6 +1963,10 @@ const approveAnnotator = async (req, res) => {
     const { userId } = req.params;
     const { newStatus = "approved" } = req.body;
 
+    console.log(
+      `✅ Admin ${req.admin.email} attempting to approve annotator: ${userId} with status: ${newStatus}`,
+    );
+
     // Validate new status
     const validStatuses = [
       "pending",
@@ -1951,6 +2001,9 @@ const approveAnnotator = async (req, res) => {
       user.annotatorStatus = "approved";
       user.microTaskerStatus = "approved";
 
+      console.log(
+        `✅ Setting ${user.email} as approved annotator (both statuses approved)`,
+      );
     } else if (newStatus === "rejected") {
       // Rejected annotator: annotator rejected but micro tasker approved
       user.annotatorStatus = "rejected";
@@ -1967,6 +2020,10 @@ const approveAnnotator = async (req, res) => {
     }
 
     await user.save();
+
+    console.log(
+      `✅ Successfully updated ${user.email} from ${previousStatus} to ${newStatus}`,
+    );
 
     // Send appropriate email notification
     try {
@@ -2043,6 +2100,8 @@ const getAllQAUsers = async (req, res) => {
       ];
     }
 
+    console.log(`📊 Filter query:`, JSON.stringify(filterQuery));
+
     // Get total count for pagination
     const totalUsers = await DTUser.countDocuments(filterQuery);
 
@@ -2113,6 +2172,10 @@ const approveUserForQA = async (req, res) => {
   try {
     const { userId } = req.params;
 
+    console.log(
+      `🔍 Admin ${req.admin.email} attempting to approve QA status for user: ${userId}`,
+    );
+
     // Validate user ID format
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(400).json({
@@ -2152,7 +2215,11 @@ const approveUserForQA = async (req, res) => {
     // Update QA status to approved
     user.qaStatus = "approved";
     await user.save();
-  
+
+    console.log(
+      `✅ Successfully approved QA status for ${user.email} (${previousQAStatus} → approved)`,
+    );
+
     // TODO: Send QA approval notification email (implement when QA email templates are ready)
     // try {
     //   await sendQAApprovalEmail(user.email, user.fullName);
@@ -2192,6 +2259,10 @@ const rejectUserForQA = async (req, res) => {
   try {
     const { userId } = req.params;
     const { reason } = req.body; // Optional rejection reason
+
+    console.log(
+      `🔍 Admin ${req.admin.email} attempting to reject QA status for user: ${userId}`,
+    );
 
     // Validate user ID format
     if (!mongoose.Types.ObjectId.isValid(userId)) {
@@ -2233,6 +2304,10 @@ const rejectUserForQA = async (req, res) => {
     user.qaStatus = "rejected";
     await user.save();
 
+    console.log(
+      `❌ Successfully rejected QA status for ${user.email} (${previousQAStatus} → rejected)`,
+    );
+
     // Return success response
     res.status(200).json({
       success: true,
@@ -2266,6 +2341,10 @@ const rejectAnnotator = async (req, res) => {
     const { userId } = req.params;
     const { reason = "" } = req.body; // Optional rejection reason
 
+    console.log(
+      `❌ Admin ${req.admin.email} rejecting annotator: ${userId} ${reason ? "with reason: " + reason : ""}`,
+    );
+
     // Find the user
     const user = await DTUser.findById(userId);
     if (!user) {
@@ -2283,6 +2362,11 @@ const rejectAnnotator = async (req, res) => {
     user.microTaskerStatus = "approved";
 
     await user.save();
+
+    console.log(`❌ ${user.email} annotator rejected, micro tasker approved`);
+    console.log(
+      `📊 Status change: ${previousStatus} → rejected (annotator), approved (micro tasker)`,
+    );
 
     // Send micro tasker approval email (soft rejection - they can still do micro tasks)
     try {
@@ -2331,6 +2415,10 @@ const getDTUserAdmin = async (req, res) => {
   try {
     const { userId } = req.params;
 
+    console.log(
+      `👤 Admin ${req.admin.email} requesting details for user: ${userId}`,
+    );
+
     const user = await DTUser.findById(userId).select("-password");
 
     if (!user) {
@@ -2341,6 +2429,7 @@ const getDTUserAdmin = async (req, res) => {
       });
     }
 
+    console.log(`✅ Retrieved user details for: ${user.email}`);
 
     res.status(200).json({
       success: true,
@@ -2372,6 +2461,8 @@ const requestAdminVerification = async (req, res) => {
     }
 
     const { fullName, email, phone, password, adminKey } = req.body;
+
+    console.log(`📧 Admin verification request for: ${email}`);
 
     // Verify admin creation key
     const validAdminKey =
@@ -2439,6 +2530,8 @@ const requestAdminVerification = async (req, res) => {
         fullName,
       );
 
+      console.log(`✅ Admin verification email sent to: ${email}`);
+
       res.status(200).json({
         success: true,
         message: "Verification code sent to admin email",
@@ -2484,6 +2577,8 @@ const confirmAdminVerification = async (req, res) => {
     }
 
     const { email, verificationCode, adminKey } = req.body;
+
+    console.log(`✅ Admin verification confirmation for: ${email}`);
 
     // Verify admin creation key again
     const validAdminKey =
@@ -2590,7 +2685,7 @@ const confirmAdminVerification = async (req, res) => {
         otpCode,
         newAdmin.fullName,
       );
-
+      console.log(`✅ OTP code sent to admin email: ${email}`);
     } catch (emailError) {
       console.error(`❌ Failed to send OTP to admin: ${email}`, emailError);
       // Don't fail the admin creation if email fails, but log it
@@ -2598,6 +2693,8 @@ const confirmAdminVerification = async (req, res) => {
 
     // Clean up verification data
     adminVerificationStore.removeVerificationCode(email);
+
+    console.log(`✅ Admin account created successfully: ${email}`);
 
     // Return admin data (note: no token provided since email needs OTP verification)
     res.status(201).json({
@@ -2642,6 +2739,10 @@ const createAdmin = async (req, res) => {
     }
 
     const { fullName, email, phone, password, adminKey } = req.body;
+
+    console.log(
+      `👑 Direct admin creation request for: ${email} (legacy method)`,
+    );
 
     // Verify admin creation key
     const validAdminKey =
@@ -2732,11 +2833,13 @@ const createAdmin = async (req, res) => {
         otpCode,
         newAdmin.fullName,
       );
-
+      console.log(`✅ OTP code sent to admin email: ${email}`);
     } catch (emailError) {
       console.error(`❌ Failed to send OTP to admin: ${email}`, emailError);
       // Don't fail the admin creation if email fails, but log it
     }
+
+    console.log(`✅ Admin account created successfully: ${email}`);
 
     // Return admin data (note: no token provided since email needs OTP verification)
     res.status(201).json({
@@ -2771,6 +2874,7 @@ const createAdmin = async (req, res) => {
 // Verify Admin Account with OTP
 const verifyAdminOTP = async (req, res) => {
   try {
+    console.log("🔐 Admin OTP verification attempt");
 
     // Validate request data
     const { error } = adminVerificationConfirmSchema.validate(req.body);
@@ -3007,6 +3111,8 @@ const resendVerificationEmail = async (req, res) => {
       });
     }
 
+    console.log(`📧 Resend verification email request for: ${email}`);
+
     // Find user by email
     const user = await DTUser.findOne({ email });
 
@@ -3035,6 +3141,8 @@ const resendVerificationEmail = async (req, res) => {
       ]);
 
       await emailPromise;
+
+      console.log(`✅ Verification email resent successfully to: ${email}`);
 
       res.status(200).json({
         success: true,
@@ -3374,6 +3482,10 @@ const applyToProject = async (req, res) => {
       });
     }
 
+    // console.log(
+    //   `✅ User ${req.user.email} approved for project application with resume: ${user.attachments.resume_url}`,
+    // );
+
     // Check if project exists and is available
 
     const project = await AnnotationProject.findById(projectId);
@@ -3620,6 +3732,9 @@ const applyToProject = async (req, res) => {
           }
         }
 
+        console.log(
+          `✅ Admin notifications sent for project application: ${project.projectName}`,
+        );
       } catch (emailError) {
         console.error(
           `⚠️ Failed to send admin notification for application:`,
@@ -3642,6 +3757,10 @@ const applyToProject = async (req, res) => {
           "You must complete the multimedia assessment before your application can be reviewed.",
       };
     }
+
+    console.log(
+      `✅ Application submitted successfully for project: ${project.projectName}${assessmentTriggered ? " (assessment required)" : ""}`,
+    );
 
     res.status(201).json({
       success: true,
@@ -3719,12 +3838,14 @@ const manuallyAddUserToProject = async (req, res) => {
       message: "Failed to manually add user to project",
     });
   }
+  console.log("User manually added to project.");
 };
 
 // DTUser function: Get user's active projects
 const getUserActiveProjects = async (req, res) => {
   try {
     const userId = req.params.userId || req.user.userId;
+    console.log(`🔍 Getting active projects for user: ${userId}`);
 
     // Verify user has access to this data
     if (req.user.userId.toString() !== userId && !req.admin) {
@@ -3769,6 +3890,8 @@ const getUserActiveProjects = async (req, res) => {
       rejectedApplications: rejectedApplications.length,
     };
 
+    console.log(`✅ Found ${applications.length} applications for user`);
+
     res.status(200).json({
       success: true,
       message: "User projects retrieved successfully",
@@ -3804,7 +3927,7 @@ const getUserInvoices = async (req, res) => {
       endDate,
     } = req.query;
 
-
+    console.log(`📄 DTUser ${userId} fetching invoices`);
 
     // Build filter object
     const filter = { dtUserId: userId };
@@ -3872,6 +3995,8 @@ const getUnpaidInvoices = async (req, res) => {
   try {
     const userId = req.user.userId;
     const { page = 1, limit = 10 } = req.query;
+
+    console.log(`💰 DTUser ${userId} fetching unpaid invoices`);
 
     const skip = (page - 1) * limit;
 
@@ -3953,6 +4078,8 @@ const getPaidInvoices = async (req, res) => {
   try {
     const userId = req.user.userId;
     const { page = 1, limit = 20 } = req.query;
+
+    console.log(`✅ DTUser ${userId} fetching paid invoices`);
 
     const skip = (page - 1) * limit;
 
@@ -4077,11 +4204,16 @@ const getInvoiceDashboard = async (req, res) => {
   try {
     const userId = req.user.userId;
 
+    console.log(`📊 DTUser ${userId} fetching invoice dashboard`);
+    console.log(`🔍 User ID type: ${typeof userId}, value: ${userId}`);
+
     // Convert userId to ObjectId if it's a string
     const objectId = new mongoose.Types.ObjectId(userId);
+    console.log(`🔍 ObjectId: ${objectId}`);
 
     // Debug: Check if any invoices exist for this user
     const totalInvoices = await Invoice.countDocuments({ dtUserId: objectId });
+    console.log(`🔍 Total invoices found for user: ${totalInvoices}`);
 
     // Debug: Get all invoices for this user to inspect their paymentStatus
     const allInvoices = await Invoice.find({ dtUserId: objectId }).select(
@@ -4558,6 +4690,8 @@ const getDTUserDashboard = async (req, res) => {
       },
     };
 
+    console.log(`✅ Dashboard generated for user: ${userEmail}`);
+
     res.status(200).json({
       success: true,
       data: dashboardData,
@@ -4578,6 +4712,8 @@ const submitResultWithCloudinary = async (req, res) => {
     const userId = req.user.userId;
     const { projectId, notes } = req.body;
 
+    console.log(`📤 User ${req.user.email} uploading result file`);
+
     // Validate that a file was uploaded
     if (!req.file) {
       return res.status(400).json({
@@ -4595,6 +4731,8 @@ const submitResultWithCloudinary = async (req, res) => {
       });
     }
 
+    console.log(`📁 Processing uploaded file: ${req.file.originalname}`);
+
     // Import cloudinary functions
     const {
       generateOptimizedUrl,
@@ -4604,6 +4742,8 @@ const submitResultWithCloudinary = async (req, res) => {
     try {
       // The file is already uploaded to Cloudinary via multer middleware
       const uploadResult = req.file;
+
+      console.log(`✅ Result uploaded to Cloudinary: ${uploadResult.filename}`);
 
       // Generate optimized URLs based on file type
       let optimizedUrl = uploadResult.path;
@@ -4662,6 +4802,7 @@ const submitResultWithCloudinary = async (req, res) => {
       // Save user with new result
       await user.save();
 
+      console.log(`✅ Result submission saved for user: ${user.email}`);
 
       res.status(200).json({
         success: true,
@@ -4736,6 +4877,7 @@ const submitResultWithCloudinary = async (req, res) => {
 const uploadIdDocument = async (req, res) => {
   try {
     const user = req.user;
+    console.log(`🆔 User ${user.email} uploading ID document`);
 
     if (!req.file) {
       return res.status(400).json({
@@ -4759,12 +4901,17 @@ const uploadIdDocument = async (req, res) => {
 
     try {
       const uploadResult = req.file;
+      console.log(
+        `✅ ID document uploaded to Cloudinary: ${uploadResult.filename}`,
+      );
 
       // Update user's attachments with ID document URL
       dtUser.attachments.id_document_url = uploadResult.path;
 
       // Save the updated user
       const updatedUser = await dtUser.save();
+
+      console.log(`✅ ID document saved for user: ${user.email}`);
 
       res.status(200).json({
         success: true,
@@ -4802,6 +4949,7 @@ const uploadIdDocument = async (req, res) => {
 const uploadResume = async (req, res) => {
   try {
     const user = req.user;
+    console.log(`📄 User ${user.email} uploading resume`);
 
     if (!req.file) {
       return res.status(400).json({
@@ -4825,11 +4973,15 @@ const uploadResume = async (req, res) => {
 
     try {
       const uploadResult = req.file;
+      console.log(`✅ Resume uploaded to Cloudinary: ${uploadResult.filename}`);
+
       // Update user's attachments with resume URL
       dtUser.attachments.resume_url = uploadResult.path;
 
       // Save the updated user
       const updatedUser = await dtUser.save();
+
+      console.log(`✅ Resume saved for user: ${user.email}`);
 
       res.status(200).json({
         success: true,
@@ -4868,6 +5020,8 @@ const getUserResultSubmissions = async (req, res) => {
   try {
     const userId = req.user.userId;
     const { page = 1, limit = 10, status } = req.query;
+
+    console.log(`📋 User ${req.user.email} requesting result submissions`);
 
     const user = await DTUser.findById(userId).populate(
       "resultSubmissions.projectId",
@@ -4958,6 +5112,10 @@ const getProjectGuidelines = async (req, res) => {
     const { projectId } = req.params;
     const userId = req.userId || req.user?.userId;
 
+    console.log(
+      `🔍 User ${userId} requesting guidelines for project: ${projectId}`,
+    );
+
     // Check if user is authenticated
     if (!userId) {
       return res.status(401).json({
@@ -5029,6 +5187,10 @@ const getProjectGuidelines = async (req, res) => {
         userRole: "annotator",
       },
     };
+
+    console.log(
+      `✅ Project guidelines provided to approved user: ${userId} for project: ${project.projectName}`,
+    );
 
     res.status(200).json({
       success: true,
@@ -5218,49 +5380,6 @@ const updateUserRole = async (req, res) => {
   }
 };
 
-
-const markAssessmentSubmitted = async (req, res) => {
-  try {
-    // Calculate one month ago from current date
-    const oneMonthAgo = new Date();
-    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-
-    console.log(`🔄 Marking assessment submission for users registered before: ${oneMonthAgo.toISOString()}`);
-
-    // Find and update users with createdAt not less than a month (i.e., createdAt <= oneMonthAgo)
-    // Only update users who don't already have assessmentSubmission set to true
-    const result = await DTUser.updateMany(
-      {
-        createdAt: { $lte: oneMonthAgo },
-        assessmentSubmission: { $ne: true }
-      },
-      {
-        $set: { assessmentSubmission: true }
-      }
-    );
-
-    console.log(`✅ Updated ${result.modifiedCount} users with assessmentSubmission: true`);
-
-    res.status(200).json({
-      success: true,
-      message: `Successfully marked ${result.modifiedCount} users with assessmentSubmission: true`,
-      data: {
-        cutoffDate: oneMonthAgo,
-        usersMatched: result.matchedCount,
-        usersModified: result.modifiedCount,
-        updatedAt: new Date()
-      }
-    });
-
-  } catch (error) {
-    console.error("❌ Error marking assessment submission:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error marking assessment submission",
-      error: error.message,
-    });
-  }
-}
 // SOP (Standard Operating Procedure) acceptance tracking 
 
 /**
@@ -5360,7 +5479,6 @@ const recordSopAcceptance = async (req, res) => {
 
 module.exports = {
   me,
-  markAssessmentSubmitted,
   createDTUser,
   createDTUserWithBackgroundEmail,
   verifyEmail,
