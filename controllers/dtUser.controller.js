@@ -1294,6 +1294,8 @@ const getAllDTUsers = async (req, res) => {
       }
     }
 
+    console.log("🔍 Final filter for fetching DTUsers:", JSON.stringify(filter, null, 2));
+
     // Calculate pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
