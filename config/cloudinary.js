@@ -1,9 +1,7 @@
 const cloudinary = require('cloudinary').v2;
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const CloudinaryStorage = require('multer-storage-cloudinary');
 const multer = require('multer');
 const envConfig = require('./envConfig');
-
-
 
 // Configure Cloudinary
 cloudinary.config({
@@ -14,11 +12,6 @@ cloudinary.config({
 
 // Verify Cloudinary configuration
 const verifyCloudinaryConfig = () => {
-
-  console.log({
-  api_key: envConfig.cloudinary.CLOUDINARY_API_KEY
-});
-
     const requiredCloudinaryVars = {
     CLOUDINARY_CLOUD_NAME: envConfig.cloudinary.CLOUDINARY_CLOUD_NAME,
     CLOUDINARY_API_KEY: envConfig.cloudinary.CLOUDINARY_API_KEY,
