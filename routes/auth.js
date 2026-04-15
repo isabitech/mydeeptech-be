@@ -118,6 +118,15 @@ router.get('/dashboard', authenticateToken, getDTUserDashboard);
 
 // DTUser Result Submission Routes (NEW) - flexible field names
 router.post('/submit-result', authenticateToken, (req, res, next) => {
+  // Check if Cloudinary is properly configured
+  if (!isCloudinaryConfigured) {
+    return res.status(500).json({
+      success: false,
+      message: 'File upload service is temporarily unavailable. Please try again later.',
+      error: 'CLOUDINARY_CONFIG_ERROR'
+    });
+  }
+
   // Create a flexible upload handler that accepts different field names
   const upload = resultFileUpload.fields([
     { name: 'resultFile', maxCount: 1 },
@@ -201,6 +210,15 @@ router.post('/upload-id-document', authenticateToken, (req, res, next) => {
 
 // Upload Resume Route - adds to profile information  
 router.post('/upload-resume', authenticateToken, (req, res, next) => {
+  // Check if Cloudinary is properly configured
+  if (!isCloudinaryConfigured) {
+    return res.status(500).json({
+      success: false,
+      message: 'File upload service is temporarily unavailable. Please try again later.',
+      error: 'CLOUDINARY_CONFIG_ERROR'
+    });
+  }
+
   // Create a flexible upload handler for resumes
   const upload = resumeUpload.fields([
     { name: 'resume', maxCount: 1 },

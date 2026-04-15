@@ -33,6 +33,9 @@ const missingVars = Object.entries(requiredCloudinaryVars)
   return true;
 };
 
+// Check if Cloudinary is properly configured
+const isCloudinaryConfigured = verifyCloudinaryConfig();
+
 // Storage configuration for different file types
 const createCloudinaryStorage = (folder, allowedFormats = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'mp4', 'mov'], resourceType = 'auto') => {
   return new CloudinaryStorage({
@@ -268,6 +271,7 @@ const generateThumbnail = (publicId, size = 150) => {
 module.exports = {
   cloudinary,
   verifyCloudinaryConfig,
+  isCloudinaryConfigured,
   
   // Upload middleware
   imageUpload,
