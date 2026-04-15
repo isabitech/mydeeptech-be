@@ -1,5 +1,6 @@
 const { Server } = require("socket.io");
 const jwt = require("jsonwebtoken");
+const mongoose = require("mongoose");
 const SupportTicket = require("../models/supportTicket.model");
 const DTUser = require("../models/dtUser.model");
 const User = require("../models/user");
@@ -336,6 +337,12 @@ const initializeSocketIO = (server) => {
     // Auto-rejoin user to their active chat tickets on connection
     const rejoinActiveTickets = async () => {
       try {
+        // Skip rejoining if userId is not a valid ObjectId (e.g., debug-user)
+        if (!mongoose.Types.ObjectId.isValid(socket.userId)) {
+          console.log(`⚠️ Skipping ticket rejoin for invalid userId: ${socket.userId}`);
+          return;
+        }
+
         const activeTickets = await SupportTicket.find({
           userId: socket.userId,
           status: { $in: ["open", "in_progress", "waiting_for_user"] },
@@ -373,6 +380,13 @@ const initializeSocketIO = (server) => {
     socket.on("get_chat_history", async (data) => {
       try {
         const { ticketId } = data;
+
+        // Skip if userId is not a valid ObjectId
+        if (!mongoose.Types.ObjectId.isValid(socket.userId)) {
+          console.log(`⚠️ Skipping chat history for invalid userId: ${socket.userId}`);
+          socket.emit("error", { message: "Invalid user session" });
+          return;
+        }
 
         const ticket = await SupportTicket.findOne({
           _id: ticketId,
@@ -413,6 +427,13 @@ const initializeSocketIO = (server) => {
     socket.on("rejoin_ticket", async (data) => {
       try {
         const { ticketId } = data;
+
+        // Skip if userId is not a valid ObjectId
+        if (!mongoose.Types.ObjectId.isValid(socket.userId)) {
+          console.log(`⚠️ Skipping ticket rejoin for invalid userId: ${socket.userId}`);
+          socket.emit("error", { message: "Invalid user session" });
+          return;
+        }
 
         const ticket = await SupportTicket.findOne({
           _id: ticketId,
@@ -455,6 +476,13 @@ const initializeSocketIO = (server) => {
           category = "general_inquiry",
           priority = "medium",
         } = data;
+
+        // Skip if userId is not a valid ObjectId
+        if (!mongoose.Types.ObjectId.isValid(socket.userId)) {
+          console.log(`⚠️ Skipping chat start for invalid userId: ${socket.userId}`);
+          socket.emit("error", { message: "Invalid user session" });
+          return;
+        }
 
         // Check if user already has an open chat ticket
         let existingTicket = await SupportTicket.findOne({
