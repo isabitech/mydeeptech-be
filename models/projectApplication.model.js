@@ -73,7 +73,8 @@ const projectApplicationSchema = new mongoose.Schema(
         "application_quality",
         "availability_mismatch",
         "rate_mismatch",
-        "other"
+        "other",
+          "qualifications_mismatch",
       ],
       default: null
     },

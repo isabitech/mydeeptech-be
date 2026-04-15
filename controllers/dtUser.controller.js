@@ -1230,6 +1230,8 @@ const getAllDTUsers = async (req, res) => {
       country,
     } = req.query;
 
+    console.log(`🔍 Filters - Status: ${status}, Verified: ${verified}, HasPassword: ${hasPassword}, Search: ${search}, Country: ${country}`);
+
     // Build filter object
     const filter = {};
 
@@ -1277,6 +1279,8 @@ const getAllDTUsers = async (req, res) => {
         filter["personal_info.country"] = { $regex: `^${country}$`, $options: "i" };
       }
     }
+
+    console.log("🔍 Final filter for fetching DTUsers:", JSON.stringify(filter, null, 2));
 
     // Calculate pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -1892,8 +1896,6 @@ const getAdminDashboard = async (req, res) => {
         invoiceActivity: "7 days",
       },
     };
-
-    console.log(`📊 Dashboard generated for admin ${req.admin.email}`);
 
     res.status(200).json({
       success: true,
@@ -5224,8 +5226,6 @@ const markAssessmentSubmitted = async (req, res) => {
     const oneMonthAgo = new Date();
     oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
 
-    console.log(`🔄 Marking assessment submission for users registered before: ${oneMonthAgo.toISOString()}`);
-
     // Find and update users with createdAt not less than a month (i.e., createdAt <= oneMonthAgo)
     // Only update users who don't already have assessmentSubmission set to true
     const result = await DTUser.updateMany(
@@ -5237,8 +5237,6 @@ const markAssessmentSubmitted = async (req, res) => {
         $set: { assessmentSubmission: true }
       }
     );
-
-    console.log(`✅ Updated ${result.modifiedCount} users with assessmentSubmission: true`);
 
     res.status(200).json({
       success: true,
