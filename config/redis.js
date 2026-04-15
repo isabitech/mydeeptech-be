@@ -12,13 +12,6 @@ const parseRedisConfig = () => {
     const redisHost = envConfig.redis.REDIS_HOST;
     const redisPort = envConfig.redis.REDIS_PORT;
     
-    // Debug: Log what we're reading from environment
-    console.log('🔍 Environment variables:');
-    console.log(`   REDIS_HOST: ${envConfig.redis.REDIS_HOST}`);
-    console.log(`   REDIS_PORT: ${envConfig.redis.REDIS_PORT}`);
-    console.log(`   REDIS_PASSWORD: ${envConfig.redis.REDIS_PASSWORD ? '[HIDDEN]' : 'Not set'}`);
-    console.log(`   REDIS_DB: ${envConfig.redis.REDIS_DB}`);
-    
     // Check if host includes port (for Redis Cloud URLs like "host:port")
     if (redisHost.includes(':') && !redisHost.startsWith('redis://')) {
         const [host, port] = redisHost.split(':');
@@ -50,9 +43,6 @@ const createRedisClient = async () => {
             connectTimeout: 5000,
             commandTimeout: 3000
         };
-
-        console.log('🔄 Attempting to connect to Redis...');
-        console.log(`📍 Redis Config: ${redisConfig.host}:${redisConfig.port}, DB: ${redisConfig.db}`);
         
         redisClient = redis.createClient({
             socket: {
@@ -74,7 +64,6 @@ const createRedisClient = async () => {
         });
 
         redisClient.on('ready', () => {
-            console.log('✅ Redis client ready to use');
             isRedisConnected = true;
             redisConnectionAttempts = 0;
         });
@@ -100,7 +89,6 @@ const createRedisClient = async () => {
         // Test connection
         const pong = await redisClient.ping();
         if (pong === 'PONG') {
-            console.log('🏓 Redis connection test successful');
             return redisClient;
         } else {
             throw new Error('Redis ping test failed');

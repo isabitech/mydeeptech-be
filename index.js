@@ -69,17 +69,6 @@ app.use((req, res, next) => {
   if (req.url.startsWith("/socket.io")) {
     console.log("🌐 ========== HTTP REQUEST TO SOCKET.IO ==========");
     console.log("   Method:", req.method);
-    console.log("   URL:", req.url);
-    console.log("   Headers:", JSON.stringify(req.headers, null, 2));
-    console.log("   Query:", JSON.stringify(req.query, null, 2));
-    console.log(
-      "   Is WebSocket upgrade?",
-      req.headers.upgrade === "websocket",
-    );
-    console.log("   Connection header:", req.headers.connection);
-    console.log("   User agent:", req.headers["user-agent"]);
-    console.log("   Remote address:", req.connection?.remoteAddress || req.ip);
-    console.log("");
   }
   next();
 });
@@ -101,9 +90,6 @@ if (swaggerUi && specs) {
       customfavIcon: "/favicon.ico",
       customCss: ".swagger-ui .topbar { display: none }",
     }),
-  );
-  console.log(
-    `📚 API Documentation available at: ${envConfig.SWAGGER_URL}/api-docs`,
   );
 } else {
   const reason = !swaggerUi
@@ -181,38 +167,21 @@ const connectDB = async () => {
         heartbeatFrequencyMS: 10000, // Heartbeat every 10s
       });
 
-      console.log(
-        `✅ MongoDB connected successfully to: ${conn.connection.host}`,
-      );
-
       // Test database connectivity
       const collections = await mongoose.connection.db
         .listCollections()
         .toArray();
-      console.log(
-        `📊 Database verification: Found ${collections.length} collections`,
-      );
 
       // Now that MongoDB is ready, initialize Socket.IO services
-      console.log(
-        "🔌 Initializing Socket.IO services after MongoDB connection...",
-      );
       initializeSocketIO(server);
       initializeHVNCSocket(server);
-      console.log("✅ Socket.IO and HVNC services initialized");
 
       // Start server only after everything is initialized
       const PORT = envConfig.PORT || 4000;
       server.listen(PORT, () => {
         console.log(`🚀 Server running on port ${PORT}`);
-        console.log(`💬 Socket.IO chat server active`);
-        console.log(`🕹️  HVNC WebSocket server active`);
-        console.log(
-          `🔗 Health check available at: http://localhost:${PORT}/health`,
-        );
-        console.log(
-          `🔧 HVNC API endpoints available at: http://localhost:${PORT}/api/hvnc/`,
-        );
+        console.log(`🔗 Health check available at: http://localhost:${PORT}/health`);
+        console.log(`🔧 HVNC API endpoints available at: http://localhost:${PORT}/api/hvnc/`);
       });
 
       return conn;
@@ -254,8 +223,6 @@ initializeRedis();
 
 // Graceful shutdown handler
 const gracefulShutdown = async (signal) => {
-  console.log(`\n🛑 Received ${signal}, starting graceful shutdown...`);
-
   try {
     // Close Redis connection
     await closeRedis();

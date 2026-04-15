@@ -3,7 +3,6 @@ const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 const SupportTicket = require("../models/supportTicket.model");
 const DTUser = require("../models/dtUser.model");
-const User = require("../models/user");
 const { createNotification } = require("./notificationService");
 // const { sendNewTicketNotificationToAdmin, sendTicketStatusUpdateEmail, sendAdminReplyNotificationEmail } = require('./supportEmailTemplates');
 // Replaced with MailService:
@@ -60,120 +59,63 @@ const initializeSocketIO = (server) => {
 
       if (isPCAgent) {
         console.log("🔧 PC Agent detected - WebSocket upgrade enabled");
-        console.log("🎯 Ensure PC agent sends proper WebSocket headers:");
-        console.log("   - Connection: Upgrade");
-        console.log("   - Upgrade: websocket");
-        console.log("   - Sec-WebSocket-Version: 13");
       }
-
       // Always allow connections
       callback(null, true);
     },
   });
 
-  // Add comprehensive Socket.IO debugging
-  console.log("🚀 Adding enhanced Socket.IO debugging...");
-
-  // Capture ALL engine events for debugging
-  io.engine.on("initial_headers", (headers, req) => {
-    console.log("📋 ========== ENGINE: INITIAL HEADERS ==========");
-    console.log("   URL:", req.url);
-    console.log("   Method:", req.method);
-    console.log("   Headers:", JSON.stringify(req.headers, null, 2));
-  });
-
   // Enhanced connection error with more context
   io.engine.on("connection_error", (error, context) => {
-    console.log("❌ ========== ENGINE: DETAILED CONNECTION ERROR ==========");
-    console.log("   Error message:", error.message || error);
-    console.log("   Error code:", error.code);
-    console.log("   Error type:", error.type);
-    console.log("   Error context:", error.context);
-    console.log("   Additional context:", context);
-
     // Try to extract request info from error object
     if (error.req) {
       console.log("   Failed Request URL:", error.req.url);
-      console.log("   Failed Request Method:", error.req.method);
-      console.log(
-        "   Failed Request Headers:",
-        JSON.stringify(error.req.headers, null, 2),
-      );
     }
 
-    console.log("🎯 ANALYSIS: Client URL/headers causing handshake rejection");
   });
 
   // Track successful connections
   io.engine.on("connection", (socket) => {
-    console.log("🔌 ========== ENGINE: RAW CONNECTION SUCCESS ==========");
-    console.log("   Engine Socket ID:", socket.id);
-    console.log("   Transport:", socket.transport.name);
-    console.log("   Remote address:", socket.request.connection.remoteAddress);
-    console.log("   User agent:", socket.request.headers["user-agent"]);
-    console.log("   URL:", socket.request.url);
-    console.log("   Query params:", socket.request.url.split("?")[1] || "none");
+    // console.log("   URL:", socket.request.url);
   });
 
   // Monitor upgrade events
   io.engine.on("upgrade", (socket) => {
-    console.log("⬆️ ========== ENGINE: TRANSPORT UPGRADE ==========");
-    console.log("   Socket:", socket.id);
-    console.log("   From:", socket.transport.name);
+    // console.log("   Socket:", socket.id);
   });
 
   // Monitor upgrade errors
   io.engine.on("upgrade_error", (error) => {
-    console.log("❌ ========== ENGINE: UPGRADE ERROR ==========");
     console.log("   Error:", error);
   });
 
   // DEBUG: Add packet interceptor to see raw packet data
   io.engine.on("packet", (packet, socket) => {
-    console.log("📦 ========== ENGINE: RAW PACKET ==========");
-    console.log("   Socket ID:", socket.id);
-    console.log("   Packet type:", packet.type);
     const data = packet.data || packet;
     const dataStr = typeof data === "string" ? data : JSON.stringify(data);
-    console.log("   Packet data:", dataStr.substring(0, 200));
 
     // Check for namespace join attempts
     if (dataStr.includes("/hvnc-device") || dataStr.includes("hvnc")) {
       console.log("🎯 HVNC NAMESPACE JOIN DETECTED!");
-      console.log("   Full packet data:", dataStr);
-      console.log("   Packet type details:", packet.type);
-      console.log("   Socket transport:", socket.transport?.name);
     }
 
     // Also check for any message that starts with numbers (Socket.IO protocol)
     if (dataStr.match(/^[0-9]/)) {
       console.log("🔢 SOCKET.IO PROTOCOL MESSAGE:");
-      console.log("   Message:", dataStr);
-      console.log("   Potential namespace join?", dataStr.includes("/"));
     }
   });
 
   // DEBUG: Add message interceptor for Engine.IO
   io.engine.on("message", (data, socket) => {
-    console.log("📨 ========== ENGINE: MESSAGE ==========");
-    console.log("   Socket ID:", socket.id);
     const msgStr = data ? data.toString() : "null";
-    console.log("   Message:", msgStr.substring(0, 200));
 
     // Check for HVNC namespace messages
     if (msgStr.includes("/hvnc-device") || msgStr.includes("hvnc")) {
       console.log("🎯🎯🎯 HVNC NAMESPACE MESSAGE DETECTED! 🎯🎯🎯");
-      console.log("   Full message:", msgStr);
-      console.log("   Message length:", msgStr.length);
-      console.log("   Socket transport:", socket.transport?.name);
-      console.log("   Socket readyState:", socket.readyState);
     }
 
     // Check for Socket.IO protocol messages
     if (msgStr.match(/^[0-9]/)) {
-      console.log("🎯 SOCKET.IO PROTOCOL MESSAGE:");
-      console.log("   Message type: ", msgStr.charAt(0));
-      console.log("   Full message: ", msgStr);
 
       // Socket.IO protocol:
       // 0 = connect, 1 = disconnect, 2 = event, 3 = ack, 4 = connect error, 5 = binary event, 6 = binary ack
@@ -183,20 +125,9 @@ const initializeSocketIO = (server) => {
           break;
         case "4":
           if (msgStr.includes("/")) {
-            console.log("   → 🚨 NAMESPACE JOIN ATTEMPT DETECTED: ", msgStr);
-            console.log("   → Attempting to process namespace join...");
-
             // Try to manually trigger Socket.IO parsing
             try {
-              console.log("   → Socket.IO instance exists:", !!io);
-              console.log(
-                "   → Engine socket transport:",
-                socket.transport?.name,
-              );
-              console.log(
-                "   → Available namespaces:",
-                io._nsps ? Array.from(io._nsps.keys()) : "none",
-              );
+              // console.log("   → Socket.IO instance exists:", !!io);
             } catch (err) {
               console.log("   → Error checking namespaces:", err.message);
             }
@@ -211,40 +142,23 @@ const initializeSocketIO = (server) => {
   });
 
   io.on("connection", (socket) => {
-    console.log("✅ ========== SOCKET.IO: HIGH-LEVEL CONNECTION ==========");
-    console.log("   Socket ID:", socket.id);
-    console.log("   Namespace:", socket.nsp.name);
-    console.log("   Connected:", socket.connected);
-    console.log("   Transport:", socket.conn?.transport?.name || "unknown");
-    console.log("   🎉 PC AGENT SOCKET.IO CONNECTION ACHIEVED!");
-    // DEBUG: Try to access all namespaces through Socket.IO API
-    console.log("🔍 NAMESPACE DEBUGGING:");
     try {
       // Check namespaces using different methods
       if (io.sockets && io.sockets.adapter && io.sockets.adapter.nsp) {
-        console.log("   Main namespace exists:", !!io.sockets);
+        // console.log("   Main namespace exists:", !!io.sockets);
       }
 
       // Force namespace registration check
       const deviceNs = io._nsps ? io._nsps.get("/hvnc-device") : null;
-      console.log(
-        "   Device namespace from _nsps:",
-        deviceNs ? "FOUND" : "NOT_FOUND",
-      );
-
       // Try alternate namespace access
       const deviceNs2 = io.of("/hvnc-device");
-      console.log(
-        "   Device namespace from io.of():",
-        deviceNs2 ? "EXISTS" : "MISSING",
-      );
 
       // Check if namespace has connections
       if (deviceNs2 && deviceNs2.sockets) {
-        console.log(
-          "   Device namespace connections:",
-          deviceNs2.sockets.size || 0,
-        );
+        // console.log(
+        //   "   Device namespace connections:",
+        //   deviceNs2.sockets.size || 0,
+        // );
       }
     } catch (err) {
       console.log("   Namespace check error:", err.message);
@@ -252,83 +166,141 @@ const initializeSocketIO = (server) => {
 
     // DEBUG: Log all incoming data to see namespace join attempts
     socket.onAny((eventName, ...args) => {
-      console.log("🔍 SOCKET.IO EVENT:", eventName, args.slice(0, 2));
+      // console.log("🔍 SOCKET.IO EVENT:", eventName, args.slice(0, 2));
     });
 
     socket.on("error", (error) => {
-      console.log("❌ SOCKET.IO ERROR:", error);
+      // console.log("❌ SOCKET.IO ERROR:", error);
     });
 
     socket.on("disconnect", (reason) => {
-      console.log("🔌 SOCKET.IO DISCONNECT:", reason);
+      // console.log("🔌 SOCKET.IO DISCONNECT:", reason);
     });
 
-    // DEBUG: Force attempt to route socket to HVNC namespace
-    console.log("🔧 ATTEMPTING MANUAL NAMESPACE ROUTING TEST...");
     try {
       const hvncNamespace = io.of("/hvnc-device");
       if (hvncNamespace) {
-        console.log("   HVNC namespace exists for manual routing");
         // Try to emit a test event to the namespace
         hvncNamespace.emit("test", { message: "Manual namespace test" });
-        console.log("   Manual test event sent to HVNC namespace");
       }
     } catch (err) {
       console.log("   Manual namespace routing error:", err.message);
     }
   });
 
-  console.log("✅ Engine debugging listeners added");
-
-  // Authentication middleware for Socket.IO - TEMPORARILY DISABLED FOR DEBUGGING
+  // Authentication middleware for Socket.IO
   io.use(async (socket, next) => {
-    console.log(
-      "🌐 ========== SOCKET.IO AUTH MIDDLEWARE (DEBUGGING MODE) ==========",
-    );
-    console.log("📋 Connection Details:");
-    console.log("   Socket ID:", socket.id);
-    console.log("   Namespace:", socket.nsp.name);
-    console.log("   Transport:", socket.conn?.transport?.name || "unknown");
-    console.log("   Remote address:", socket.handshake.address);
-    console.log(
-      "   Query params:",
-      JSON.stringify(socket.handshake.query, null, 2),
-    );
-    console.log(
-      "   Headers:",
-      JSON.stringify(socket.handshake.headers, null, 2),
-    );
 
-    // TEMPORARILY ALLOW ALL CONNECTIONS TO DEBUG HANDSHAKE ISSUE
-    console.log(
-      "🚨 DEBUGGING: Allowing all connections without authentication",
-    );
+    try {
+      // Get token from auth header or query parameter
+      const token = socket.handshake.auth.token || 
+                   socket.handshake.headers.authorization?.split(' ')[1] ||
+                   socket.handshake.query.token;
 
-    // Set dummy values to prevent errors
-    socket.userId = "debug-user";
-    socket.userType = "debug";
-    socket.isAdmin = false;
-    socket.userEmail = "debug@test.com";
-    socket.userName = "Debug User";
+      if (!token) {
+        console.log("❌ No authentication token provided");
+        return next(new Error('Authentication token required'));
+      }
 
-    return next();
+      // Verify JWT token
+      const decoded = jwt.verify(token, envConfig.jwt.JWT_SECRET);
+
+      // Get user type from query or default to 'user'
+      const userType = socket.handshake.query.userType || 'user';
+
+      // Fetch user data based on type
+      let user = null;
+      let isAdmin = false;
+
+      if (userType === 'dtuser') {
+        user = await DTUser.findById(decoded.userId);
+        if (!user) {
+          return next(new Error('User not found'));
+        }
+        
+        if (!user.isEmailVerified) {
+          return next(new Error('Email not verified'));
+        }
+
+        // Set socket properties
+        socket.userId = user._id.toString();
+        socket.userType = 'dtuser';
+        socket.userEmail = user.email;
+        socket.userName = user.fullName || user.email;
+        socket.isAdmin = false;
+
+      } else if (userType === 'user') {
+        user = await DTUser.findById(decoded.userId);
+        if (!user) {
+          console.log("❌ DTUser not found:", decoded.userId);
+          return next(new Error('User not found'));
+        }
+        
+        if (!user.isEmailVerified) {
+          return next(new Error('Email not verified'));
+        }
+
+        // Set socket properties
+        socket.userId = user._id.toString();
+        socket.userType = 'user';
+        socket.userEmail = user.email;
+        socket.userName = user.fullName || user.email;
+        
+        // Check if user is admin
+        isAdmin = user.role === 'admin' || user.role === 'moderator';
+        socket.isAdmin = isAdmin;
+
+      } else if (userType === 'admin') {
+        user = await DTUser.findById(decoded.userId);
+        if (!user) {
+          console.log("❌ Admin DTUser not found:", decoded.userId);
+          return next(new Error('Admin user not found'));
+        }
+        
+        if (!user.isEmailVerified) {
+          console.log("❌ Admin DTUser email not verified:", decoded.email);
+          return next(new Error('Email not verified'));
+        }
+
+        // Verify admin role
+        if (user.role !== 'admin' && user.role !== 'moderator') {
+          console.log("❌ DTUser does not have admin privileges:", user.email);
+          return next(new Error('Admin privileges required'));
+        }
+
+        // Set socket properties for admin
+        socket.userId = user._id.toString();
+        socket.userType = 'admin';
+        socket.userEmail = user.email;
+        socket.userName = user.fullName || user.email;
+        socket.isAdmin = true;
+
+      } else {
+        console.log("❌ Invalid userType:", userType);
+        return next(new Error('Invalid user type'));
+      }
+      return next();
+
+    } catch (error) {
+      console.error("❌ Authentication failed:", error.message);
+      
+      if (error.name === 'JsonWebTokenError') {
+        return next(new Error('Invalid authentication token'));
+      } else if (error.name === 'TokenExpiredError') {
+        return next(new Error('Authentication token expired'));
+      } else {
+        return next(new Error('Authentication failed'));
+      }
+    }
   });
 
   io.on("connection", (socket) => {
-    console.log(`🔗 User connected: ${socket.userName} (${socket.userId})`);
-
     // Track connected users/admins
     if (socket.isAdmin) {
       connectedAdmins.set(socket.userId, socket.id);
       socket.join("admins"); // Join admin room for broadcasts
-      console.log(
-        `👨‍💼 Admin connected: ${socket.userName} (${socket.userEmail})`,
-      );
     } else {
       connectedUsers.set(socket.userId, socket.id);
-      console.log(
-        `👤 User connected: ${socket.userName} (${socket.userEmail})`,
-      );
     }
 
     // Join user to their personal room for targeted messages
@@ -339,7 +311,6 @@ const initializeSocketIO = (server) => {
       try {
         // Skip rejoining if userId is not a valid ObjectId (e.g., debug-user)
         if (!mongoose.Types.ObjectId.isValid(socket.userId)) {
-          console.log(`⚠️ Skipping ticket rejoin for invalid userId: ${socket.userId}`);
           return;
         }
 
@@ -351,9 +322,6 @@ const initializeSocketIO = (server) => {
 
         for (const ticket of activeTickets) {
           socket.join(`ticket_${ticket._id}`);
-          console.log(
-            `🔄 User ${socket.userName} rejoined ticket: ${ticket.ticketNumber}`,
-          );
         }
 
         if (activeTickets.length > 0) {
@@ -383,7 +351,6 @@ const initializeSocketIO = (server) => {
 
         // Skip if userId is not a valid ObjectId
         if (!mongoose.Types.ObjectId.isValid(socket.userId)) {
-          console.log(`⚠️ Skipping chat history for invalid userId: ${socket.userId}`);
           socket.emit("error", { message: "Invalid user session" });
           return;
         }
@@ -413,10 +380,6 @@ const initializeSocketIO = (server) => {
           createdAt: ticket.createdAt,
           lastUpdated: ticket.lastUpdated,
         });
-
-        console.log(
-          `📋 Chat history sent for ticket ${ticket.ticketNumber} to ${socket.userName}`,
-        );
       } catch (error) {
         console.error("❌ Error getting chat history:", error);
         socket.emit("error", { message: "Failed to get chat history" });
@@ -430,7 +393,6 @@ const initializeSocketIO = (server) => {
 
         // Skip if userId is not a valid ObjectId
         if (!mongoose.Types.ObjectId.isValid(socket.userId)) {
-          console.log(`⚠️ Skipping ticket rejoin for invalid userId: ${socket.userId}`);
           socket.emit("error", { message: "Invalid user session" });
           return;
         }
@@ -459,9 +421,6 @@ const initializeSocketIO = (server) => {
           lastUpdated: ticket.lastUpdated,
         });
 
-        console.log(
-          `🔄 User ${socket.userName} manually rejoined ticket: ${ticket.ticketNumber}`,
-        );
       } catch (error) {
         console.error("❌ Error rejoining ticket:", error);
         socket.emit("error", { message: "Failed to rejoin ticket" });
@@ -479,33 +438,11 @@ const initializeSocketIO = (server) => {
 
         // Skip if userId is not a valid ObjectId
         if (!mongoose.Types.ObjectId.isValid(socket.userId)) {
-          console.log(`⚠️ Skipping chat start for invalid userId: ${socket.userId}`);
           socket.emit("error", { message: "Invalid user session" });
           return;
         }
 
-        // Check if user already has an open chat ticket
-        let existingTicket = await SupportTicket.findOne({
-          userId: socket.userId,
-          status: { $in: ["open", "in_progress"] },
-          isChat: true,
-        });
-
-        if (existingTicket) {
-          // Join existing chat ticket room
-          socket.join(`ticket_${existingTicket._id}`);
-
-          socket.emit("chat_started", {
-            ticketId: existingTicket._id,
-            ticketNumber: existingTicket.ticketNumber,
-            messages: existingTicket.messages,
-            status: existingTicket.status,
-          });
-
-          return;
-        }
-
-        // Generate ticket number using timestamp + userId
+        // Generate unique ticket number using timestamp + userId
         const generateTicketNumber = () => {
           const timestamp = Date.now();
           const userIdShort = socket.userId.toString().slice(-8);
@@ -513,72 +450,93 @@ const initializeSocketIO = (server) => {
         };
 
         const ticketNumber = generateTicketNumber();
-        console.log(`🎫 Socket.IO - Generated ticket number: ${ticketNumber}`);
 
-        // Create new chat ticket
-        const ticket = await SupportTicket.create({
-          ticketNumber,
-          userId: socket.userId,
-          userModel: socket.userType === "dtuser" ? "DTUser" : "User",
-          subject: `Chat Support - ${new Date().toLocaleDateString()}`,
-          description: message,
-          category,
-          priority,
-          isChat: true,
-          messages: [
-            {
-              sender: socket.userId,
-              senderModel: socket.userType === "dtuser" ? "DTUser" : "User",
-              message,
-              isAdminReply: false,
-              timestamp: new Date(),
-            },
-          ],
-        });
+        // Use findOneAndUpdate with upsert to prevent race condition duplicates
+        const ticket = await SupportTicket.findOneAndUpdate(
+          {
+            userId: socket.userId,
+            status: { $in: ["open", "in_progress"] },
+            isChat: true,
+          },
+          {
+            $setOnInsert: {
+              ticketNumber,
+              userId: socket.userId,
+              userModel: "DTUser",
+              subject: `Chat Support - ${new Date().toLocaleDateString()}`,
+              description: message,
+              category,
+              priority,
+              isChat: true,
+              status: "open",
+              createdAt: new Date(),
+              lastUpdated: new Date(),
+              messages: [
+                {
+                  sender: socket.userId,
+                  senderModel: "DTUser", 
+                  message,
+                  isAdminReply: false,
+                  timestamp: new Date(),
+                },
+              ],
+            }
+          },
+          {
+            upsert: true,
+            new: true,
+            setDefaultsOnInsert: true
+          }
+        );
+
+        const isNewTicket = ticket.messages.length === 1;
 
         // Join ticket room
         socket.join(`ticket_${ticket._id}`);
 
-        // Notify admins about new chat
-        socket.to("admins").emit("new_chat_ticket", {
-          ticketId: ticket._id,
-          ticketNumber: ticket.ticketNumber,
-          userName: socket.userName,
-          userEmail: socket.userEmail,
-          message,
-          priority: ticket.priority,
-          category: ticket.category,
-          createdAt: ticket.createdAt,
-        });
-
-        // Send email to support if no admins online
-        if (connectedAdmins.size === 0) {
-          const user = {
-            fullName: socket.userName,
-            email: socket.userEmail,
-            _id: socket.userId,
-          };
-          await mailService.sendNewTicketNotificationToAdmin(
-            "support@mydeeptech.ng",
-            ticket,
-            user,
-          );
-        }
-
-        // Create notification for user
-        await createNotification({
-          userId: socket.userId,
-          type: "support_chat",
-          title: `Chat Support Started - ${ticket.ticketNumber}`,
-          message:
-            "Your chat session has started. Our support team will assist you shortly.",
-          priority: "medium",
-          data: {
+        // Only send notifications for new tickets
+        if (isNewTicket) {
+          // Notify admins about new chat
+          socket.to("admins").emit("new_chat_ticket", {
             ticketId: ticket._id,
             ticketNumber: ticket.ticketNumber,
-            isChat: true,
-          },
-        });
+            userName: socket.userName,
+            userEmail: socket.userEmail,
+            message,
+            priority: ticket.priority,
+            category: ticket.category,
+            createdAt: ticket.createdAt,
+          });
+
+          // Send email to support if no admins online
+          if (connectedAdmins.size === 0) {
+            const user = {
+              fullName: socket.userName,
+              email: socket.userEmail,
+              _id: socket.userId,
+            };
+            await MailService.sendNewTicketNotificationToAdmin(
+              "support@mydeeptech.ng",
+              ticket,
+              user,
+            );
+          }
+
+          // Create notification for user
+          await createNotification({
+            userId: socket.userId,
+            type: "support_chat",
+            title: `Chat Support Started - ${ticket.ticketNumber}`,
+            message: "Your chat session has started. Our support team will assist you shortly.",
+            priority: "medium",
+            data: {
+              ticketId: ticket._id,
+              ticketNumber: ticket.ticketNumber,
+              isChat: true,
+            },
+          });
+        } else {
+        }
 
         socket.emit("chat_started", {
           ticketId: ticket._id,
@@ -587,11 +545,34 @@ const initializeSocketIO = (server) => {
           status: ticket.status,
         });
 
-        console.log(
-          `💬 New chat ticket created: ${ticket.ticketNumber} by ${socket.userName}`,
-        );
       } catch (error) {
         console.error("❌ Error starting chat:", error);
+        
+        // Handle duplicate key errors gracefully
+        if (error.code === 11000) {
+          // Retry by finding the existing ticket
+          try {
+            const existingTicket = await SupportTicket.findOne({
+              userId: socket.userId,
+              status: { $in: ["open", "in_progress"] },
+              isChat: true,
+            });
+
+            if (existingTicket) {
+              socket.join(`ticket_${existingTicket._id}`);
+              socket.emit("chat_started", {
+                ticketId: existingTicket._id,
+                ticketNumber: existingTicket.ticketNumber,
+                messages: existingTicket.messages,
+                status: existingTicket.status,
+              });
+              return;
+            }
+          } catch (retryError) {
+            console.error("❌ Error in retry logic:", retryError);
+          }
+        }
+        
         socket.emit("error", { message: "Failed to start chat" });
       }
     });
@@ -623,9 +604,7 @@ const initializeSocketIO = (server) => {
           sender: socket.userId,
           senderModel: socket.isAdmin
             ? "Admin"
-            : socket.userType === "dtuser"
-              ? "DTUser"
-              : "User",
+            : "DTUser",
           message,
           isAdminReply,
           timestamp: new Date(),
@@ -658,10 +637,6 @@ const initializeSocketIO = (server) => {
 
         // If admin replied, notify user
         if (isAdminReply) {
-          console.log(
-            `🔔 Admin ${socket.userName} replied to ticket ${ticket.ticketNumber} for user ${ticket.userId}`,
-          );
-
           // Create in-app notification
           await createNotification({
             userId: ticket.userId,
@@ -675,47 +650,21 @@ const initializeSocketIO = (server) => {
               isChat: true,
             },
           });
-
-          // Check if we can send daily email notification
-          console.log(
-            `📧 Checking daily email eligibility for user ${ticket.userId}...`,
-          );
           const canSendEmail = await canSendDailyEmail(
             ticket.userId.toString(),
             "admin_reply",
           );
-          console.log(`📧 Can send email today: ${canSendEmail}`);
-
           if (canSendEmail) {
             try {
-              console.log(
-                `👤 Fetching user details for userId: ${ticket.userId}, userModel: ${ticket.userModel}`,
-              );
-
               // Get user details for email
-              let user;
-              if (ticket.userModel === "DTUser") {
-                user = await DTUser.findById(ticket.userId).select(
-                  "fullName email",
-                );
-              } else {
-                user = await User.findById(ticket.userId).select(
-                  "fullName email username",
-                );
-              }
-
-              console.log(
-                `👤 User found: ${!!user}, Email: ${user?.email ? "Yes" : "No"}`,
+              const user = await DTUser.findById(ticket.userId).select(
+                "fullName email",
               );
 
               if (user && user.email) {
-                console.log(
-                  `📧 Attempting to send admin reply email to ${user.email}...`,
-                );
-
                 // Send admin reply email notification
                 const emailResult =
-                  await mailService.sendAdminReplyNotificationEmail(
+                  await MailService.sendAdminReplyNotificationEmail(
                     user.email,
                     ticket,
                     {
@@ -725,58 +674,35 @@ const initializeSocketIO = (server) => {
                     },
                   );
 
-                console.log(`📧 Email service result:`, emailResult);
-
                 if (emailResult.success) {
                   // Mark that we've sent the daily email
-                  console.log(
-                    `📧 Marking daily email as sent for user ${ticket.userId.toString()}...`,
-                  );
                   const markResult = await markDailyEmailSent(
                     ticket.userId.toString(),
                     "admin_reply",
                   );
-                  console.log(`📧 Daily email marked as sent: ${markResult}`);
-                  console.log(
-                    `📧 ✅ Daily admin reply email sent to ${user.email} for ticket ${ticket.ticketNumber}`,
-                  );
                 } else {
-                  console.error(
-                    `📧 ❌ Failed to send admin reply email: ${emailResult.error}`,
-                  );
                 }
               } else {
-                console.log(
-                  `📧 ⚠️ User email not found for userId: ${ticket.userId} - User: ${JSON.stringify(user)}`,
-                );
               }
             } catch (emailError) {
               console.error(
                 "📧 ❌ Error in email sending process:",
                 emailError,
               );
-              console.error("📧 ❌ Stack trace:", emailError.stack);
             }
           } else {
             // Log that email was skipped due to daily limit
-            console.log(
-              `📧 ⏭️ Daily email limit reached for user ${ticket.userId}, checking status...`,
-            );
+           
             try {
               const emailStatus = await getDailyEmailStatus(
                 ticket.userId.toString(),
                 "admin_reply",
-              );
-              console.log(`📧 Email status:`, emailStatus);
-              console.log(
-                `📧 Daily email limit reached for user ${ticket.userId}. Last sent: ${emailStatus.lastSent}, expires in: ${emailStatus.expiresIn}s`,
               );
             } catch (statusError) {
               console.error("📧 ❌ Error getting email status:", statusError);
             }
           }
         } else {
-          // User message - notify online admins
           socket.to("admins").emit("user_message", {
             ticketId: ticket._id,
             ticketNumber: ticket.ticketNumber,
@@ -789,13 +715,10 @@ const initializeSocketIO = (server) => {
           // If no admins online, send email
           if (connectedAdmins.size === 0) {
             // Email notification logic will be handled here
-            console.log("📧 No admins online, should send email notification");
+          } else {
           }
         }
 
-        console.log(
-          `💬 Message sent in ticket ${ticket.ticketNumber} by ${socket.userName}`,
-        );
       } catch (error) {
         console.error("❌ Error sending message:", error);
         socket.emit("error", { message: "Failed to send message" });
@@ -843,10 +766,6 @@ const initializeSocketIO = (server) => {
           status: ticket.status,
           assignedTo: ticket.assignedTo,
         });
-
-        console.log(
-          `👨‍💼 Admin ${socket.userName} joined ticket ${ticket.ticketNumber}`,
-        );
       } catch (error) {
         console.error("❌ Error joining ticket:", error);
         socket.emit("error", { message: "Failed to join ticket" });
@@ -893,8 +812,7 @@ const initializeSocketIO = (server) => {
           userId: ticket.userId,
           type: "support_resolved",
           title: `Chat Session Closed - ${ticket.ticketNumber}`,
-          message:
-            "Your chat session has been resolved. Please rate your experience.",
+          message: "Your chat session has been resolved. Please rate your experience.",
           priority: "high",
           data: {
             ticketId: ticket._id,
@@ -904,9 +822,6 @@ const initializeSocketIO = (server) => {
           },
         });
 
-        console.log(
-          `✅ Chat ticket ${ticket.ticketNumber} closed by ${socket.userName}`,
-        );
       } catch (error) {
         console.error("❌ Error closing chat:", error);
         socket.emit("error", { message: "Failed to close chat" });
@@ -936,10 +851,60 @@ const initializeSocketIO = (server) => {
       }
     });
 
+    // Handle explicit admin room join (frontend compatibility)
+    socket.on("join_admin_room", () => {
+      if (socket.isAdmin) {
+        socket.join("admins");
+      } else {
+      }
+    });
+
+    // Handle admin joining specific chat room for real-time messages
+    socket.on("join_chat_room", async (data) => {
+      try {
+        const { ticketId } = data;
+
+        if (!socket.isAdmin) {
+          socket.emit("error", { message: "Admin access required" });
+          return;
+        }
+
+        // Verify ticket exists
+        const ticket = await SupportTicket.findById(ticketId);
+        if (!ticket) {
+          socket.emit("error", { message: "Ticket not found" });
+          return;
+        }
+
+        // Join the specific ticket room for real-time messages
+        socket.join(`ticket_${ticketId}`);
+
+        socket.emit("chat_room_joined", {
+          ticketId: ticket._id,
+          ticketNumber: ticket.ticketNumber
+        });
+
+      } catch (error) {
+        console.error("❌ Error joining chat room:", error);
+        socket.emit("error", { message: "Failed to join chat room" });
+      }
+    });
+
+    // Handle admin leaving specific chat room
+    socket.on("leave_chat_room", (data) => {
+      try {
+        const { ticketId } = data;
+        
+        if (socket.isAdmin) {
+          socket.leave(`ticket_${ticketId}`);
+        }
+      } catch (error) {
+        console.error("❌ Error leaving chat room:", error);
+      }
+    });
+
     // Handle disconnect
     socket.on("disconnect", () => {
-      console.log(`🔌 User disconnected: ${socket.userName}`);
-
       if (socket.isAdmin) {
         connectedAdmins.delete(socket.userId);
       } else {
@@ -948,7 +913,6 @@ const initializeSocketIO = (server) => {
     });
   });
 
-  console.log("🚀 Socket.IO chat server initialized");
 };
 
 /**
