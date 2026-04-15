@@ -22,14 +22,11 @@ const verifyCloudinaryConfig = () => {
 const missingVars = Object.entries(requiredCloudinaryVars)
   .filter(([, value]) => !value)
   .map(([key]) => key);
-
   
   if (missingVars.length > 0) {
-    console.log(`⚠️ Missing Cloudinary environment variables: ${missingVars.join(', ')}`);
     return false;
   }
-  
-  console.log('✅ Cloudinary configuration loaded');
+
   return true;
 };
 
@@ -217,7 +214,6 @@ const resultFileUpload = multer({
 const deleteCloudinaryFile = async (publicId) => {
   try {
     const result = await cloudinary.uploader.destroy(publicId);
-    console.log(`🗑️ Deleted file from Cloudinary: ${publicId}`);
     return result;
   } catch (error) {
     console.error(`❌ Error deleting file from Cloudinary: ${publicId}`, error);
