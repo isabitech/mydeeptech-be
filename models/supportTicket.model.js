@@ -178,7 +178,6 @@ const supportTicketSchema = new mongoose.Schema({
 // Auto-generate ticket number as fallback (timestamp + random)
 supportTicketSchema.pre('save', function(next) {
   if (this.isNew && !this.ticketNumber) {
-    console.log('⚠️ Generating fallback ticket number in model...');
     const timestamp = Date.now();
     const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
     this.ticketNumber = `TKT-${timestamp}-${random}`;
@@ -209,5 +208,21 @@ supportTicketSchema.index({ category: 1 });
 supportTicketSchema.index({ priority: 1 });
 supportTicketSchema.index({ assignedTo: 1 });
 supportTicketSchema.index({ createdAt: -1 });
+
+// Compound unique index to prevent duplicate active chat tickets per user
+supportTicketSchema.index(
+  { 
+    userId: 1, 
+    isChat: 1, 
+    status: 1 
+  }, 
+  { 
+    unique: true,
+    partialFilterExpression: { 
+      isChat: true, 
+      status: { $in: ['open', 'in_progress'] } 
+    } 
+  }
+);
 
 module.exports = mongoose.model('SupportTicket', supportTicketSchema);
