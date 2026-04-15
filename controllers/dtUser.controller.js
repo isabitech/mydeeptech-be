@@ -158,9 +158,10 @@ const createDTUser = async (req, res) => {
     // 1️⃣ Check if user already exists
     const existing = await DTUser.findOne({ email });
     if (existing) {
+      // "User already exists with this email: This looks more verbose"
       return res
         .status(400)
-        .json({ message: "User already exists with this email" });
+        .json({ message: "Registration failed. Check your details and try again." });
     }
 
     // 2️⃣ Create new user
@@ -471,8 +472,6 @@ const dtUserLogin = async (req, res) => {
 
       // Automatically resend verification email
       try {
-        console.log(`📧 Resending verification email to: ${email}`);
-
         // Send verification email with timeout
         const emailPromise = Promise.race([
           MailService.sendVerificationEmail(
@@ -487,8 +486,6 @@ const dtUserLogin = async (req, res) => {
         ]);
 
         await emailPromise;
-
-        console.log(`✅ Verification email resent successfully to: ${email}`);
 
         return res.status(400).json({
           success: false,
@@ -532,6 +529,23 @@ const dtUserLogin = async (req, res) => {
       });
     }
 
+    // Fetch user's domains from the new domain-to-user relationship
+    let userDomains = [];
+    try {
+      const domainRelationships = await DomainToUserService.fetchDomainToUserById(user._id);
+      // Transform to include both domain info and assignment ID for removal
+      userDomains = domainRelationships.map(relation => ({
+        _id: relation.domain_child._id,
+        name: relation.domain_child.name,
+        assignmentId: relation._id // Include assignment ID for removal
+      }));
+    } catch (domainError) {
+      console.log(`Failed to fetch domains for user ${user.email}:`, domainError.message);
+      // Continue with login even if domain fetch fails
+    }
+
+    console.log("userDomains:", JSON.stringify(userDomains, null, 2));
+
     // Generate JWT token
     const token = jwt.sign(
       {
@@ -557,7 +571,8 @@ const dtUserLogin = async (req, res) => {
         email: user.email,
         role: user.role,
         phone: user.phone,
-        domains: user.domains,
+        domains: user.domains, // Legacy domain field (kept for backwards compatibility)
+        userDomains: userDomains, // New structured domain relationships
         socialsFollowed: user.socialsFollowed,
         consent: user.consent,
         isEmailVerified: user.isEmailVerified,
@@ -654,6 +669,20 @@ const getDTUserProfile = async (req, res) => {
       });
     }
 
+    // Fetch user's domains from the new domain-to-user relationship
+    let userDomains = [];
+    try {
+      const domainRelationships = await DomainToUserService.fetchDomainToUserById(user._id);
+      // Transform to include both domain info and assignment ID for removal
+      userDomains = domainRelationships.map(relation => ({
+        _id: relation.domain_child._id,
+        name: relation.domain_child.name,
+        assignmentId: relation._id // Include assignment ID for removal
+      }));
+    } catch (domainError) {
+      console.log(`⚠️ Failed to fetch domains for user ${user.email}:`, domainError.message);
+    }
+
     // Structure the response in camelCase format with all requested fields
     const profileData = {
       // Basic user information
@@ -661,7 +690,8 @@ const getDTUserProfile = async (req, res) => {
       fullName: user.fullName,
       email: user.email,
       phone: user.phone,
-      domains: user.domains,
+      domains: user.domains, // Legacy domain field  
+      userDomains: userDomains, // New structured domain relationships
       consent: user.consent,
       annotatorStatus: user.annotatorStatus,
       microTaskerStatus: user.microTaskerStatus,
@@ -716,6 +746,7 @@ const getDTUserProfile = async (req, res) => {
       projectPreferences: {
         domainsOfInterest:
           user.project_preferences?.domains_of_interest || user.domains || [],
+        userDomains: userDomains, // New structured domain relationships
         availabilityType: user.project_preferences?.availability_type || "",
         ndaSigned: user.project_preferences?.nda_signed || false,
       },
@@ -792,6 +823,12 @@ const updateDTUserProfile = async (req, res) => {
         currentStatus: user.annotatorStatus,
       });
     }
+
+  //   const domainIds = domains.map((domain) => domain.id);
+  //   const domainNames = domains.map((domain) => domain.name);
+  //   // Map domain to user after creation
+  //   await DomainToUserService.assignMultipleDomainsToUser(savedUser._id, domainIds);
+
     // Prepare update object
     const updateData = {};
 
@@ -978,13 +1015,27 @@ const updateDTUserProfile = async (req, res) => {
       { new: true, runValidators: true },
     );
 
+    // Fetch updated user's domains from the new domain-to-user relationship  
+    let userDomains = [];
+    try {
+      const domainRelationships = await DomainToUserService.fetchDomainToUserById(updatedUser._id);
+      userDomains = domainRelationships.map(relation => ({
+        _id: relation.domain_child._id,
+        name: relation.domain_child.name,
+        assignmentId: relation._id // Include assignment ID for removal
+      }));
+    } catch (domainError) {
+      console.log(`⚠️ Failed to fetch domains for updated user:`, domainError.message);
+    }
+
     // Return updated profile in the same format as getDTUserProfile
     const profileData = {
       id: updatedUser._id,
       fullName: updatedUser.fullName,
       email: updatedUser.email,
       phone: updatedUser.phone,
-      domains: updatedUser.domains,
+      domains: updatedUser.domains,  
+      userDomains: userDomains, // New structured domain relationships
       consent: updatedUser.consent,
       annotatorStatus: updatedUser.annotatorStatus,
       microTaskerStatus: updatedUser.microTaskerStatus,
@@ -1042,6 +1093,7 @@ const updateDTUserProfile = async (req, res) => {
           updatedUser.project_preferences?.domains_of_interest ||
           updatedUser.domains ||
           [],
+        userDomains: userDomains, // New structured domain relationships
         availabilityType:
           updatedUser.project_preferences?.availability_type || "",
         ndaSigned: updatedUser.project_preferences?.nda_signed || false,
@@ -1291,6 +1343,7 @@ const getAllDTUsers = async (req, res) => {
       },
       { $group: { _id: "$annotatorStatus", count: { $sum: 1 } } },
     ]);
+
 
     res.status(200).json({
       success: true,
@@ -2908,6 +2961,8 @@ const adminLogin = async (req, res) => {
       });
     }
 
+
+
     // Generate JWT token
     const token = jwt.sign(
       {
@@ -2933,7 +2988,7 @@ const adminLogin = async (req, res) => {
         fullName: admin.fullName,
         email: admin.email,
         phone: admin.phone,
-        domains: admin.domains,
+        domains: admin.domains, // Legacy domain field (kept for backwards compatibility)
         isEmailVerified: admin.isEmailVerified,
         hasSetPassword: admin.hasSetPassword,
         annotatorStatus: admin.annotatorStatus,
