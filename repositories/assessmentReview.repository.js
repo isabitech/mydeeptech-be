@@ -7,15 +7,47 @@ class AssessmentReviewRepository {
     return await submission.save();
   }
 
-  async findAllPaginated({ page, limit, sort, search }) {
+  async findAllPaginated({
+    page,
+    limit,
+    sort,
+    search,
+    scoreFilter,
+    minScore,
+    maxScore,
+  }) {
     const filter = {};
 
+    // 🔍 Search
     if (search) {
       filter.$or = [
         { fullName: { $regex: search, $options: "i" } },
         { emailAddress: { $regex: search, $options: "i" } },
         { googleDriveLink: { $regex: search, $options: "i" } },
       ];
+    }
+
+    // 🎯 Score filtering (NESTED FIELD FIX)
+    if (minScore !== undefined || maxScore !== undefined) {
+      filter["reviewRating.score"] = {};
+
+      if (!isNaN(minScore)) {
+        filter["reviewRating.score"].$gte = minScore;
+      }
+
+      if (!isNaN(maxScore)) {
+        filter["reviewRating.score"].$lte = maxScore;
+      }
+    } else if (scoreFilter) {
+      const scoreRanges = {
+        low: { $gte: 0, $lte: 200 },
+        medium: { $gt: 200, $lte: 400 },
+        high: { $gt: 400, $lte: 599 },
+      };
+
+      if (scoreRanges[scoreFilter]) {
+        filter["reviewRating.score"] = scoreRanges[scoreFilter];
+      }
     }
 
     const skip = (page - 1) * limit;
@@ -28,6 +60,7 @@ class AssessmentReviewRepository {
         .populate({ path: "userId", select: "attachments.resume_url" })
         .populate({ path: "reviewerId", select: "fullName email role" })
         .lean(),
+
       AssessmentReview.countDocuments(filter),
     ]);
 
@@ -44,7 +77,6 @@ class AssessmentReviewRepository {
 
     return { assessmentReviews, total };
   }
-
   async findByUserIdPaginated({ userId, page, limit, sort }) {
     const skip = (page - 1) * limit;
 

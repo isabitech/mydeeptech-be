@@ -180,12 +180,12 @@ class BaseMailService {
             // Send email using the properly configured API instance
             const result = await brevoApiInstance.sendTransacEmail(sendSmtpEmail);
             
-            console.log('Email sent successfully:', {
-                recipient: recipientEmail,
-                subject: subject,
-                messageId: result.messageId,
-                timestamp: new Date().toISOString()
-            });
+            // console.log('Email sent successfully:', {
+            //     recipient: recipientEmail,
+            //     subject: subject,
+            //     messageId: result.messageId,
+            //     timestamp: new Date().toISOString()
+            // });
            return result;
         } catch (error) {
             console.error("ERROR SENDING EMAIL VIA BREVO:", {

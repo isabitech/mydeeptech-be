@@ -1,6 +1,7 @@
 const dtUserService = require("../services/dtUser.service");
 const AnnotationProjectService = require("../services/annotationProject.service");
 const AnnotationProjectRepository = require("../repositories/annotationProject.repository");
+const DTUser = require("../models/dtUser.model");
 
 const annotationProjectService = new AnnotationProjectService(
   new AnnotationProjectRepository(),
@@ -19,9 +20,10 @@ const sendVerificationEmailsToUnverifiedUsers = async (req, res) => {
         data: result,
       });
     }
+
     return result;
   } catch (error) {
-    console.error("❌ Error in bulk verification email process:", error);
+    console.error("Error in bulk verification email process:", error);
     if (res) {
       res.status(500).json({
         success: false,
@@ -39,25 +41,31 @@ const createDTUser = async (req, res) => {
     const result = await dtUserService.createDTUser(req.body);
 
     if (result.status === 400) {
-      return res.status(400).json({ message: result.message });
-    }
-
-    if (result.emailSent === false) {
-      return res.status(201).json({
-        message:
-          "User created successfully. However, there was an issue sending the verification email. Please contact support.",
-        user: result.user,
-        emailSent: false,
-        emailError: result.emailError,
+      return res.status(400).json({
+        message: "User already exists with this email",
       });
     }
 
-    res.status(201).json({
-      message: "User created successfully. Verification email sent.",
-      user: result.user,
-    });
+    const { newUser, emailPromise } = result;
+
+    try {
+      await emailPromise;
+      return res.status(201).json({
+        message: "User created successfully. Verification email sent.",
+        user: newUser,
+      });
+    } catch (emailError) {
+      console.error("Email sending failed:", emailError.message);
+      return res.status(201).json({
+        message:
+          "User created successfully. However, there was an issue sending the verification email. Please contact support.",
+        user: newUser,
+        emailSent: false,
+        emailError: emailError.message,
+      });
+    }
   } catch (error) {
-    console.error("❌ Error creating user:", error);
+    console.error("Error creating user:", error);
     res.status(500).json({
       message: "Server error",
       error: error.message,
@@ -73,16 +81,18 @@ const createDTUserWithBackgroundEmail = async (req, res) => {
     );
 
     if (result.status === 400) {
-      return res.status(400).json({ message: result.message });
+      return res.status(400).json({
+        message: "User already exists with this email",
+      });
     }
 
     res.status(201).json({
       message:
         "User created successfully. Verification email will be sent shortly.",
-      user: result.user,
+      user: result.newUser,
     });
   } catch (error) {
-    console.error("❌ Error creating user:", error);
+    console.error("Error creating user:", error);
     res.status(500).json({
       message: "Server error",
       error: error.message,
@@ -93,10 +103,10 @@ const createDTUserWithBackgroundEmail = async (req, res) => {
 // Email verification function
 const verifyEmail = async (req, res) => {
   try {
-    const result = await dtUserService.verifyEmail(
-      req.params.id,
-      req.query.email,
-    );
+    const result = await dtUserService.verifyEmail({
+      id: req.params.id,
+      email: req.query.email,
+    });
 
     if (result.status === 404) {
       return res
@@ -110,6 +120,7 @@ const verifyEmail = async (req, res) => {
     }
 
     const { user, reason } = result;
+
     res.status(200).json({
       success: true,
       message:
@@ -124,7 +135,7 @@ const verifyEmail = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ Error verifying email:", error);
+    console.error("Error verifying email:", error);
     res.status(500).json({
       success: false,
       message: "Server error during email verification",
@@ -136,28 +147,33 @@ const verifyEmail = async (req, res) => {
 // Password setup function (after email verification)
 const setupPassword = async (req, res) => {
   try {
-    const result = await dtUserService.setupPassword(req.body);
+    const result = await dtUserService.setupPassword({
+      userId: req.body.userId,
+      email: req.body.email,
+      password: req.body.password,
+      body: req.body,
+    });
 
     if (result.status === 400) {
-      // if (result.reason === "validation") return res.status(400).json({ success: false, message: result.message });
       if (result.reason === "email_mismatch")
         return res
           .status(400)
           .json({ success: false, message: "Invalid request" });
       if (result.reason === "not_verified")
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message: "Email must be verified before setting up password",
-          });
+        return res.status(400).json({
+          success: false,
+          message: "Email must be verified before setting up password",
+        });
       if (result.reason === "already_set")
+        return res.status(400).json({
+          success: false,
+          message: "Password has already been set. Use login instead.",
+        });
+      if (result.reason === "validation") {
         return res
           .status(400)
-          .json({
-            success: false,
-            message: "Password has already been set. Use login instead.",
-          });
+          .json({ success: false, message: result.message });
+      }
     }
     if (result.status === 404) {
       return res
@@ -186,7 +202,7 @@ const setupPassword = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ Error setting up password:", error);
+    console.error("Error setting up password:", error);
     res.status(500).json({
       success: false,
       message: "Server error during password setup",
@@ -264,7 +280,7 @@ const dtUserLogin = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ Error during DTUser login:", error);
+    console.error("Error during DTUser login:", error);
     res.status(500).json({
       success: false,
       message: "Server error during login",
@@ -310,7 +326,7 @@ const me = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ Error fetching current user:", error);
+    console.error("Error fetching current user:", error);
     res.status(500).json({
       success: false,
       message: "Server error fetching user record",
@@ -331,6 +347,7 @@ const getDTUserProfile = async (req, res) => {
     }
 
     const { user } = result;
+
     const profileData = {
       id: user._id,
       fullName: user.fullName,
@@ -413,7 +430,7 @@ const getDTUserProfile = async (req, res) => {
       profile: profileData,
     });
   } catch (error) {
-    console.error("❌ Error fetching DTUser profile:", error);
+    console.error("Error fetching DTUser profile:", error);
     res.status(500).json({
       success: false,
       message: "Server error fetching profile",
@@ -425,10 +442,19 @@ const getDTUserProfile = async (req, res) => {
 // Update DTUser profile (PATCH endpoint)
 const updateDTUserProfile = async (req, res) => {
   try {
+    const userResult = await dtUserService.getDTUserProfile(req.params.userId);
+
+    if (userResult.status === 404) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+
     const result = await dtUserService.updateDTUserProfile({
       userId: req.params.userId,
       requesterId: req.user.userId,
       body: req.body,
+      user: userResult.user,
     });
 
     if (result.status === 400) {
@@ -463,7 +489,7 @@ const updateDTUserProfile = async (req, res) => {
       profile: result.updatedUser,
     });
   } catch (error) {
-    console.error("❌ Error updating DTUser profile:", error);
+    console.error("Error updating DTUser profile:", error);
     res.status(500).json({
       success: false,
       message: "Server error updating profile",
@@ -500,12 +526,10 @@ const resetDTUserPassword = async (req, res) => {
           .json({ success: false, message: "Current password is incorrect" });
       }
       if (result.reason === "same_password") {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message: "New password must be different from current password",
-          });
+        return res.status(400).json({
+          success: false,
+          message: "New password must be different from current password",
+        });
       }
     }
 
@@ -529,7 +553,7 @@ const resetDTUserPassword = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ Error resetting DTUser password:", error);
+    console.error("Error resetting DTUser password:", error);
     res.status(500).json({
       success: false,
       message: "Server error during password reset",
@@ -557,7 +581,7 @@ const getDTUser = async (req, res) => {
       user: result.user,
     });
   } catch (error) {
-    console.error("❌ Error fetching user:", error);
+    console.error("Error fetching user:", error);
     res.status(500).json({
       success: false,
       message: "Server error",
@@ -592,7 +616,7 @@ const getAllDTUsers = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ Error fetching all DTUsers:", error);
+    console.error("Error fetching all DTUsers:", error);
     res.status(500).json({
       success: false,
       message: "Server error fetching DTUsers",
@@ -627,7 +651,7 @@ const getAllAdminUsers = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ Error fetching admin users:", error);
+    console.error("Error fetching admin users:", error);
     res.status(500).json({
       success: false,
       message: "Server error fetching admin users",
@@ -647,7 +671,7 @@ const getAdminDashboard = async (req, res) => {
       data: result.dashboardData,
     });
   } catch (error) {
-    console.error("❌ Error fetching admin dashboard overview:", error);
+    console.error("Error fetching admin dashboard overview:", error);
     res.status(500).json({
       success: false,
       message: "Server error fetching dashboard data",
@@ -679,6 +703,7 @@ const approveAnnotator = async (req, res) => {
     }
 
     const { user, previousStatus, newStatus } = result;
+
     res.status(200).json({
       success: true,
       message: `Annotator status updated successfully from ${previousStatus} to ${newStatus}`,
@@ -697,7 +722,7 @@ const approveAnnotator = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ Error approving annotator:", error);
+    console.error("Error approving annotator:", error);
     res.status(500).json({
       success: false,
       message: "Server error updating annotator status",
@@ -732,7 +757,7 @@ const getAllQAUsers = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ Error fetching QA users:", error);
+    console.error("Error fetching QA users:", error);
     res.status(500).json({
       success: false,
       message: "Server error fetching QA users",
@@ -775,6 +800,7 @@ const approveUserForQA = async (req, res) => {
     }
 
     const { user, previousQAStatus } = result;
+
     res.status(200).json({
       success: true,
       message: `QA status approved successfully for ${user.fullName}`,
@@ -791,7 +817,7 @@ const approveUserForQA = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ Error approving QA status:", error);
+    console.error("Error approving QA status:", error);
     res.status(500).json({
       success: false,
       message: "Server error updating QA status",
@@ -834,6 +860,7 @@ const rejectUserForQA = async (req, res) => {
     }
 
     const { user, previousQAStatus } = result;
+
     res.status(200).json({
       success: true,
       message: `QA status rejected for ${user.fullName}`,
@@ -851,7 +878,7 @@ const rejectUserForQA = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ Error rejecting QA status:", error);
+    console.error("Error rejecting QA status:", error);
     res.status(500).json({
       success: false,
       message: "Server error updating QA status",
@@ -874,9 +901,11 @@ const rejectAnnotator = async (req, res) => {
     }
 
     const { user, previousStatus } = result;
+
     res.status(200).json({
       success: true,
-      message: `Annotator rejected successfully. User approved as micro tasker.`,
+      message:
+        "Annotator rejected successfully. User approved as micro tasker.",
       data: {
         userId: user._id,
         fullName: user.fullName,
@@ -891,7 +920,7 @@ const rejectAnnotator = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ Error rejecting annotator:", error);
+    console.error("Error rejecting annotator:", error);
     res.status(500).json({
       success: false,
       message: "Server error rejecting annotator",
@@ -919,7 +948,7 @@ const getDTUserAdmin = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ Error fetching user details (admin):", error);
+    console.error("Error fetching user details (admin):", error);
     res.status(500).json({
       success: false,
       message: "Server error fetching user details",
@@ -979,7 +1008,7 @@ const requestAdminVerification = async (req, res) => {
       data: result.data,
     });
   } catch (error) {
-    console.error("❌ Error requesting admin verification:", error);
+    console.error("Error requesting admin verification:", error);
     res.status(500).json({
       success: false,
       message: "Server error requesting admin verification",
@@ -1042,6 +1071,7 @@ const confirmAdminVerification = async (req, res) => {
     }
 
     const newAdmin = result.admin;
+
     res.status(201).json({
       success: true,
       message:
@@ -1062,7 +1092,7 @@ const confirmAdminVerification = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ Error confirming admin verification:", error);
+    console.error("Error confirming admin verification:", error);
     res.status(500).json({
       success: false,
       message: "Server error creating admin account",
@@ -1109,6 +1139,7 @@ const createAdmin = async (req, res) => {
     }
 
     const newAdmin = result.admin;
+
     res.status(201).json({
       success: true,
       message:
@@ -1129,7 +1160,7 @@ const createAdmin = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ Error creating admin account:", error);
+    console.error("Error creating admin account:", error);
     res.status(500).json({
       success: false,
       message: "Server error creating admin account",
@@ -1218,7 +1249,7 @@ const verifyAdminOTP = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ Error during admin OTP verification:", error);
+    console.error("Error during admin OTP verification:", error);
     res.status(500).json({
       success: false,
       message: "Server error during OTP verification",
@@ -1281,7 +1312,7 @@ const adminLogin = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ Error during admin login:", error);
+    console.error("Error during admin login:", error);
     res.status(500).json({
       success: false,
       message: "Server error during admin login",
@@ -1293,13 +1324,15 @@ const adminLogin = async (req, res) => {
 // Resend verification email endpoint
 const resendVerificationEmail = async (req, res) => {
   try {
+    if (!req.body.email) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Email is required" });
+    }
+
     const result = await dtUserService.resendVerificationEmail(req.body.email);
 
     if (result.status === 400) {
-      if (result.reason === "email_required")
-        return res
-          .status(400)
-          .json({ success: false, message: "Email is required" });
       if (result.reason === "already_verified")
         return res
           .status(400)
@@ -1322,7 +1355,7 @@ const resendVerificationEmail = async (req, res) => {
       });
     } catch (emailError) {
       console.error(
-        `❌ Failed to resend verification email to ${user.email}:`,
+        `Failed to resend verification email to ${user.email}:`,
         emailError.message,
       );
       res.status(500).json({
@@ -1333,7 +1366,7 @@ const resendVerificationEmail = async (req, res) => {
       });
     }
   } catch (error) {
-    console.error("❌ Error while resending verification email:", error);
+    console.error("Error while resending verification email:", error);
     res.status(500).json({
       success: false,
       message: "Server error while resending verification email",
@@ -1354,12 +1387,10 @@ const getAvailableProjects = async (req, res) => {
         .json({ success: false, message: "User not found." });
     }
     if (result.status === 403) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "Access denied. Only approved annotators can view projects.",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Only approved annotators can view projects.",
+      });
     }
     res.status(200).json({
       success: true,
@@ -1367,7 +1398,7 @@ const getAvailableProjects = async (req, res) => {
       data: result.data,
     });
   } catch (error) {
-    console.error("❌ Error fetching projects:", error);
+    console.error("Error fetching projects:", error);
     res.status(500).json({
       success: false,
       message: "Server error",
@@ -1469,7 +1500,7 @@ const applyToProject = async (req, res) => {
       });
     }
 
-    console.error("❌ Error applying to project:", error);
+    console.error("Error applying to project:", error);
     res.status(500).json({
       success: false,
       message: "Server error while applying to project",
@@ -1500,7 +1531,7 @@ const getUserActiveProjects = async (req, res) => {
       data: result.data,
     });
   } catch (error) {
-    console.error("❌ Error fetching user active projects:", error);
+    console.error("Error fetching user active projects:", error);
     res.status(500).json({
       success: false,
       message: "Server error fetching user projects",
@@ -1524,7 +1555,7 @@ const getUserInvoices = async (req, res) => {
       data: result.data,
     });
   } catch (error) {
-    console.error("❌ Error fetching user invoices:", error);
+    console.error("Error fetching user invoices:", error);
     res.status(500).json({
       success: false,
       message: "Server error fetching invoices",
@@ -1546,7 +1577,7 @@ const getUnpaidInvoices = async (req, res) => {
       data: result.data,
     });
   } catch (error) {
-    console.error("❌ Error fetching unpaid invoices:", error);
+    console.error("Error fetching unpaid invoices:", error);
     res.status(500).json({
       success: false,
       message: "Server error fetching unpaid invoices",
@@ -1568,7 +1599,7 @@ const getPaidInvoices = async (req, res) => {
       data: result.data,
     });
   } catch (error) {
-    console.error("❌ Error fetching paid invoices:", error);
+    console.error("Error fetching paid invoices:", error);
     res.status(500).json({
       success: false,
       message: "Server error fetching paid invoices",
@@ -1592,12 +1623,10 @@ const getInvoiceDetails = async (req, res) => {
     }
 
     if (result.status === 404) {
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message: "Invoice not found or access denied",
-        });
+      return res.status(404).json({
+        success: false,
+        message: "Invoice not found or access denied",
+      });
     }
 
     res.status(200).json({
@@ -1605,7 +1634,7 @@ const getInvoiceDetails = async (req, res) => {
       data: result.data,
     });
   } catch (error) {
-    console.error("❌ Error fetching invoice details:", error);
+    console.error("Error fetching invoice details:", error);
     res.status(500).json({
       success: false,
       message: "Server error fetching invoice details",
@@ -1624,7 +1653,7 @@ const getInvoiceDashboard = async (req, res) => {
       data: result.data,
     });
   } catch (error) {
-    console.error("❌ Error fetching invoice dashboard:", error);
+    console.error("Error fetching invoice dashboard:", error);
     res.status(500).json({
       success: false,
       message: "Server error fetching invoice dashboard",
@@ -1636,8 +1665,6 @@ const getInvoiceDashboard = async (req, res) => {
 // DTUser Dashboard - Personal overview for authenticated users
 const getDTUserDashboard = async (req, res) => {
   try {
-    console.log("📥 User", req.user.userId, "requesting dashboard");
-
     const result = await dtUserService.getDTUserDashboard({
       userId: req.user?.userId || req.userId,
       email: req.user?.email || req.email,
@@ -1654,7 +1681,7 @@ const getDTUserDashboard = async (req, res) => {
       data: result.data,
     });
   } catch (error) {
-    console.error("❌ Error generating DTUser dashboard:", error);
+    console.error("Error generating DTUser dashboard:", error);
     res.status(500).json({
       success: false,
       message: "Server error generating user dashboard",
@@ -1697,14 +1724,12 @@ const manuallyAddUserToProject = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Project not found" });
     if (error.message === "already_approved")
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "User is already approved for this project",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "User is already approved for this project",
+      });
 
-    console.error("❌ Error manually adding user to project:", error);
+    console.error("Error manually adding user to project:", error);
     res.status(500).json({
       success: false,
       message: "Server error adding user to project",
@@ -1714,7 +1739,6 @@ const manuallyAddUserToProject = async (req, res) => {
 };
 
 // Submit result file upload and store in Cloudinary
-
 const submitResultWithCloudinary = async (req, res) => {
   try {
     const result = await dtUserService.submitResultWithCloudinary({
@@ -1744,7 +1768,7 @@ const submitResultWithCloudinary = async (req, res) => {
       data: result.data,
     });
   } catch (error) {
-    console.error("❌ Error processing result upload:", error);
+    console.error("Error processing result upload:", error);
     res.status(500).json({
       success: false,
       message: "Server error processing result upload",
@@ -1780,7 +1804,7 @@ const uploadIdDocument = async (req, res) => {
       data: result.data,
     });
   } catch (error) {
-    console.error("❌ Error in ID document upload:", error);
+    console.error("Error in ID document upload:", error);
     res.status(500).json({
       success: false,
       message: "Server error during ID document upload",
@@ -1816,7 +1840,7 @@ const uploadResume = async (req, res) => {
       data: result.data,
     });
   } catch (error) {
-    console.error("❌ Error in resume upload:", error);
+    console.error("Error in resume upload:", error);
     res.status(500).json({
       success: false,
       message: "Server error during resume upload",
@@ -1845,7 +1869,7 @@ const getUserResultSubmissions = async (req, res) => {
       data: result.data,
     });
   } catch (error) {
-    console.error("❌ Error getting result submissions:", error);
+    console.error("Error getting result submissions:", error);
     res.status(500).json({
       success: false,
       message: "Server error retrieving result submissions",
@@ -1881,7 +1905,7 @@ const getProjectGuidelines = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Project not found" });
 
-    console.error("❌ Error getting project guidelines:", error);
+    console.error("Error getting project guidelines:", error);
     res.status(500).json({
       success: false,
       message: "Server error retrieving project guidelines",
@@ -1906,7 +1930,7 @@ const getAllUsersForRoleManagement = async (req, res) => {
       summary: result.summary,
     });
   } catch (error) {
-    console.error("❌ Error in getAllUsersForRoleManagement:", error);
+    console.error("Error in getAllUsersForRoleManagement:", error);
     res.status(500).json({
       success: false,
       message: "Server error fetching users for role management",
@@ -1942,7 +1966,7 @@ const updateUserRole = async (req, res) => {
       data: result.data,
     });
   } catch (error) {
-    console.error("❌ Error in updateUserRole:", error);
+    console.error("Error in updateUserRole:", error);
     res.status(500).json({
       success: false,
       message: "Server error updating user role",
@@ -1951,8 +1975,141 @@ const updateUserRole = async (req, res) => {
   }
 };
 
+const markAssessmentSubmitted = async (req, res) => {
+  try {
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+    const result = await DTUser.updateMany(
+      {
+        createdAt: { $lte: oneMonthAgo },
+        assessmentSubmission: { $ne: true },
+      },
+      {
+        $set: { assessmentSubmission: true },
+      },
+    );
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully marked ${result.modifiedCount} users with assessmentSubmission: true`,
+      data: {
+        cutoffDate: oneMonthAgo,
+        usersMatched: result.matchedCount,
+        usersModified: result.modifiedCount,
+        updatedAt: new Date(),
+      },
+    });
+  } catch (error) {
+    console.error("Error marking assessment submission:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error marking assessment submission",
+      error: error.message,
+    });
+  }
+};
+
+// SOP (Standard Operating Procedure) acceptance tracking
+
+/**
+ * Check if user has accepted the SOP
+ * GET /api/auth/sop-acceptance/status
+ */
+const getSopAcceptanceStatus = async (req, res) => {
+  try {
+    const { userId } = req.user;
+
+    const user = await DTUser.findById(userId).select(
+      "sop_acceptance fullName email _id",
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+        data: null,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "SOP acceptance status retrieved successfully",
+      data: {
+        has_accepted: user.sop_acceptance?.has_accepted || false,
+        accepted_at: user.sop_acceptance?.accepted_at || null,
+        user: {
+          userId: user._id,
+          name: user.fullName,
+          email: user.email,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error getting SOP acceptance status:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to get SOP acceptance status",
+      error: error.message || "Unknown error",
+      data: null,
+    });
+  }
+};
+
+/**
+ * Record user's acceptance of the SOP
+ * POST /api/auth/sop-acceptance
+ */
+const recordSopAcceptance = async (req, res) => {
+  try {
+    const { userId } = req.user;
+
+    const user = await DTUser.findByIdAndUpdate(
+      userId,
+      {
+        $set: {
+          "sop_acceptance.has_accepted": true,
+          "sop_acceptance.accepted_at": new Date(),
+        },
+      },
+      { new: true },
+    ).select("sop_acceptance fullName email _id");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+        data: null,
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "SOP acceptance recorded successfully",
+      data: {
+        has_accepted: user.sop_acceptance.has_accepted,
+        accepted_at: user.sop_acceptance.accepted_at,
+        user: {
+          userId: user._id,
+          name: user.fullName,
+          email: user.email,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("Error recording SOP acceptance:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to record SOP acceptance",
+      error: error.message || "Unknown error",
+      data: null,
+    });
+  }
+};
+
 module.exports = {
   me,
+  markAssessmentSubmitted,
   createDTUser,
   createDTUserWithBackgroundEmail,
   verifyEmail,
@@ -1995,4 +2152,6 @@ module.exports = {
   getAllUsersForRoleManagement,
   updateUserRole,
   manuallyAddUserToProject,
+  getSopAcceptanceStatus,
+  recordSopAcceptance,
 };
