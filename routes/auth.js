@@ -45,7 +45,7 @@ const {
 } = require('../controllers/passwordReset.controller.js');
 
 // Import Cloudinary upload middleware for result submissions
-const { resultFileUpload, idDocumentUpload, resumeUpload } = require('../config/cloudinary');
+const { resultFileUpload, idDocumentUpload, resumeUpload, isCloudinaryConfigured } = require('../config/cloudinary');
 
 const router = express.Router()
 
@@ -156,6 +156,15 @@ router.get('/result-submissions', authenticateToken, getUserResultSubmissions);
 // Upload ID Document Route - adds to profile information
 router.post('/upload-id-document', authenticateToken, (req, res, next) => {
   console.log('🚀 ID document upload endpoint hit');
+
+  // Check if Cloudinary is properly configured
+  if (!isCloudinaryConfigured) {
+    return res.status(500).json({
+      success: false,
+      message: 'File upload service is temporarily unavailable. Please try again later.',
+      error: 'CLOUDINARY_CONFIG_ERROR'
+    });
+  }
 
   // Create a flexible upload handler for ID documents
   const upload = idDocumentUpload.fields([
