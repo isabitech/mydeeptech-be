@@ -1091,8 +1091,6 @@ const resetDTUserPassword = async (req, res) => {
     const { oldPassword, newPassword } = req.body;
     const userId = req.user.userId; // From JWT token via authenticateToken middleware
 
-    console.log(`🔐 Password reset request for user ID: ${userId}`);
-
     // Find user by ID
     const user = await DTUser.findById(userId);
 
@@ -1106,7 +1104,6 @@ const resetDTUserPassword = async (req, res) => {
 
     // Check if user has a password set
     if (!user.hasSetPassword || !user.password) {
-      console.log(`❌ User ${user.email} does not have a password set`);
       return res.status(400).json({
         success: false,
         message:
@@ -1118,7 +1115,6 @@ const resetDTUserPassword = async (req, res) => {
     // Verify old password
     const isOldPasswordValid = await bcrypt.compare(oldPassword, user.password);
     if (!isOldPasswordValid) {
-      console.log(`❌ Invalid old password for user: ${user.email}`);
       return res.status(400).json({
         success: false,
         message: "Current password is incorrect",
@@ -1128,9 +1124,6 @@ const resetDTUserPassword = async (req, res) => {
     // Check if new password is different from old password
     const isSamePassword = await bcrypt.compare(newPassword, user.password);
     if (isSamePassword) {
-      console.log(
-        `❌ New password same as old password for user: ${user.email}`,
-      );
       return res.status(400).json({
         success: false,
         message: "New password must be different from current password",
@@ -1144,9 +1137,6 @@ const resetDTUserPassword = async (req, res) => {
     // Update user password
     user.password = hashedNewPassword;
     await user.save();
-
-    console.log(`✅ Password successfully reset for user: ${user.email}`);
-
     res.status(200).json({
       success: true,
       message: "Password reset successfully",
@@ -1174,12 +1164,9 @@ const getDTUser = async (req, res) => {
   try {
     const { id } = req.params;
 
-    console.log(`👤 Fetching DTUser details for ID: ${id}`);
-
     const user = await DTUser.findById(id).select("-password"); // Exclude password for security
 
     if (!user) {
-      console.log(`❌ User not found with ID: ${id}`);
       return res.status(404).json({
         success: false,
         message: "User not found",
@@ -1230,8 +1217,6 @@ const getAllDTUsers = async (req, res) => {
       country,
     } = req.query;
 
-    console.log(`🔍 Filters - Status: ${status}, Verified: ${verified}, HasPassword: ${hasPassword}, Search: ${search}, Country: ${country}`);
-
     // Build filter object
     const filter = {};
 
@@ -1279,8 +1264,6 @@ const getAllDTUsers = async (req, res) => {
         filter["personal_info.country"] = { $regex: `^${country}$`, $options: "i" };
       }
     }
-
-    console.log("🔍 Final filter for fetching DTUsers:", JSON.stringify(filter, null, 2));
 
     // Calculate pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -1345,8 +1328,6 @@ const getAllDTUsers = async (req, res) => {
 // Admin function: Get all admin users
 const getAllAdminUsers = async (req, res) => {
   try {
-    console.log(`🔍 Admin ${req.admin.email} requesting admin users list`);
-
     // Build filter for admin users only
     const filter = {
       $or: [
@@ -1375,8 +1356,6 @@ const getAllAdminUsers = async (req, res) => {
         ],
       });
     }
-
-    // console.log('🔍 Admin users filter:', JSON.stringify(filter, null, 2));
 
     // Get admin users with pagination
     const adminUsers = await DTUser.find(filter)
@@ -2214,7 +2193,6 @@ const rejectUserForQA = async (req, res) => {
 
     // Check current QA status
     const previousQAStatus = user.qaStatus;
-    console.log(`📋 Current QA status for ${user.email}: ${previousQAStatus}`);
 
     // Check if user is already rejected
     if (user.qaStatus === "rejected") {
@@ -2335,7 +2313,6 @@ const getDTUserAdmin = async (req, res) => {
     const user = await DTUser.findById(userId).select("-password");
 
     if (!user) {
-      console.log(`❌ User not found with ID: ${userId}`);
       return res.status(404).json({
         success: false,
         message: "User not found",
@@ -2378,7 +2355,6 @@ const requestAdminVerification = async (req, res) => {
     const validAdminKey =
       envConfig.admin.ADMIN_CREATION_KEY || "super-secret-admin-key-2024";
     if (adminKey !== validAdminKey) {
-      console.log(`❌ Invalid admin creation key provided`);
       return res.status(403).json({
         success: false,
         message: "Invalid admin creation key",
@@ -2397,7 +2373,6 @@ const requestAdminVerification = async (req, res) => {
       adminEmails.includes(email.toLowerCase());
 
     if (!isValidAdminEmail) {
-      console.log(`❌ Invalid admin email domain: ${email}`);
       return res.status(400).json({
         success: false,
         message:
@@ -2409,7 +2384,6 @@ const requestAdminVerification = async (req, res) => {
     // Check if admin already exists
     const existingAdmin = await DTUser.findOne({ email: email.toLowerCase() });
     if (existingAdmin) {
-      console.log(`❌ Admin already exists: ${email}`);
       return res.status(409).json({
         success: false,
         message: "Admin account already exists with this email",
@@ -2490,7 +2464,6 @@ const confirmAdminVerification = async (req, res) => {
     const validAdminKey =
       envConfig.admin.ADMIN_CREATION_KEY || "super-secret-admin-key-2024";
     if (adminKey !== validAdminKey) {
-      console.log(`❌ Invalid admin creation key provided`);
       return res.status(403).json({
         success: false,
         message: "Invalid admin creation key",
@@ -2501,7 +2474,6 @@ const confirmAdminVerification = async (req, res) => {
     // Get verification data
     const verificationData = adminVerificationStore.getVerificationData(email);
     if (!verificationData) {
-      console.log(`❌ No verification request found for: ${email}`);
       return res.status(404).json({
         success: false,
         message: "No verification request found or verification expired",
@@ -2511,7 +2483,6 @@ const confirmAdminVerification = async (req, res) => {
 
     // Check if verification code has expired
     if (Date.now() > verificationData.expiresAt) {
-      console.log(`❌ Verification code expired for: ${email}`);
       adminVerificationStore.removeVerificationCode(email);
       return res.status(400).json({
         success: false,
@@ -2522,7 +2493,6 @@ const confirmAdminVerification = async (req, res) => {
 
     // Check verification attempts
     if (verificationData.attempts >= 3) {
-      console.log(`❌ Too many verification attempts for: ${email}`);
       adminVerificationStore.removeVerificationCode(email);
       return res.status(429).json({
         success: false,
@@ -2534,7 +2504,6 @@ const confirmAdminVerification = async (req, res) => {
 
     // Verify the code
     if (verificationCode !== verificationData.code) {
-      console.log(`❌ Invalid verification code for: ${email}`);
       const attempts = adminVerificationStore.incrementAttempts(email);
       return res.status(400).json({
         success: false,
@@ -2603,8 +2572,7 @@ const confirmAdminVerification = async (req, res) => {
     // Return admin data (note: no token provided since email needs OTP verification)
     res.status(201).json({
       success: true,
-      message:
-        "Admin account created successfully! Please check your email for the OTP code to verify your account.",
+      message: "Admin account created successfully! Please check your email for the OTP code to verify your account.",
       otpVerificationRequired: true,
       admin: {
         id: newAdmin._id,
@@ -2648,7 +2616,6 @@ const createAdmin = async (req, res) => {
     const validAdminKey =
       envConfig.admin.ADMIN_CREATION_KEY || "super-secret-admin-key-2024";
     if (adminKey !== validAdminKey) {
-      console.log(`❌ Invalid admin creation key provided`);
       return res.status(403).json({
         success: false,
         message: "Invalid admin creation key",
@@ -2667,7 +2634,6 @@ const createAdmin = async (req, res) => {
       adminEmails.includes(email.toLowerCase());
 
     if (!isValidAdminEmail) {
-      console.log(`❌ Invalid admin email domain: ${email}`);
       return res.status(400).json({
         success: false,
         message:
@@ -2679,7 +2645,6 @@ const createAdmin = async (req, res) => {
     // Check if admin already exists
     const existingAdmin = await DTUser.findOne({ email: email.toLowerCase() });
     if (existingAdmin) {
-      console.log(`❌ Admin already exists: ${email}`);
       return res.status(409).json({
         success: false,
         message: "Admin account already exists with this email",
@@ -2742,8 +2707,7 @@ const createAdmin = async (req, res) => {
     // Return admin data (note: no token provided since email needs OTP verification)
     res.status(201).json({
       success: true,
-      message:
-        "Admin account created successfully! Please check your email for the OTP code to verify your account.",
+      message: "Admin account created successfully! Please check your email for the OTP code to verify your account.",
       otpVerificationRequired: true,
       admin: {
         id: newAdmin._id,
@@ -2857,8 +2821,6 @@ const verifyAdminOTP = async (req, res) => {
       { expiresIn: "7d" },
     );
 
-    console.log(`✅ Admin account verified successfully: ${email}`);
-
     res.status(200).json({
       success: true,
       message: "Admin account verified successfully! You are now logged in.",
@@ -2910,7 +2872,6 @@ const adminLogin = async (req, res) => {
     if (!email.endsWith("@mydeeptech.ng")) {
       return res.status(400).json({
         success: false,
-        // message: "Admin login is restricted to @mydeeptech.ng domain",
         message: "Invalid credentials or account not verified",
       });
     }
@@ -2958,8 +2919,6 @@ const adminLogin = async (req, res) => {
       envConfig.jwt.JWT_SECRET || "your-secret-key",
       { expiresIn: "7d" },
     );
-
-    console.log("✅ Admin login successful for:", email);
 
     // Return success response
     res.status(200).json({
@@ -3338,17 +3297,9 @@ const applyToProject = async (req, res) => {
 
     // Check if user is an approved annotator
     const user = await DTUser.findById(userId);
-    console.log(`👤 User status check:`, {
-      found: !!user,
-      email: user?.email,
-      annotatorStatus: user?.annotatorStatus,
-      hasResume: !!user?.attachments?.resume_url,
-    });
-
+ 
     if (!user || user.annotatorStatus !== "approved") {
-      // console.log(
-      //   `❌ User ${req.user.email} access denied - Status: ${user?.annotatorStatus || "unknown"}`,
-      // );
+     
       return res.status(403).json({
         success: false,
         message:
@@ -3361,9 +3312,7 @@ const applyToProject = async (req, res) => {
       !user.attachments?.resume_url ||
       user.attachments.resume_url.trim() === ""
     ) {
-      // console.log(
-      //   `❌ User ${req.user.email} application denied - No resume uploaded`,
-      // );
+    
       return res.status(400).json({
         success: false,
         message: "Please upload your resume in your profile section",
@@ -3442,15 +3391,10 @@ const applyToProject = async (req, res) => {
 
     if (requiresAssessment) {
       // Check user's multimedia assessment status
-      // console.log(
-      //   `🎯 Project requires multimedia assessment. User status: ${user.multimediaAssessmentStatus}`,
-      // );
-
+     
       if (user.multimediaAssessmentStatus === "approved") {
         // User already passed assessment, proceed normally
-        // console.log(
-        //   `✅ User ${user.email} already approved for multimedia assessment`,
-        // );
+      
       } else if (user.multimediaAssessmentStatus === "failed") {
         // Check if 24-hour cooldown has passed
         const cooldownHours = 24;
@@ -3474,9 +3418,6 @@ const applyToProject = async (req, res) => {
           });
         }
 
-        console.log(
-          `🔄 User ${user.email} eligible for assessment retake after cooldown`,
-        );
       }
 
       if (user.multimediaAssessmentStatus !== "approved") {
@@ -3529,9 +3470,7 @@ const applyToProject = async (req, res) => {
           );
 
           assessmentTriggered = true;
-          console.log(
-            `📧 Assessment invitation sent to ${user.email} for project: ${project.projectName}`,
-          );
+        
         } catch (assessmentError) {
           console.error(
             `❌ Failed to trigger assessment for user ${user.email}:`,
@@ -3579,9 +3518,6 @@ const applyToProject = async (req, res) => {
     // Send email notification to admin(s) only if not assessment-gated
     if (!assessmentTriggered) {
       try {
-        const {
-          sendProjectApplicationNotification,
-        } = require("../utils/projectMailer");
 
         // Get project creator and assigned admins
         const projectWithAdmins = await AnnotationProject.findById(projectId)
@@ -3804,8 +3740,6 @@ const getUserInvoices = async (req, res) => {
       startDate,
       endDate,
     } = req.query;
-
-
 
     // Build filter object
     const filter = { dtUserId: userId };
