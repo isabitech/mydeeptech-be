@@ -28,6 +28,7 @@
     "seed-rbac": "node scripts/rbacSeeder.js",
     "seed-resources": "node scripts/seedResources.js",
     "drop-resources": "node scripts/dropResources.js",
+    "promote-user-admin": "node scripts/promoteUserToAdmin.js",
     "assign-super-admin": "node scripts/assignSuperAdmin.js",
     "remove-old-admin": "node scripts/removeOldAdmin.js",
     "hvnc:migrate": "node scripts/hvnc-migration.js",

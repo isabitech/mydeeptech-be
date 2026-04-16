@@ -36,6 +36,10 @@ class DomainSubCategoryRepository {
     return DomainSubCategoryModel.findOne({ name, domain_category: domainCategoryId }).populate("domain_category", "_id name slug");
   }
 
+  static findBySlugAndCategory(slug, domainCategoryId) {
+    return DomainSubCategoryModel.findOne({ slug, domain_category: domainCategoryId }).populate("domain_category", "_id name slug");
+  }
+
 
   static async create(payload) {
     const newSubCategory = new DomainSubCategoryModel(payload);

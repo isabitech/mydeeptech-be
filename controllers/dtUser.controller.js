@@ -27,6 +27,7 @@ const adminVerificationStore = require("../utils/adminVerificationStore");
 const envConfig = require("../config/envConfig");
 const { RoleType } = require("../utils/role");
 const MailService = require("../services/mail-service/mail-service");
+const RoleService = require("../services/role.service");
 
 // Function to send verification emails to all unverified users
 const sendVerificationEmailsToUnverifiedUsers = async (req, res) => {
@@ -577,60 +578,56 @@ const dtUserLogin = async (req, res) => {
 };
 
 const me = async (req, res) => {
-
   const { email } = req.user;
 
   const user = await DTUser.findOne({ email });
 
-  if(!user) {
+  if (!user) {
     return res.status(404).json({
       success: false,
       message: "User not found",
     });
   }
 
-      // Generate JWT token
-    const token = jwt.sign(
-      {
-        userId: user._id,
-        email: user.email,
-        fullName: user.fullName,
-      },
-      envConfig.jwt.JWT_SECRET || "your-secret-key", // Use environment variable for production
-      { expiresIn: "7d" }, // Token expires in 7 days
-    );
+  // Generate JWT token
+  const token = jwt.sign(
+    {
+      userId: user._id,
+      email: user.email,
+      fullName: user.fullName,
+    },
+    envConfig.jwt.JWT_SECRET || "your-secret-key", // Use environment variable for production
+    { expiresIn: "7d" }, // Token expires in 7 days
+  );
 
-   res.status(200).json({
-      success: true,
-      message: "User records fetched successfully",
-      _usrinfo: {
-        data: token, // Token stored in the format frontend expects for sessionStorage
-      },
-      token: token, // Also include token directly for backwards compatibility
-      user: {
-        id: user._id,
-        fullName: user.fullName,
-        email: user.email,
-        phone: user.phone,
-        role: user.role,
-        domains: user.domains,
-        socialsFollowed: user.socialsFollowed,
-        consent: user.consent,
-        isEmailVerified: user.isEmailVerified,
-        hasSetPassword: user.hasSetPassword,
-        annotatorStatus: user.annotatorStatus,
-        microTaskerStatus: user.microTaskerStatus,
-        qaStatus: user.qaStatus,
-        resultLink: user.resultLink,
-        isAssessmentSubmitted: !!user.assessmentSubmission, // Ensure boolean value
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-      },
-    });
-
-}
-
-
+  res.status(200).json({
+    success: true,
+    message: "User records fetched successfully",
+    _usrinfo: {
+      data: token, // Token stored in the format frontend expects for sessionStorage
+    },
+    token: token, // Also include token directly for backwards compatibility
+    user: {
+      id: user._id,
+      fullName: user.fullName,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      domains: user.domains,
+      socialsFollowed: user.socialsFollowed,
+      consent: user.consent,
+      isEmailVerified: user.isEmailVerified,
+      hasSetPassword: user.hasSetPassword,
+      annotatorStatus: user.annotatorStatus,
+      microTaskerStatus: user.microTaskerStatus,
+      qaStatus: user.qaStatus,
+      resultLink: user.resultLink,
+      isAssessmentSubmitted: !!user.assessmentSubmission, // Ensure boolean value
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    },
+  });
+};
 
 // Get DTUser profile by userId
 const getDTUserProfile = async (req, res) => {
@@ -2759,8 +2756,27 @@ const createAdmin = async (req, res) => {
       resultLink: "",
     });
 
-    await newAdmin.save();
+    let giveRole;
+    const session = await mongoose.startSession();
+    await session.startTransaction();
 
+    try {
+      await newAdmin.save({ session });
+
+      const role = await RoleService.getRoleByName("moderator", session);
+      giveRole = await RoleService.assignRoleToUser(
+        role._id,
+        newAdmin._id,
+        session,
+      );
+
+      await session.commitTransaction();
+    } catch (err) {
+      await session.abortTransaction();
+      throw err;
+    } finally {
+      await session.endSession();
+    }
     // Generate and send OTP code for email verification
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
 
@@ -2811,6 +2827,8 @@ const createAdmin = async (req, res) => {
         microTaskerStatus: newAdmin.microTaskerStatus,
         createdAt: newAdmin.createdAt,
         isAdmin: true,
+        role: giveRole.name || "admin",
+        role_permission: giveRole.role_permission, // Include role and permissions for frontend access control
       },
     });
   } catch (error) {

@@ -34,6 +34,10 @@ class DomainCategoryRepository {
     return DomainCategoryModel.findOne({ name });
   }
 
+  static findBySlug(slug) {
+    return DomainCategoryModel.findOne({ slug });
+  }
+
   static async updateById(id, updateData) {
     return await DomainCategoryModel.findByIdAndUpdate(id, updateData, { new: true });
   }
