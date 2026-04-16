@@ -36,15 +36,21 @@ class RoleRepository {
     };
   }
 
-  async findById(id) {
-    return await Role.findById(id).populate({
+  async findById(id, session = null) {
+    let query = Role.findById(id);
+    if (session) query = query.session(session);
+
+    return await query.populate({
       path: "permissions",
       select: "name resource action -_id",
     });
   }
 
-  async findByName(name) {
-    return await Role.findOne({ name: name.toLowerCase().trim() }).populate({
+  async findByName(name, session = null) {
+    let query = Role.findOne({ name: name.toLowerCase().trim() });
+    if (session) query = query.session(session);
+
+    return await query.populate({
       path: "permissions",
       select: "name resource action -_id",
     });
@@ -129,11 +135,11 @@ class RoleRepository {
     });
   }
 
-  async assignToUser(roleId, userId) {
+  async assignToUser(roleId, userId, session = null) {
     return await DTUser.findByIdAndUpdate(
       userId,
       { $set: { role_permission: roleId } },
-      { new: true },
+      { new: true, session },
     ).populate({
       path: "role_permission",
       select: "name description isActive permissions",
