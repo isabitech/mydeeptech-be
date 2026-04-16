@@ -1,7 +1,7 @@
 // Layer: Service
-const sessionRepository = require('../repositories/sessionManagement.repository');
-const hvncShiftRepository = require('../repositories/hvnc-shift.repository');
-const WebSocket = require('ws');
+const sessionRepository = require("../repositories/sessionManagement.repository");
+const hvncShiftRepository = require("../repositories/hvnc-shift.repository");
+const WebSocket = require("ws");
 
 class SessionManagementService {
   constructor() {
@@ -11,27 +11,27 @@ class SessionManagementService {
   }
 
   async handleDeviceConnection(deviceId, ws, device) {
-    await sessionRepository.updateDeviceStatus(deviceId, 'online');
+    await sessionRepository.updateDeviceStatus(deviceId, "online");
     this.deviceConnections.set(deviceId, {
       ws,
       lastPing: Date.now(),
-      device
+      device,
     });
   }
 
   async handleDeviceDisconnection(deviceId) {
-    await sessionRepository.updateDeviceStatus(deviceId, 'offline');
+    await sessionRepository.updateDeviceStatus(deviceId, "offline");
     this.deviceConnections.delete(deviceId);
-    
+
     // Terminate active sessions for this device
     const terminatedSessions = [];
     for (const [sessionId, sessionData] of this.activeSessions.entries()) {
       if (sessionData.session.device_id === deviceId) {
         const endedAt = new Date();
         await sessionRepository.updateSession(sessionId, {
-          status: 'terminated',
+          status: "terminated",
           ended_at: endedAt,
-          termination_reason: 'device_disconnected'
+          termination_reason: "device_disconnected",
         });
         terminatedSessions.push({ sessionId, userWs: sessionData.userWs });
         this.activeSessions.delete(sessionId);
@@ -59,27 +59,27 @@ class SessionManagementService {
   async startSession(userEmail, deviceId, userWs) {
     const deviceConnection = this.deviceConnections.get(deviceId);
     if (!deviceConnection) {
-      throw new Error('Device is not online');
+      throw new Error("Device is not online");
     }
 
     const session = await sessionRepository.createSession({
       user_email: userEmail,
       device_id: deviceId,
       started_at: new Date(),
-      status: 'active',
-      client_info: { connection_type: 'websocket' }
+      status: "active",
+      client_info: { connection_type: "websocket" },
     });
 
     this.activeSessions.set(session._id.toString(), {
       session,
       userWs,
-      deviceWs: deviceConnection.ws
+      deviceWs: deviceConnection.ws,
     });
 
-    await sessionRepository.logEvent(userEmail, 'session_started', {
+    await sessionRepository.logEvent(userEmail, "session_started", {
       session_id: session._id,
       device_id: deviceId,
-      connection_type: 'websocket'
+      connection_type: "websocket",
     });
 
     return session;
@@ -87,28 +87,32 @@ class SessionManagementService {
 
   async endSession(sessionId) {
     const sessionData = this.activeSessions.get(sessionId);
-    if (!sessionData) throw new Error('Session not found');
+    if (!sessionData) throw new Error("Session not found");
 
     const endedAt = new Date();
     const updatedSession = await sessionRepository.updateSession(sessionId, {
-      status: 'ended',
-      ended_at: endedAt
+      status: "ended",
+      ended_at: endedAt,
     });
 
     this.activeSessions.delete(sessionId);
     const duration = endedAt - updatedSession.started_at;
 
-    return { session: updatedSession, duration, deviceWs: sessionData.deviceWs };
+    return {
+      session: updatedSession,
+      duration,
+      deviceWs: sessionData.deviceWs,
+    };
   }
 
   async forceEndSession(sessionId, reason, adminEmail) {
     const session = await sessionRepository.findSessionById(sessionId);
-    if (!session) throw new Error('Session not found');
+    if (!session) throw new Error("Session not found");
 
     await sessionRepository.updateSession(sessionId, {
-      status: 'terminated',
+      status: "terminated",
       ended_at: new Date(),
-      termination_reason: reason
+      termination_reason: reason,
     });
 
     const sessionData = this.activeSessions.get(sessionId);
@@ -124,12 +128,17 @@ class SessionManagementService {
       activeSessions: this.activeSessions.size,
       connectedDevices: this.deviceConnections.size,
       connectedUsers: this.userConnections.size,
-      totalConnections: this.deviceConnections.size + Array.from(this.userConnections.values()).reduce((t, c) => t + c.size, 0)
+      totalConnections:
+        this.deviceConnections.size +
+        Array.from(this.userConnections.values()).reduce(
+          (t, c) => t + c.size,
+          0,
+        ),
     };
 
     const totalSessions = await sessionRepository.countSessions();
     const activeDbSessions = await sessionRepository.countSessions({
-      status: { $in: ['active', 'idle'] }
+      status: { $in: ["active", "idle"] },
     });
 
     return {
@@ -137,8 +146,8 @@ class SessionManagementService {
       database: {
         totalSessions,
         activeSessions: activeDbSessions,
-        completedSessions: totalSessions - activeDbSessions
-      }
+        completedSessions: totalSessions - activeDbSessions,
+      },
     };
   }
 
@@ -154,20 +163,21 @@ class SessionManagementService {
     try {
       const shifts = await hvncShiftRepository.findActiveByDeviceId(deviceId);
       const updateMessage = {
-        type: 'device_status_update',
-        data: { deviceId, status, timestamp: new Date() }
+        type: "device_status_update",
+        data: { deviceId, status, timestamp: new Date() },
       };
 
       for (const shift of shifts) {
         const userConnections = this.userConnections.get(shift.user_email);
         if (userConnections) {
-          userConnections.forEach(ws => {
-            if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(updateMessage));
+          userConnections.forEach((ws) => {
+            if (ws.readyState === WebSocket.OPEN)
+              ws.send(JSON.stringify(updateMessage));
           });
         }
       }
     } catch (error) {
-      console.error('Broadcast device status error:', error);
+      console.error("Broadcast device status error:", error);
     }
   }
 
@@ -179,17 +189,19 @@ class SessionManagementService {
         const deviceConnection = this.deviceConnections.get(shift.device_id);
         const isOnline = !!deviceConnection;
 
-        ws.send(JSON.stringify({
-          type: 'device_status',
-          data: {
-            deviceId: shift.device_id,
-            status: isOnline ? 'online' : 'offline',
-            lastSeen: deviceConnection?.lastPing || null
-          }
-        }));
+        ws.send(
+          JSON.stringify({
+            type: "device_status",
+            data: {
+              deviceId: shift.device_id,
+              status: isOnline ? "online" : "offline",
+              lastSeen: deviceConnection?.lastPing || null,
+            },
+          }),
+        );
       }
     } catch (error) {
-      console.error('Send device status error:', error);
+      console.error("Send device status error:", error);
     }
   }
 
@@ -208,22 +220,26 @@ class SessionManagementService {
           connection.ws.close();
         }
 
-        const terminatedSessions = await this.handleDeviceDisconnection(deviceId);
+        const terminatedSessions =
+          await this.handleDeviceDisconnection(deviceId);
         for (const terminated of terminatedSessions) {
-          if (terminated.userWs && terminated.userWs.readyState === WebSocket.OPEN) {
+          if (
+            terminated.userWs &&
+            terminated.userWs.readyState === WebSocket.OPEN
+          ) {
             terminated.userWs.send(
               JSON.stringify({
-                type: 'session_terminated',
+                type: "session_terminated",
                 data: {
                   sessionId: terminated.sessionId,
-                  reason: 'Device disconnected'
-                }
-              })
+                  reason: "Device disconnected",
+                },
+              }),
             );
           }
         }
 
-        await this.broadcastDeviceStatusUpdate(deviceId, 'offline');
+        await this.broadcastDeviceStatusUpdate(deviceId, "offline");
       } catch (error) {
         console.error(`Inactive device cleanup failed for ${deviceId}:`, error);
       }
@@ -249,7 +265,10 @@ class SessionManagementService {
             ws.close();
           }
         } catch (error) {
-          console.error(`Failed closing inactive user socket for ${userEmail}:`, error);
+          console.error(
+            `Failed closing inactive user socket for ${userEmail}:`,
+            error,
+          );
         }
       }
 
