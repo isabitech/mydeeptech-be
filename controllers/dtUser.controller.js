@@ -144,7 +144,6 @@ const createDTUser = async (req, res) => {
     const { fullName, phone, email, country, domains, socialsFollowed, consent } = req.body;
 
     const domainIds = domains.map((domain) => domain.id);
-    const domainNames = domains.map((domain) => domain.name);
 
     if(!domainIds || domainIds.length === 0) {
         return res.status(500).json({
@@ -169,7 +168,6 @@ const createDTUser = async (req, res) => {
       fullName,
       phone,
       email,
-      domains: domainNames,
       socialsFollowed,
       consent,
       personal_info: {
@@ -238,7 +236,6 @@ const createDTUser = async (req, res) => {
 const createDTUserWithBackgroundEmail = async (req, res) => {
   try {
     const { fullName, phone, email, country, domains, socialsFollowed, consent } = req.body;
-    const domainNames = domains.map((domain) => domain.name);
     // 1️⃣ Check if user already exists
     const existing = await DTUser.findOne({ email });
     if (existing) {
@@ -252,7 +249,6 @@ const createDTUserWithBackgroundEmail = async (req, res) => {
       fullName,
       phone,
       email,
-      domains: domainNames,
       socialsFollowed,
       consent,
       personal_info: {
@@ -851,11 +847,6 @@ const updateDTUserProfile = async (req, res) => {
       });
     }
 
-  //   const domainIds = domains.map((domain) => domain.id);
-  //   const domainNames = domains.map((domain) => domain.name);
-  //   // Map domain to user after creation
-  //   await DomainToUserService.assignMultipleDomainsToUser(savedUser._id, domainIds);
-
     // Prepare update object
     const updateData = {};
 
@@ -1001,10 +992,7 @@ const updateDTUserProfile = async (req, res) => {
     if (req.body.projectPreferences) {
       updateData.project_preferences = {
         ...user.project_preferences?.toObject(),
-        domains_of_interest:
-          req.body.projectPreferences.domainsOfInterest !== undefined
-            ? req.body.projectPreferences.domainsOfInterest
-            : user.project_preferences?.domains_of_interest,
+        domains_of_interest: user.project_preferences?.domains_of_interest,
         availability_type:
           req.body.projectPreferences.availabilityType !== undefined
             ? req.body.projectPreferences.availabilityType
