@@ -19,14 +19,11 @@ const Role = require("../models/roles.model"); // ensure model is registered
 const Permission = require("../models/permissions.model"); // ensure model is registered
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-// const { sendAdminVerificationEmail } = require("../utils/adminMailer");
-// Replaced with MailService methods
-// const { sendAnnotatorApprovalEmail, sendAnnotatorRejectionEmail } = require("../utils/annotatorMailer");
-// Replaced with MailService methods
 const adminVerificationStore = require("../utils/adminVerificationStore");
 const envConfig = require("../config/envConfig");
 const { RoleType } = require("../utils/role");
 const MailService = require("../services/mail-service/mail-service");
+const RoleService = require("../services/role.service");
 const DomainToUserService = require("../services/domain-to-user.service");
 
 // Function to send verification emails to all unverified users
@@ -140,13 +137,20 @@ const sendVerificationEmailsToUnverifiedUsers = async (req, res) => {
 // Option 1: Send email with timeout (current implementation)
 const createDTUser = async (req, res) => {
   try {
-
-    const { fullName, phone, email, country, domains, socialsFollowed, consent } = req.body;
+    const {
+      fullName,
+      phone,
+      email,
+      country,
+      domains,
+      socialsFollowed,
+      consent,
+    } = req.body;
 
     const domainIds = domains.map((domain) => domain.id);
 
-    if(!domainIds || domainIds.length === 0) {
-        return res.status(500).json({
+    if (!domainIds || domainIds.length === 0) {
+      return res.status(500).json({
         status: false,
         user: null,
         message: "Domain IDs are required",
@@ -160,7 +164,9 @@ const createDTUser = async (req, res) => {
       // "User already exists with this email: This looks more verbose"
       return res
         .status(400)
-        .json({ message: "Registration failed. Check your details and try again." });
+        .json({
+          message: "Registration failed. Check your details and try again.",
+        });
     }
 
     // 2️⃣ Create new user
@@ -178,7 +184,7 @@ const createDTUser = async (req, res) => {
     // 3️⃣ Save user to database
     const savedUser = await newUser.save();
 
-    if(!savedUser) {
+    if (!savedUser) {
       return res.status(500).json({
         status: false,
         user: null,
@@ -188,7 +194,10 @@ const createDTUser = async (req, res) => {
     }
 
     // Map domain to user after creation
-    await DomainToUserService.assignMultipleDomainsToUser(savedUser._id, domainIds);
+    await DomainToUserService.assignMultipleDomainsToUser(
+      savedUser._id,
+      domainIds,
+    );
 
     // 4️⃣ Send verification email asynchronously with timeout
     // FIXED: Use only one email service to prevent conflicts
@@ -236,6 +245,7 @@ const createDTUser = async (req, res) => {
 const createDTUserWithBackgroundEmail = async (req, res) => {
   try {
     const { fullName, phone, email, country, domains, socialsFollowed, consent } = req.body;
+
     // 1️⃣ Check if user already exists
     const existing = await DTUser.findOne({ email });
     if (existing) {
@@ -453,19 +463,20 @@ const dtUserLogin = async (req, res) => {
 
     // Find user by email
     let user = await DTUser.findOne({ email })
-        .populate({
-          path: "userDomains",
-          match: { deleted_at: null },
-           populate: {
-            path: "domain_child",
-            select: "name"
-          },
+      .populate({
+        path: "userDomains",
+        match: { deleted_at: null },
+        populate: {
+          path: "domain_child",
+          select: "name",
+        },
         // populate: [
         //   { path: "domain_category", select: "name" },
         //   { path: "domain_child", select: "name" },
         //   { path: "domain_sub_category", select: "name" }
         // ]
-        }).lean();
+      })
+      .lean();
 
     if (!user) {
       console.log(`❌ User not found with email: ${email}`);
@@ -475,13 +486,13 @@ const dtUserLogin = async (req, res) => {
       });
     }
 
-     user = {
+    user = {
       ...user,
-      userDomains: user.userDomains.map(domain => ({
+      userDomains: user.userDomains.map((domain) => ({
         _id: domain.domain_child._id,
         name: domain.domain_child.name,
-        assignmentId: domain._id
-      }))
+        assignmentId: domain._id,
+      })),
     };
 
     // Check if email is verified
@@ -596,86 +607,81 @@ const dtUserLogin = async (req, res) => {
   }
 };
 
-
 const me = async (req, res) => {
-
   const { email } = req.user;
 
-   // Find user by email
-    let user = await DTUser.findOne({ email })
-        .populate({
-          path: "userDomains",
-          match: { deleted_at: null },
-           populate: {
-            path: "domain_child",
-            select: "name"
-          },
-        // populate: [
-        //   { path: "domain_category", select: "name" },
-        //   { path: "domain_child", select: "name" },
-        //   { path: "domain_sub_category", select: "name" }
-        // ]
-        }).lean();
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-     user = {
-      ...user,
-      userDomains: user.userDomains.map(domain => ({
-        _id: domain.domain_child._id,
-        name: domain.domain_child.name,
-        assignmentId: domain._id
-      }))
-    };
-
-      // Generate JWT token
-    const token = jwt.sign(
-      {
-        userId: user._id,
-        email: user.email,
-        fullName: user.fullName,
+  // Find user by email
+  let user = await DTUser.findOne({ email })
+    .populate({
+      path: "userDomains",
+      match: { deleted_at: null },
+      populate: {
+        path: "domain_child",
+        select: "name",
       },
-      envConfig.jwt.JWT_SECRET || "your-secret-key", // Use environment variable for production
-      { expiresIn: "7d" }, // Token expires in 7 days
-    );
+      // populate: [
+      //   { path: "domain_category", select: "name" },
+      //   { path: "domain_child", select: "name" },
+      //   { path: "domain_sub_category", select: "name" }
+      // ]
+    })
+    .lean();
 
-   res.status(200).json({
-      success: true,
-      message: "User records fetched successfully",
-      _usrinfo: {
-        data: token, // Token stored in the format frontend expects for sessionStorage
-      },
-      token: token, // Also include token directly for backwards compatibility
-      user: {
-        id: user._id,
-        fullName: user.fullName,
-        email: user.email,
-        phone: user.phone,
-        role: user.role,
-        // domains: user.domains,
-        socialsFollowed: user.socialsFollowed,
-        consent: user.consent,
-        isEmailVerified: user.isEmailVerified,
-        hasSetPassword: user.hasSetPassword,
-        annotatorStatus: user.annotatorStatus,
-        microTaskerStatus: user.microTaskerStatus,
-        qaStatus: user.qaStatus,
-        resultLink: user.resultLink,
-        isAssessmentSubmitted: !!user.assessmentSubmission, // Ensure boolean value
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-      },
+  if (!user) {
+    return res.status(404).json({
+      success: false,
+      message: "User not found",
     });
+  }
 
-}
+  user = {
+    ...user,
+    userDomains: user.userDomains.map((domain) => ({
+      _id: domain.domain_child._id,
+      name: domain.domain_child.name,
+      assignmentId: domain._id,
+    })),
+  };
 
+  // Generate JWT token
+  const token = jwt.sign(
+    {
+      userId: user._id,
+      email: user.email,
+      fullName: user.fullName,
+    },
+    envConfig.jwt.JWT_SECRET || "your-secret-key", // Use environment variable for production
+    { expiresIn: "7d" }, // Token expires in 7 days
+  );
 
-
+  res.status(200).json({
+    success: true,
+    message: "User records fetched successfully",
+    _usrinfo: {
+      data: token, // Token stored in the format frontend expects for sessionStorage
+    },
+    token: token, // Also include token directly for backwards compatibility
+    user: {
+      id: user._id,
+      fullName: user.fullName,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      // domains: user.domains,
+      socialsFollowed: user.socialsFollowed,
+      consent: user.consent,
+      isEmailVerified: user.isEmailVerified,
+      hasSetPassword: user.hasSetPassword,
+      annotatorStatus: user.annotatorStatus,
+      microTaskerStatus: user.microTaskerStatus,
+      qaStatus: user.qaStatus,
+      resultLink: user.resultLink,
+      isAssessmentSubmitted: !!user.assessmentSubmission, // Ensure boolean value
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    },
+  });
+};
 // Get DTUser profile by userId
 const getDTUserProfile = async (req, res) => {
   try {
@@ -695,15 +701,19 @@ const getDTUserProfile = async (req, res) => {
     // Fetch user's domains from the new domain-to-user relationship
     let userDomains = [];
     try {
-      const domainRelationships = await DomainToUserService.fetchDomainToUserById(user._id);
+      const domainRelationships =
+        await DomainToUserService.fetchDomainToUserById(user._id);
       // Transform to include both domain info and assignment ID for removal
-      userDomains = domainRelationships.map(relation => ({
+      userDomains = domainRelationships.map((relation) => ({
         _id: relation.domain_child._id,
         name: relation.domain_child.name,
-        assignmentId: relation._id // Include assignment ID for removal
+        assignmentId: relation._id, // Include assignment ID for removal
       }));
     } catch (domainError) {
-      console.log(`⚠️ Failed to fetch domains for user ${user.email}:`, domainError.message);
+      console.log(
+        `⚠️ Failed to fetch domains for user ${user.email}:`,
+        domainError.message,
+      );
     }
 
     // Structure the response in camelCase format with all requested fields
@@ -713,7 +723,7 @@ const getDTUserProfile = async (req, res) => {
       fullName: user.fullName,
       email: user.email,
       phone: user.phone,
-      domains: user.domains, // Legacy domain field  
+      domains: user.domains, // Legacy domain field
       userDomains: userDomains, // New structured domain relationships
       consent: user.consent,
       annotatorStatus: user.annotatorStatus,
@@ -748,7 +758,8 @@ const getDTUserProfile = async (req, res) => {
         educationField: user.professional_background?.education_field || "",
         yearsOfExperience:
           user.professional_background?.years_of_experience || 0,
-        annotationExperienceTypes: user.professional_background?.annotation_experience_types || [],
+        annotationExperienceTypes:
+          user.professional_background?.annotation_experience_types || [],
       },
       toolExperience: user.tool_experience || [],
       annotationSkills: user.annotation_skills || [],
@@ -846,7 +857,6 @@ const updateDTUserProfile = async (req, res) => {
         currentStatus: user.annotatorStatus,
       });
     }
-
     // Prepare update object
     const updateData = {};
 
@@ -1024,24 +1034,28 @@ const updateDTUserProfile = async (req, res) => {
     }
 
     // Perform the update
-    const updatedUser = await DTUser.findByIdAndUpdate(
+    let updatedUser = await DTUser.findByIdAndUpdate(
       userId,
       { $set: updateData },
-      { new: true, runValidators: true },
-    );
+      { new: true, runValidators: true }).select("-password")
+        .populate({
+          path: "userDomains",
+          match: { deleted_at: null },
+           populate: {
+            path: "domain_child",
+            select: "name"
+          },
+        }).lean();
 
-    // Fetch updated user's domains from the new domain-to-user relationship  
-    let userDomains = [];
-    try {
-      const domainRelationships = await DomainToUserService.fetchDomainToUserById(updatedUser._id);
-      userDomains = domainRelationships.map(relation => ({
-        _id: relation.domain_child._id,
-        name: relation.domain_child.name,
-        assignmentId: relation._id // Include assignment ID for removal
-      }));
-    } catch (domainError) {
-      console.log(`⚠️ Failed to fetch domains for updated user:`, domainError.message);
-    }
+      updatedUser = {
+        ...updatedUser,
+        userDomains: updatedUser.userDomains.map(domain => ({
+          _id: domain.domain_child._id,
+          name: domain.domain_child.name,
+          assignmentId: domain._id
+        }))
+      };
+    
 
     // Return updated profile in the same format as getDTUserProfile
     const profileData = {
@@ -1049,8 +1063,7 @@ const updateDTUserProfile = async (req, res) => {
       fullName: updatedUser.fullName,
       email: updatedUser.email,
       phone: updatedUser.phone,
-      domains: updatedUser.domains,  
-      userDomains: userDomains, // New structured domain relationships
+      userDomains: updatedUser.userDomains, // New structured domain relationships
       consent: updatedUser.consent,
       annotatorStatus: updatedUser.annotatorStatus,
       microTaskerStatus: updatedUser.microTaskerStatus,
@@ -1104,11 +1117,8 @@ const updateDTUserProfile = async (req, res) => {
         hasMicrophone: updatedUser.system_info?.has_microphone || false,
       },
       projectPreferences: {
-        domainsOfInterest:
-          updatedUser.project_preferences?.domains_of_interest ||
-          updatedUser.domains ||
-          [],
-        userDomains: userDomains, // New structured domain relationships
+        domainsOfInterest: updatedUser.project_preferences?.domains_of_interest || updatedUser.domains || [],
+        userDomains: updatedUser.userDomains, // New structured domain relationships
         availabilityType:
           updatedUser.project_preferences?.availability_type || "",
         ndaSigned: updatedUser.project_preferences?.nda_signed || false,
@@ -1272,7 +1282,6 @@ const getDTUser = async (req, res) => {
 // Admin function: Get all DTUsers
 const getAllDTUsers = async (req, res) => {
   try {
-
     // Query parameters for filtering and pagination
     const {
       page = 1,
@@ -1328,7 +1337,10 @@ const getAllDTUsers = async (req, res) => {
         ];
       } else {
         // Filter by specific country (case-insensitive)
-        filter["personal_info.country"] = { $regex: `^${country}$`, $options: "i" };
+        filter["personal_info.country"] = {
+          $regex: `^${country}$`,
+          $options: "i",
+        };
       }
     }
 
@@ -1336,33 +1348,33 @@ const getAllDTUsers = async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     // Get users with pagination
-      let users = await DTUser.find(filter)
-        .select("-password")
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(parseInt(limit))
-        .populate({
-          path: "userDomains",
-          match: { deleted_at: null },
-           populate: {
-            path: "domain_child",
-            select: "name" // only what you need
-          },
-          // populate: [
-          //   { path: "domain_category", select: "name" },
-          //   { path: "domain_child", select: "name" },
-          //   { path: "domain_sub_category", select: "name" }
-          // ]
-        }).lean();
+    let users = await DTUser.find(filter)
+      .select("-password")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit))
+      .populate({
+        path: "userDomains",
+        match: { deleted_at: null },
+        populate: {
+          path: "domain_child",
+          select: "name", // only what you need
+        },
+        // populate: [
+        //   { path: "domain_category", select: "name" },
+        //   { path: "domain_child", select: "name" },
+        //   { path: "domain_sub_category", select: "name" }
+        // ]
+      })
+      .lean();
 
-
-    users = users.map(user => ({
+    users = users.map((user) => ({
       ...user,
-      userDomains: user.userDomains.map(domain => ({
+      userDomains: user.userDomains.map((domain) => ({
         _id: domain.domain_child._id,
         name: domain.domain_child.name,
-        assignmentId: domain._id // Include assignment ID for removal
-      }))
+        assignmentId: domain._id, // Include assignment ID for removal
+      })),
     }));
 
     // Get total count for pagination
@@ -1381,7 +1393,6 @@ const getAllDTUsers = async (req, res) => {
       },
       { $group: { _id: "$annotatorStatus", count: { $sum: 1 } } },
     ]);
-
 
     res.status(200).json({
       success: true,
@@ -1458,7 +1469,6 @@ const getAllAdminUsers = async (req, res) => {
 
     // Get total count for pagination
     const totalAdminUsers = await DTUser.countDocuments(filter);
-
 
     const roleSummary = await DTUser.aggregate([
       {
@@ -2021,7 +2031,6 @@ const approveAnnotator = async (req, res) => {
       // Approved annotator: both statuses set to approved
       user.annotatorStatus = "approved";
       user.microTaskerStatus = "approved";
-
     } else if (newStatus === "rejected") {
       // Rejected annotator: annotator rejected but micro tasker approved
       user.annotatorStatus = "rejected";
@@ -2223,7 +2232,7 @@ const approveUserForQA = async (req, res) => {
     // Update QA status to approved
     user.qaStatus = "approved";
     await user.save();
-  
+
     // TODO: Send QA approval notification email (implement when QA email templates are ready)
     // try {
     //   await sendQAApprovalEmail(user.email, user.fullName);
@@ -2409,7 +2418,6 @@ const getDTUserAdmin = async (req, res) => {
         message: "User not found",
       });
     }
-
 
     res.status(200).json({
       success: true,
@@ -2651,7 +2659,6 @@ const confirmAdminVerification = async (req, res) => {
         otpCode,
         newAdmin.fullName,
       );
-
     } catch (emailError) {
       console.error(`❌ Failed to send OTP to admin: ${email}`, emailError);
       // Don't fail the admin creation if email fails, but log it
@@ -2663,7 +2670,8 @@ const confirmAdminVerification = async (req, res) => {
     // Return admin data (note: no token provided since email needs OTP verification)
     res.status(201).json({
       success: true,
-      message: "Admin account created successfully! Please check your email for the OTP code to verify your account.",
+      message:
+        "Admin account created successfully! Please check your email for the OTP code to verify your account.",
       otpVerificationRequired: true,
       admin: {
         id: newAdmin._id,
@@ -2763,8 +2771,27 @@ const createAdmin = async (req, res) => {
       resultLink: "",
     });
 
-    await newAdmin.save();
+    let giveRole;
+    const session = await mongoose.startSession();
+    await session.startTransaction();
 
+    try {
+      await newAdmin.save({ session });
+
+      const role = await RoleService.getRoleByName("moderator", session);
+      giveRole = await RoleService.assignRoleToUser(
+        role._id,
+        newAdmin._id,
+        session,
+      );
+
+      await session.commitTransaction();
+    } catch (err) {
+      await session.abortTransaction();
+      throw err;
+    } finally {
+      await session.endSession();
+    }
     // Generate and send OTP code for email verification
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit OTP
 
@@ -2789,7 +2816,6 @@ const createAdmin = async (req, res) => {
         otpCode,
         newAdmin.fullName,
       );
-
     } catch (emailError) {
       console.error(`❌ Failed to send OTP to admin: ${email}`, emailError);
       // Don't fail the admin creation if email fails, but log it
@@ -2798,7 +2824,8 @@ const createAdmin = async (req, res) => {
     // Return admin data (note: no token provided since email needs OTP verification)
     res.status(201).json({
       success: true,
-      message: "Admin account created successfully! Please check your email for the OTP code to verify your account.",
+      message:
+        "Admin account created successfully! Please check your email for the OTP code to verify your account.",
       otpVerificationRequired: true,
       admin: {
         id: newAdmin._id,
@@ -2812,6 +2839,8 @@ const createAdmin = async (req, res) => {
         microTaskerStatus: newAdmin.microTaskerStatus,
         createdAt: newAdmin.createdAt,
         isAdmin: true,
+        role: giveRole.name || "admin",
+        role_permission: giveRole.role_permission, // Include role and permissions for frontend access control
       },
     });
   } catch (error) {
@@ -2827,7 +2856,6 @@ const createAdmin = async (req, res) => {
 // Verify Admin Account with OTP
 const verifyAdminOTP = async (req, res) => {
   try {
-
     // Validate request data
     const { error } = adminVerificationConfirmSchema.validate(req.body);
     if (error) {
@@ -2998,8 +3026,6 @@ const adminLogin = async (req, res) => {
         message: "Invalid credentials or account not verified",
       });
     }
-
-
 
     // Generate JWT token
     const token = jwt.sign(
@@ -3390,9 +3416,8 @@ const applyToProject = async (req, res) => {
 
     // Check if user is an approved annotator
     const user = await DTUser.findById(userId);
- 
+
     if (!user || user.annotatorStatus !== "approved") {
-     
       return res.status(403).json({
         success: false,
         message:
@@ -3405,7 +3430,6 @@ const applyToProject = async (req, res) => {
       !user.attachments?.resume_url ||
       user.attachments.resume_url.trim() === ""
     ) {
-    
       return res.status(400).json({
         success: false,
         message: "Please upload your resume in your profile section",
@@ -3484,10 +3508,9 @@ const applyToProject = async (req, res) => {
 
     if (requiresAssessment) {
       // Check user's multimedia assessment status
-     
+
       if (user.multimediaAssessmentStatus === "approved") {
         // User already passed assessment, proceed normally
-      
       } else if (user.multimediaAssessmentStatus === "failed") {
         // Check if 24-hour cooldown has passed
         const cooldownHours = 24;
@@ -3510,7 +3533,6 @@ const applyToProject = async (req, res) => {
             },
           });
         }
-
       }
 
       if (user.multimediaAssessmentStatus !== "approved") {
@@ -3563,7 +3585,6 @@ const applyToProject = async (req, res) => {
           );
 
           assessmentTriggered = true;
-        
         } catch (assessmentError) {
           console.error(
             `❌ Failed to trigger assessment for user ${user.email}:`,
@@ -3611,7 +3632,6 @@ const applyToProject = async (req, res) => {
     // Send email notification to admin(s) only if not assessment-gated
     if (!assessmentTriggered) {
       try {
-
         // Get project creator and assigned admins
         const projectWithAdmins = await AnnotationProject.findById(projectId)
           .populate("createdBy", "fullName email")
@@ -3649,7 +3669,6 @@ const applyToProject = async (req, res) => {
             );
           }
         }
-
       } catch (emailError) {
         console.error(
           `⚠️ Failed to send admin notification for application:`,
@@ -4690,7 +4709,6 @@ const submitResultWithCloudinary = async (req, res) => {
       // Save user with new result
       await user.save();
 
-
       res.status(200).json({
         success: true,
         message: "Result file uploaded and stored successfully in Cloudinary",
@@ -5246,7 +5264,6 @@ const updateUserRole = async (req, res) => {
   }
 };
 
-
 const markAssessmentSubmitted = async (req, res) => {
   try {
     // Calculate one month ago from current date
@@ -5258,11 +5275,11 @@ const markAssessmentSubmitted = async (req, res) => {
     const result = await DTUser.updateMany(
       {
         createdAt: { $lte: oneMonthAgo },
-        assessmentSubmission: { $ne: true }
+        assessmentSubmission: { $ne: true },
       },
       {
-        $set: { assessmentSubmission: true }
-      }
+        $set: { assessmentSubmission: true },
+      },
     );
 
     res.status(200).json({
@@ -5272,10 +5289,9 @@ const markAssessmentSubmitted = async (req, res) => {
         cutoffDate: oneMonthAgo,
         usersMatched: result.matchedCount,
         usersModified: result.modifiedCount,
-        updatedAt: new Date()
-      }
+        updatedAt: new Date(),
+      },
     });
-
   } catch (error) {
     console.error("❌ Error marking assessment submission:", error);
     res.status(500).json({
@@ -5284,8 +5300,8 @@ const markAssessmentSubmitted = async (req, res) => {
       error: error.message,
     });
   }
-}
-// SOP (Standard Operating Procedure) acceptance tracking 
+};
+// SOP (Standard Operating Procedure) acceptance tracking
 
 /**
  * Check if user has accepted the SOP
@@ -5293,10 +5309,11 @@ const markAssessmentSubmitted = async (req, res) => {
  */
 const getSopAcceptanceStatus = async (req, res) => {
   try {
-
     const { userId } = req.user;
 
-    const user = await DTUser.findById(userId).select('sop_acceptance fullName email _id');
+    const user = await DTUser.findById(userId).select(
+      "sop_acceptance fullName email _id",
+    );
 
     if (!user) {
       return res.status(404).json({
@@ -5336,19 +5353,18 @@ const getSopAcceptanceStatus = async (req, res) => {
  */
 const recordSopAcceptance = async (req, res) => {
   try {
-
     const { userId } = req.user;
-    
+
     const user = await DTUser.findByIdAndUpdate(
-      userId, 
+      userId,
       {
         $set: {
-          'sop_acceptance.has_accepted': true,
-          'sop_acceptance.accepted_at': new Date(),
-        }
+          "sop_acceptance.has_accepted": true,
+          "sop_acceptance.accepted_at": new Date(),
+        },
       },
-      { new: true }
-    ).select('sop_acceptance fullName email _id');
+      { new: true },
+    ).select("sop_acceptance fullName email _id");
 
     if (!user) {
       return res.status(404).json({
