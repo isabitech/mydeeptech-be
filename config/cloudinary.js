@@ -3,8 +3,6 @@ const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const multer = require('multer');
 const envConfig = require('./envConfig');
 
-
-
 // Configure Cloudinary
 cloudinary.config({
   cloud_name: envConfig.cloudinary.CLOUDINARY_CLOUD_NAME,
@@ -14,11 +12,6 @@ cloudinary.config({
 
 // Verify Cloudinary configuration
 const verifyCloudinaryConfig = () => {
-
-  console.log({
-  api_key: envConfig.cloudinary.CLOUDINARY_API_KEY
-});
-
     const requiredCloudinaryVars = {
     CLOUDINARY_CLOUD_NAME: envConfig.cloudinary.CLOUDINARY_CLOUD_NAME,
     CLOUDINARY_API_KEY: envConfig.cloudinary.CLOUDINARY_API_KEY,
@@ -29,16 +22,16 @@ const verifyCloudinaryConfig = () => {
 const missingVars = Object.entries(requiredCloudinaryVars)
   .filter(([, value]) => !value)
   .map(([key]) => key);
-
   
   if (missingVars.length > 0) {
-    console.log(`⚠️ Missing Cloudinary environment variables: ${missingVars.join(', ')}`);
     return false;
   }
-  
-  console.log('✅ Cloudinary configuration loaded');
+
   return true;
 };
+
+// Check if Cloudinary is properly configured
+const isCloudinaryConfigured = verifyCloudinaryConfig();
 
 // Storage configuration for different file types
 const createCloudinaryStorage = (folder, allowedFormats = ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'mp4', 'mov'], resourceType = 'auto') => {
@@ -221,7 +214,6 @@ const resultFileUpload = multer({
 const deleteCloudinaryFile = async (publicId) => {
   try {
     const result = await cloudinary.uploader.destroy(publicId);
-    console.log(`🗑️ Deleted file from Cloudinary: ${publicId}`);
     return result;
   } catch (error) {
     console.error(`❌ Error deleting file from Cloudinary: ${publicId}`, error);
@@ -275,6 +267,7 @@ const generateThumbnail = (publicId, size = 150) => {
 module.exports = {
   cloudinary,
   verifyCloudinaryConfig,
+  isCloudinaryConfigured,
   
   // Upload middleware
   imageUpload,

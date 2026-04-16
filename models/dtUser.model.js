@@ -237,7 +237,7 @@ const dtUserSchema = new mongoose.Schema(
       other_languages: { type: [String], default: [] },
       english_fluency_level: {
         type: String,
-        enum: ["basic", "intermediate", "advanced", "native", ""],
+        enum: ["basic", "intermediate", "advanced", "fluent", "native", ""],
         default: "",
       },
     },
@@ -291,10 +291,25 @@ const dtUserSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+
+    // SOP (Standard Operating Procedure) acceptance tracking
+    sop_acceptance: {
+      has_accepted: { type: Boolean, default: false },
+      accepted_at: { type: Date, default: null },
+    },
   },
 
   { timestamps: true },
 );
+
+  dtUserSchema.virtual("userDomains", {
+    ref: "DomainToUser",
+    localField: "_id",
+    foreignField: "user",
+  });
+
+  dtUserSchema.set("toObject", { virtuals: true });
+  dtUserSchema.set("toJSON", { virtuals: true });
 
 dtUserSchema.pre("findOneAndDelete", async function (next) {
   const userId = this.getQuery()._id;

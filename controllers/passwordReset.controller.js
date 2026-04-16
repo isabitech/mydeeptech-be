@@ -210,6 +210,7 @@ const resetPassword = async (req, res) => {
  */
 const dtUserForgotPassword = async (req, res) => {
   try {
+  
     const { email } = req.body;
 
     if (!email) {
@@ -271,8 +272,6 @@ const dtUserForgotPassword = async (req, res) => {
         resetToken, 
         'dtuser'
       );
-
-      console.log(`🔐 Password reset token generated for DTUser: ${dtUser.email}`);
 
       res.status(200).json({
         success: true,

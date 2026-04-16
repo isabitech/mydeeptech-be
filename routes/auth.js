@@ -1,5 +1,5 @@
 const express = require('express');
-const { signup, login, getAllUsers, getUsers, updateUserRole, getUserById, getRoles, getRoleStatistics } = require('../controllers/user.js'); // Ensure this path is correct
+const { signup, login, getAllUsers, getUsers, getUserById, getRoles, getRoleStatistics } = require('../controllers/user.js'); // Ensure this path is correct
 const { createProject, getProject, updateProject, deleteProject } = require('../controllers/project.js')
 const { createTask, getTask, getAllTasks, assignTask} = require('../controllers/task.js')
 const {validateVisitor} = require('../controllers/validateuser.js')
@@ -29,7 +29,9 @@ const {
   uploadIdDocument, 
   uploadResume, 
   getProjectGuidelines, 
-  me
+  me,
+  getSopAcceptanceStatus,
+  recordSopAcceptance
 } = require("../controllers/dtUser.controller.js");
 const { authenticateToken, authorizeProfileAccess } = require('../middleware/auth.js');
 
@@ -43,7 +45,7 @@ const {
 } = require('../controllers/passwordReset.controller.js');
 
 // Import Cloudinary upload middleware for result submissions
-const { resultFileUpload, idDocumentUpload, resumeUpload } = require('../config/cloudinary');
+const { resultFileUpload, idDocumentUpload, resumeUpload, isCloudinaryConfigured } = require('../config/cloudinary');
 
 const router = express.Router()
 
@@ -107,11 +109,24 @@ router.get('/invoices/paid', authenticateToken, getPaidInvoices);
 router.get('/invoices/dashboard', authenticateToken, getInvoiceDashboard);
 router.get('/invoices/:invoiceId', authenticateToken, getInvoiceDetails);
 
+// SOP (Standard Operating Procedure) Routes
+router.get('/sop-acceptance/status', authenticateToken, getSopAcceptanceStatus);
+router.post('/sop-acceptance', authenticateToken, recordSopAcceptance);
+
 // DTUser Dashboard Route - Personal overview for authenticated DTUsers
 router.get('/dashboard', authenticateToken, getDTUserDashboard);
 
 // DTUser Result Submission Routes (NEW) - flexible field names
 router.post('/submit-result', authenticateToken, (req, res, next) => {
+  // Check if Cloudinary is properly configured
+  if (!isCloudinaryConfigured) {
+    return res.status(500).json({
+      success: false,
+      message: 'File upload service is temporarily unavailable. Please try again later.',
+      error: 'CLOUDINARY_CONFIG_ERROR'
+    });
+  }
+
   // Create a flexible upload handler that accepts different field names
   const upload = resultFileUpload.fields([
     { name: 'resultFile', maxCount: 1 },
@@ -151,6 +166,15 @@ router.get('/result-submissions', authenticateToken, getUserResultSubmissions);
 router.post('/upload-id-document', authenticateToken, (req, res, next) => {
   console.log('🚀 ID document upload endpoint hit');
 
+  // Check if Cloudinary is properly configured
+  if (!isCloudinaryConfigured) {
+    return res.status(500).json({
+      success: false,
+      message: 'File upload service is temporarily unavailable. Please try again later.',
+      error: 'CLOUDINARY_CONFIG_ERROR'
+    });
+  }
+
   // Create a flexible upload handler for ID documents
   const upload = idDocumentUpload.fields([
     { name: 'idDocument', maxCount: 1 },
@@ -186,6 +210,15 @@ router.post('/upload-id-document', authenticateToken, (req, res, next) => {
 
 // Upload Resume Route - adds to profile information  
 router.post('/upload-resume', authenticateToken, (req, res, next) => {
+  // Check if Cloudinary is properly configured
+  if (!isCloudinaryConfigured) {
+    return res.status(500).json({
+      success: false,
+      message: 'File upload service is temporarily unavailable. Please try again later.',
+      error: 'CLOUDINARY_CONFIG_ERROR'
+    });
+  }
+
   // Create a flexible upload handler for resumes
   const upload = resumeUpload.fields([
     { name: 'resume', maxCount: 1 },

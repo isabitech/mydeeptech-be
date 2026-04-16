@@ -123,7 +123,7 @@ const dtUserProfileUpdateSchema = Joi.object({
     languageProficiency: Joi.object({
         primaryLanguage: Joi.string().max(50).allow(''),
         otherLanguages: Joi.array().items(Joi.string().max(50)),
-        englishFluencyLevel: Joi.string().valid('basic', 'intermediate', 'advanced', 'native', '').allow('')
+        englishFluencyLevel: Joi.string().valid('basic', 'intermediate', 'advanced', 'fluent', 'native', '').allow('')
     }).optional(),
 
     // System info updates

@@ -127,7 +127,7 @@ const sendVerificationEmailBrevoAPI = async (email, name, userId) => {
 // Send email via Brevo SMTP (fallback method)
 const sendVerificationEmailBrevoSMTP = async (email, name, userId) => {
   const transporter = createBrevoSMTPTransporter();
-    const FRONTEND_URL = envConfig.NODE_ENV === 'production' ? 'https://mydeeptech.ng' : 'http://localhost:5173';
+   const FRONTEND_URL = envConfig.FRONTEND_URL;
     const href = `${FRONTEND_URL}/verify-email/${userId}?email=${encodeURIComponent(email)}`;
   
   const mailOptions = {

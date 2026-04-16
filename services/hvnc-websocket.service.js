@@ -86,8 +86,6 @@ const initializeHVNCSocket = (server) => {
       return;
     }
 
-    console.log("🔌 Adding HVNC namespaces to existing Socket.IO instance...");
-
     // Create HVNC namespaces on existing Socket.IO instance
     deviceNamespace = io.of("/hvnc-device");
     adminNamespace = io.of("/hvnc-admin");
@@ -109,16 +107,12 @@ const initializeHVNCSocket = (server) => {
     // );
 
     // DEBUG: Log all namespaces on the main Socket.IO instance
-    console.log("📋 All Socket.IO namespaces:");
     if (io._nsps) {
       // console.log("   _nsps keys:", Object.keys(io._nsps));
       // console.log("   _nsps Map size:", io._nsps.size || "undefined");
       // Try to iterate through _nsps if it's a Map
       if (typeof io._nsps.forEach === "function") {
         // console.log("   _nsps Map contents:");
-        io._nsps.forEach((namespace, key) => {
-          console.log(`     "${key}": ${namespace ? "EXISTS" : "NULL"}`);
-        });
       }
     }
     if (io.sockets && io.sockets.adapter && io.sockets.adapter.nsp) {
@@ -154,7 +148,6 @@ const initializeHVNCSocket = (server) => {
     });
   } catch (error) {
     console.error("❌ Failed to get Socket.IO instance:", error.message);
-    console.error("❌ Chat service must be initialized before HVNC service");
     return;
   }
 
@@ -176,18 +169,13 @@ const initializeHVNCSocket = (server) => {
 
       // Check if JWT secret is available
       if (!envConfig?.jwt?.JWT_SECRET) {
-        // console.error("   ❌ JWT_SECRET not configured");
         return next(new Error("Server authentication configuration error"));
       }
 
       // Verify JWT token
       const decoded = jwt.verify(token, envConfig.jwt.JWT_SECRET);
-      // console.log("   ✅ JWT decoded successfully");
-      // console.log("   Device ID:", decoded.device_id);
-      // console.log("   Token type:", decoded.type);
 
       if (decoded.type !== "device") {
-        // console.log("   ❌ Invalid token type:", decoded.type);
         return next(new Error("Invalid device token"));
       }
 
@@ -199,19 +187,12 @@ const initializeHVNCSocket = (server) => {
       };
       socket.authToken = token;
 
-      // console.log("   ✅ Device authenticated:", decoded.device_id);
       return next();
     } catch (error) {
-      console.log("   ❌ Authentication failed:", error.message);
       console.error("   Full error:", error);
       return next(new Error("Device authentication failed: " + error.message));
     }
   });
-
-  // console.log(
-  //   "📋 Device namespace middleware attached:",
-  //   typeof deviceNamespace.use === "function" ? "SUCCESS" : "FAILED",
-  // );
 
   // Admin authentication middleware
   adminNamespace.use(async (socket, next) => {
@@ -284,10 +265,6 @@ const initializeHVNCSocket = (server) => {
   // Device connection handling - database validation
   deviceNamespace.on("connection", async (socket) => {
     try {
-      // console.log(`🔌 Device WebSocket connected - starting validation...`);
-      // console.log(`   Device ID from auth: ${socket.deviceAuth?.device_id}`);
-
-      // Perform database validation for all devices
 
       // Now perform database validation (after WebSocket upgrade completed)
       const decoded = socket.deviceAuth;
@@ -298,11 +275,6 @@ const initializeHVNCSocket = (server) => {
         return;
       }
 
-      // console.log("🔍 Looking up device in database...");
-      // console.log("   Device ID from token:", decoded.device_id);
-      // console.log("   Object ID from token:", decoded.id);
-
-      // Try to find device by both ObjectId and device_id for safety
       let device;
       try {
         if (decoded.id) {
@@ -312,10 +284,7 @@ const initializeHVNCSocket = (server) => {
         // If not found by ObjectId, try by device_id
         if (!device) {
           device = await HVNCDevice.findOne({ device_id: decoded.device_id });
-          // console.log(
-          //   "📊 Fallback lookup by device_id:",
-          //   device ? "FOUND" : "NOT FOUND",
-          // );
+      
         } else {
           // console.log(
           //   "📊 Database lookup by ObjectId:",
@@ -348,10 +317,6 @@ const initializeHVNCSocket = (server) => {
       // Authentication successful - complete setup
       socket.deviceId = device.device_id;
       socket.device = device;
-
-      // console.log(
-      //   `✅ Device fully authenticated: ${device.pc_name} (${device.device_id})`,
-      // );
 
       // Store device connection
       connectedDevices.set(device.device_id, {
@@ -893,7 +858,6 @@ const initializeHVNCSocket = (server) => {
   // Admin connection handling
   adminNamespace.on("connection", (socket) => {
     const admin = socket.admin;
-    console.log(`👨‍💼 Admin connected: ${admin.full_name} (${admin.email})`);
 
     // Track admin connection
     connectedAdmins.set(admin._id.toString(), socket.id);
@@ -1089,8 +1053,6 @@ const initializeHVNCSocket = (server) => {
   // User connection handling (following chat pattern)
   userNamespace.on("connection", (socket) => {
     const user = socket.user;
-    console.log(`👤 User connected to HVNC: ${user.fullName} (${user.email})`);
-
     // Track user connection
     connectedUsers.set(user._id.toString(), socket.id);
 

@@ -154,8 +154,6 @@ class SessionManager {
       }
       this.userConnections.get(user.email).add(ws);
 
-      console.log(`User connected: ${user.full_name} (${user.email})`);
-
       // Send current status of assigned devices
       await this.sendUserDeviceStatus(user.email, ws);
 
