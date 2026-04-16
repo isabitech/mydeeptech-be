@@ -24,6 +24,8 @@ const domainToUser = new mongoose.Schema(
     },
     { timestamps: true }
 );
+
+
 domainToUser.index({ domain_child: 1, user: 1 }, { unique: true });
 
 const DomainToUser = mongoose.model("DomainToUser", domainToUser);

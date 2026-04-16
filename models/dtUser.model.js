@@ -302,6 +302,15 @@ const dtUserSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+  dtUserSchema.virtual("userDomains", {
+    ref: "DomainToUser",
+    localField: "_id",
+    foreignField: "user",
+  });
+
+  dtUserSchema.set("toObject", { virtuals: true });
+  dtUserSchema.set("toJSON", { virtuals: true });
+
 dtUserSchema.pre("findOneAndDelete", async function (next) {
   const userId = this.getQuery()._id;
   await mongoose.model("DomainToUser").deleteMany({ user: userId });

@@ -456,7 +456,20 @@ const dtUserLogin = async (req, res) => {
     const { email, password } = req.body;
 
     // Find user by email
-    const user = await DTUser.findOne({ email });
+    let user = await DTUser.findOne({ email })
+        .populate({
+          path: "userDomains",
+          match: { deleted_at: null },
+           populate: {
+            path: "domain_child",
+            select: "name"
+          },
+        // populate: [
+        //   { path: "domain_category", select: "name" },
+        //   { path: "domain_child", select: "name" },
+        //   { path: "domain_sub_category", select: "name" }
+        // ]
+        }).lean();
 
     if (!user) {
       console.log(`❌ User not found with email: ${email}`);
@@ -465,6 +478,15 @@ const dtUserLogin = async (req, res) => {
         message: "User not found",
       });
     }
+
+     user = {
+      ...user,
+      userDomains: user.userDomains.map(domain => ({
+        _id: domain.domain_child._id,
+        name: domain.domain_child.name,
+        assignmentId: domain._id
+      }))
+    };
 
     // Check if email is verified
     if (!user.isEmailVerified) {
@@ -529,23 +551,6 @@ const dtUserLogin = async (req, res) => {
       });
     }
 
-    // Fetch user's domains from the new domain-to-user relationship
-    let userDomains = [];
-    try {
-      const domainRelationships = await DomainToUserService.fetchDomainToUserById(user._id);
-      // Transform to include both domain info and assignment ID for removal
-      userDomains = domainRelationships.map(relation => ({
-        _id: relation.domain_child._id,
-        name: relation.domain_child.name,
-        assignmentId: relation._id // Include assignment ID for removal
-      }));
-    } catch (domainError) {
-      console.log(`Failed to fetch domains for user ${user.email}:`, domainError.message);
-      // Continue with login even if domain fetch fails
-    }
-
-    console.log("userDomains:", JSON.stringify(userDomains, null, 2));
-
     // Generate JWT token
     const token = jwt.sign(
       {
@@ -572,7 +577,6 @@ const dtUserLogin = async (req, res) => {
         role: user.role,
         phone: user.phone,
         domains: user.domains, // Legacy domain field (kept for backwards compatibility)
-        userDomains: userDomains, // New structured domain relationships
         socialsFollowed: user.socialsFollowed,
         consent: user.consent,
         isEmailVerified: user.isEmailVerified,
@@ -601,14 +605,37 @@ const me = async (req, res) => {
 
   const { email } = req.user;
 
-  const user = await DTUser.findOne({ email });
+   // Find user by email
+    let user = await DTUser.findOne({ email })
+        .populate({
+          path: "userDomains",
+          match: { deleted_at: null },
+           populate: {
+            path: "domain_child",
+            select: "name"
+          },
+        // populate: [
+        //   { path: "domain_category", select: "name" },
+        //   { path: "domain_child", select: "name" },
+        //   { path: "domain_sub_category", select: "name" }
+        // ]
+        }).lean();
 
-  if(!user) {
-    return res.status(404).json({
-      success: false,
-      message: "User not found",
-    });
-  }
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+     user = {
+      ...user,
+      userDomains: user.userDomains.map(domain => ({
+        _id: domain.domain_child._id,
+        name: domain.domain_child.name,
+        assignmentId: domain._id
+      }))
+    };
 
       // Generate JWT token
     const token = jwt.sign(
@@ -634,7 +661,7 @@ const me = async (req, res) => {
         email: user.email,
         phone: user.phone,
         role: user.role,
-        domains: user.domains,
+        // domains: user.domains,
         socialsFollowed: user.socialsFollowed,
         consent: user.consent,
         isEmailVerified: user.isEmailVerified,
@@ -1321,11 +1348,34 @@ const getAllDTUsers = async (req, res) => {
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     // Get users with pagination
-    const users = await DTUser.find(filter)
-      .select("-password") // Exclude password field
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit));
+      let users = await DTUser.find(filter)
+        .select("-password")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .populate({
+          path: "userDomains",
+          match: { deleted_at: null },
+           populate: {
+            path: "domain_child",
+            select: "name" // only what you need
+          },
+          // populate: [
+          //   { path: "domain_category", select: "name" },
+          //   { path: "domain_child", select: "name" },
+          //   { path: "domain_sub_category", select: "name" }
+          // ]
+        }).lean();
+
+
+    users = users.map(user => ({
+      ...user,
+      userDomains: user.userDomains.map(domain => ({
+        _id: domain.domain_child._id,
+        name: domain.domain_child.name,
+        assignmentId: domain._id // Include assignment ID for removal
+      }))
+    }));
 
     // Get total count for pagination
     const totalUsers = await DTUser.countDocuments(filter);
@@ -1349,7 +1399,7 @@ const getAllDTUsers = async (req, res) => {
       success: true,
       message: "DTUsers retrieved successfully",
       data: {
-        users: users,
+        users,
         pagination: {
           currentPage: parseInt(page),
           totalPages: totalPages,
