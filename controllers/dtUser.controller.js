@@ -1089,6 +1089,8 @@ const confirmAdminVerification = async (req, res) => {
         microTaskerStatus: newAdmin.microTaskerStatus,
         createdAt: newAdmin.createdAt,
         isAdmin: true,
+        role: newAdmin.role || "admin",
+        role_permission: newAdmin.role_permission,
       },
     });
   } catch (error) {

@@ -51,8 +51,8 @@ class RoleService {
     return role;
   }
 
-  async getRoleByName(name) {
-    const role = await roleRepository.findByName(name);
+  async getRoleByName(name, session = null) {
+    const role = await roleRepository.findByName(name, session);
     if (!role) throw new Error(`Role "${name}" not found`);
     return role;
   }
@@ -140,11 +140,15 @@ class RoleService {
     );
   }
 
-  async assignRoleToUser(roleId, userId) {
-    const role = await roleRepository.findById(roleId);
+  async assignRoleToUser(roleId, userId, session = null) {
+    const role = await roleRepository.findById(roleId, session);
     if (!role) throw new Error("Role not found");
 
-    const updatedUser = await roleRepository.assignToUser(roleId, userId);
+    const updatedUser = await roleRepository.assignToUser(
+      roleId,
+      userId,
+      session,
+    );
     if (!updatedUser) throw new Error("User not found");
 
     return updatedUser;

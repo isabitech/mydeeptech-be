@@ -2,6 +2,7 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 const DtUserRepository = require("../repositories/dtUser.repository");
+const DTUser = require("../models/dtUser.model");
 const { emailQueue } = require("../utils/emailQueue");
 const {
   dtUserPasswordSchema,
@@ -33,7 +34,7 @@ const {
 class DtUserService {
   constructor(
     repository = new DtUserRepository(),
-    projectRepository = new AnnotationProjectRepository()
+    projectRepository = new AnnotationProjectRepository(),
   ) {
     this.repository = repository;
     this.projectRepository = projectRepository;
@@ -555,7 +556,6 @@ class DtUserService {
    * Resend verification email.
    */
   async resendVerificationEmail(email) {
-
     const user = await this.repository.findByEmail(email);
     if (!user) {
       return { status: 404, reason: "not_found" };
@@ -1052,12 +1052,15 @@ class DtUserService {
         .lean(),
 
       // Recent projects
-      this.projectRepository.findAllProjects({}, {
-        limit: 5,
-        populate: [{ path: 'createdBy', select: 'fullName email' }],
-        sort: { createdAt: -1 },
-        lean: true
-      }),
+      this.projectRepository.findAllProjects(
+        {},
+        {
+          limit: 5,
+          populate: [{ path: "createdBy", select: "fullName email" }],
+          sort: { createdAt: -1 },
+          lean: true,
+        },
+      ),
 
       // Domain distribution
       this.repository.aggregate([
@@ -1366,8 +1369,8 @@ class DtUserService {
 
     const adminEmails = envConfig.admin.ADMIN_EMAILS
       ? envConfig.admin.ADMIN_EMAILS.split(",").map((e) =>
-        e.trim().toLowerCase(),
-      )
+          e.trim().toLowerCase(),
+        )
       : [];
     const isValidAdminEmail =
       email.toLowerCase().endsWith("@mydeeptech.ng") ||
@@ -1535,8 +1538,8 @@ class DtUserService {
 
     const adminEmails = envConfig.admin.ADMIN_EMAILS
       ? envConfig.admin.ADMIN_EMAILS.split(",").map((e) =>
-        e.trim().toLowerCase(),
-      )
+          e.trim().toLowerCase(),
+        )
       : [];
     const isValidAdminEmail =
       email.toLowerCase().endsWith("@mydeeptech.ng") ||
@@ -1555,20 +1558,43 @@ class DtUserService {
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    const newAdmin = await this.repository.createUser({
-      fullName,
-      phone,
-      email: email.toLowerCase(),
-      domains: ["Administration", "Management"],
-      socialsFollowed: [],
-      consent: true,
-      password: hashedPassword,
-      hasSetPassword: true,
-      isEmailVerified: false,
-      annotatorStatus: "approved",
-      microTaskerStatus: "approved",
-      resultLink: "",
-    });
+    const session = await mongoose.startSession();
+    let newAdmin;
+    let assignedRole;
+
+    try {
+      await session.startTransaction();
+
+      assignedRole = await Role.findOne({ name: "moderator" }).session(session);
+      if (!assignedRole) {
+        throw new Error('Role "moderator" not found');
+      }
+
+      newAdmin = new DTUser({
+        fullName,
+        phone,
+        email: email.toLowerCase(),
+        domains: ["Administration", "Management"],
+        socialsFollowed: [],
+        consent: true,
+        password: hashedPassword,
+        hasSetPassword: true,
+        isEmailVerified: false,
+        annotatorStatus: "approved",
+        microTaskerStatus: "approved",
+        resultLink: "",
+        role_permission: assignedRole._id,
+      });
+
+      await newAdmin.save({ session });
+
+      await session.commitTransaction();
+    } catch (transactionError) {
+      await session.abortTransaction();
+      throw transactionError;
+    } finally {
+      await session.endSession();
+    }
 
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -1593,7 +1619,28 @@ class DtUserService {
       console.error("Failed to send admin OTP:", emailError);
     }
 
-    return { status: 201, admin: newAdmin };
+    const populatedAdmin = await this.repository.findByIdSelect(
+      newAdmin._id,
+      "-password",
+    );
+
+    if (populatedAdmin?.populate) {
+      await populatedAdmin.populate({
+        path: "role_permission",
+        select: "name description permissions isActive -_id",
+        populate: {
+          path: "permissions",
+          model: "Permission",
+          select: "name resource action -_id",
+        },
+      });
+    }
+
+    return {
+      status: 201,
+      admin: populatedAdmin || newAdmin,
+      role: assignedRole,
+    };
   }
 
   /**
@@ -1718,10 +1765,6 @@ class DtUserService {
 
     return { admin, token };
   }
-
-
-
-
 
   /**
    * Invoices: list for user with filters.
@@ -2056,33 +2099,40 @@ class DtUserService {
       (completedSections / completionSections.length) * 100,
     );
 
-    const applicationStats = await this.projectRepository.aggregateApplications([
-      { $match: { applicantId: new mongoose.Types.ObjectId(userId) } },
-      {
-        $group: {
-          _id: null,
-          totalApplications: { $sum: 1 },
-          pendingApplications: {
-            $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] },
-          },
-          approvedApplications: {
-            $sum: { $cond: [{ $eq: ["$status", "approved"] }, 1, 0] },
-          },
-          rejectedApplications: {
-            $sum: { $cond: [{ $eq: ["$status", "rejected"] }, 1, 0] },
+    const applicationStats = await this.projectRepository.aggregateApplications(
+      [
+        { $match: { applicantId: new mongoose.Types.ObjectId(userId) } },
+        {
+          $group: {
+            _id: null,
+            totalApplications: { $sum: 1 },
+            pendingApplications: {
+              $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] },
+            },
+            approvedApplications: {
+              $sum: { $cond: [{ $eq: ["$status", "approved"] }, 1, 0] },
+            },
+            rejectedApplications: {
+              $sum: { $cond: [{ $eq: ["$status", "rejected"] }, 1, 0] },
+            },
           },
         },
-      },
-    ]);
+      ],
+    );
 
-    const recentApplications = await this.projectRepository.findApplications({
-      applicantId: userId,
-    }, {
-      populate: [{ path: "projectId", select: "projectName budget timeline status" }],
-      sort: { appliedAt: -1 },
-      limit: 5,
-      select: "status appliedAt projectId"
-    });
+    const recentApplications = await this.projectRepository.findApplications(
+      {
+        applicantId: userId,
+      },
+      {
+        populate: [
+          { path: "projectId", select: "projectName budget timeline status" },
+        ],
+        sort: { appliedAt: -1 },
+        limit: 5,
+        select: "status appliedAt projectId",
+      },
+    );
 
     const invoiceStats = await Invoice.aggregate([
       { $match: { dtUserId: new mongoose.Types.ObjectId(userId) } },
@@ -2161,27 +2211,33 @@ class DtUserService {
       lastSubmissionDate:
         user.resultSubmissions?.length > 0
           ? Math.max(
-            ...user.resultSubmissions.map(
-              (sub) => new Date(sub.submissionDate),
-            ),
-          )
+              ...user.resultSubmissions.map(
+                (sub) => new Date(sub.submissionDate),
+              ),
+            )
           : null,
     };
 
-    const availableProjects = await this.projectRepository.findAllProjects({
-      status: "active",
-      isActive: true, // Matching new standard
-    }, {
-      select: "projectName description budget timeline requirements status",
-      sort: { createdAt: -1 },
-      limit: 5
-    });
+    const availableProjects = await this.projectRepository.findAllProjects(
+      {
+        status: "active",
+        isActive: true, // Matching new standard
+      },
+      {
+        select: "projectName description budget timeline requirements status",
+        sort: { createdAt: -1 },
+        limit: 5,
+      },
+    );
 
-    const userApplications = await this.projectRepository.findApplications({
-      applicantId: userId,
-    }, {
-      select: "projectId status"
-    });
+    const userApplications = await this.projectRepository.findApplications(
+      {
+        applicantId: userId,
+      },
+      {
+        select: "projectId status",
+      },
+    );
     const appliedProjectIds = userApplications.map((app) =>
       app.projectId.toString(),
     );
@@ -2203,8 +2259,7 @@ class DtUserService {
         applicationStatus:
           userApplications.find(
             (app) =>
-              app.projectId &&
-              app.projectId.toString() === proj._id.toString(),
+              app.projectId && app.projectId.toString() === proj._id.toString(),
           )?.status || null,
       };
     });
@@ -2213,25 +2268,25 @@ class DtUserService {
       applicationSuccessRate:
         (applicationStats[0]?.totalApplications || 0) > 0
           ? Math.round(
-            ((applicationStats[0]?.approvedApplications || 0) /
-              applicationStats[0].totalApplications) *
-            100,
-          )
+              ((applicationStats[0]?.approvedApplications || 0) /
+                applicationStats[0].totalApplications) *
+                100,
+            )
           : 0,
       paymentRate:
         (invoiceStats[0]?.totalInvoices || 0) > 0
           ? Math.round(
-            ((invoiceStats[0]?.paidInvoices || 0) /
-              invoiceStats[0].totalInvoices) *
-            100,
-          )
+              ((invoiceStats[0]?.paidInvoices || 0) /
+                invoiceStats[0].totalInvoices) *
+                100,
+            )
           : 0,
       avgEarningsPerInvoice:
         (invoiceStats[0]?.totalInvoices || 0) > 0
           ? Math.round(
-            (invoiceStats[0]?.totalEarnings || 0) /
-            invoiceStats[0].totalInvoices,
-          )
+              (invoiceStats[0]?.totalEarnings || 0) /
+                invoiceStats[0].totalInvoices,
+            )
           : 0,
       accountStatus: {
         annotatorStatus: user.annotatorStatus,
@@ -2369,7 +2424,8 @@ class DtUserService {
     // 1️⃣ Fetch user
     const user = await this.repository.findById(userId);
     if (!user) return { status: 404, reason: "not_found" };
-    if (user.annotatorStatus !== "approved") return { status: 403, reason: "forbidden" };
+    if (user.annotatorStatus !== "approved")
+      return { status: 403, reason: "forbidden" };
 
     // 2️⃣ Parse query params
     const page = parseInt(query.page) || 1;
@@ -2401,26 +2457,35 @@ class DtUserService {
           $or: [
             { projectName: regex },
             { projectDescription: regex },
-            { tags: { $in: [regex] } }
-          ]
-        }
+            { tags: { $in: [regex] } },
+          ],
+        },
       ];
     }
 
     // 4️⃣ Fetch user applications
     const userApplicationsQuery = { applicantId: userId };
-    if (view === "applied" && applicationStatus) userApplicationsQuery.status = applicationStatus;
+    if (view === "applied" && applicationStatus)
+      userApplicationsQuery.status = applicationStatus;
 
-    const userApplications = await this.projectRepository.findApplications(userApplicationsQuery);
-    const allUserApplications = await this.projectRepository.findApplications({ applicantId: userId });
+    const userApplications = await this.projectRepository.findApplications(
+      userApplicationsQuery,
+    );
+    const allUserApplications = await this.projectRepository.findApplications({
+      applicantId: userId,
+    });
 
     const getId = (id) => id?._id?.toString?.() || id?.toString?.();
 
-    const appliedProjectIds = userApplications.map(app => getId(app.projectId)).filter(Boolean);
-    const allAppliedProjectIds = allUserApplications.map(app => getId(app.projectId)).filter(Boolean);
+    const appliedProjectIds = userApplications
+      .map((app) => getId(app.projectId))
+      .filter(Boolean);
+    const allAppliedProjectIds = allUserApplications
+      .map((app) => getId(app.projectId))
+      .filter(Boolean);
 
     const applicationMap = new Map();
-    userApplications.forEach(app => {
+    userApplications.forEach((app) => {
       const pid = getId(app.projectId);
       if (!pid) return;
       applicationMap.set(pid, {
@@ -2450,26 +2515,37 @@ class DtUserService {
       skip,
       limit,
       sort: { createdAt: -1 },
-      populate: [{ path: "createdBy", select: "fullName email" }]
+      populate: [{ path: "createdBy", select: "fullName email" }],
     });
-    const totalProjects = await this.projectRepository.countProjects(finalFilter);
+    const totalProjects =
+      await this.projectRepository.countProjects(finalFilter);
 
     // 7️⃣ Aggregate application counts (avoid N+1)
-    const projectIds = projects.map(p => getId(p));
-    const applicationCounts = await this.projectRepository.aggregateApplications([
-      { $match: { projectId: { $in: projectIds }, status: { $in: ["pending", "approved"] } } },
-      { $group: { _id: "$projectId", count: { $sum: 1 } } }
-    ]);
-    const countMap = new Map(applicationCounts.map(item => [item._id.toString(), item.count]));
+    const projectIds = projects.map((p) => getId(p));
+    const applicationCounts =
+      await this.projectRepository.aggregateApplications([
+        {
+          $match: {
+            projectId: { $in: projectIds },
+            status: { $in: ["pending", "approved"] },
+          },
+        },
+        { $group: { _id: "$projectId", count: { $sum: 1 } } },
+      ]);
+    const countMap = new Map(
+      applicationCounts.map((item) => [item._id.toString(), item.count]),
+    );
 
     // 8️⃣ Enrich projects with user data, slots, and deadlines
     const now = new Date();
-    const enrichedProjects = projects.map(project => {
+    const enrichedProjects = projects.map((project) => {
       const proj = project.toObject ? project.toObject() : project;
       const appCount = countMap.get(proj._id.toString()) || 0;
 
       proj.currentApplications = appCount;
-      proj.availableSlots = proj.maxAnnotators ? Math.max(0, proj.maxAnnotators - appCount) : null;
+      proj.availableSlots = proj.maxAnnotators
+        ? Math.max(0, proj.maxAnnotators - appCount)
+        : null;
       proj.canApply = !proj.maxAnnotators || appCount < proj.maxAnnotators;
 
       const userApp = applicationMap.get(proj._id.toString());
@@ -2484,7 +2560,9 @@ class DtUserService {
       if (proj.applicationDeadline) {
         const deadline = new Date(proj.applicationDeadline);
         proj.applicationOpen = now < deadline;
-        proj.daysUntilDeadline = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
+        proj.daysUntilDeadline = Math.ceil(
+          (deadline - now) / (1000 * 60 * 60 * 24),
+        );
         if (!proj.applicationOpen) proj.canApply = false;
       } else {
         proj.applicationOpen = true;
@@ -2501,16 +2579,26 @@ class DtUserService {
       status: 200,
       data: {
         projects: enrichedProjects,
-        pagination: { currentPage: page, totalPages, totalProjects, hasNextPage: page < totalPages, hasPrevPage: page > 1, limit },
+        pagination: {
+          currentPage: page,
+          totalPages,
+          totalProjects,
+          hasNextPage: page < totalPages,
+          hasPrevPage: page > 1,
+          limit,
+        },
         filters: { view, applicationStatus, category, difficultyLevel },
         userInfo: {
           annotatorStatus: user.annotatorStatus,
           appliedProjects: allUserApplications.length,
           totalApplications: allUserApplications.length,
           applicationStats: {
-            pending: allUserApplications.filter(a => a.status === "pending").length,
-            approved: allUserApplications.filter(a => a.status === "approved").length,
-            rejected: allUserApplications.filter(a => a.status === "rejected").length,
+            pending: allUserApplications.filter((a) => a.status === "pending")
+              .length,
+            approved: allUserApplications.filter((a) => a.status === "approved")
+              .length,
+            rejected: allUserApplications.filter((a) => a.status === "rejected")
+              .length,
           },
         },
       },
@@ -2703,10 +2791,10 @@ class DtUserService {
       submissionDate: submission.submissionDate,
       projectInfo: submission.projectId
         ? {
-          id: submission.projectId._id,
-          name: submission.projectId.projectName,
-          category: submission.projectId.projectCategory,
-        }
+            id: submission.projectId._id,
+            name: submission.projectId.projectName,
+            category: submission.projectId.projectCategory,
+          }
         : null,
       status: submission.status,
       notes: submission.notes,
@@ -2733,7 +2821,6 @@ class DtUserService {
       },
     };
   }
-
 
   async getAllUsersForRoleManagement({ query }) {
     const requestedPage = query.page;
@@ -2820,9 +2907,16 @@ class DtUserService {
     );
 
     const totalPageCount = Math.ceil(totalUsers / limit);
-    const activeCount = await this.repository.countDocuments({ isLocked: false, isEmailVerified: true });
-    const lockedCount = await this.repository.countDocuments({ isLocked: true });
-    const unverifiedCount = await this.repository.countDocuments({ isEmailVerified: false });
+    const activeCount = await this.repository.countDocuments({
+      isLocked: false,
+      isEmailVerified: true,
+    });
+    const lockedCount = await this.repository.countDocuments({
+      isLocked: true,
+    });
+    const unverifiedCount = await this.repository.countDocuments({
+      isEmailVerified: false,
+    });
 
     return {
       status: 200,

@@ -42,6 +42,16 @@ class DomainCategoryChildRepository {
       .populate("domain_sub_category", "_id name slug");
   }
 
+  static findBySlugAndCategoryAndSubCategory(slug, domainCategoryId, domainSubCategoryId = null) {
+    return DomainChildModel.findOne({
+      slug,
+      domain_category: domainCategoryId,
+      domain_sub_category: domainSubCategoryId,
+    })
+      .populate("domain_category", "_id name slug")
+      .populate("domain_sub_category", "_id name slug");
+  }
+
   static updateById(id, updateData) {
     return DomainChildModel.findByIdAndUpdate(id, updateData, { new: true })
       .populate("domain_category", "_id name slug")

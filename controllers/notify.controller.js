@@ -4,7 +4,6 @@ class NotifyController {
     async summary(req, res) {
 
         const userId = req.userId || req.user?.userId;
-        console.log(`📊 User ${userId} requesting notification summary`);
         // Get notification counts and summary data
         try {
             const [totalNotifications, unreadCount, readCount, highPriorityCount, mediumPriorityCount, lowPriorityCount, recentNotifications] = await Promise.all([
@@ -64,7 +63,6 @@ class NotifyController {
         const limit = parseInt(req.query.limit) || 10;
         const skip = (page - 1) * limit;
 
-        console.log(`📥 User ${userId} requesting notifications - page ${page}, limit ${limit}`);
         try {
             // Fetch notifications for this user
             const [notifications, totalNotifications, unreadCount, readCount] = await Promise.all([
@@ -73,8 +71,6 @@ class NotifyController {
                 Notification.countDocuments({ userId, isRead: false }),
                 Notification.countDocuments({ userId, isRead: true })
             ]);
-
-            console.log(`📥 Found ${totalNotifications} total, ${unreadCount} unread, ${readCount} read notifications for user ${userId}`);
 
             res.status(200).json({
                 success: true,
@@ -110,7 +106,6 @@ class NotifyController {
         const { notificationId } = req.params;
         const userId = req.userId || req.user?.userId;
 
-        console.log(`📖 User ${userId} marking notification ${notificationId} as read`);
         try {
             // Update the notification in the database
             const updatedNotification = await Notification.findOneAndUpdate(
@@ -159,28 +154,20 @@ class NotifyController {
     }
 
     async markAllAsRead(req, res) {
-
         const userId = req.userId || req.user?.userId;
-        console.log(`📚 User ${userId} marking ALL notifications as read`);
-        console.log(`📚 User ID type: ${typeof userId}`);
         try {
             // First, let's see what notifications exist for this user
             const existingNotifications = await Notification.find({ userId });
-            console.log(`📚 Found ${existingNotifications.length} total notifications for user ${userId}`);
             const unreadNotifications = await Notification.find({ userId, isRead: false });
-            console.log(`📚 Found ${unreadNotifications.length} unread notifications for user ${userId}`);
             // If no unread notifications found, let's check with string conversion
             if (unreadNotifications.length === 0) {
-                console.log(`📚 Trying with string conversion of userId...`);
                 const userIdString = String(userId);
                 const unreadWithString = await Notification.find({ userId: userIdString, isRead: false });
-                console.log(`📚 Found ${unreadWithString.length} unread notifications with string userId`);
                 // Also try with ObjectId conversion
                 const mongoose = require('mongoose');
                 if (mongoose.Types.ObjectId.isValid(userId)) {
                     const userIdObj = new mongoose.Types.ObjectId(userId);
                     const unreadWithObj = await Notification.find({ userId: userIdObj, isRead: false });
-                    console.log(`📚 Found ${unreadWithObj.length} unread notifications with ObjectId conversion`);
                 }
             }
            // Update all unread notifications for this user
@@ -196,8 +183,6 @@ class NotifyController {
                     }
                 }
             );
-
-            console.log(`📚 Update result: ${updateResult.modifiedCount} documents modified out of ${updateResult.matchedCount} matched`);
 
             res.status(200).json({
                 success: true,
@@ -223,8 +208,6 @@ class NotifyController {
         try {
             const { notificationId } = req.params;
             const userId = req.userId || req.user?.userId;
-
-            console.log(`🗑️ User ${userId} deleting notification ${notificationId}`);
 
             // Delete the notification from the database
             const deletedNotification = await Notification.findOneAndDelete({
@@ -262,8 +245,6 @@ class NotifyController {
     async getNotificationPreferences(req, res) {
         try {
             const userId = req.userId || req.user?.userId;
-
-            console.log(`⚙️ User ${userId} requesting notification preferences`);
 
             // Return default preferences until user preference model is implemented
             const defaultPreferences = {
@@ -310,8 +291,6 @@ class NotifyController {
         try {
             const userId = req.userId || req.user?.userId;
             const { preferences } = req.body;
-
-            console.log(`⚙️ User ${userId} updating notification preferences`);
 
             // For now, just return the provided preferences until user preference model is implemented
             res.status(200).json({

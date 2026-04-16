@@ -192,6 +192,74 @@ class SessionManagementService {
       console.error('Send device status error:', error);
     }
   }
+
+  async cleanupInactiveConnections(timeoutMs = 5 * 60 * 1000) {
+    const now = Date.now();
+
+    for (const [deviceId, connection] of this.deviceConnections.entries()) {
+      if (now - connection.lastPing <= timeoutMs) continue;
+
+      try {
+        if (
+          connection.ws &&
+          (connection.ws.readyState === WebSocket.OPEN ||
+            connection.ws.readyState === WebSocket.CONNECTING)
+        ) {
+          connection.ws.close();
+        }
+
+        const terminatedSessions = await this.handleDeviceDisconnection(deviceId);
+        for (const terminated of terminatedSessions) {
+          if (terminated.userWs && terminated.userWs.readyState === WebSocket.OPEN) {
+            terminated.userWs.send(
+              JSON.stringify({
+                type: 'session_terminated',
+                data: {
+                  sessionId: terminated.sessionId,
+                  reason: 'Device disconnected'
+                }
+              })
+            );
+          }
+        }
+
+        await this.broadcastDeviceStatusUpdate(deviceId, 'offline');
+      } catch (error) {
+        console.error(`Inactive device cleanup failed for ${deviceId}:`, error);
+      }
+    }
+
+    for (const [userEmail, connections] of this.userConnections.entries()) {
+      const activeConnections = new Set();
+
+      for (const ws of connections) {
+        if (
+          ws.readyState === WebSocket.OPEN &&
+          now - (ws.lastPing || 0) <= timeoutMs
+        ) {
+          activeConnections.add(ws);
+          continue;
+        }
+
+        try {
+          if (
+            ws.readyState === WebSocket.OPEN ||
+            ws.readyState === WebSocket.CONNECTING
+          ) {
+            ws.close();
+          }
+        } catch (error) {
+          console.error(`Failed closing inactive user socket for ${userEmail}:`, error);
+        }
+      }
+
+      if (activeConnections.size === 0) {
+        this.userConnections.delete(userEmail);
+      } else {
+        this.userConnections.set(userEmail, activeConnections);
+      }
+    }
+  }
 }
 
 module.exports = new SessionManagementService();

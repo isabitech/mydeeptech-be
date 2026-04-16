@@ -7,6 +7,7 @@ const WebSocket = require('ws');
  * Session Management with WebSocket Support
  * Handles real-time session monitoring and control
  */
+
 class SessionManager {
   /**
    * Initialize WebSocket server
@@ -162,15 +163,22 @@ class SessionManager {
     }
   }
 
+  /**
+   * Handle device heartbeat
+   */
   async handleDeviceHeartbeat(ws, data) {
     if (ws.type !== 'device') return;
+
     const deviceConnection = sessionService.getDeviceConnection(ws.deviceId);
     if (deviceConnection) {
       deviceConnection.lastPing = Date.now();
-      await sessionRepository.updateDeviceStatus(ws.deviceId, 'online', data.systemInfo);
+      await sessionRepository.updateDeviceStatus(ws.deviceId, 'online', data?.systemInfo || {});
     }
   }
 
+  /**
+   * Handle session status updates
+   */
   async handleSessionUpdate(ws, data) {
     const { sessionId, status, metadata } = data;
     try {
@@ -178,22 +186,28 @@ class SessionManager {
       if (!session) return;
 
       const updateData = { status };
-      if (metadata) updateData.metadata = { ...session.metadata, ...metadata };
+      if (metadata) {
+        updateData.metadata = { ...session.metadata, ...metadata };
+      }
       if (status === 'ended' || status === 'terminated') {
         updateData.ended_at = new Date();
         sessionService.activeSessions.delete(sessionId);
       }
-
       await sessionRepository.updateSession(sessionId, updateData);
 
       const userConnections = sessionService.getAllUserConnections(session.user_email);
       if (userConnections) {
         const updateMessage = {
           type: 'session_update',
-          data: { sessionId, deviceId: session.device_id, status, timestamp: new Date() }
+          data: {
+            sessionId,
+            deviceId: session.device_id,
+            status,
+            timestamp: new Date()
+          }
         };
-        userConnections.forEach(uWs => {
-          if (uWs.readyState === WebSocket.OPEN) uWs.send(JSON.stringify(updateMessage));
+        userConnections.forEach((userWs) => {
+          if (userWs.readyState === WebSocket.OPEN) userWs.send(JSON.stringify(updateMessage));
         });
       }
       console.log(`Session ${sessionId} updated to status: ${status}`);
@@ -202,21 +216,34 @@ class SessionManager {
     }
   }
 
+  /**
+   * Start a new session via WebSocket
+   */
   async handleStartSession(ws, data) {
     if (ws.type !== 'user') return;
+
     try {
       const { deviceId } = data;
       const session = await sessionService.startSession(ws.userEmail, deviceId, ws);
       const deviceConnection = sessionService.getDeviceConnection(deviceId);
-
+      if (deviceConnection && deviceConnection.ws && deviceConnection.ws.readyState === WebSocket.OPEN) {
       deviceConnection.ws.send(JSON.stringify({
         type: 'session_started',
-        data: { sessionId: session._id, userEmail: session.user_email, userName: ws.userName }
+        data: {
+          sessionId: session._id,
+          userEmail: session.user_email,
+          userName: ws.userName
+        }
       }));
+      }
 
       ws.send(JSON.stringify({
         type: 'session_started',
-        data: { sessionId: session._id, deviceId, startTime: session.started_at }
+        data: {
+          sessionId: session._id,
+          deviceId: deviceId,
+          startTime: session.started_at
+        }
       }));
       console.log(`Session started: ${session._id} (${ws.userEmail} -> ${deviceId})`);
     } catch (error) {
@@ -225,18 +252,26 @@ class SessionManager {
     }
   }
 
+  /**
+   * End a session via WebSocket
+   */
   async handleEndSession(ws, data) {
     try {
       const { sessionId } = data;
       const { session, duration, deviceWs } = await sessionService.endSession(sessionId);
-
       if (deviceWs && deviceWs.readyState === WebSocket.OPEN) {
-        deviceWs.send(JSON.stringify({ type: 'session_ended', data: { sessionId, duration } }));
+        deviceWs.send(JSON.stringify({
+          type: 'session_ended',
+          data: { sessionId, duration }
+        }));
       }
-
       ws.send(JSON.stringify({
         type: 'session_ended',
-        data: { sessionId, endTime: session.ended_at, duration }
+        data: {
+          sessionId,
+          endTime: session.ended_at,
+          duration
+        }
       }));
       console.log(`Session ended: ${sessionId}`);
     } catch (error) {
@@ -245,14 +280,25 @@ class SessionManager {
     }
   }
 
+  async handleGetDeviceStatus(ws) {
+    if (ws.type !== 'user' || !ws.userEmail) return;
+    await this.sendUserDeviceStatus(ws.userEmail, ws);
+  }
+
+  /**
+   * Handle disconnection
+   */
   async handleDisconnection(ws) {
     if (ws.type === 'device' && ws.deviceId) {
       const terminated = await sessionService.handleDeviceDisconnection(ws.deviceId);
-      for (const t of terminated) {
-        if (t.userWs && t.userWs.readyState === WebSocket.OPEN) {
-          t.userWs.send(JSON.stringify({
+      for (const sessionData of terminated) {
+        if (sessionData.userWs && sessionData.userWs.readyState === WebSocket.OPEN) {
+          sessionData.userWs.send(JSON.stringify({
             type: 'session_terminated',
-            data: { sessionId: t.sessionId, reason: 'Device disconnected' }
+            data: {
+              sessionId: sessionData.sessionId,
+              reason: 'Device disconnected'
+            }
           }));
         }
       }
@@ -272,19 +318,12 @@ class SessionManager {
     await sessionService.sendUserDeviceStatus(userEmail, ws);
   }
 
-  cleanupInactiveConnections() {
-    // Delegation to service or keep here? Let's keep the cleanup logic in the service
-    // but the WS calls might need the service to tell us which to close.
-    // Actually, service can manage the collections.
-    sessionService.getSessionStats(); // Example call to trigger some internal state check if needed
+  async cleanupInactiveConnections() {
+    await sessionService.cleanupInactiveConnections();
   }
 
-  getSessionStats() {
-    return sessionService.activeSessions.size > 0 ? {
-        activeSessions: sessionService.activeSessions.size,
-        connectedDevices: sessionService.deviceConnections.size,
-        connectedUsers: sessionService.userConnections.size
-    } : { activeSessions: 0, connectedDevices: 0, connectedUsers: 0 };
+  async getSessionStats() {
+    return sessionService.getSessionStats();
   }
 }
 
@@ -304,14 +343,19 @@ const forceEndSession = async (req, res) => {
   try {
     const { sessionId } = req.params;
     const { reason = 'force_ended_by_admin' } = req.body;
-    
-    const { session, sessionData } = await sessionService.forceEndSession(sessionId, reason, req.admin?.email);
-    
+
+    const { sessionData } = await sessionService.forceEndSession(sessionId, reason, req.admin?.email);
+
     if (sessionData) {
       const terminationMessage = {
         type: 'session_terminated',
-        data: { sessionId, reason, terminatedBy: req.admin?.email || 'admin' }
+        data: {
+          sessionId,
+          reason,
+          terminatedBy: req.admin?.email || 'admin'
+        }
       };
+
       if (sessionData.userWs && sessionData.userWs.readyState === WebSocket.OPEN) {
         sessionData.userWs.send(JSON.stringify(terminationMessage));
       }
@@ -319,7 +363,7 @@ const forceEndSession = async (req, res) => {
         sessionData.deviceWs.send(JSON.stringify(terminationMessage));
       }
     }
-    
+
     res.json({ success: true, message: 'Session terminated successfully' });
   } catch (error) {
     console.error('Force end session error:', error);
@@ -327,4 +371,4 @@ const forceEndSession = async (req, res) => {
   }
 };
 
-module.exports = { SessionManager, sessionManager, getSessionStats, forceEndSession };
+module.exports = { SessionManager, sessionManager, getSessionStats, forceEndSession };

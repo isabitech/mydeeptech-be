@@ -27,6 +27,7 @@ const {
   resultFileUpload,
   idDocumentUpload,
   resumeUpload,
+  isCloudinaryConfigured,
 } = require("../config/cloudinary");
 
 const router = express.Router();
@@ -193,13 +194,22 @@ router.post(
   "/submit-result",
   authenticateToken,
   (req, res, next) => {
+    if (!isCloudinaryConfigured) {
+      return res.status(500).json({
+        success: false,
+        message:
+          "File upload service is temporarily unavailable. Please try again later.",
+        error: "CLOUDINARY_CONFIG_ERROR",
+      });
+    }
+
     // Create a flexible upload handler that accepts different field names
     const upload = resultFileUpload.fields([
       { name: "resultFile", maxCount: 1 },
       { name: "file", maxCount: 1 },
       { name: "result", maxCount: 1 },
       { name: "upload", maxCount: 1 },
-      { name: "screenshots", maxCount: 1 }, // Added support for 'screenshots' field
+      { name: "screenshots", maxCount: 1 },
     ]);
 
     upload(req, res, (err) => {
@@ -246,6 +256,15 @@ router.post(
   (req, res, next) => {
     console.log("🚀 ID document upload endpoint hit");
 
+    if (!isCloudinaryConfigured) {
+      return res.status(500).json({
+        success: false,
+        message:
+          "File upload service is temporarily unavailable. Please try again later.",
+        error: "CLOUDINARY_CONFIG_ERROR",
+      });
+    }
+
     // Create a flexible upload handler for ID documents
     const upload = idDocumentUpload.fields([
       { name: "idDocument", maxCount: 1 },
@@ -291,6 +310,15 @@ router.post(
   "/upload-resume",
   authenticateToken,
   (req, res, next) => {
+    if (!isCloudinaryConfigured) {
+      return res.status(500).json({
+        success: false,
+        message:
+          "File upload service is temporarily unavailable. Please try again later.",
+        error: "CLOUDINARY_CONFIG_ERROR",
+      });
+    }
+
     // Create a flexible upload handler for resumes
     const upload = resumeUpload.fields([
       { name: "resume", maxCount: 1 },
