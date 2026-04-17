@@ -353,7 +353,7 @@ const getDTUserProfile = async (req, res) => {
       fullName: user.fullName,
       email: user.email,
       phone: user.phone,
-      domains: user.domains,
+      userDomains: user.userDomains || [], // New structured domain relationships
       consent: user.consent,
       annotatorStatus: user.annotatorStatus,
       microTaskerStatus: user.microTaskerStatus,

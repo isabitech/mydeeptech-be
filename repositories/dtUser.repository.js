@@ -8,9 +8,18 @@ class DtUserRepository {
       .sort({ createdAt: -1 });
   }
 
-  findByEmail(email) {
-    return DTUser.findOne({ email });
-  }
+findByEmail(email) {
+  return DTUser.findOne({ email })
+    .populate({
+      path: "userDomains",
+      match: { deleted_at: null },
+      populate: {
+        path: "domain_child",
+        select: "name",
+      },
+    })
+    .exec();
+}
 
   findById(id) {
     return DTUser.findById(id);

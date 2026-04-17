@@ -290,7 +290,24 @@ class DtUserService {
    * Get current user info.
    */
   async me(email) {
-    const user = await this.repository.findByEmail(email);
+    // const user = await this.repository.findByEmail(email);
+     let user = await DTUser.findOne({ email })
+    .populate({
+      path: "userDomains",
+      match: { deleted_at: null },
+      populate: {
+        path: "domain_child",
+        select: "name",
+      },
+      // populate: [
+      //   { path: "domain_category", select: "name" },
+      //   { path: "domain_child", select: "name" },
+      //   { path: "domain_sub_category", select: "name" }
+      // ]
+    })
+    .lean()
+    .exec();
+
     if (!user) {
       return { status: 404, reason: "not_found" };
     }
@@ -312,10 +329,34 @@ class DtUserService {
    * Get DTUser profile by id.
    */
   async getDTUserProfile(userId) {
-    const user = await this.repository.findById(userId);
+    // Find user with populated userDomains (same as getAllDTUsers method)
+    let user = await DTUser.findById(userId)
+      .populate({
+        path: "userDomains",
+        match: { deleted_at: null },
+        populate: {
+          path: "domain_child",
+          select: "name",
+        },
+      })
+      .lean()
+      .exec();
+
     if (!user) {
       return { status: 404, reason: "not_found" };
     }
+
+    // Transform userDomains to expected format (same as in getAllDTUsers)
+    if (user.userDomains && user.userDomains.length > 0) {
+      user.userDomains = user.userDomains.map((domain) => ({
+        _id: domain.domain_child._id,
+        name: domain.domain_child.name,
+        assignmentId: domain._id, // Include assignment ID for removal
+      }));
+    } else {
+      user.userDomains = [];
+    }
+
     return { user };
   }
 
@@ -346,7 +387,7 @@ class DtUserService {
 
     if (body.personalInfo) {
       updateData.personal_info = {
-        ...user.personal_info?.toObject(),
+        ...user.personal_info,
         country:
           body.personalInfo.country !== undefined
             ? body.personalInfo.country
@@ -368,7 +409,7 @@ class DtUserService {
 
     if (body.paymentInfo) {
       updateData.payment_info = {
-        ...user.payment_info?.toObject(),
+        ...user.payment_info,
         account_name:
           body.paymentInfo.accountName !== undefined
             ? body.paymentInfo.accountName
@@ -402,7 +443,7 @@ class DtUserService {
 
     if (body.professionalBackground) {
       updateData.professional_background = {
-        ...user.professional_background?.toObject(),
+        ...user.professional_background,
         education_field:
           body.professionalBackground.educationField !== undefined
             ? body.professionalBackground.educationField
@@ -428,7 +469,7 @@ class DtUserService {
 
     if (body.languageProficiency) {
       updateData.language_proficiency = {
-        ...user.language_proficiency?.toObject(),
+        ...user.language_proficiency,
         primary_language:
           body.languageProficiency.primaryLanguage !== undefined
             ? body.languageProficiency.primaryLanguage
@@ -446,7 +487,7 @@ class DtUserService {
 
     if (body.systemInfo) {
       updateData.system_info = {
-        ...user.system_info?.toObject(),
+        ...user.system_info,
         device_type:
           body.systemInfo.deviceType !== undefined
             ? body.systemInfo.deviceType
@@ -476,11 +517,8 @@ class DtUserService {
 
     if (body.projectPreferences) {
       updateData.project_preferences = {
-        ...user.project_preferences?.toObject(),
-        domains_of_interest:
-          body.projectPreferences.domainsOfInterest !== undefined
-            ? body.projectPreferences.domainsOfInterest
-            : user.project_preferences?.domains_of_interest,
+        ...user.project_preferences,
+        domains_of_interest: user.project_preferences?.domains_of_interest,
         availability_type:
           body.projectPreferences.availabilityType !== undefined
             ? body.projectPreferences.availabilityType
@@ -494,7 +532,7 @@ class DtUserService {
 
     if (body.attachments) {
       updateData.attachments = {
-        ...user.attachments?.toObject(),
+        ...user.attachments,
         resume_url:
           body.attachments.resumeUrl !== undefined
             ? body.attachments.resumeUrl
@@ -510,11 +548,36 @@ class DtUserService {
       };
     }
 
-    const updatedUser = await this.repository.findByIdAndUpdate(
+    // const updatedUser = await this.repository.findByIdAndUpdate(
+    //   userId,
+    //   { $set: updateData },
+    //   { new: true, runValidators: true },
+    // );
+
+    // Perform the update
+    let updatedUser = await DTUser.findByIdAndUpdate(
       userId,
       { $set: updateData },
-      { new: true, runValidators: true },
-    );
+      { new: true, runValidators: true }).select("-password")
+        .populate({
+          path: "userDomains",
+          match: { deleted_at: null },
+           populate: {
+            path: "domain_child",
+            select: "name"
+          },
+        })
+        .exec();
+
+      updatedUser = {
+        ...updatedUser,
+        domains: undefined,
+        userDomains: updatedUser.userDomains.map(domain => ({
+          _id: domain.domain_child._id,
+          name: domain.domain_child.name,
+          assignmentId: domain._id
+        }))
+      };
 
     return { updatedUser };
   }
@@ -639,12 +702,37 @@ class DtUserService {
 
     const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
 
-    const users = await this.repository
+    let users = await this.repository
       .find(filter)
       .select("-password")
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(parseInt(limit, 10));
+      .limit(parseInt(limit, 10))
+      .populate({
+        path: "userDomains",
+        match: { deleted_at: null },
+        populate: {
+          path: "domain_child",
+          select: "name", // only what you need
+        },
+        // populate: [
+        //   { path: "domain_category", select: "name" },
+        //   { path: "domain_child", select: "name" },
+        //   { path: "domain_sub_category", select: "name" }
+        // ]
+      })
+      .lean()
+      .exec();
+
+
+      users = users.map((user) => ({
+      ...user,
+      userDomains: user.userDomains.map((domain) => ({
+        _id: domain.domain_child._id,
+        name: domain.domain_child.name,
+        assignmentId: domain._id, // Include assignment ID for removal
+      })),
+    }));
 
     const totalUsers = await this.repository.countDocuments(filter);
     const totalPages = Math.ceil(totalUsers / parseInt(limit, 10));
