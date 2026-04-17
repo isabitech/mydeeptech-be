@@ -25,6 +25,7 @@ const Role = require("../models/roles.model");
 const Permission = require("../models/permissions.model");
 const adminVerificationStore = require("../utils/adminVerificationStore");
 const { RoleType } = require("../utils/role");
+const DomainToUserServiceClass = require("../services/domain-to-user.service");
 const {
   generateOptimizedUrl,
   generateThumbnail,
@@ -35,9 +36,11 @@ class DtUserService {
   constructor(
     repository = new DtUserRepository(),
     projectRepository = new AnnotationProjectRepository(),
+    domainToUserService = new DomainToUserServiceClass(),
   ) {
     this.repository = repository;
     this.projectRepository = projectRepository;
+    this.domainToUserService = domainToUserService;
   }
 
   /**
@@ -119,10 +122,14 @@ class DtUserService {
       fullName,
       phone,
       email,
-      domains,
       socialsFollowed,
       consent,
     });
+    const domainIds = domains.map((domain) => domain.id);
+    await this.domainToUserService.assignMultipleDomainsToUser(
+      newUser._id,
+      domainIds,
+    );
 
     const emailPromise = Promise.race([
       MailService.sendVerificationEmail(
