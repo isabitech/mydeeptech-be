@@ -21,6 +21,8 @@ const {
 const validateRequest = require("../middleware/validate-request.middleware");
 // Import password reset controllers
 const passwordResetController = require("../controllers/passwordReset.controller.js");
+// Import rate limiters for specific auth endpoints
+const { rateLimiters } = require("../middleware/simpleRateLimit.js");
 
 // Import Cloudinary upload middleware for result submissions
 const {
@@ -32,24 +34,27 @@ const {
 
 const router = express.Router();
 
-router.post("/signup", userController.signup);
-router.post("/login", userController.login);
+// Apply strict auth rate limiting only to authentication endpoints
+router.post("/signup", rateLimiters.auth, userController.signup);
+router.post("/login", rateLimiters.auth, userController.login);
 
 // ======================
 // PASSWORD RESET ROUTES
 // ======================
 
-// Regular User Password Reset
-router.post("/forgot-password", passwordResetController.forgotPassword);
-router.post("/reset-password", passwordResetController.resetPassword);
+// Regular User Password Reset (with auth rate limiting)
+router.post("/forgot-password", rateLimiters.auth, passwordResetController.forgotPassword);
+router.post("/reset-password", rateLimiters.auth, passwordResetController.resetPassword);
 
-// DTUser Password Reset
+// DTUser Password Reset (with auth rate limiting)
 router.post(
   "/dtuser-forgot-password",
+  rateLimiters.auth,
   passwordResetController.dtUserForgotPassword,
 );
 router.post(
   "/dtuser-reset-password",
+  rateLimiters.auth,
   passwordResetController.dtUserResetPassword,
 );
 
@@ -89,11 +94,13 @@ router.get(
 );
 router.post(
   "/setupPassword",
+  rateLimiters.auth,
   validateRequest({ body: dtUserPasswordSchema }),
   dtUserController.setupPassword,
 );
 router.post(
   "/dtUserLogin",
+  rateLimiters.auth,
   validateRequest({ body: loginSchema }),
   dtUserController.dtUserLogin,
 );

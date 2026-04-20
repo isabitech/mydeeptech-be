@@ -46,6 +46,9 @@ const { corsOptions } = require("./utils/cors-options.utils");
 const errorMiddleware = require("./middleware/error.middleware");
 const notFoundMiddleware = require("./middleware/notfound-middleware");
 
+// Rate limiting
+const { rateLimiters } = require("./middleware/simpleRateLimit");
+
 const app = express();
 const server = createServer(app);
 
@@ -79,6 +82,9 @@ app.use("/api/payments/webhook", express.raw({ type: "application/json" }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Health check endpoint (no rate limiting for monitoring)
+app.get("/health", healthCheck);
+
 // API Documentation (only if Swagger is available)
 if (swaggerUi && specs) {
   app.use(
@@ -100,12 +106,16 @@ if (swaggerUi && specs) {
   console.log(`📚 API Documentation not available (${reason})`);
 }
 
+// Simple Rate Limiting Setup
+app.use("/api", rateLimiters.api); // General API rate limiting
+// Note: Auth rate limiting now applied to specific endpoints in auth routes
+
 // Routes
 app.use("/api/auth", route);
 app.use("/api/admin", adminRoute);
 app.use("/api/admin/email-tracking", adminEmailTrackingRoute);
 app.use("/api/debug/email", debugEmailRoute);
-app.use("/api/media", mediaRoute);
+app.use("/api/media", rateLimiters.upload, mediaRoute); // Upload rate limiting
 app.use("/api/notifications", notificationRoute);
 app.use("/api/assessments", assessmentRoute);
 app.use("/api/support", supportRoute);
