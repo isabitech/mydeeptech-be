@@ -181,7 +181,7 @@ router.post("/sessions/activity", sessionController.updateActivity);
 router.get(
   "/sessions/:session_id",
   authenticateUserSession,
-  sessionController.getSession,
+  sessionController.getSessionDetails,
 );
 
 /**

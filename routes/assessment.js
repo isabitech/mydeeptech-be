@@ -2,18 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 // Import controllers
-const {
-  submitAssessment,
-  getUserAssessmentHistory,
-  checkRetakeEligibility,
-  getAdminAssessments,
-  getAssessmentQuestions,
-  getAllAssessments,
-  startAssessmentById,
-  getAssessmentSubmissions,
-  getAdminAssessmentsOverview,
-  getUserAssessmentsOverview
-} = require('../controllers/assessment.controller');
+const assessmentController = require('../controllers/assessment.controller');
 
 const {
   startAssessmentSession,
@@ -49,7 +38,7 @@ const { authenticateAdmin } = require('../middleware/adminAuth');
  * @access Private (User)
  * @query assessmentType, difficulty, category, limit
  */
-router.get('/questions', authenticateToken, getAssessmentQuestions);
+router.get('/questions', authenticateToken, assessmentController.getAssessmentQuestions);
 
 /**
  * @route GET /api/assessments/available
@@ -57,7 +46,7 @@ router.get('/questions', authenticateToken, getAssessmentQuestions);
  * @access Private (User)
  * @returns List of assessments user can take with status and requirements
  */
-router.get('/available', authenticateToken, getAllAssessments);
+router.get('/available', authenticateToken, assessmentController.getAllAssessments);
 
 /**
  * @route POST /api/assessments/start/:assessmentId
@@ -66,7 +55,7 @@ router.get('/available', authenticateToken, getAllAssessments);
  * @param assessmentId - 'english-proficiency' or multimedia assessment ObjectId
  * @returns Assessment questions/session or error if not eligible
  */
-router.post('/start/:assessmentId', authenticateToken, startAssessmentById);
+router.post('/start/:assessmentId', authenticateToken, assessmentController.startAssessmentById);
 
 /**
  * @route GET /api/assessments/overview
@@ -74,7 +63,7 @@ router.post('/start/:assessmentId', authenticateToken, startAssessmentById);
  * @access Private (User)
  * @returns User's assessment progress, scores, and personalized recommendations
  */
-router.get('/overview', authenticateToken, getUserAssessmentsOverview);
+router.get('/overview', authenticateToken, assessmentController.getUserAssessmentsOverview);
 
 /**
  * @route POST /api/assessments/submit
@@ -90,7 +79,7 @@ router.get('/overview', authenticateToken, getUserAssessmentsOverview);
  *   passingScore: number
  * }
  */
-router.post('/submit', authenticateToken, submitAssessment);
+router.post('/submit', authenticateToken, assessmentController.submitAssessment);
 
 /**
  * @route GET /api/assessments/history
@@ -98,7 +87,7 @@ router.post('/submit', authenticateToken, submitAssessment);
  * @access Private (User)
  * @query page, limit, assessmentType, passed
  */
-router.get('/history', authenticateToken, getUserAssessmentHistory);
+router.get('/history', authenticateToken, assessmentController.getUserAssessmentHistory);
 
 /**
  * @route GET /api/assessments/retake-eligibility
@@ -106,7 +95,7 @@ router.get('/history', authenticateToken, getUserAssessmentHistory);
  * @access Private (User)
  * @query assessmentType
  */
-router.get('/retake-eligibility', authenticateToken, checkRetakeEligibility);
+router.get('/retake-eligibility', authenticateToken, assessmentController.checkRetakeEligibility);
 
 // ==========================================
 // MULTIMEDIA ASSESSMENT SESSION ROUTES
@@ -232,7 +221,7 @@ router.post('/spidey/:submissionId/stage4/submit', authenticateToken, submitStag
  * @access Private (Admin)
  * @query page, limit, assessmentType, passed, userId
  */
-router.get('/admin', authenticateAdmin, getAdminAssessments);
+router.get('/admin', authenticateAdmin, assessmentController.getAdminAssessments);
 
 /**
  * @route GET /api/admin/assessments/overview
@@ -240,7 +229,7 @@ router.get('/admin', authenticateAdmin, getAdminAssessments);
  * @access Private (Admin)
  * @returns Overview of all assessment types with comprehensive statistics
  */
-router.get('/admin/overview', authenticateAdmin, getAdminAssessmentsOverview);
+router.get('/admin/overview', authenticateAdmin, assessmentController.getAdminAssessmentsOverview);
 
 /**
  * @route GET /api/assessments/:assessmentId/submissions
@@ -250,6 +239,6 @@ router.get('/admin/overview', authenticateAdmin, getAdminAssessmentsOverview);
  * @query page, limit, status, userId (admin only), sortBy, sortOrder
  * @returns List of submissions for the specified assessment
  */
-router.get('/:assessmentId/submissions', authenticateToken, getAssessmentSubmissions);
+router.get('/:assessmentId/submissions', authenticateToken, assessmentController.getAssessmentSubmissions);
 
 module.exports = router;

@@ -13,16 +13,42 @@ class DomainToUserService {
             throw new AppError({ message: "User ID is required", statusCode: 400 });
         }
 
+        // Remove duplicates from the input array
+        const uniqueDomainIds = [...new Set(domainIds)];
+        
+        // Get all existing domain assignments for this user in one query
+        const existingAssignments = await DomainToUserRepository.findByUserId(userId);
+        const existingDomainIds = new Set(existingAssignments.map(assignment => assignment.domain_child.toString()));
+        
+        // Filter out domains that are already assigned
+        const newDomainIds = uniqueDomainIds.filter(domainId => !existingDomainIds.has(domainId.toString()));
+        
         const createdMappings = [];
-        for (const domain_child of domainIds) {
-            const existing = await DomainToUserRepository.findByUserAndDomainChild(userId, domain_child);
-            if (!existing) {
+        
+        // Add existing assignments to response
+        createdMappings.push(...existingAssignments.filter(assignment => 
+            uniqueDomainIds.includes(assignment.domain_child.toString())
+        ));
+        
+        // Create new assignments only for domains not already assigned
+        for (const domain_child of newDomainIds) {
+            try {
                 const mapping = await this.createDomainToUser({ userId, domain_child });
                 createdMappings.push(mapping);
-            } else {
-                createdMappings.push(existing);
+            } catch (error) {
+                // If duplicate key error occurs, fetch the existing record instead
+                if (error.code === 11000) {
+                    console.log(`Domain ${domain_child} already assigned to user ${userId}, fetching existing record`);
+                    const existing = await DomainToUserRepository.findByUserAndDomainChild(userId, domain_child);
+                    if (existing) {
+                        createdMappings.push(existing);
+                    }
+                } else {
+                    throw error;
+                }
             }
         }
+        
         return createdMappings;
     }
 

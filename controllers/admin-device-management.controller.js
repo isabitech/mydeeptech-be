@@ -1,9 +1,4 @@
-const HVNCDevice = require("../models/hvnc-device.model");
-const DTUser = require("../models/dtUser.model");
-const HVNCShift = require("../models/hvnc-shift.model");
-const HVNCSession = require("../models/hvnc-session.model");
-const HVNCActivityLog = require("../models/hvnc-activity-log.model");
-const crypto = require("crypto");
+const adminDeviceManagementService = require("../services/admin-device-management.service");
 
 /**
  * GET /api/hvnc/admin/devices
@@ -12,96 +7,18 @@ const crypto = require("crypto");
 const getAllDevices = async (req, res) => {
   try {
     const { status } = req.query;
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-
-    // Build query filter
-    let query = {};
-    if (status === "Active") {
-      query = {
-        last_seen: { $gt: fiveMinutesAgo },
-        status: "online",
-      };
-    } else if (status === "Offline") {
-      query = {
-        $or: [
-          { last_seen: { $lte: fiveMinutesAgo } },
-          { status: { $ne: "online" } },
-        ],
-      };
-    }
-
-    const devices = await HVNCDevice.find(query).lean();
-
-    // Transform devices for frontend
-    const deviceData = await Promise.all(
-      devices.map(async (device) => {
-        const isOnline =
-          device.last_seen > fiveMinutesAgo && device.status === "online";
-
-        // Get assigned user
-        let assignedUser = "Unassigned";
-        let assignedUserId = null;
-        const shift = await HVNCShift.findOne({
-          device_id: device.device_id,
-          status: "active",
-          $or: [{ end_date: null }, { end_date: { $gte: new Date() } }],
-        });
-
-        if (shift) {
-          const user = await DTUser.findOne({ email: shift.user_email }).select(
-            "fullName email",
-          );
-          if (user) {
-            assignedUser = user.fullName;
-            assignedUserId = user._id.toString();
-          }
-        }
-
-        // Calculate Hubstaff time (placeholder - integrate with actual Hubstaff API)
-        const hubstaffSeconds = device.system_info?.hubstaff_seconds || 0;
-        const hubstaffHours = Math.floor(hubstaffSeconds / 3600);
-        const hubstaffMinutes = Math.floor((hubstaffSeconds % 3600) / 60);
-        const hubstaffSecondsRem = hubstaffSeconds % 60;
-        const hubstaffDisplay = `${hubstaffHours.toString().padStart(2, "0")}:${hubstaffMinutes.toString().padStart(2, "0")}:${hubstaffSecondsRem.toString().padStart(2, "0")}`;
-
-        // Calculate Hubstaff percentage (8 hours = 100%)
-        const hubstaffPercent = Math.min(
-          100,
-          Math.floor((hubstaffSeconds / (8 * 3600)) * 100),
-        );
-
-        return {
-          id: device._id,
-          pcName: device.pc_name,
-          status: isOnline ? "Active" : "Offline",
-          assigned: assignedUser,
-          assignedUserId: assignedUserId,
-          hubstaff: hubstaffDisplay,
-          hubstaffSeconds: hubstaffSeconds,
-          hubstaffPercent: hubstaffPercent,
-        };
-      }),
-    );
-
-    // Count totals
-    const total = await HVNCDevice.countDocuments();
-    const activeCount = await HVNCDevice.countDocuments({
-      last_seen: { $gt: fiveMinutesAgo },
-      status: "online",
-    });
-    const inactiveCount = total - activeCount;
-
+    const data = await adminDeviceManagementService.getAllDevices({ status });
     res.json({
-      total,
-      activeCount,
-      inactiveCount,
-      devices: deviceData,
+      total: data.total,
+      activeCount: data.activeCount,
+      inactiveCount: data.inactiveCount,
+      devices: data.devices
     });
   } catch (error) {
     console.error("Get devices error:", error);
     res.status(500).json({
       success: false,
-      error: "Failed to fetch devices",
+      error: "Failed to fetch devices"
     });
   }
 };
@@ -113,115 +30,13 @@ const getAllDevices = async (req, res) => {
 const getDeviceDetail = async (req, res) => {
   try {
     const { deviceId } = req.params;
-
-    const device = await HVNCDevice.findById(deviceId).lean();
-    if (!device) {
-      return res.status(404).json({
-        success: false,
-        error: "Device not found",
-      });
-    }
-
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-    const isOnline =
-      device.last_seen > fiveMinutesAgo && device.status === "online";
-
-    // Get assigned user
-    let assignedUser = "Unassigned";
-    let assignedUserId = null;
-    const shift = await HVNCShift.findOne({
-      device_id: device.device_id,
-      status: "active",
-      $or: [{ end_date: null }, { end_date: { $gte: new Date() } }],
-    });
-
-    if (shift) {
-      const user = await DTUser.findOne({ email: shift.user_email }).select(
-        "fullName email",
-      );
-      if (user) {
-        assignedUser = user.fullName;
-        assignedUserId = user._id.toString();
-      }
-    }
-
-    // Calculate Hubstaff data
-    const hubstaffSeconds = device.system_info?.hubstaff_seconds || 0;
-    const hubstaffHours = Math.floor(hubstaffSeconds / 3600);
-    const hubstaffMinutes = Math.floor((hubstaffSeconds % 3600) / 60);
-    const hubstaffSecondsRem = hubstaffSeconds % 60;
-    const hubstaffDisplay = `${hubstaffHours.toString().padStart(2, "0")}:${hubstaffMinutes.toString().padStart(2, "0")}:${hubstaffSecondsRem.toString().padStart(2, "0")}`;
-    const hubstaffPercent = Math.min(
-      100,
-      Math.floor((hubstaffSeconds / (8 * 3600)) * 100),
-    );
-
-    // Get current access code (or generate if none exists)
-    let accessCode = device.initial_access_code;
-    if (!accessCode) {
-      accessCode = generateAccessCode();
-      // Update device with new access code
-      await HVNCDevice.findByIdAndUpdate(deviceId, {
-        initial_access_code: accessCode,
-      });
-    }
-
-    // Format last seen
-    let lastSeen = "Never";
-    if (device.last_seen) {
-      const lastSeenMs = Date.now() - device.last_seen.getTime();
-      if (lastSeenMs < 60000) {
-        lastSeen = "Just now";
-      } else if (lastSeenMs < 3600000) {
-        const mins = Math.floor(lastSeenMs / 60000);
-        lastSeen = `${mins} min${mins > 1 ? "s" : ""} ago`;
-      } else if (lastSeenMs < 86400000) {
-        const hours = Math.floor(lastSeenMs / 3600000);
-        lastSeen = `${hours} hour${hours > 1 ? "s" : ""} ago`;
-      } else {
-        const days = Math.floor(lastSeenMs / 86400000);
-        lastSeen = `${days} day${days > 1 ? "s" : ""} ago`;
-      }
-    }
-
-    // Get recent activity for this device
-    const activities = await HVNCActivityLog.find({
-      device_id: device.device_id,
-    })
-      .sort({ timestamp: -1 })
-      .limit(10)
-      .lean();
-
-    const activityData = activities.map((activity, index) => {
-      const isActive = index === 0; // Latest activity is active
-      return {
-        id: activity._id.toString(),
-        time: formatTime(activity.timestamp),
-        event: activity.event_type
-          .replace(/_/g, " ")
-          .replace(/\b\w/g, (l) => l.toUpperCase()),
-        active: isActive,
-      };
-    });
-
-    res.json({
-      id: device._id,
-      pcName: device.pc_name,
-      status: isOnline ? "Active" : "Offline",
-      assigned: assignedUser,
-      assignedUserId: assignedUserId,
-      hubstaff: hubstaffDisplay,
-      hubstaffSeconds: hubstaffSeconds,
-      hubstaffPercent: hubstaffPercent,
-      lastSeen: lastSeen,
-      accessCode: accessCode,
-      activity: activityData,
-    });
+    const data = await adminDeviceManagementService.getDeviceDetail(deviceId);
+    res.json(data);
   } catch (error) {
     console.error("Get device detail error:", error);
-    res.status(500).json({
+    res.status(error.status || 500).json({
       success: false,
-      error: "Failed to fetch device details",
+      error: error.message || "Failed to fetch device details"
     });
   }
 };
@@ -237,81 +52,20 @@ const registerDevice = async (req, res) => {
     if (!pcName) {
       return res.status(400).json({
         success: false,
-        error: "PC name is required",
+        error: "PC name is required"
       });
     }
 
-    // Generate unique device ID
-    const deviceId = `HVNC_${Date.now()}`;
-    const accessCode = generateAccessCode();
-
-    // Get assigned user info
-    let assignedUser = "Unassigned";
-    if (assignedUserId) {
-      const user =
-        await DTUser.findById(assignedUserId).select("fullName email");
-      if (user) {
-        assignedUser = user.fullName;
-
-        // Create a shift for this user/device assignment
-        await HVNCShift.create({
-          user_email: user.email,
-          device_id: deviceId,
-          start_date: new Date(),
-          end_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
-          start_time: "00:00",
-          end_time: "23:59",
-          timezone: "UTC",
-          is_recurring: true,
-          days_of_week: [0, 1, 2, 3, 4, 5, 6],
-          status: "active",
-        });
-      }
-    }
-
-    // Create device
-    const device = await HVNCDevice.create({
-      device_id: deviceId,
-      pc_name: pcName,
-      hostname: pcName,
-      status: "offline",
-      initial_access_code: accessCode,
-      installed_at: new Date(),
-      last_seen: new Date(),
+    const data = await adminDeviceManagementService.registerDevice({
+      pcName,
+      assignedUserId
     });
-
-    // Log device registration
-    await HVNCActivityLog.logDeviceEvent(
-      deviceId,
-      "device_registered",
-      {
-        pc_name: pcName,
-        assigned_user: assignedUser,
-        access_code: accessCode,
-      },
-      {
-        ip_address: req.ip,
-        user_agent: req.headers["user-agent"],
-      },
-    );
-
-    res.json({
-      id: device._id,
-      pcName: device.pc_name,
-      status: "Offline",
-      assigned: assignedUser,
-      assignedUserId: assignedUserId,
-      hubstaff: "00:00:00",
-      hubstaffSeconds: 0,
-      hubstaffPercent: 0,
-      lastSeen: "Never",
-      accessCode: accessCode,
-    });
+    res.json(data);
   } catch (error) {
     console.error("Register device error:", error);
     res.status(500).json({
       success: false,
-      error: "Failed to register device",
+      error: "Failed to register device"
     });
   }
 };
@@ -324,62 +78,16 @@ const updateDevice = async (req, res) => {
   try {
     const { deviceId } = req.params;
     const { assignedUserId, pcName } = req.body;
-
-    const device = await HVNCDevice.findById(deviceId);
-    if (!device) {
-      return res.status(404).json({
-        success: false,
-        error: "Device not found",
-      });
-    }
-
-    // Update device name if provided
-    if (pcName) {
-      device.pc_name = pcName;
-      device.hostname = pcName;
-    }
-
-    // Handle user assignment
-    if (assignedUserId) {
-      // Use only DTUser model
-      const user =
-        await DTUser.findById(assignedUserId).select("fullName email");
-
-      if (!user) {
-        return res.status(404).json({
-          success: false,
-          error: "User not found in DT users",
-        });
-      }
-
-      // Remove existing shifts for this device
-      await HVNCShift.deleteMany({ device_id: device.device_id });
-
-      // Create new shift for assigned user
-      await HVNCShift.create({
-        user_email: user.email,
-        device_id: device.device_id,
-        start_date: new Date(),
-        end_date: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
-        start_time: "00:00",
-        end_time: "23:59",
-        timezone: "UTC",
-        is_recurring: true,
-        days_of_week: [0, 1, 2, 3, 4, 5, 6],
-        status: "active",
-      });
-    }
-
-    await device.save();
-
-    // Return updated device detail
-    const deviceDetail = await getDeviceDetailById(deviceId);
-    res.json(deviceDetail);
+    const data = await adminDeviceManagementService.updateDevice(deviceId, {
+      assignedUserId,
+      pcName
+    });
+    res.json(data);
   } catch (error) {
     console.error("Update device error:", error);
-    res.status(500).json({
+    res.status(error.status || 500).json({
       success: false,
-      error: "Failed to update device",
+      error: error.message || "Failed to update device"
     });
   }
 };
@@ -391,53 +99,16 @@ const updateDevice = async (req, res) => {
 const deleteDevice = async (req, res) => {
   try {
     const { deviceId } = req.params;
-
-    const device = await HVNCDevice.findById(deviceId);
-    if (!device) {
-      return res.status(404).json({
-        success: false,
-        error: "Device not found",
-      });
-    }
-
-    // End any active sessions
-    await HVNCSession.updateMany(
-      { device_id: device.device_id, status: { $in: ["active", "idle"] } },
-      {
-        status: "terminated",
-        ended_at: new Date(),
-        termination_reason: "device_removed",
-      },
-    );
-
-    // Remove shifts
-    await HVNCShift.deleteMany({ device_id: device.device_id });
-
-    // Log device removal
-    await HVNCActivityLog.logDeviceEvent(
-      device.device_id,
-      "device_removed",
-      {
-        pc_name: device.pc_name,
-      },
-      {
-        ip_address: req.ip,
-        user_agent: req.headers["user-agent"],
-      },
-    );
-
-    // Remove device
-    await HVNCDevice.findByIdAndDelete(deviceId);
-
+    await adminDeviceManagementService.deleteDevice(deviceId);
     res.json({
       success: true,
-      message: "Device removed successfully.",
+      message: "Device removed successfully."
     });
   } catch (error) {
     console.error("Delete device error:", error);
-    res.status(500).json({
+    res.status(error.status || 500).json({
       success: false,
-      error: "Failed to remove device",
+      error: error.message || "Failed to remove device"
     });
   }
 };
@@ -449,49 +120,13 @@ const deleteDevice = async (req, res) => {
 const generateNewAccessCode = async (req, res) => {
   try {
     const { deviceId } = req.params;
-
-    const device = await HVNCDevice.findById(deviceId);
-    if (!device) {
-      return res.status(404).json({
-        success: false,
-        error: "Device not found",
-      });
-    }
-
-    const newAccessCode = generateAccessCode();
-    const generatedAt = new Date();
-
-    // Update device access code
-    device.initial_access_code = newAccessCode;
-    await device.save();
-
-    // Invalidate any Redis-stored codes for this device
-    const hvncVerificationStore = require("../utils/hvncVerificationStore");
-    await hvncVerificationStore.removeAllCodesForDevice(device.device_id);
-
-    // Log access code generation
-    await HVNCActivityLog.logDeviceEvent(
-      device.device_id,
-      "access_code_generated",
-      {
-        new_code: newAccessCode,
-        generated_by: req.admin?.email || "admin",
-      },
-      {
-        ip_address: req.ip,
-        user_agent: req.headers["user-agent"],
-      },
-    );
-
-    res.json({
-      accessCode: newAccessCode,
-      generatedAt: generatedAt.toISOString(),
-    });
+    const data = await adminDeviceManagementService.generateNewAccessCode(deviceId);
+    res.json(data);
   } catch (error) {
     console.error("Generate access code error:", error);
-    res.status(500).json({
+    res.status(error.status || 500).json({
       success: false,
-      error: "Failed to generate new access code",
+      error: error.message || "Failed to generate new access code"
     });
   }
 };
@@ -503,104 +138,22 @@ const generateNewAccessCode = async (req, res) => {
 const startHubstaffTimer = async (req, res) => {
   try {
     const { deviceId } = req.params;
-    const { projectId, taskName } = req.body; // Optional parameters
-
-    const device = await HVNCDevice.findById(deviceId);
-    if (!device) {
-      return res.status(404).json({
-        success: false,
-        error: "Device not found",
-      });
-    }
-
-    // Send WebSocket command to PC Agent first
-    const HVNCCommand = require("../models/hvnc-command.model");
-    const {
-      sendCommandToDeviceAndWait,
-    } = require("../services/hvnc-websocket.service");
-
-    let commandResponse = null;
-    try {
-      // Create command for PC Agent
-      const command = await HVNCCommand.createCommand({
-        device_id: device.device_id,
-        session_id: `admin_hubstaff_${req.admin?._id || "unknown"}`,
-        user_email: req.admin?.email || "admin",
-        type: "hubstaff",
-        action: "hubstaff_start",
-        parameters: { projectId, taskName },
-        priority: "high",
-        timeout_seconds: 30,
-        metadata: {
-          source: "admin_dashboard",
-          admin_user: req.admin?.email || "admin",
-          action_type: "hubstaff_control",
-        },
-      });
-
-      // Send to PC Agent via WebSocket and wait for response
-      console.log(
-        `🚀 Sending Hubstaff start command to device: ${device.device_id}`,
-      );
-      commandResponse = await sendCommandToDeviceAndWait(
-        device.device_id,
-        command,
-        30000,
-      );
-      console.log(`✅ Hubstaff start confirmed by device: ${device.device_id}`);
-    } catch (wsError) {
-      console.error(
-        "❌ Failed to send WebSocket command or get response:",
-        wsError.message,
-      );
-      return res.status(500).json({
-        success: false,
-        error: "Failed to communicate with PC Agent",
-        message: wsError.message,
-        deviceStatus: "Device may be offline or unresponsive",
-      });
-    }
-
-    const startedAt = new Date();
-
-    // Update device Hubstaff status in database
-    if (!device.system_info) {
-      device.system_info = {};
-    }
-    device.system_info.hubstaff_running = true;
-    device.system_info.hubstaff_started_at = startedAt;
-    await device.save();
-
-    // Log Hubstaff start
-    await HVNCActivityLog.logDeviceEvent(
-      device.device_id,
-      "hubstaff_timer_started",
-      {
-        started_by: req.admin?.email || "admin",
-        projectId,
-        taskName,
-      },
-      {
-        ip_address: req.ip,
-        user_agent: req.headers["user-agent"],
-      },
-    );
-
-    res.json({
-      success: true,
-      deviceId: device._id,
-      hubstaffRunning: true,
-      startedAt: startedAt.toISOString(),
-      commandSent: true,
-      pcAgentResponse: commandResponse,
-      parameters: { projectId, taskName },
-      message: "Hubstaff timer started successfully on PC Agent",
+    const { projectId, taskName } = req.body;
+    const data = await adminDeviceManagementService.startHubstaffTimer(deviceId, {
+      projectId,
+      taskName,
+      ip: req.ip,
+      userAgent: req.headers["user-agent"],
+      adminEmail: req.admin?.email || "admin"
     });
+    res.json(data);
   } catch (error) {
     console.error("Start Hubstaff timer error:", error);
-    res.status(500).json({
+    res.status(error.status || 500).json({
       success: false,
-      error: "Failed to start Hubstaff timer",
+      error: error.message || "Failed to start Hubstaff timer",
+      message: error.message,
+      deviceStatus: error.deviceStatus
     });
   }
 };
@@ -612,208 +165,22 @@ const startHubstaffTimer = async (req, res) => {
 const pauseHubstaffTimer = async (req, res) => {
   try {
     const { deviceId } = req.params;
-
-    const device = await HVNCDevice.findById(deviceId);
-    if (!device) {
-      return res.status(404).json({
-        success: false,
-        error: "Device not found",
-      });
-    }
-
-    // Send WebSocket command to PC Agent first
-    const HVNCCommand = require("../models/hvnc-command.model");
-    const {
-      sendCommandToDeviceAndWait,
-    } = require("../services/hvnc-websocket.service");
-
-    let commandResponse = null;
-    try {
-      // Create command for PC Agent
-      const command = await HVNCCommand.createCommand({
-        device_id: device.device_id,
-        session_id: `admin_hubstaff_${req.admin?._id || "unknown"}`,
-        user_email: req.admin?.email || "admin",
-        type: "hubstaff",
-        action: "hubstaff_pause",
-        parameters: {},
-        priority: "high",
-        timeout_seconds: 30,
-        metadata: {
-          source: "admin_dashboard",
-          admin_user: req.admin?.email || "admin",
-          action_type: "hubstaff_control",
-        },
-      });
-
-      // Send to PC Agent via WebSocket and wait for response
-      console.log(
-        `⏸️ Sending Hubstaff pause command to device: ${device.device_id}`,
-      );
-      commandResponse = await sendCommandToDeviceAndWait(
-        device.device_id,
-        command,
-        30000,
-      );
-      console.log(`✅ Hubstaff pause confirmed by device: ${device.device_id}`);
-    } catch (wsError) {
-      console.error(
-        "❌ Failed to send WebSocket command or get response:",
-        wsError.message,
-      );
-      return res.status(500).json({
-        success: false,
-        error: "Failed to communicate with PC Agent",
-        message: wsError.message,
-        deviceStatus: "Device may be offline or unresponsive",
-      });
-    }
-
-    const pausedAt = new Date();
-    let elapsed = "00:00:00";
-
-    // Calculate elapsed time if timer was running
-    if (
-      device.system_info?.hubstaff_running &&
-      device.system_info?.hubstaff_started_at
-    ) {
-      const elapsedMs =
-        pausedAt - new Date(device.system_info.hubstaff_started_at);
-      const elapsedSeconds = Math.floor(elapsedMs / 1000);
-      const hours = Math.floor(elapsedSeconds / 3600);
-      const minutes = Math.floor((elapsedSeconds % 3600) / 60);
-      const seconds = elapsedSeconds % 60;
-      elapsed = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
-
-      // Update total seconds
-      const currentTotal = device.system_info.hubstaff_seconds || 0;
-      device.system_info.hubstaff_seconds = currentTotal + elapsedSeconds;
-    }
-
-    // Update device Hubstaff status
-    device.system_info = device.system_info || {};
-    device.system_info.hubstaff_running = false;
-    device.system_info.hubstaff_paused_at = pausedAt;
-    delete device.system_info.hubstaff_started_at;
-    await device.save();
-
-    // Log Hubstaff pause
-    await HVNCActivityLog.logDeviceEvent(
-      device.device_id,
-      "hubstaff_timer_paused",
-      {
-        paused_by: req.admin?.email || "admin",
-        elapsed_time: elapsed,
-      },
-      {
-        ip_address: req.ip,
-        user_agent: req.headers["user-agent"],
-      },
-    );
-
-    res.json({
-      success: true,
-      deviceId: device._id,
-      hubstaffRunning: false,
-      pausedAt: pausedAt.toISOString(),
-      elapsedTime: elapsed,
-      commandSent: true,
-      pcAgentResponse: commandResponse,
-      message: "Hubstaff timer paused successfully on PC Agent",
+    const data = await adminDeviceManagementService.pauseHubstaffTimer(deviceId, {
+      ip: req.ip,
+      userAgent: req.headers["user-agent"],
+      adminEmail: req.admin?.email || "admin"
     });
+    res.json(data);
   } catch (error) {
     console.error("Pause Hubstaff timer error:", error);
-    res.status(500).json({
+    res.status(error.status || 500).json({
       success: false,
-      error: "Failed to pause Hubstaff timer",
+      error: error.message || "Failed to pause Hubstaff timer",
+      message: error.message,
+      deviceStatus: error.deviceStatus
     });
   }
 };
-//     }, {
-//       ip_address: req.ip,
-//       user_agent: req.headers['user-agent']
-//     });
-
-//     res.json({
-//       deviceId: device._id,
-//       hubstaffRunning: false,
-//       pausedAt: pausedAt.toISOString(),
-//       elapsed: elapsed
-//     });
-
-//   } catch (error) {
-//     console.error('Pause Hubstaff timer error:', error);
-//     res.status(500).json({
-//       success: false,
-//       error: 'Failed to pause Hubstaff timer'
-//     });
-//   }
-// };
-
-/**
- * Helper functions
- */
-function generateAccessCode() {
-  return crypto.randomBytes(4).toString("hex").toUpperCase();
-}
-
-function formatTime(timestamp) {
-  return new Date(timestamp).toLocaleTimeString("en-US", {
-    hour12: false,
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-async function getDeviceDetailById(deviceId) {
-  const device = await HVNCDevice.findById(deviceId).lean();
-  if (!device) return null;
-
-  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-  const isOnline =
-    device.last_seen > fiveMinutesAgo && device.status === "online";
-
-  // Get assigned user
-  let assignedUser = "Unassigned";
-  let assignedUserId = null;
-  const shift = await HVNCShift.findOne({
-    device_id: device.device_id,
-    status: "active",
-    $or: [{ end_date: null }, { end_date: { $gte: new Date() } }],
-  });
-
-  if (shift) {
-    const user = await DTUser.findOne({ email: shift.user_email }).select(
-      "fullName email",
-    );
-    if (user) {
-      assignedUser = user.fullName;
-      assignedUserId = user._id.toString();
-    }
-  }
-
-  // Calculate Hubstaff data
-  const hubstaffSeconds = device.system_info?.hubstaff_seconds || 0;
-  const hubstaffHours = Math.floor(hubstaffSeconds / 3600);
-  const hubstaffMinutes = Math.floor((hubstaffSeconds % 3600) / 60);
-  const hubstaffSecondsRem = hubstaffSeconds % 60;
-  const hubstaffDisplay = `${hubstaffHours.toString().padStart(2, "0")}:${hubstaffMinutes.toString().padStart(2, "0")}:${hubstaffSecondsRem.toString().padStart(2, "0")}`;
-  const hubstaffPercent = Math.min(
-    100,
-    Math.floor((hubstaffSeconds / (8 * 3600)) * 100),
-  );
-
-  return {
-    id: device._id,
-    pcName: device.pc_name,
-    status: isOnline ? "Active" : "Offline",
-    assigned: assignedUser,
-    assignedUserId: assignedUserId,
-    hubstaff: hubstaffDisplay,
-    hubstaffSeconds: hubstaffSeconds,
-    hubstaffPercent: hubstaffPercent,
-  };
-}
 
 module.exports = {
   getAllDevices,
@@ -823,5 +190,5 @@ module.exports = {
   deleteDevice,
   generateNewAccessCode,
   startHubstaffTimer,
-  pauseHubstaffTimer,
+  pauseHubstaffTimer
 };

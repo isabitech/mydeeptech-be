@@ -352,11 +352,7 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
       const adminEmail = envConfig.email.ADMIN_EMAIL || process.env.ADMIN_EMAIL || 'admin@mydeeptech.com';
       const approvalUrl = bulkTransferResponse.data?.approval_url;
       
-      if (approvalUrl) {
-        // Send approval required notification to admin
-        console.log(`Sending approval required notification to admin: ${adminEmail}`);
-        // You could create a new email template for approval notifications
-      }
+      // if (approvalUrl) {}
 
       return ResponseClass.Success(res, {
         message: `Transfer submitted but requires manual approval. ${pendingInvoices.length} invoices pending approval.`,
@@ -396,9 +392,6 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
       });
     }
 
-    // If no approval required, process immediately as before
-    console.log('Transfer approved automatically, processing payments...');
-
     // Mark invoices as paid and send email notifications immediately 
     // (when no approval is required)
     const processedInvoices = [];
@@ -437,8 +430,6 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
         };
 
         await invoice.save();
-
-        console.log(`Invoice ${invoice.invoiceNumber} marked as paid immediately`);
 
         // Send payment confirmation email to recipient immediately
         const paymentData = {
@@ -535,10 +526,7 @@ const initializeBulkTransferWithInvoices = async (req, res) => {
         });
       }
     }
-
-    console.log(`🔄 Bulk transfer completed - ${processedInvoices.length} invoices processed`);
-    console.log(`📧 Email notifications: ${emailResults.filter(e => e.status === 'sent').length} sent, ${emailResults.filter(e => e.status === 'failed').length} failed`);
-    
+ 
     const successfulTransfers = processedInvoices.filter(inv => inv.status === 'completed').length;
     const failedTransfers = processedInvoices.filter(inv => inv.status === 'error').length;
     const sentEmails = emailResults.filter(e => e.status === 'sent').length;
@@ -595,8 +583,6 @@ const completeApprovedTransfers = async (req, res) => {
   try {
     const { batchId } = req.params;
     
-    console.log(`🔄 Processing approved transfers for batch: ${batchId}`);
-    
     // Find all invoices with approval_required status for this batch
     const pendingInvoices = await Invoice.find({
       'paymentMetadata.batchId': batchId,
@@ -635,8 +621,6 @@ const completeApprovedTransfers = async (req, res) => {
         };
         await invoice.save();
 
-        console.log(`✅ Invoice ${invoice.invoiceNumber} marked as paid after approval`);
-
         // Send payment confirmation email to recipient
         const paymentData = {
           invoiceNumber: invoice.invoiceNumber,
@@ -659,7 +643,6 @@ const completeApprovedTransfers = async (req, res) => {
               recipientName || 'Recipient',
               paymentData
             );
-            console.log(`📧 ✅ Payment confirmation sent for invoice ${invoice.invoiceNumber}`);
             emailResults.push({
               invoiceNumber: invoice.invoiceNumber,
               recipientEmail,
@@ -691,7 +674,6 @@ const completeApprovedTransfers = async (req, res) => {
             'Administrator',
             adminNotificationData
           );
-          console.log(`📧 ✅ Admin notification sent for invoice ${invoice.invoiceNumber}`);
         } catch (adminEmailError) {
           console.error(`❌ Failed to send admin notification for invoice ${invoice.invoiceNumber}:`, adminEmailError);
         }
@@ -722,7 +704,7 @@ const completeApprovedTransfers = async (req, res) => {
     const sentEmails = emailResults.filter(e => e.status === 'sent').length;
 
     return ResponseClass.Success(res, {
-      message: `✅ ${successfulTransfers} approved transfers completed. Email notifications sent to ${sentEmails} recipients.`,
+      message: `${successfulTransfers} approved transfers completed. Email notifications sent to ${sentEmails} recipients.`,
       data: {
         batchId,
         processedInvoices,
@@ -828,24 +810,6 @@ const VerifyAccountNumber = async (req, res) => {
             });
         }
 
-        // Validate account number format (should be 10 digits for Nigerian banks)
-        // if (!/^\d{10}$/.test(accountNumber)) {
-        //     return ResponseClass.Error(res, {
-        //         message: "Invalid account number format. Account number should be 10 digits",
-        //         statusCode: 400,
-        //         data: { accountNumber }
-        //     });
-        // }
-
-        // Validate bank code format (should be 3 digits)
-        // if (!/^\d{3}$/.test(bankCode)) {
-        //     return ResponseClass.Error(res, {
-        //         message: "Invalid bank code format. Bank code should be 3 digits",
-        //         statusCode: 400,
-        //         data: { bankCode }
-        //     });
-        // }
-
         const paystackSecretKey = envConfig.paystack.PAYSTACK_SECRET_KEY;
 
         if (!paystackSecretKey) {
@@ -858,8 +822,6 @@ const VerifyAccountNumber = async (req, res) => {
 
         const paystackUrl = `${envConfig.paystack.PAYSTACK_BASE_URL}/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`;
         
-        console.log(`🔍 Verifying account: ${accountNumber} with bank code: ${bankCode}`);
-
         const response = await axios.get(paystackUrl, {
             headers: {
                 'Authorization': `Bearer ${paystackSecretKey}`,
@@ -1005,8 +967,6 @@ const getAllBanksByCountryInAfrica = async (req, res) => {
         // Build the complete Paystack URL
         const paystackUrl = `${envConfig.paystack.PAYSTACK_BASE_URL}/bank${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
         
-        console.log(`🔍 Fetching banks from: ${paystackUrl}`);
-
         // Make API call to Paystack
         const response = await axios.get(paystackUrl, {
             headers: {
@@ -1019,8 +979,6 @@ const getAllBanksByCountryInAfrica = async (req, res) => {
         if (response.data && response.data.status === true) {
             const banksData = response.data.data;
             const meta = response.data.meta;
-            
-            console.log(`✅ Successfully fetched ${Array.isArray(banksData) ? banksData.length : 0} banks`);
             
             // Transform the data to include useful information
             const transformedBanks = Array.isArray(banksData) ? banksData.map(bank => ({
@@ -1085,7 +1043,7 @@ const getAllBanksByCountryInAfrica = async (req, res) => {
         }
 
     } catch (error) {
-        console.error('❌ Error fetching banks:', error);
+        console.error('❌ Error fetching banks:', error?.message || error);
 
         // Handle specific Paystack API errors
         if (error.response && error.response.data) {
