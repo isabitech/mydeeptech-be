@@ -1,18 +1,8 @@
 const express = require("express");
-const userController = require("../controllers/user.js");
-const dtUserController = require("../controllers/dtUser.controller.js");
+const AuthController = require("../controllers/auth.controller.js");
+const AdminController = require("../controllers/admin.controller.js");
 const annotationProjectController = require("../controllers/annotationProject.controller.js");
-const {
-  createInvoice,
-  getAllInvoices,
-  getInvoiceDetails,
-  updatePaymentStatus,
-  sendInvoiceReminder,
-  deleteInvoice,
-  bulkAuthorizePayment,
-  generatePaystackCSV,
-  generateMPESACSV,
-} = require("../controllers/invoice.controller.js");
+const InvoiceController = require("../controllers/invoice.controller.js");
 const notificationController = require("../controllers/notification.controller.js");
 const assessmentController = require("../controllers/assessment.controller.js");
 const {
@@ -22,7 +12,6 @@ const {
   updateVideoReel,
   deleteVideoReel,
   bulkAddVideoReels,
-  getVideoReelAnalytics,
 } = require("../controllers/videoReel.controller.js");
 const {
   createAssessmentConfig,
@@ -38,73 +27,56 @@ const { authenticateAdmin } = require("../middleware/adminAuth.js");
 const router = express.Router();
 
 // Admin Authentication
-router.post("/login", dtUserController.adminLogin);
-router.post("/register", dtUserController.createAdmin);
+router.post("/login", AdminController.adminLogin);
+router.post("/register", AdminController.createAdmin);
 
 // Admin Creation Routes - Two-step process with email verification
-router.post("/create/request", dtUserController.requestAdminVerification);
-router.post("/create/confirm", dtUserController.confirmAdminVerification);
+router.post("/create/request", AdminController.requestAdminVerification);
+router.post("/create/confirm", AdminController.confirmAdminVerification);
 
 // Admin OTP Verification Route
-router.post("/verify-otp", dtUserController.verifyAdminOTP);
+router.post("/verify-otp", AdminController.verifyAdminOTP);
 
 // Legacy admin creation route
-router.post("/create", dtUserController.createAdmin);
+router.post("/create", AdminController.createAdmin);
 
 // Admin Routes - All require admin authentication
-router.get("/dashboard", authenticateAdmin, dtUserController.getAdminDashboard);
-router.get("/dtusers", authenticateAdmin, dtUserController.getAllDTUsers);
-router.get(
-  "/admin-users",
-  authenticateAdmin,
-  dtUserController.getAllAdminUsers,
-);
+router.get("/dashboard", authenticateAdmin, AdminController.getAdminDashboard);
+router.get("/dtusers", authenticateAdmin, AdminController.getAllDTUsers);
+router.get("/admin-users", authenticateAdmin, AdminController.getAllAdminUsers);
 router.get(
   "/dtusers/:userId",
   authenticateAdmin,
-  dtUserController.getDTUserAdmin,
+  AdminController.getDTUserAdmin,
 );
 router.patch(
   "/dtusers/:userId/approve",
   authenticateAdmin,
-  dtUserController.approveAnnotator,
+  AdminController.approveAnnotator,
 );
 router.patch(
   "/dtusers/:userId/qa-approve",
   authenticateAdmin,
-  dtUserController.approveUserForQA,
+  AdminController.approveUserForQA,
 );
 router.patch(
   "/dtusers/:userId/qa-reject",
   authenticateAdmin,
-  dtUserController.rejectUserForQA,
+  AdminController.rejectUserForQA,
 );
-router.get("/qa-users", authenticateAdmin, dtUserController.getAllQAUsers);
+router.get("/qa-users", authenticateAdmin, AdminController.getAllQAUsers);
 router.patch(
   "/dtusers/:userId/reject",
   authenticateAdmin,
-  dtUserController.rejectAnnotator,
+  AdminController.rejectAnnotator,
 );
 
 // Bulk Email Management Routes
 router.post(
   "/dtusers/send-verification-emails",
   authenticateAdmin,
-  dtUserController.sendVerificationEmailsToUnverifiedUsers,
+  AuthController.sendVerificationEmailsToUnverifiedUsers,
 );
-
-// User Role Management Routes
-router.put(
-  "/users/:userId/role",
-  authenticateAdmin,
-  dtUserController.updateUserRole,
-);
-router.get(
-  "/users/all",
-  authenticateAdmin,
-  dtUserController.getAllUsersForRoleManagement,
-);
-router.get("/roles", authenticateAdmin, userController.getRoles);
 
 // Project Management Routes
 router.post(
@@ -229,31 +201,31 @@ router.get(
 );
 
 // Invoice Management Routes
-router.post("/invoices", authenticateAdmin, createInvoice);
-router.get("/invoices", authenticateAdmin, getAllInvoices);
+router.post("/invoices", authenticateAdmin,InvoiceController.createInvoice);
+router.get("/invoices", authenticateAdmin, InvoiceController.getAllInvoices);
 router.post(
   "/invoices/bulk-authorize-payment",
   authenticateAdmin,
-  bulkAuthorizePayment,
+  InvoiceController.bulkAuthorizePayment,
 );
 router.get(
   "/invoices/generate-paystack-csv",
   authenticateAdmin,
-  generatePaystackCSV,
+  InvoiceController.generatePaystackCSV,
 );
-router.get("/invoices/generate-mpesa-csv", authenticateAdmin, generateMPESACSV);
-router.get("/invoices/:invoiceId", authenticateAdmin, getInvoiceDetails);
+router.get("/invoices/generate-mpesa-csv", authenticateAdmin, InvoiceController.generateMPESACSV);
+router.get("/invoices/:invoiceId", authenticateAdmin, InvoiceController.getInvoiceDetails);
 router.patch(
   "/invoices/:invoiceId/payment-status",
   authenticateAdmin,
-  updatePaymentStatus,
+  InvoiceController.updatePaymentStatus,
 );
 router.post(
   "/invoices/:invoiceId/send-reminder",
   authenticateAdmin,
-  sendInvoiceReminder,
+  InvoiceController.sendInvoiceReminder,
 );
-router.delete("/invoices/:invoiceId", authenticateAdmin, deleteInvoice);
+router.delete("/invoices/:invoiceId", authenticateAdmin, InvoiceController.deleteInvoice);
 
 // Notification Management Routes
 router.get(

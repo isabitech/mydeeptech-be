@@ -4,6 +4,9 @@ const projectController = require("../controllers/project.js");
 const taskController = require("../controllers/task.js");
 const { validateVisitor } = require("../controllers/validateuser.js");
 const dtUserController = require("../controllers/dtUser.controller.js");
+const AuthController = require("../controllers/auth.controller.js");
+const ProfileController = require("../controllers/profile.controller.js");
+const InvoiceController = require("../controllers/invoice.controller.js");
 const {
   authenticateToken,
   authorizeProfileAccess,
@@ -43,8 +46,16 @@ router.post("/login", rateLimiters.auth, userController.login);
 // ======================
 
 // Regular User Password Reset (with auth rate limiting)
-router.post("/forgot-password", rateLimiters.auth, passwordResetController.forgotPassword);
-router.post("/reset-password", rateLimiters.auth, passwordResetController.resetPassword);
+router.post(
+  "/forgot-password",
+  rateLimiters.auth,
+  passwordResetController.forgotPassword,
+);
+router.post(
+  "/reset-password",
+  rateLimiters.auth,
+  passwordResetController.resetPassword,
+);
 
 // DTUser Password Reset (with auth rate limiting)
 router.post(
@@ -85,50 +96,50 @@ router.post("/emailValidation", validateVisitor);
 router.post(
   "/createDTuser",
   validateRequest({ body: signupSchema }),
-  dtUserController.createDTUser,
+  AuthController.createDTUser,
 );
 router.get(
   "/verifyDTusermail/:id",
   validateRequest({ params: idSchema, query: resendVerificationEmailSchema }),
-  dtUserController.verifyEmail,
+  AuthController.verifyEmail,
 );
 router.post(
   "/setupPassword",
   rateLimiters.auth,
   validateRequest({ body: dtUserPasswordSchema }),
-  dtUserController.setupPassword,
+  AuthController.setupPassword,
 );
 router.post(
   "/dtUserLogin",
   rateLimiters.auth,
   validateRequest({ body: loginSchema }),
-  dtUserController.dtUserLogin,
+  AuthController.dtUserLogin,
 );
-router.get("/me", authenticateToken, dtUserController.me);
+router.get("/me", authenticateToken, AuthController.me);
 router.post(
   "/resendVerificationEmail",
   validateRequest({ body: resendVerificationEmailSchema }),
-  dtUserController.resendVerificationEmail,
+  AuthController.resendVerificationEmail,
 );
 router.get(
   "/dtUserProfile/:userId",
   authenticateToken,
   authorizeProfileAccess,
   validateRequest({ params: idSchema }),
-  dtUserController.getDTUserProfile,
+  ProfileController.getDTUserProfile,
 );
 router.patch(
   "/dtUserProfile/:userId",
   authenticateToken,
   authorizeProfileAccess,
   validateRequest({ params: idSchema, body: dtUserProfileUpdateSchema }),
-  dtUserController.updateDTUserProfile,
+  ProfileController.updateDTUserProfile,
 );
 router.patch(
   "/dtUserResetPassword",
   authenticateToken,
   validateRequest({ body: dtUserPasswordResetSchema }),
-  dtUserController.resetDTUserPassword,
+  AuthController.resetDTUserPassword,
 );
 
 // Project routes for DTUsers (approved annotators only)
@@ -155,38 +166,38 @@ router.get(
 );
 
 // DTUser Invoice Routes
-router.get("/invoices", authenticateToken, dtUserController.getUserInvoices);
+router.get("/invoices", authenticateToken, InvoiceController.getUserInvoices);
 router.get(
   "/invoices/unpaid",
   authenticateToken,
-  dtUserController.getUnpaidInvoices,
+  InvoiceController.getUnpaidInvoices,
 );
 router.get(
   "/invoices/paid",
   authenticateToken,
-  dtUserController.getPaidInvoices,
+  InvoiceController.getPaidInvoices,
 );
 router.get(
   "/invoices/dashboard",
   authenticateToken,
-  dtUserController.getInvoiceDashboard,
+  InvoiceController.getInvoiceDashboard,
 );
 router.get(
   "/invoices/:invoiceId",
   authenticateToken,
-  dtUserController.getInvoiceDetails,
+  InvoiceController.getInvoiceDetails,
 );
 
 // SOP (Standard Operating Procedure) Routes
 router.get(
   "/sop-acceptance/status",
   authenticateToken,
-  dtUserController.getSopAcceptanceStatus,
+  ProfileController.getSopAcceptanceStatus,
 );
 router.post(
   "/sop-acceptance",
   authenticateToken,
-  dtUserController.recordSopAcceptance,
+  ProfileController.recordSopAcceptance,
 );
 
 // DTUser Dashboard Route - Personal overview for authenticated DTUsers
@@ -309,7 +320,7 @@ router.post(
       next();
     });
   },
-  dtUserController.uploadIdDocument,
+  ProfileController.uploadIdDocument,
 );
 
 // Upload Resume Route - adds to profile information
@@ -361,7 +372,7 @@ router.post(
       next();
     });
   },
-  dtUserController.uploadResume,
+  ProfileController.uploadResume,
 );
 
 // Debug endpoint to test file upload (temporary)
