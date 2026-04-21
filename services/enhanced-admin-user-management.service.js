@@ -13,37 +13,84 @@ const HVNCSessionRepository = require("../repositories/hvnc-session.repository")
 const HVNCActivityLogRepository = require("../repositories/hvnc-activity-log.repository");
 
 class EnhancedAdminUserManagementService {
+  toInt(value, fallback) {
+    const parsed = parseInt(value, 10);
+    return Number.isNaN(parsed) ? fallback : parsed;
+  }
+
+  buildPagination({ page, limit, total }) {
+    return {
+      currentPage: page,
+      totalPages: Math.ceil(total / limit),
+      totalUsers: total,
+      usersPerPage: limit,
+    };
+  }
+
+  buildStatusQuery(status) {
+    const query = {};
+
+    if (status) {
+      if (status === "active") {
+        query.is_account_locked = false;
+        query.isEmailVerified = true;
+      } else if (status === "locked") {
+        query.is_account_locked = true;
+      } else if (status === "unverified") {
+        query.isEmailVerified = false;
+      }
+    }
+
+    return query;
+  }
+
+  buildUserSearchQuery(search) {
+    if (!search) {
+      return {};
+    }
+
+    return {
+      $or: [
+        { fullName: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
+      ],
+    };
+  }
+
+  buildUserStatus(user) {
+    if (user.is_account_locked) return "locked";
+    if (!user.isEmailVerified) return "unverified";
+    if (!user.hasSetPassword) return "incomplete";
+    return "active";
+  }
+
+  async getShiftDeviceName(shift) {
+    try {
+      const device = await HVNCDeviceRepository.findOne({
+        device_id: shift.device_id,
+      });
+
+      return device?.pc_name || "Unknown";
+    } catch (err) {
+      return "Unknown";
+    }
+  }
+
   /**
    * Get all DTUsers with enhanced device assignment info
    * @param {Object} filters - Filter options
    * @returns {Promise<Object>} Users data
    */
   async getAllUsers(filters = {}) {
-    let query = {};
-
-    if (filters.status) {
-      if (filters.status === "active") {
-        query.is_account_locked = false;
-        query.isEmailVerified = true;
-      } else if (filters.status === "locked") {
-        query.is_account_locked = true;
-      } else if (filters.status === "unverified") {
-        query.isEmailVerified = false;
-      }
-    }
-
+    let query = this.buildStatusQuery(filters.status);
     if (filters.role) {
       query.role = filters.role;
     }
 
-    if (filters.search) {
-      query.$or = [
-        { fullName: { $regex: filters.search, $options: "i" } },
-        { email: { $regex: filters.search, $options: "i" } },
-      ];
-    }
+    Object.assign(query, this.buildUserSearchQuery(filters.search));
 
-    const { page = 1, limit = 20 } = filters;
+    const page = this.toInt(filters.page, 1);
+    const limit = this.toInt(filters.limit, 20);
     const skip = (page - 1) * limit;
 
     const users = await DTUserRepository.find(query);
@@ -71,12 +118,7 @@ class EnhancedAdminUserManagementService {
 
     return {
       users: filteredUserData,
-      pagination: {
-        currentPage: parseInt(page),
-        totalPages: Math.ceil(total / parseInt(limit)),
-        totalUsers: total,
-        usersPerPage: parseInt(limit),
-      },
+      pagination: this.buildPagination({ page, limit, total }),
       summary: {
         total,
         activeCount,
@@ -99,42 +141,26 @@ class EnhancedAdminUserManagementService {
       throw { status: 404, message: "User not found" };
     }
 
-    const shifts = await HVNCShiftRepository.find({
-      user_email: user.email,
-    });
+    const [shifts, sessions, activities] = await Promise.all([
+      HVNCShiftRepository.find({ user_email: user.email }),
+      HVNCSessionRepository.find({ user_email: user.email }),
+      HVNCActivityLogRepository.find({ user_email: user.email }),
+    ]);
 
     const shiftsWithDevices = await Promise.all(
-      shifts.map(async (shift) => {
-        try {
-          const device = await HVNCDeviceRepository.findOne({
-            device_id: shift.device_id,
-          });
-          return {
-            id: shift._id,
-            deviceId: shift.device_id,
-            deviceName: device?.pc_name || "Unknown",
-            startDate: shift.start_date,
-            endDate: shift.end_date,
-            startTime: shift.start_time,
-            endTime: shift.end_time,
-            status: shift.status,
-            isRecurring: shift.is_recurring,
-            timezone: shift.timezone,
-          };
-        } catch (err) {
-          return {
-            id: shift._id,
-            deviceId: shift.device_id,
-            deviceName: "Unknown",
-            status: shift.status,
-          };
-        }
-      }),
+      shifts.map(async (shift) => ({
+        id: shift._id,
+        deviceId: shift.device_id,
+        deviceName: await this.getShiftDeviceName(shift),
+        startDate: shift.start_date,
+        endDate: shift.end_date,
+        startTime: shift.start_time,
+        endTime: shift.end_time,
+        status: shift.status,
+        isRecurring: shift.is_recurring,
+        timezone: shift.timezone,
+      })),
     );
-
-    const sessions = await HVNCSessionRepository.find({
-      user_email: user.email,
-    });
 
     const sessionData = sessions
       .sort((a, b) => new Date(b.started_at) - new Date(a.started_at))
@@ -148,10 +174,6 @@ class EnhancedAdminUserManagementService {
         duration: this._calculateDuration(session.started_at, session.ended_at),
       }));
 
-    const activities = await HVNCActivityLogRepository.find({
-      user_email: user.email,
-    });
-
     return {
       user: {
         id: user._id,
@@ -159,13 +181,7 @@ class EnhancedAdminUserManagementService {
         email: user.email,
         phone: user.phone,
         role: user.role,
-        status: user.is_account_locked
-          ? "locked"
-          : !user.isEmailVerified
-            ? "unverified"
-            : !user.hasSetPassword
-              ? "incomplete"
-              : "active",
+        status: this.buildUserStatus(user),
         createdAt: user.createdAt,
         lastLogin: user.last_login,
         annotatorStatus: user.annotatorStatus,
@@ -453,7 +469,9 @@ class EnhancedAdminUserManagementService {
       throw { status: 404, message: "User not found" };
     }
 
-    const { page = 1, limit = 20, status } = filters;
+    const page = this.toInt(filters.page, 1);
+    const limit = this.toInt(filters.limit, 20);
+    const { status } = filters;
     const skip = (page - 1) * limit;
 
     let query = { user_email: user.email };
@@ -480,8 +498,8 @@ class EnhancedAdminUserManagementService {
     return {
       sessions: sessionData,
       pagination: {
-        currentPage: parseInt(page),
-        totalPages: Math.ceil(totalSessions / parseInt(limit)),
+        currentPage: page,
+        totalPages: Math.ceil(totalSessions / limit),
         totalSessions,
       },
     };

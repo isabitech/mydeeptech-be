@@ -1,6 +1,33 @@
 const notificationRepository = require('../repositories/notification-repository');
 
 class UserNotificationService {
+    toInt(value, fallback) {
+        const parsed = parseInt(value, 10);
+        return Number.isNaN(parsed) ? fallback : parsed;
+    }
+
+    buildPagination({ page, limit, total }) {
+        return {
+            currentPage: page,
+            totalPages: Math.ceil(total / limit),
+            totalNotifications: total,
+            hasNextPage: page * limit < total,
+            hasPrevPage: page > 1,
+            limit
+        };
+    }
+
+    buildPriorityBreakdown({ high, medium, low }) {
+        return { high, medium, low };
+    }
+
+    buildTypeBreakdown(typeBreakdown = []) {
+        return typeBreakdown.reduce((acc, item) => {
+            acc[item._id] = item.count;
+            return acc;
+        }, {});
+    }
+
     /**
      * Get notification summary for a user
      */
@@ -32,15 +59,12 @@ class UserNotificationService {
             unreadCount,
             readCount,
             recentCount: recentNotifications,
-            priorityBreakdown: {
+            priorityBreakdown: this.buildPriorityBreakdown({
                 high: highPriorityCount,
                 medium: mediumPriorityCount,
                 low: lowPriorityCount
-            },
-            typeBreakdown: typeBreakdown.reduce((acc, item) => {
-                acc[item._id] = item.count;
-                return acc;
-            }, {}),
+            }),
+            typeBreakdown: this.buildTypeBreakdown(typeBreakdown),
             latestNotifications,
             lastUpdated: new Date()
         };
@@ -50,8 +74,8 @@ class UserNotificationService {
      * Get user notifications with pagination
      */
     async getUserNotifications(userId, query) {
-        const page = parseInt(query.page) || 1;
-        const limit = parseInt(query.limit) || 20;
+        const page = this.toInt(query.page, 1);
+        const limit = this.toInt(query.limit, 20);
         const skip = (page - 1) * limit;
 
         const filter = { userId, userModel: 'DTUser' };
@@ -66,14 +90,7 @@ class UserNotificationService {
 
         return {
             notifications,
-            pagination: {
-                currentPage: page,
-                totalPages: Math.ceil(totalNotifications / limit),
-                totalNotifications,
-                hasNextPage: page * limit < totalNotifications,
-                hasPrevPage: page > 1,
-                limit
-            },
+            pagination: this.buildPagination({ page, limit, total: totalNotifications }),
             summary: {
                 totalNotifications,
                 unreadCount,

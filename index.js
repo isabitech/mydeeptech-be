@@ -251,5 +251,4 @@ const gracefulShutdown = async (signal) => {
 // Handle graceful shutdown
 process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
-
 // Server startup is now handled in connectDB() after MongoDB and Socket.IO initialization

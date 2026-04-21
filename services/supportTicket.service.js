@@ -3,20 +3,55 @@ const supportTicketRepository = require("../repositories/supportTicket.repositor
 const { createNotification } = require("../utils/notificationService");
 
 class SupportTicketService {
+  toInt(value, fallback) {
+    const parsed = parseInt(value, 10);
+    return Number.isNaN(parsed) ? fallback : parsed;
+  }
+
+  buildPagination({ page, limit, total }) {
+    return {
+      currentPage: page,
+      totalPages: Math.ceil(total / limit),
+      totalTickets: total,
+      hasNextPage: page * limit < total,
+      hasPrevPage: page > 1,
+      limit,
+    };
+  }
+
+  buildTicketFilter(query) {
+    const { status, category, priority, assignedTo } = query;
+    const filter = {};
+
+    if (status) filter.status = status;
+    if (category) filter.category = category;
+    if (priority) filter.priority = priority;
+    if (assignedTo) filter.assignedTo = assignedTo;
+
+    return filter;
+  }
+
   /**
    * Determine user model type
    * @private
    */
   async _getUserModel(userId) {
     try {
-      const dtUser = await supportTicketRepository.findDTUserById(userId);
+      const [dtUser, user] = await Promise.all([
+        supportTicketRepository.findDTUserById(userId),
+        supportTicketRepository.findUserById(userId),
+      ]);
+
       if (dtUser) return "DTUser";
-      const user = await supportTicketRepository.findUserById(userId);
       if (user) return "User";
     } catch (error) {
       console.log("User lookup error:", error);
     }
     return "DTUser"; // Default assumption
+  }
+
+  async getUserModel(userId) {
+    return this._getUserModel(userId);
   }
 
   /**
@@ -37,8 +72,7 @@ class SupportTicketService {
         message: "Subject, description, and category are required",
       };
     }
-
-    const userModel = await this._getUserModel(userId);
+    const userModel = await this.getUserModel(userId);
 
     const ticket = await supportTicketRepository.create({
       userId,
@@ -82,8 +116,8 @@ class SupportTicketService {
    * Get user's support tickets with pagination
    */
   async getUserTickets(userId, query) {
-    const page = parseInt(query.page) || 1;
-    const limit = parseInt(query.limit) || 10;
+    const page = this.toInt(query.page, 1);
+    const limit = this.toInt(query.limit, 10);
     const skip = (page - 1) * limit;
     const { status, category } = query;
 
@@ -208,16 +242,10 @@ class SupportTicketService {
    * Get all support tickets (admin only)
    */
   async getAllTickets(query) {
-    const page = parseInt(query.page) || 1;
-    const limit = parseInt(query.limit) || 20;
+    const page = this.toInt(query.page, 1);
+    const limit = this.toInt(query.limit, 20);
     const skip = (page - 1) * limit;
-    const { status, category, priority, assignedTo } = query;
-
-    const filter = {};
-    if (status) filter.status = status;
-    if (category) filter.category = category;
-    if (priority) filter.priority = priority;
-    if (assignedTo) filter.assignedTo = assignedTo;
+    const filter = this.buildTicketFilter(query);
 
     const populate = [
       { path: "userId", select: "fullName email" },
@@ -237,14 +265,7 @@ class SupportTicketService {
 
     return {
       tickets,
-      pagination: {
-        currentPage: page,
-        totalPages: Math.ceil(totalTickets / limit),
-        totalTickets,
-        hasNextPage: page * limit < totalTickets,
-        hasPrevPage: page > 1,
-        limit,
-      },
+      pagination: this.buildPagination({ page, limit, total: totalTickets }),
     };
   }
 
