@@ -96,6 +96,7 @@ class InvoiceController {
   }
 
   static async getAllInvoices(req, res) {
+    console.log("getAllInvoices");
     try {
       const result = await InvoiceService.getAllInvoices(req.query);
       res.status(200).json({ success: true, data: result });
