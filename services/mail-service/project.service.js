@@ -3,7 +3,6 @@ const BaseMailService = require('./base.service');
 class ProjectMailService extends BaseMailService {
 
     static async sendProjectApplicationNotification(recipientEmail, recipientName, applicationData) {
-        console.log(`Sending project application notification to ${recipientEmail}`);
         
         let htmlTemplate = this.getMailTemplate('sendProjectApplicationNotification');
         
@@ -37,7 +36,6 @@ class ProjectMailService extends BaseMailService {
     }
 
     static async sendProjectApprovalNotification(recipientEmail, recipientName, projectData) {
-        console.log(`Sending project approval notification to ${recipientEmail}`);
         
         let htmlTemplate = this.getMailTemplate('sendProjectApprovalNotification');
         
@@ -68,7 +66,6 @@ class ProjectMailService extends BaseMailService {
     }
 
     static async sendProjectRejectionNotification(recipientEmail, recipientName, projectData) {
-        console.log(`Sending project rejection notification to ${recipientEmail}`);
         
         let htmlTemplate = this.getMailTemplate('sendProjectRejectionNotification');
         
@@ -100,7 +97,6 @@ class ProjectMailService extends BaseMailService {
     }
 
     static async sendApplicantRemovalNotification(recipientEmail, recipientName, removalData) {
-        console.log(`Sending applicant removal notification to ${recipientEmail}`);
         
         let htmlTemplate = this.getMailTemplate('sendApplicantRemovalNotification');
         
@@ -133,7 +129,6 @@ class ProjectMailService extends BaseMailService {
     }
 
     static async sendProjectAnnotatorRemovedNotification(recipientEmail, recipientName, removalData) {
-        console.log(`Sending project annotator removed notification to ${recipientEmail}`);
         
         let htmlTemplate = this.getMailTemplate('sendProjectAnnotatorRemovedNotification');
         
@@ -167,7 +162,6 @@ class ProjectMailService extends BaseMailService {
     }
 
     static async sendProjectDeletionOTP(recipientEmail, recipientName, deletionData) {
-        console.log(`Preparing to send project deletion OTP to ${recipientEmail}`);
         let htmlTemplate = this.getMailTemplate('sendProjectDeletionOTP');
         
         const { projectName, otp, expiryTime, requestedBy, reason = 'Not specified' } = deletionData;

@@ -27,7 +27,7 @@ const {
     verifyTransfer,
     checkUserBankDetails,
     testRecipientCreation,
-    initializeBulkTransferWithInvoices
+    initializeBulkTransferWithInvoices                                  
 } = require('../controllers/paystack-controller/payment-controller');
 const { callback } = require('../controllers/paystack-controller/callback.controller');
 

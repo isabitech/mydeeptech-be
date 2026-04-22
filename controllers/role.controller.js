@@ -131,8 +131,12 @@ class RoleController {
     }
   }
   async assignRoleToUser(req, res, next) {
+    console.log("Assigning role to user with params:", req.params);
     try {
       const { id: roleId, userId } = req.params;
+
+      console.log(`Assigning role ${roleId} to user ${userId}`);
+
       const updatedUser = await rolesService.assignRoleToUser(roleId, userId);
       return ResponseClass.Success(res, {
         message: "Role assigned to user successfully",

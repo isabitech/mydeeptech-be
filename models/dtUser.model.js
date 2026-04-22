@@ -311,10 +311,10 @@ const dtUserSchema = new mongoose.Schema(
   dtUserSchema.set("toObject", { virtuals: true });
   dtUserSchema.set("toJSON", { virtuals: true });
 
-dtUserSchema.pre("findOneAndDelete", async function (next) {
-  const userId = this.getQuery()._id;
-  await mongoose.model("DomainToUser").deleteMany({ user: userId });
-  next();
-});
+  dtUserSchema.pre("findOneAndDelete", async function (next) {
+    const userId = this.getQuery()._id;
+    await mongoose.model("DomainToUser").deleteMany({ user: userId });
+    next();
+  });
 
 module.exports = mongoose.model("DTUser", dtUserSchema);

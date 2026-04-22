@@ -5,7 +5,6 @@ class PaymentNotificationService extends BaseMailService {
      * Send payment confirmation email to individual recipient
      */
     static async sendPaymentConfirmation(recipientEmail, recipientName, paymentData) {
-        console.log(`Sending payment confirmation to ${recipientEmail}`);
         
         let htmlTemplate = this.getMailTemplate('sendPaymentConfirmation');
         
@@ -92,7 +91,6 @@ class PaymentNotificationService extends BaseMailService {
      * Send bulk payment summary email to admin/initiator
      */
     static async sendBulkPaymentSummary(adminEmail, adminName, summaryData) {
-        console.log(`Sending bulk payment summary to admin: ${adminEmail}`);
         
         let htmlTemplate = this.getMailTemplate('sendBulkPaymentSummary');
         
@@ -225,7 +223,6 @@ class PaymentNotificationService extends BaseMailService {
      * Send admin notification for individual transfer success
      */
     static async sendAdminTransferNotification(adminEmail, adminName, transferData) {
-        console.log(`Sending admin transfer notification to ${adminEmail}`);
         
         const { 
             invoiceNumber, 

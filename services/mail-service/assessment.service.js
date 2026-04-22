@@ -3,7 +3,6 @@ const BaseMailService = require('./base.service');
 class AssessmentMailService extends BaseMailService {
 
     static async sendAssessmentInvitationEmail(recipientEmail, recipientName, assessmentData = {}) {
-        console.log(`Preparing to send assessment invitation email to ${recipientEmail}`);
         let htmlTemplate = this.getMailTemplate('sendAssessmentInvitationEmail');
         
         const { 
@@ -37,7 +36,6 @@ class AssessmentMailService extends BaseMailService {
     }
 
     static async sendAssessmentCompletionEmail(recipientEmail, recipientName, assessmentData = {}) {
-        console.log(`Preparing to send assessment completion email to ${recipientEmail}`);
         let htmlTemplate = this.getMailTemplate('sendAssessmentCompletionEmail');
         
         const { 

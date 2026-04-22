@@ -1,9 +1,6 @@
-const MultimediaAssessmentConfig = require('../models/multimediaAssessmentConfig.model');
-const AnnotationProject = require('../models/annotationProject.model');
-const VideoReel = require('../models/videoReel.model');
 const Joi = require('joi');
+const MultimediaAssessmentConfigService = require('../services/multimediaAssessmentConfig.service');
 
-// Validation schema for assessment configuration
 const assessmentConfigSchema = Joi.object({
   title: Joi.string().required().trim().max(100),
   description: Joi.string().required().trim().max(1000),
@@ -76,95 +73,14 @@ const assessmentConfigSchema = Joi.object({
   }).optional()
 });
 
-/**
- * Create multimedia assessment configuration
- * POST /api/admin/multimedia-assessments/config
- */
 const createAssessmentConfig = async (req, res) => {
   try {
-    console.log(`🎯 Admin ${req.admin.email} creating multimedia assessment config`);
-    
-    // Validate request body
     const { error, value } = assessmentConfigSchema.validate(req.body);
     if (error) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: error.details.map(detail => detail.message)
-      });
+      return res.status(400).json({ success: false, message: 'Validation failed', errors: error.details.map(detail => detail.message) });
     }
     
-    // Check if project exists
-    const project = await AnnotationProject.findById(value.projectId);
-    if (!project) {
-      return res.status(404).json({
-        success: false,
-        message: 'Project not found'
-      });
-    }
-    
-    // Check if assessment already exists for this project
-    const existingAssessment = await MultimediaAssessmentConfig.findOne({
-      projectId: value.projectId,
-      isActive: true
-    });
-    
-    if (existingAssessment) {
-      return res.status(400).json({
-        success: false,
-        message: 'Active assessment configuration already exists for this project',
-        existingAssessmentId: existingAssessment._id
-      });
-    }
-    
-    // Validate score weights sum to 100
-    if (value.scoring?.scoreWeights) {
-      const weights = value.scoring.scoreWeights;
-      const total = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
-      if (Math.abs(total - 100) > 0.01) {
-        return res.status(400).json({
-          success: false,
-          message: 'Score weights must total 100',
-          currentTotal: total
-        });
-      }
-    }
-    
-    // Calculate total available reels
-    const reelsPerNiche = value.videoReels?.reelsPerNiche || {};
-    const totalConfiguredReels = Object.values(reelsPerNiche).reduce((sum, count) => sum + count, 0);
-    
-    // Validate that we have enough reels for each niche
-    for (const [niche, requiredCount] of Object.entries(reelsPerNiche)) {
-      if (requiredCount > 0) {
-        const availableCount = await VideoReel.countDocuments({
-          niche,
-          isActive: true,
-          isApproved: true
-        });
-        
-        if (availableCount < requiredCount) {
-          return res.status(400).json({
-            success: false,
-            message: `Insufficient video reels for niche '${niche}'. Required: ${requiredCount}, Available: ${availableCount}`
-          });
-        }
-      }
-    }
-    
-    // Create assessment configuration
-    const assessmentConfig = new MultimediaAssessmentConfig({
-      ...value,
-      createdBy: req.admin.userId,
-      videoReels: {
-        ...value.videoReels,
-        totalAvailable: totalConfiguredReels
-      }
-    });
-    
-    await assessmentConfig.save();
-    
-    console.log(`✅ Assessment configuration created: ${assessmentConfig.title} for project: ${project.projectName}`);
+    const { assessmentConfig, projectName } = await MultimediaAssessmentConfigService.createAssessmentConfig(value, req.admin.userId);
     
     res.status(201).json({
       success: true,
@@ -175,7 +91,7 @@ const createAssessmentConfig = async (req, res) => {
           title: assessmentConfig.title,
           description: assessmentConfig.description,
           projectId: assessmentConfig.projectId,
-          projectName: project.projectName,
+          projectName: projectName,
           requirements: assessmentConfig.requirements,
           videoReels: assessmentConfig.videoReels,
           scoring: assessmentConfig.scoring,
@@ -186,67 +102,18 @@ const createAssessmentConfig = async (req, res) => {
         }
       }
     });
-    
   } catch (error) {
+    if (error.status) {
+        return res.status(error.status).json({ success: false, message: error.message, existingAssessmentId: error.existingAssessmentId, currentTotal: error.currentTotal });
+    }
     console.error('❌ Error creating assessment configuration:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error creating assessment configuration',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Server error creating assessment configuration', error: error.message });
   }
 };
 
-/**
- * Get all assessment configurations
- * GET /api/admin/multimedia-assessments/config
- */
 const getAllAssessmentConfigs = async (req, res) => {
   try {
-    const {
-      page = 1,
-      limit = 20,
-      projectId,
-      isActive,
-      search,
-      sortBy = 'createdAt',
-      sortOrder = 'desc'
-    } = req.query;
-    
-    // Build match conditions
-    const matchConditions = {};
-    
-    if (projectId) matchConditions.projectId = projectId;
-    if (isActive !== undefined) matchConditions.isActive = isActive === 'true';
-    
-    if (search) {
-      matchConditions.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { description: { $regex: search, $options: 'i' } }
-      ];
-    }
-    
-    // Build sort object
-    const sort = {};
-    sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
-    
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    
-    // Execute queries
-    const [assessmentConfigs, totalCount] = await Promise.all([
-      MultimediaAssessmentConfig.find(matchConditions)
-        .populate('projectId', 'projectName projectDescription status')
-        .populate('createdBy', 'fullName email')
-        .populate('lastModifiedBy', 'fullName email')
-        .sort(sort)
-        .skip(skip)
-        .limit(parseInt(limit)),
-      MultimediaAssessmentConfig.countDocuments(matchConditions)
-    ]);
-    
-    const totalPages = Math.ceil(totalCount / parseInt(limit));
-    
-    console.log(`📊 Retrieved ${assessmentConfigs.length} assessment configurations`);
+    const { assessmentConfigs, totalPages, totalCount, page, limit } = await MultimediaAssessmentConfigService.getAllAssessmentConfigs(req.query);
     
     res.status(200).json({
       success: true,
@@ -272,60 +139,24 @@ const getAllAssessmentConfigs = async (req, res) => {
           updatedAt: config.updatedAt
         })),
         pagination: {
-          currentPage: parseInt(page),
+          currentPage: page,
           totalPages,
           totalCount,
-          limit: parseInt(limit),
-          hasNextPage: parseInt(page) < totalPages,
-          hasPrevPage: parseInt(page) > 1
+          limit,
+          hasNextPage: page < totalPages,
+          hasPrevPage: page > 1
         }
       }
     });
-    
   } catch (error) {
     console.error('❌ Error retrieving assessment configurations:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error retrieving assessment configurations',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Server error retrieving assessment configurations', error: error.message });
   }
 };
 
-/**
- * Get assessment configuration by ID
- * GET /api/admin/multimedia-assessments/config/:id
- */
 const getAssessmentConfigById = async (req, res) => {
   try {
-    const { id } = req.params;
-    
-    const assessmentConfig = await MultimediaAssessmentConfig.findById(id)
-      .populate('projectId', 'projectName projectDescription status budget')
-      .populate('createdBy', 'fullName email')
-      .populate('lastModifiedBy', 'fullName email');
-    
-    if (!assessmentConfig) {
-      return res.status(404).json({
-        success: false,
-        message: 'Assessment configuration not found'
-      });
-    }
-    
-    // Get available reels count for each niche
-    const nicheAvailability = {};
-    for (const [niche, requiredCount] of Object.entries(assessmentConfig.videoReels.reelsPerNiche)) {
-      if (requiredCount > 0) {
-        nicheAvailability[niche] = {
-          required: requiredCount,
-          available: await VideoReel.countDocuments({
-            niche,
-            isActive: true,
-            isApproved: true
-          })
-        };
-      }
-    }
+    const { assessmentConfig, nicheAvailability } = await MultimediaAssessmentConfigService.getAssessmentConfigById(req.params.id);
     
     res.status(200).json({
       success: true,
@@ -344,10 +175,7 @@ const getAssessmentConfigById = async (req, res) => {
             budget: assessmentConfig.projectId.budget
           },
           requirements: assessmentConfig.requirements,
-          videoReels: {
-            ...assessmentConfig.videoReels,
-            nicheAvailability
-          },
+          videoReels: { ...assessmentConfig.videoReels, nicheAvailability },
           scoring: assessmentConfig.scoring,
           taskSettings: assessmentConfig.taskSettings,
           totalConfiguredReels: assessmentConfig.totalConfiguredReels,
@@ -361,99 +189,23 @@ const getAssessmentConfigById = async (req, res) => {
         }
       }
     });
-    
   } catch (error) {
+    if (error.status) return res.status(error.status).json({ success: false, message: error.message });
     console.error('❌ Error retrieving assessment configuration:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error retrieving assessment configuration',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Server error retrieving assessment configuration', error: error.message });
   }
 };
 
-/**
- * Update assessment configuration
- * PUT /api/admin/multimedia-assessments/config/:id
- */
 const updateAssessmentConfig = async (req, res) => {
   try {
-    const { id } = req.params;
-    
-    // Validate request body (excluding projectId from updates)
     const updateSchema = assessmentConfigSchema.fork(['projectId'], schema => schema.optional());
     const { error, value } = updateSchema.validate(req.body);
     
     if (error) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation failed',
-        errors: error.details.map(detail => detail.message)
-      });
+      return res.status(400).json({ success: false, message: 'Validation failed', errors: error.details.map(detail => detail.message) });
     }
     
-    const assessmentConfig = await MultimediaAssessmentConfig.findById(id);
-    if (!assessmentConfig) {
-      return res.status(404).json({
-        success: false,
-        message: 'Assessment configuration not found'
-      });
-    }
-    
-    // Validate score weights if provided
-    if (value.scoring?.scoreWeights) {
-      const weights = value.scoring.scoreWeights;
-      const total = Object.values(weights).reduce((sum, weight) => sum + weight, 0);
-      if (Math.abs(total - 100) > 0.01) {
-        return res.status(400).json({
-          success: false,
-          message: 'Score weights must total 100',
-          currentTotal: total
-        });
-      }
-    }
-    
-    // If updating video reels configuration, validate availability
-    if (value.videoReels?.reelsPerNiche) {
-      for (const [niche, requiredCount] of Object.entries(value.videoReels.reelsPerNiche)) {
-        if (requiredCount > 0) {
-          const availableCount = await VideoReel.countDocuments({
-            niche,
-            isActive: true,
-            isApproved: true
-          });
-          
-          if (availableCount < requiredCount) {
-            return res.status(400).json({
-              success: false,
-              message: `Insufficient video reels for niche '${niche}'. Required: ${requiredCount}, Available: ${availableCount}`
-            });
-          }
-        }
-      }
-    }
-    
-    // Update configuration
-    Object.keys(value).forEach(key => {
-      if (key === 'videoReels' && value.videoReels) {
-        // Update video reels configuration and calculate total
-        assessmentConfig.videoReels = {
-          ...assessmentConfig.videoReels,
-          ...value.videoReels
-        };
-        if (value.videoReels.reelsPerNiche) {
-          assessmentConfig.videoReels.totalAvailable = Object.values(value.videoReels.reelsPerNiche)
-            .reduce((sum, count) => sum + count, 0);
-        }
-      } else {
-        assessmentConfig[key] = value[key];
-      }
-    });
-    
-    assessmentConfig.lastModifiedBy = req.admin.userId;
-    await assessmentConfig.save();
-    
-    console.log(`✅ Assessment configuration updated: ${assessmentConfig.title} by ${req.admin.email}`);
+    const assessmentConfig = await MultimediaAssessmentConfigService.updateAssessmentConfig(req.params.id, value, req.admin.userId);
     
     res.status(200).json({
       success: true,
@@ -473,90 +225,32 @@ const updateAssessmentConfig = async (req, res) => {
         }
       }
     });
-    
   } catch (error) {
+    if (error.status) return res.status(error.status).json({ success: false, message: error.message, currentTotal: error.currentTotal });
     console.error('❌ Error updating assessment configuration:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error updating assessment configuration',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Server error updating assessment configuration', error: error.message });
   }
 };
 
-/**
- * Delete assessment configuration
- * DELETE /api/admin/multimedia-assessments/config/:id
- */
 const deleteAssessmentConfig = async (req, res) => {
   try {
-    const { id } = req.params;
-    
-    const assessmentConfig = await MultimediaAssessmentConfig.findById(id);
-    if (!assessmentConfig) {
-      return res.status(404).json({
-        success: false,
-        message: 'Assessment configuration not found'
-      });
-    }
-    
-    // Check if there are any active submissions using this configuration
-    const MultimediaAssessmentSubmission = require('../models/multimediaAssessmentSubmission.model');
-    const activeSubmissions = await MultimediaAssessmentSubmission.countDocuments({
-      assessmentId: id,
-      status: { $in: ['in_progress', 'submitted', 'under_review'] }
-    });
-    
-    if (activeSubmissions > 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Cannot delete assessment configuration with active submissions',
-        activeSubmissions
-      });
-    }
-    
-    // Soft delete - mark as inactive
-    assessmentConfig.isActive = false;
-    await assessmentConfig.save();
-    
-    console.log(`🗑️ Assessment configuration deleted: ${assessmentConfig.title} by ${req.admin.email}`);
+    const assessmentConfig = await MultimediaAssessmentConfigService.deleteAssessmentConfig(req.params.id);
     
     res.status(200).json({
       success: true,
       message: 'Assessment configuration deleted successfully',
-      data: {
-        deletedId: assessmentConfig._id,
-        title: assessmentConfig.title,
-        deletedAt: new Date()
-      }
+      data: { deletedId: assessmentConfig._id, title: assessmentConfig.title, deletedAt: new Date() }
     });
-    
   } catch (error) {
+    if (error.status) return res.status(error.status).json({ success: false, message: error.message, activeSubmissions: error.activeSubmissions });
     console.error('❌ Error deleting assessment configuration:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error deleting assessment configuration',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Server error deleting assessment configuration', error: error.message });
   }
 };
 
-/**
- * Get assessment configuration for a specific project
- * GET /api/admin/multimedia-assessments/config/project/:projectId
- */
 const getAssessmentConfigByProject = async (req, res) => {
   try {
-    const { projectId } = req.params;
-    
-    const assessmentConfig = await MultimediaAssessmentConfig.getByProject(projectId);
-    
-    if (!assessmentConfig) {
-      return res.status(404).json({
-        success: false,
-        message: 'No active assessment configuration found for this project'
-      });
-    }
+    const assessmentConfig = await MultimediaAssessmentConfigService.getAssessmentConfigByProject(req.params.projectId);
     
     res.status(200).json({
       success: true,
@@ -575,14 +269,10 @@ const getAssessmentConfigByProject = async (req, res) => {
         }
       }
     });
-    
   } catch (error) {
+    if (error.status) return res.status(error.status).json({ success: false, message: error.message });
     console.error('❌ Error retrieving assessment configuration by project:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error retrieving assessment configuration',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: 'Server error retrieving assessment configuration', error: error.message });
   }
 };
 
