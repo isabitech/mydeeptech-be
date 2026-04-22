@@ -333,7 +333,7 @@ class InvoiceService {
     return results;
   }
 
-  async buildInvoiceFilter(invoiceIds) {
+  async buildUnpaidInvoiceFilter(invoiceIds) {
     let invoiceFilter = { paymentStatus: { $in: ["unpaid", "overdue"] } };
 
     if (invoiceIds && Array.isArray(invoiceIds) && invoiceIds.length > 0) {
@@ -385,7 +385,7 @@ class InvoiceService {
   }
 
   async generatePaystackCSV(invoiceIds) {
-    const invoiceFilter = await this.buildInvoiceFilter(invoiceIds);
+    const invoiceFilter = await this.buildUnpaidInvoiceFilter(invoiceIds);
     const unpaidInvoices = await InvoiceRepository.find(invoiceFilter);
 
     if (unpaidInvoices.length === 0) {
@@ -498,7 +498,7 @@ class InvoiceService {
   }
 
   async generateMPESACSV(invoiceIds) {
-    const invoiceFilter = await this.buildInvoiceFilter(invoiceIds);
+    const invoiceFilter = await this.buildUnpaidInvoiceFilter(invoiceIds);
     const unpaidInvoices = await InvoiceRepository.find(invoiceFilter);
 
     if (unpaidInvoices.length === 0) {
