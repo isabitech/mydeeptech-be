@@ -304,7 +304,7 @@ class DTUserController {
   static async getProjectGuidelines(req, res) {
     try {
       const { projectId } = req.params;
-      const userId = req.userId || req.user?.userId;
+      const userId = req.user?.userId || req.userId;
 
       if (!userId) {
         return res.status(401).json({

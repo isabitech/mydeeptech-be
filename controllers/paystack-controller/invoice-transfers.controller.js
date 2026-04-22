@@ -912,8 +912,6 @@ const getAllBanksByCountryInAfrica = async (req, res) => {
             include_nip_sort_code
         } = req.query;
 
-        console.log(`🏦 Fetching banks for country: ${country || 'all'}`);
-
         // Validate country parameter if provided
         const validCountries = ['ghana', 'kenya', 'nigeria', 'south africa'];
         if (country && !validCountries.includes(country.toLowerCase())) {
