@@ -121,6 +121,14 @@ const getAdminNotifications = async (req, res) => {
           hasPrev: payloads.page > 1,
           limit: payloads.limit
         },
+        analytics: {
+          totalSent: notificationsService.totalNotifications,
+          totalRead: notificationsService.totalNotifications - notificationsService.unreadNotifications,
+          totalUnread: notificationsService.unreadNotifications,
+          readRate: notificationsService.totalNotifications > 0 
+            ? ((notificationsService.totalNotifications - notificationsService.unreadNotifications) / notificationsService.totalNotifications * 100).toFixed(1)
+            : 0
+        },
         summary: {
           totalNotifications: notificationsService.totalNotifications,
           unreadNotifications: notificationsService.unreadNotifications,
