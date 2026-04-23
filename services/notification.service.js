@@ -149,13 +149,35 @@ class AdminNotificationService {
      * Get admin notifications with full filtering (uses repository)
      */
     async getAdminNotifications(payloads) {
-        // The repository already handles the heavy lifting
-        return await notificationRepository.findWithPagination({
-            filter: this._buildFilter(payloads),
+        const filter = this._buildFilter(payloads);
+        
+        // Get notifications with pagination
+        const notifications = await notificationRepository.findWithPagination({
+            filter,
             sort: { createdAt: -1 },
             skip: payloads.skip,
             limit: payloads.limit
         });
+
+        // Get total count for pagination
+        const totalNotifications = await notificationRepository.countAll(filter);
+
+        // Get unread count
+        const unreadFilter = { ...filter, isRead: false };
+        const unreadNotifications = await notificationRepository.countAll(unreadFilter);
+
+        // Get recent notifications count (last 7 days)
+        const recentDate = new Date();
+        recentDate.setDate(recentDate.getDate() - 7);
+        const recentFilter = { ...filter, createdAt: { $gte: recentDate } };
+        const recentNotifications = await notificationRepository.countAll(recentFilter);
+
+        return {
+            notifications,
+            totalNotifications,
+            unreadNotifications,
+            recentNotifications
+        };
     }
 
     /**

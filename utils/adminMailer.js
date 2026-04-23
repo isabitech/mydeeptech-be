@@ -1,10 +1,7 @@
 const { sendEmail } = require('./brevoSMTP');
 
-const sendAdminVerificationEmail = async (email, verificationCode, adminName) => {
+const sendAdminVerificationEmail = async (email, recipientName, verificationCode) => {
     try {
-
-        console.log(`📧 Sending admin verification email to: ${email}`);
-
         const emailData = {
             to: email,
             subject: "🔐 Admin Account Verification - MyDeepTech",
@@ -32,7 +29,7 @@ const sendAdminVerificationEmail = async (email, verificationCode, adminName) =>
                         <p>MyDeepTech Administration Panel</p>
                     </div>
                     <div class="content">
-                        <h2>Hello ${adminName || 'Admin'},</h2>
+                        <h2>Hello ${recipientName || 'Admin'},</h2>
                         <p>A new admin account creation request has been initiated for this email address.</p>
                         
                         <div class="verification-code">
@@ -105,7 +102,6 @@ This is an automated security email. Please do not reply.
         };
 
         const result = await sendEmail(emailData);
-        console.log(`✅ Admin verification email sent successfully to: ${email}`);
         return result;
 
     } catch (error) {

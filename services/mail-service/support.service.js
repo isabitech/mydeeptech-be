@@ -3,7 +3,6 @@ const BaseMailService = require('./base.service');
 class SupportMailService extends BaseMailService {
 
     static async sendSupportTicketCreationEmail(recipientEmail, recipientName, ticketData) {
-        console.log(`Preparing to send support ticket creation email to ${recipientEmail}`);
         let htmlTemplate = this.getMailTemplate('sendSupportTicketCreationEmail');
         
         const { ticketNumber, subject, category, priority, description, createdAt } = ticketData;
@@ -30,7 +29,6 @@ class SupportMailService extends BaseMailService {
     }
 
     static async sendadminSupportTicketNotification(recipientEmail, recipientName, ticketData, userData) {
-        console.log(`Preparing to send admin support ticket notification to ${recipientEmail}`);
         let htmlTemplate = this.getMailTemplate('sendAdminSupportTicketNotification');
         
         const { ticketNumber, subject, category, priority, description, createdAt } = ticketData;
@@ -60,7 +58,6 @@ class SupportMailService extends BaseMailService {
     }
 
     static async sendNewTicketNotificationToAdmin(recipientEmail, ticketData, userData) {
-        console.log(`Sending new ticket notification to admin: ${recipientEmail}`);
         
         let htmlTemplate = this.getMailTemplate('sendNewTicketNotificationToAdmin');
         
@@ -93,7 +90,6 @@ class SupportMailService extends BaseMailService {
     }
 
     static async sendAdminReplyNotificationEmail(recipientEmail, ticketData, replyData) {
-        console.log(`Sending admin reply notification to ${recipientEmail}`);
         
         let htmlTemplate = this.getMailTemplate('sendAdminReplyNotificationEmail');
         

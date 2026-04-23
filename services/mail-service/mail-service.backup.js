@@ -17,7 +17,6 @@ class MailService {
     constructor(){}
 
     static async sendVerificationEmail(recipientEmail, recipientName, userId) {
-        console.log(`Preparing to send verification email to ${recipientEmail} for user ID: ${userId}`);
         const FRONTEND_URL = envConfig.FRONTEND_URL;
         const verificationUrl = `${FRONTEND_URL}/verify-email/${userId}?email=${encodeURIComponent(recipientEmail)}`;
         let htmlTemplate = getMailTemplate('sendVerificationEmail');
@@ -61,7 +60,6 @@ class MailService {
 
     // DTUser Password Reset Email (supports both user types)
     static async sendPasswordResetEmailWithType(recipientEmail, recipientName, resetToken, userType = 'dtuser') {
-        console.log(`Preparing to send password reset email to ${recipientEmail} for ${userType}`);
         let htmlTemplate = getMailTemplate('sendPasswordResetEmail');
         
         const FRONTEND_URL = envConfig.FRONTEND_URL;
@@ -91,7 +89,6 @@ class MailService {
 
     // DTUser Invoice Notification
     static async sendDTUserInvoiceNotification(recipientEmail, recipientName, invoiceData) {
-        console.log(`Preparing to send DTUser invoice notification to ${recipientEmail}`);
         let htmlTemplate = getMailTemplate('sendDTUserInvoiceNotification');
         
         const { invoiceNumber, projectName, amount, currency = 'USD', dueDate, description } = invoiceData;
@@ -125,7 +122,6 @@ class MailService {
 
     // Partner Invoice Email
     static async sendPartnerInvoiceEmail(recipientEmail, recipientName, invoiceData) {
-        console.log(`Preparing to send partner invoice to ${recipientEmail}`);
         let htmlTemplate = getMailTemplate('sendPartnerInvoiceEmail');
         
         const { name, amount, due_date, description = 'Partner invoice', companyName = 'MyDeepTech' } = invoiceData;
@@ -155,7 +151,6 @@ class MailService {
 
     // Admin Verification Email
     static async sendAdminVerificationEmail(recipientEmail, recipientName, verificationCode) {
-        console.log(`Preparing to send admin verification email to ${recipientEmail}`);
         let htmlTemplate = getMailTemplate('sendAdminVerificationEmail');
         
         htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{recipientName}}', recipientName);
@@ -174,7 +169,6 @@ class MailService {
 
     // Annotator Approval Email
     static async sendAnnotatorApprovalEmail(recipientEmail, recipientName) {
-        console.log(`Preparing to send annotator approval email to ${recipientEmail}`);
         let htmlTemplate = getMailTemplate('sendAnnotatorApprovalEmail');
         
         htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{recipientName}}', recipientName);
@@ -192,7 +186,6 @@ class MailService {
 
     // Annotator Rejection Email
     static async sendAnnotatorRejectionEmail(recipientEmail, recipientName) {
-        console.log(`Preparing to send annotator rejection email to ${recipientEmail}`);
         let htmlTemplate = getMailTemplate('sendAnnotatorRejectionEmail');
         
         htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{recipientName}}', recipientName);
@@ -210,7 +203,6 @@ class MailService {
 
     // Project Deletion OTP Email
     static async sendProjectDeletionOTP(recipientEmail, recipientName, deletionData) {
-        console.log(`Preparing to send project deletion OTP to ${recipientEmail}`);
         let htmlTemplate = getMailTemplate('sendProjectDeletionOTP');
         
         const { projectName, otp, expiryTime, requestedBy, reason = 'Not specified' } = deletionData;
@@ -235,7 +227,6 @@ class MailService {
 
     // Support Ticket Creation Email
     static async sendSupportTicketCreationEmail(recipientEmail, recipientName, ticketData) {
-        console.log(`Preparing to send support ticket creation email to ${recipientEmail}`);
         let htmlTemplate = getMailTemplate('sendSupportTicketCreationEmail');
         
         const { ticketNumber, subject, category, priority, description, createdAt } = ticketData;
@@ -261,7 +252,6 @@ class MailService {
 
     // Admin Support Ticket Notification
     static async sendadminSupportTicketNotification(recipientEmail, recipientName, ticketData, userData) {
-        console.log(`Preparing to send admin support ticket notification to ${recipientEmail}`);
         let htmlTemplate = getMailTemplate('sendAdminSupportTicketNotification');
         
         const { ticketNumber, subject, category, priority, description, createdAt } = ticketData;
@@ -290,7 +280,6 @@ class MailService {
 
     // Assessment Invitation Email
     static async sendAssessmentInvitationEmail(recipientEmail, recipientName, assessmentData = {}) {
-        console.log(`Preparing to send assessment invitation email to ${recipientEmail}`);
         let htmlTemplate = getMailTemplate('sendAssessmentInvitationEmail');
         
         const { title = 'Multimedia Assessment', timeLimit = '60 minutes', description = 'Complete your assessment to continue' } = assessmentData;
@@ -313,7 +302,6 @@ class MailService {
 
     // Assessment Completion Email
     static async sendAssessmentCompletionEmail(recipientEmail, recipientName, assessmentData = {}) {
-        console.log(`Preparing to send assessment completion email to ${recipientEmail}`);
         let htmlTemplate = getMailTemplate('sendAssessmentCompletionEmail');
         
         const { 
@@ -349,7 +337,6 @@ class MailService {
     static async sendGeneralNotification(recipientEmail, recipientName, subject, message) {}
 
     static async sendPasswordResetConfirmationEmail(recipientEmail, recipientName, userType = 'user') {
-        console.log(`Sending password reset confirmation to ${recipientEmail}`);
         
         let htmlTemplate = getMailTemplate('sendPasswordResetConfirmationEmail');
         
@@ -377,8 +364,6 @@ class MailService {
     }
 
     static async sendNewTicketNotificationToAdmin(recipientEmail, ticketData, userData) {
-        console.log(`Sending new ticket notification to admin: ${recipientEmail}`);
-        
         let htmlTemplate = getMailTemplate('sendNewTicketNotificationToAdmin');
         
         const message = `
@@ -408,7 +393,6 @@ class MailService {
     }
 
     static async sendAdminReplyNotificationEmail(recipientEmail, ticketData, replyData) {
-        console.log(`Sending admin reply notification to ${recipientEmail}`);
         
         let htmlTemplate = getMailTemplate('sendAdminReplyNotificationEmail');
         
@@ -438,7 +422,6 @@ class MailService {
     }
 
     static async sendProjectApplicationNotification(recipientEmail, recipientName, applicationData) {
-        console.log(`Sending project application notification to ${recipientEmail}`);
         
         let htmlTemplate = getMailTemplate('sendProjectApplicationNotification');
         
@@ -470,7 +453,6 @@ class MailService {
     }
 
     static async sendProjectApprovalNotification(recipientEmail, recipientName, projectData) {
-        console.log(`Sending project approval notification to ${recipientEmail}`);
         
         let htmlTemplate = getMailTemplate('sendProjectApprovalNotification');
         
@@ -499,7 +481,6 @@ class MailService {
     }
 
     static async sendProjectRejectionNotification(recipientEmail, recipientName, projectData) {
-        console.log(`Sending project rejection notification to ${recipientEmail}`);
         
         let htmlTemplate = getMailTemplate('sendProjectRejectionNotification');
         
@@ -529,7 +510,6 @@ class MailService {
     }
 
     static async sendApplicantRemovalNotification(recipientEmail, recipientName, removalData) {
-        console.log(`Sending applicant removal notification to ${recipientEmail}`);
         
         let htmlTemplate = getMailTemplate('sendApplicantRemovalNotification');
         
@@ -560,7 +540,6 @@ class MailService {
     }
 
     static async sendProjectAnnotatorRemovedNotification(recipientEmail, recipientName, removalData) {
-        console.log(`Sending project annotator removed notification to ${recipientEmail}`);
         
         let htmlTemplate = getMailTemplate('sendProjectAnnotatorRemovedNotification');
         

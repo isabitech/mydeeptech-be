@@ -3,9 +3,6 @@ const envConfig = require("../../config/envConfig");
 
 class AuthMailService extends BaseMailService {
   static async sendVerificationEmail(recipientEmail, recipientName, userId) {
-    console.log(
-      `Preparing to send verification email to ${recipientEmail} for user ID: ${userId}`,
-    );
     const FRONTEND_URL = envConfig.FRONTEND_URL;
     const verificationUrl = `${FRONTEND_URL}/verify-email/${userId}?email=${encodeURIComponent(recipientEmail)}`;
     let htmlTemplate = this.getMailTemplate("sendVerificationEmail");
@@ -84,9 +81,7 @@ class AuthMailService extends BaseMailService {
     resetToken,
     userType = "dtuser",
   ) {
-    console.log(
-      `Preparing to send password reset email to ${recipientEmail} for ${userType}`,
-    );
+
     let htmlTemplate = this.getMailTemplate("sendPasswordResetEmail");
 
     const FRONTEND_URL = envConfig.FRONTEND_URL;
@@ -131,7 +126,6 @@ class AuthMailService extends BaseMailService {
     recipientName,
     userType = "user",
   ) {
-    console.log(`Sending password reset confirmation to ${recipientEmail}`);
 
     let htmlTemplate = this.getMailTemplate(
       "sendPasswordResetConfirmationEmail",
@@ -175,9 +169,7 @@ class AuthMailService extends BaseMailService {
     recipientName,
     verificationCode,
   ) {
-    console.log(
-      `Preparing to send admin verification email to ${recipientEmail}`,
-    );
+
     let htmlTemplate = this.getMailTemplate("sendAdminVerificationEmail");
 
     htmlTemplate = this.replaceTemplatePlaceholders(
@@ -205,9 +197,7 @@ class AuthMailService extends BaseMailService {
   }
 
   static async sendAnnotatorApprovalEmail(recipientEmail, recipientName) {
-    console.log(
-      `Preparing to send annotator approval email to ${recipientEmail}`,
-    );
+
     let htmlTemplate = this.getMailTemplate("sendAnnotatorApprovalEmail");
 
     htmlTemplate = this.replaceTemplatePlaceholders(
@@ -231,9 +221,7 @@ class AuthMailService extends BaseMailService {
   }
 
   static async sendAnnotatorRejectionEmail(recipientEmail, recipientName) {
-    console.log(
-      `Preparing to send annotator rejection email to ${recipientEmail}`,
-    );
+
     let htmlTemplate = this.getMailTemplate("sendAnnotatorRejectionEmail");
 
     htmlTemplate = this.replaceTemplatePlaceholders(

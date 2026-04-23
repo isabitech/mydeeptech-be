@@ -3,7 +3,6 @@ const BaseMailService = require('./base.service');
 class InvoiceMailService extends BaseMailService {
 
     static async sendDTUserInvoiceNotification(recipientEmail, recipientName, invoiceData) {
-        console.log(`Preparing to send DTUser invoice notification to ${recipientEmail}`);
         let htmlTemplate = this.getMailTemplate('sendDTUserInvoiceNotification');
 
         const { invoiceNumber, projectName, amount, currency = 'USD', dueDate, description } = invoiceData;
@@ -38,7 +37,6 @@ class InvoiceMailService extends BaseMailService {
     }
 
     static async sendPartnerInvoiceEmail(recipientEmail, recipientName, invoiceData) {
-        console.log(`Preparing to send partner invoice to ${recipientEmail}`);
         let htmlTemplate = this.getMailTemplate('sendPartnerInvoiceEmail');
 
         const { name, amount, due_date, description = 'Partner invoice', companyName = 'MyDeepTech', currency } = invoiceData;
