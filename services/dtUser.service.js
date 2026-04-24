@@ -231,8 +231,8 @@ class DtUserService {
   /**
    * Admin: Legacy direct creation.
    */
-  async createAdmin(body) {
-    return this.adminAuthService.createAdmin(body);
+  async createAdmin(body, req = null) {
+    return this.adminAuthService.createAdmin(body, req);
   }
 
   /**
@@ -240,6 +240,48 @@ class DtUserService {
    */
   async verifyAdminOTP(body) {
     return this.adminAuthService.verifyAdminOTP(body);
+  }
+
+  /**
+   * Admin: Verify existing admin OTP (no admin key required).
+   */
+  async verifyExistingAdminOTP(body) {
+    return this.adminAuthService.verifyExistingAdminOTP(body);
+  }
+
+  /**
+   * Admin: Resend admin OTP.
+   */
+  async resendAdminOTP(body) {
+    return this.adminAuthService.resendAdminOTP(body);
+  }
+
+  /**
+   * Admin: Resend admin OTP for existing users (no admin key required).
+   */
+  async resendExistingAdminOTP(body) {
+    return this.adminAuthService.resendExistingAdminOTP(body);
+  }
+
+  /**
+   * Admin: Save registration state for cross-device access.
+   */
+  async saveAdminRegistrationState(email, currentStep, formData, adminId, req) {
+    return this.adminAuthService.saveRegistrationState(email, currentStep, formData, adminId, req);
+  }
+
+  /**
+   * Admin: Get registration state for cross-device access.
+   */
+  async getAdminRegistrationState(email) {
+    return this.adminAuthService.getRegistrationState(email);
+  }
+
+  /**
+   * Admin: Complete registration and cleanup state.
+   */
+  async completeAdminRegistrationState(email) {
+    return this.adminAuthService.completeRegistrationState(email);
   }
 
   /**
