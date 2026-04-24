@@ -10,12 +10,16 @@ const { initRedis, closeRedis } = require("./config/redis");
 // Conditionally load Swagger (optional dependency)
 let swaggerUi, specs;
 try {
+  console.log(`🔍 Loading Swagger... SWAGGER_ENABLED: ${process.env.SWAGGER_ENABLED || 'undefined'}`);
+  console.log(`🔍 NODE_ENV: ${process.env.NODE_ENV}`);
   const swagger = require("./config/swagger");
   swaggerUi = swagger.swaggerUi;
   specs = swagger.specs;
+  console.log(`✅ Swagger loaded successfully`);
 } catch (error) {
-  console.log(
-    "⚠️ Swagger dependencies not found. API documentation will not be available.",
+  console.error(
+    "❌ Swagger dependencies error:",
+    error.message
   );
   swaggerUi = null;
   specs = null;
@@ -86,7 +90,9 @@ app.use(express.urlencoded({ extended: true }));
 app.get("/health", healthCheck);
 
 // API Documentation (only if Swagger is available)
-if (swaggerUi && specs) {
+console.log(`🔍 Checking Swagger setup: swaggerUi=${!!swaggerUi}, specs=${!!specs}, SWAGGER_ENABLED=${envConfig.SWAGGER_ENABLED}`);
+
+if (swaggerUi && specs && envConfig.SWAGGER_ENABLED) {
   app.use(
     "/api-docs",
     swaggerUi.serve,
@@ -97,12 +103,15 @@ if (swaggerUi && specs) {
       customCss: ".swagger-ui .topbar { display: none }",
     }),
   );
+  console.log(`📚 Swagger API Documentation enabled at /api-docs`);
 } else {
   const reason = !swaggerUi
     ? "Swagger dependencies missing"
-    : !envConfig.SWAGGER_ENABLED
+    : !specs
+      ? "Swagger specs not available" 
+      : !envConfig.SWAGGER_ENABLED
       ? "Swagger disabled via environment"
-      : "Swagger specs not available";
+      : "Unknown reason";
   console.log(`📚 API Documentation not available (${reason})`);
 }
 
