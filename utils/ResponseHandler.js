@@ -229,7 +229,7 @@ const Errors = {
   invalidAdminEmail: (res) =>
     forbidden(
       res,
-      "Invalid domain for admin email",
+      "Invalid email domain",
       {
         code: "INVALID_ADMIN_EMAIL",
       },

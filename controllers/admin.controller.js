@@ -382,7 +382,7 @@ class AdminController {
           return res.status(400).json({
             success: false,
             message:
-              "Invalid domain for admin email",
+              "Invalid email domain",
             code: "INVALID_ADMIN_EMAIL",
           });
         }
@@ -527,7 +527,7 @@ class AdminController {
         if (result.reason === "invalid_admin_email") {
           return res.status(400).json({
             success: false,
-            message: "Invalid domain for admin email",
+            message: "Invalid email domain",
             code: "INVALID_ADMIN_EMAIL",
           });
         }
@@ -754,23 +754,20 @@ class AdminController {
   // Admin Login
   static async adminLogin(req, res) {
     try {
-      console.log('Admin login request received for:', req.body.email);
       const result = await dtUserService.adminLogin(req.body);
-
-      console.log('Admin login result:', { status: result.status, reason: result.reason });
 
       if (result.status === 400) {
         if (result.reason === "validation") {
           return res.status(400).json({
             success: false,
-            message: "Validation error",
+            message: result?.message || "Validation error",
             errors: result.errors,
           });
         }
         if (result.reason === "invalid_domain") {
           return res.status(400).json({
             success: false,
-            message: "Invalid credentials or account not verified",
+            message:  "Invalid credentials or account not verified",
           });
         }
       }
