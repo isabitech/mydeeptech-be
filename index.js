@@ -192,6 +192,13 @@ const connectDB = async () => {
         console.log(`🚀 Server running on port ${PORT}`);
         console.log(`🔗 Health check available at: http://localhost:${PORT}/health`);
         console.log(`🔧 HVNC API endpoints available at: http://localhost:${PORT}/api/hvnc/`);
+        
+        // Log Swagger documentation endpoint if available
+        if (swaggerUi && specs) {
+          console.log(`📚 Swagger API Documentation available at: http://localhost:${PORT}/api-docs`);
+        } else {
+          console.log(`❌ Swagger API Documentation not available (check dependencies and environment config)`);
+        }
       });
 
       return conn;
