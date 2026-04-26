@@ -124,6 +124,7 @@ class AdminService {
       verified,
       hasPassword,
       search,
+      country,
     } = query;
 
     const filter = this.getNonAdminUserFilter();
@@ -146,6 +147,21 @@ class AdminService {
         "email",
         "phone",
       ]).$or;
+    }
+
+    if (country && country !== 'all') {
+      if (country.toLowerCase() === 'unknown') {
+        // Filter for users with no country (null, undefined, empty, or field doesn't exist)
+        filter.$or = [
+          { 'personal_info.country': { $exists: false } },
+          { 'personal_info.country': null },
+          { 'personal_info.country': '' },
+          { 'personal_info.country': /^\s*$/ } // Only whitespace
+        ];
+      } else {
+        // Filter by country in personal_info.country field
+        filter['personal_info.country'] = new RegExp(`^${country}$`, 'i'); // Case-insensitive exact match
+      }
     }
 
     const pageNumber = this.toInt(page, 1);
