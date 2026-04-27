@@ -77,6 +77,11 @@ const annotationProjectSchema = new mongoose.Schema(
       type: String, // e.g., "2 weeks", "1 month"
       default: null
     },
+    applicationDuration: {
+      type: Number, // Duration in weeks (1, 2, 3, 4)
+      enum: [1, 2, 3, 4],
+      default: null // null means no auto-expiry
+    },
     difficultyLevel: {
       type: String,
       enum: ["beginner", "intermediate", "advanced", "expert"],

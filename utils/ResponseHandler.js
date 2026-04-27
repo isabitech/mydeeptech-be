@@ -229,7 +229,7 @@ const Errors = {
   invalidAdminEmail: (res) =>
     forbidden(
       res,
-      "Admin email must end with @mydeeptech.ng or be in approved admin list",
+      "Invalid email domain",
       {
         code: "INVALID_ADMIN_EMAIL",
       },

@@ -382,7 +382,7 @@ class AdminController {
           return res.status(400).json({
             success: false,
             message:
-              "Admin email must end with @mydeeptech.ng or be in approved admin list",
+              "Invalid email domain",
             code: "INVALID_ADMIN_EMAIL",
           });
         }
@@ -516,7 +516,7 @@ class AdminController {
   // Legacy admin creation function (kept for backward compatibility)
   static async createAdmin(req, res) {
     try {
-      const result = await dtUserService.createAdmin(req.body);
+      const result = await dtUserService.createAdmin(req.body, req);
 
       if (result.status === 400) {
         if (result.reason === "validation") {
@@ -527,8 +527,7 @@ class AdminController {
         if (result.reason === "invalid_admin_email") {
           return res.status(400).json({
             success: false,
-            message:
-              "Admin email must end with @mydeeptech.ng or be in approved admin list",
+            message: "Invalid email domain",
             code: "INVALID_ADMIN_EMAIL",
           });
         }
@@ -668,6 +667,90 @@ class AdminController {
       });
     }
   }
+
+  // Verify Existing Admin OTP (no admin key required)
+  static async verifyExistingAdminOTP(req, res) {
+    try {
+      const result = await dtUserService.verifyExistingAdminOTP(req.body);
+
+      if (result.status === 400) {
+        if (result.reason === "validation") {
+          return res.status(400).json({
+            success: false,
+            message: result.message,
+            errors: result.errors,
+          });
+        }
+        if (result.reason === "otp_expired") {
+          return res.status(400).json({
+            success: false,
+            message: "OTP has expired. Please request a new one.",
+            code: "OTP_EXPIRED",
+          });
+        }
+        if (result.reason === "invalid_otp") {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid OTP code",
+            code: "INVALID_OTP",
+            attemptsRemaining: result.attemptsRemaining,
+          });
+        }
+      }
+
+      if (result.status === 404) {
+        if (result.reason === "otp_not_found") {
+          return res.status(404).json({
+            success: false,
+            message: "No OTP verification request found or OTP expired",
+            code: "OTP_NOT_FOUND",
+          });
+        }
+        if (result.reason === "admin_not_found") {
+          return res.status(404).json({
+            success: false,
+            message: "Admin account not found",
+            code: "ADMIN_NOT_FOUND",
+          });
+        }
+      }
+
+      const { admin, token } = result;
+
+      res.status(200).json({
+        success: true,
+        message: "Admin account verified successfully! You are now logged in.",
+        _usrinfo: {
+          data: token,
+        },
+        token: token,
+        admin: {
+          id: admin._id,
+          fullName: admin.fullName,
+          email: admin.email,
+          phone: admin.phone,
+          domains: admin.domains,
+          isEmailVerified: admin.isEmailVerified,
+          hasSetPassword: admin.hasSetPassword,
+          annotatorStatus: admin.annotatorStatus,
+          microTaskerStatus: admin.microTaskerStatus,
+          qaStatus: admin.qaStatus,
+          createdAt: admin.createdAt,
+          isAdmin: true,
+          role: admin.role || "admin",
+          role_permission: admin.role_permission,
+        },
+      });
+    } catch (error) {
+      console.error("Error verifying existing admin OTP:", error);
+      res.status(500).json({
+        success: false,
+        message: "Server error verifying OTP",
+        error: error.message,
+      });
+    }
+  }
+
   // Admin Login
   static async adminLogin(req, res) {
     try {
@@ -677,14 +760,14 @@ class AdminController {
         if (result.reason === "validation") {
           return res.status(400).json({
             success: false,
-            message: "Validation error",
+            message: result?.message || "Validation error",
             errors: result.errors,
           });
         }
         if (result.reason === "invalid_domain") {
           return res.status(400).json({
             success: false,
-            message: "Invalid credentials or account not verified",
+            message:  "Invalid credentials or account not verified",
           });
         }
       }
@@ -693,6 +776,27 @@ class AdminController {
         return res.status(401).json({
           success: false,
           message: "Invalid credentials or account not verified",
+        });
+      }
+
+      if (result.status === 403) {
+        if (result.reason === "email_not_verified") {
+          return res.status(403).json({
+            success: false,
+            message: "Email verification required to complete login",
+            code: "EMAIL_NOT_VERIFIED",
+            requiresOtpVerification: true,
+            data: result.data,
+          });
+        }
+      }
+
+      if (result.status === 500) {
+        console.error('Server error in adminLogin:', result.message);
+        return res.status(500).json({
+          success: false,
+          message: "Server error during login",
+          error: result.message,
         });
       }
 
@@ -862,6 +966,293 @@ class AdminController {
       res.status(500).json({
         success: false,
         message: "Server error marking assessment submission",
+        error: error.message,
+      });
+    }
+  }
+
+  // Resend Admin OTP
+  static async resendAdminOTP(req, res) {
+    try {
+      const result = await dtUserService.resendAdminOTP(req.body);
+
+      if (result.status === 400) {
+        if (result.reason === "validation") {
+          return res.status(400).json({
+            success: false,
+            message: "Validation error",
+            errors: result.errors,
+          });
+        }
+        if (result.reason === "already_verified") {
+          return res.status(400).json({
+            success: false,
+            message: "Admin account is already verified",
+            code: "ALREADY_VERIFIED",
+          });
+        }
+      }
+
+      if (result.status === 403) {
+        return res.status(403).json({
+          success: false,
+          message: "Invalid admin creation key",
+          code: "INVALID_ADMIN_KEY",
+        });
+      }
+
+      if (result.status === 404) {
+        if (result.reason === "no_pending_verification") {
+          return res.status(404).json({
+            success: false,
+            message: "No pending verification found. Please start the registration process again.",
+            code: "NO_PENDING_VERIFICATION",
+          });
+        }
+        if (result.reason === "admin_not_found") {
+          return res.status(404).json({
+            success: false,
+            message: "Admin account not found",
+            code: "ADMIN_NOT_FOUND",
+          });
+        }
+      }
+
+      if (result.status === 500) {
+        return res.status(500).json({
+          success: false,
+          message: "Failed to send new verification code. Please try again.",
+          error: result.message,
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "New verification code sent to your email",
+        data: result.data,
+      });
+    } catch (error) {
+      console.error("Error resending admin OTP:", error);
+      res.status(500).json({
+        success: false,
+        message: "Server error resending OTP",
+        error: error.message,
+      });
+    }
+  }
+
+  // Resend Admin OTP for Existing Users (no admin key required)
+  static async resendExistingAdminOTP(req, res) {
+    try {
+      const result = await dtUserService.resendExistingAdminOTP(req.body);
+
+      if (result.status === 400) {
+        if (result.reason === "validation") {
+          return res.status(400).json({
+            success: false,
+            message: "Validation error",
+            errors: result.errors,
+          });
+        }
+        if (result.reason === "already_verified") {
+          return res.status(400).json({
+            success: false,
+            message: "Account is already verified",
+          });
+        }
+      }
+
+      if (result.status === 404) {
+        if (result.reason === "admin_not_found") {
+          return res.status(404).json({
+            success: false,
+            message: "Admin account not found",
+          });
+        }
+      }
+
+      if (result.status === 500) {
+        if (result.reason === "email_failed") {
+          return res.status(500).json({
+            success: false,
+            message: "Failed to send verification email",
+            error: result.message,
+          });
+        }
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Verification code resent successfully",
+        data: result.data,
+      });
+    } catch (error) {
+      console.error("Error resending existing admin OTP:", error);
+      res.status(500).json({
+        success: false,
+        message: "Server error resending OTP",
+        error: error.message,
+      });
+    }
+  }
+
+  // Get registration state for cross-device access
+  static async getRegistrationState(req, res) {
+    try {
+      const { email } = req.params;
+
+      if (!email) {
+        return res.status(400).json({
+          success: false,
+          message: "Email is required",
+        });
+      }
+
+      const result = await dtUserService.getAdminRegistrationState(email);
+
+      if (!result.success) {
+        if (result.reason === 'no_state_found') {
+          return res.status(404).json({
+            success: false,
+            message: "No active registration found for this email",
+            code: "NO_REGISTRATION_STATE",
+          });
+        }
+        
+        return res.status(500).json({
+          success: false,
+          message: "Failed to retrieve registration state",
+          error: result.error,
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Registration state retrieved successfully",
+        data: result.data,
+      });
+    } catch (error) {
+      console.error("Error retrieving registration state:", error);
+      res.status(500).json({
+        success: false,
+        message: "Server error retrieving registration state",
+        error: error.message,
+      });
+    }
+  }
+
+  // Save/update registration state for cross-device access
+  static async saveRegistrationState(req, res) {
+    try {
+      const { email, currentStep, formData, adminId } = req.body;
+
+      if (!email || !currentStep || !formData) {
+        return res.status(400).json({
+          success: false,
+          message: "Email, currentStep, and formData are required",
+        });
+      }
+
+      const result = await dtUserService.saveAdminRegistrationState(
+        email,
+        currentStep,
+        formData,
+        adminId,
+        req
+      );
+
+      if (!result.success) {
+        return res.status(500).json({
+          success: false,
+          message: "Failed to save registration state",
+          error: result.error,
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Registration state saved successfully",
+      });
+    } catch (error) {
+      console.error("Error saving registration state:", error);
+      res.status(500).json({
+        success: false,
+        message: "Server error saving registration state",
+        error: error.message,
+      });
+    }
+  }
+
+  // Application Expiry Management
+  static async processExpiredApplications(req, res) {
+    try {
+      const ApplicationExpiryService = require("../services/applicationExpiry.service");
+      const expiryService = new ApplicationExpiryService();
+
+      const result = await expiryService.processExpiredApplications();
+      
+      res.status(200).json({
+        success: true,
+        message: "Expired applications processed successfully",
+        data: {
+          processedCount: result.processedCount,
+          errorCount: result.errorCount,
+          processedApplications: result.processedApplications,
+          errors: result.errors,
+          processedAt: result.processedAt,
+        },
+      });
+    } catch (error) {
+      console.error("Error processing expired applications:", error);
+      res.status(500).json({
+        success: false,
+        message: "Server error processing expired applications",
+        error: error.message,
+      });
+    }
+  }
+
+  static async getExpiryStatistics(req, res) {
+    try {
+      const ApplicationExpiryService = require("../services/applicationExpiry.service");
+      const expiryService = new ApplicationExpiryService();
+
+      const days = parseInt(req.query.days) || 30;
+      const statistics = await expiryService.getExpiryStatistics(days);
+
+      res.status(200).json({
+        success: true,
+        message: "Expiry statistics retrieved successfully",
+        data: statistics,
+      });
+    } catch (error) {
+      console.error("Error getting expiry statistics:", error);
+      res.status(500).json({
+        success: false,
+        message: "Server error getting expiry statistics",
+        error: error.message,
+      });
+    }
+  }
+
+  static async getApplicationsExpiringSoon(req, res) {
+    try {
+      const ApplicationExpiryService = require("../services/applicationExpiry.service");
+      const expiryService = new ApplicationExpiryService();
+
+      const hours = parseInt(req.query.hours) || 24;
+      const expiringSoon = await expiryService.getApplicationsExpiringSoon(hours);
+
+      res.status(200).json({
+        success: true,
+        message: "Applications expiring soon retrieved successfully",
+        data: expiringSoon,
+      });
+    } catch (error) {
+      console.error("Error getting applications expiring soon:", error);
+      res.status(500).json({
+        success: false,
+        message: "Server error getting applications expiring soon",
         error: error.message,
       });
     }
