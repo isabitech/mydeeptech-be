@@ -1878,6 +1878,13 @@ class AnnotationProjectService {
       applicationStatus = "assessment_required";
     }
 
+    // Calculate expiry date if project has applicationDuration
+    let expiryDate = null;
+    if (project.applicationDuration) {
+      const currentDate = new Date();
+      expiryDate = new Date(currentDate.getTime() + (project.applicationDuration * 7 * 24 * 60 * 60 * 1000));
+    }
+
     const application = await this.repository.createApplication({
       projectId,
       applicantId: userId,
@@ -1887,6 +1894,7 @@ class AnnotationProjectService {
       availability: availability || "flexible",
       estimatedCompletionTime: estimatedCompletionTime || "",
       status: applicationStatus,
+      expiryDate,
     });
 
     await this.repository.updateProject(projectId, {
