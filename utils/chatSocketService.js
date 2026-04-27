@@ -263,7 +263,7 @@ const initializeSocketIO = (server) => {
         }
 
         // Verify admin role
-        if (user.role !== 'admin' && user.role !== 'moderator') {
+        if (user.role === 'user' ) {
           console.log("❌ DTUser does not have admin privileges:", user.email);
           return next(new Error('Admin privileges required'));
         }
