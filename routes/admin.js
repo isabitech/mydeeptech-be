@@ -189,6 +189,13 @@ router.delete(
   annotationProjectController.removeApprovedApplicant,
 );
 
+// Approve rejected applicant route
+router.post(
+  "/applications/approve-rejected-project-applicant",
+  authenticateAdmin,
+  annotationProjectController.approveRejectedProjectApplicant,
+);
+
 // Bulk Application Management Routes
 router.post(
   "/applications/bulk/approve",
