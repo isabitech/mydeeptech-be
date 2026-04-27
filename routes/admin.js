@@ -37,6 +37,19 @@ router.post("/create/confirm", AdminController.confirmAdminVerification);
 // Admin OTP Verification Route
 router.post("/verify-otp", AdminController.verifyAdminOTP);
 
+// Admin OTP Verification for Existing Users (no admin key required)
+router.post("/verify-otp-existing", AdminController.verifyExistingAdminOTP);
+
+// Admin Resend OTP Route
+router.post("/resend-otp", AdminController.resendAdminOTP);
+
+// Admin Resend OTP for Existing Users (no admin key required)
+router.post("/resend-otp-existing", AdminController.resendExistingAdminOTP);
+
+// Cross-device registration state management
+router.get("/registration-state/:email", AdminController.getRegistrationState);
+router.post("/registration-state", AdminController.saveRegistrationState);
+
 // Legacy admin creation route
 router.post("/create", AdminController.createAdmin);
 
@@ -174,6 +187,13 @@ router.delete(
   "/applications/:applicationId/remove",
   authenticateAdmin,
   annotationProjectController.removeApprovedApplicant,
+);
+
+// Approve rejected applicant route
+router.post(
+  "/applications/approve-rejected-project-applicant",
+  authenticateAdmin,
+  annotationProjectController.approveRejectedProjectApplicant,
 );
 
 // Bulk Application Management Routes

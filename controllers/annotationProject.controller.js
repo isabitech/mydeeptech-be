@@ -96,6 +96,12 @@ const removeApplicantSchema = Joi.object({
   removalNotes: Joi.string().max(500).allow("").optional(),
 });
 
+const approveRejectedApplicantSchema = Joi.object({
+  projectId: Joi.string().required(),
+  applicantId: Joi.string().required(),
+  reviewNotes: Joi.string().max(500).allow("").optional(),
+});
+
 class AnnotationProjectController {
   constructor() {
     this.service = new AnnotationProjectService(
@@ -245,6 +251,71 @@ class AnnotationProjectController {
       res.status(500).json({
         success: false,
         message: "Server error updating annotation project",
+        error: error.message,
+      });
+    }
+  }
+  
+    async approveRejectedProjectApplicant(req, res) {
+    try {
+      const { error, value } = this._validate(approveRejectedApplicantSchema, req.body);
+      if (error) {
+        return res.status(400).json({
+          success: false,
+          message: "Validation error",
+          errors: error.details.map((d) => d.message),
+        });
+      }
+
+      const admin = this._getAdmin(req);
+      const result = await this.service.approveRejectedApplicant(
+        value.projectId,
+        value.applicantId,
+        admin,
+        value.reviewNotes
+      );
+
+      res.status(200).json({
+        success: true,
+        message: "Applicant approved successfully",
+        data: result,
+      });
+    } catch (error) {
+      if (error.message === "Project not found") {
+        return res.status(404).json({ 
+          success: false, 
+          message: "Project not found" 
+        });
+      }
+      if (error.message === "Application not found") {
+        return res.status(404).json({ 
+          success: false, 
+          message: "Application not found" 
+        });
+      }
+      if (error.message === "Only rejected or removed applicants can be re-approved") {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Only rejected or removed applicants can be re-approved" 
+        });
+      }
+      if (error.message === "Project is not active") {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Cannot approve applicants for inactive projects" 
+        });
+      }
+      if (error.message.includes("maximum annotators")) {
+        return res.status(400).json({ 
+          success: false, 
+          message: error.message 
+        });
+      }
+      
+      console.error("Error approving rejected applicant:", error);
+      res.status(500).json({
+        success: false,
+        message: "Server error approving rejected applicant",
         error: error.message,
       });
     }

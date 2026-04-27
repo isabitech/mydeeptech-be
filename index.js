@@ -14,9 +14,7 @@ try {
   swaggerUi = swagger.swaggerUi;
   specs = swagger.specs;
 } catch (error) {
-  console.log(
-    "⚠️ Swagger dependencies not found. API documentation will not be available.",
-  );
+  console.error("❌ Swagger dependencies error:", error.message);
   swaggerUi = null;
   specs = null;
 }
@@ -85,8 +83,7 @@ app.use(express.urlencoded({ extended: true }));
 // Health check endpoint (no rate limiting for monitoring)
 app.get("/health", healthCheck);
 
-// API Documentation (only if Swagger is available)
-if (swaggerUi && specs) {
+if (swaggerUi && specs && envConfig.SWAGGER_ENABLED) {
   app.use(
     "/api-docs",
     swaggerUi.serve,
@@ -100,10 +97,11 @@ if (swaggerUi && specs) {
 } else {
   const reason = !swaggerUi
     ? "Swagger dependencies missing"
-    : !envConfig.SWAGGER_ENABLED
+    : !specs
+      ? "Swagger specs not available" 
+      : !envConfig.SWAGGER_ENABLED
       ? "Swagger disabled via environment"
-      : "Swagger specs not available";
-  console.log(`📚 API Documentation not available (${reason})`);
+      : "Unknown reason";
 }
 
 // Simple Rate Limiting Setup
@@ -141,10 +139,7 @@ const initializeRedis = async () => {
     await initRedis();
     console.log("✅ Redis initialization completed");
   } catch (error) {
-    console.log(
-      "⚠️ Redis initialization failed, will use fallback storage:",
-      error.message,
-    );
+    console.log("⚠️ Redis initialization failed, will use fallback storage:", error.message);
   }
 };
 
@@ -158,9 +153,7 @@ const connectDB = async () => {
 
   while (retries < maxRetries) {
     try {
-      console.log(
-        `🔄 Attempting MongoDB connection (attempt ${retries + 1}/${maxRetries})...`,
-      );
+      console.log(`🔄 Attempting MongoDB connection (attempt ${retries + 1}/${maxRetries})...`);
       // Perform actual database ping
       if (envConfig.NODE_ENV === "development") {
         const dns = require("node:dns");
@@ -195,10 +188,10 @@ const connectDB = async () => {
         
         // Log Swagger documentation endpoint if available
         if (swaggerUi && specs) {
-          console.log(`📚 Swagger API Documentation available at: http://localhost:${PORT}/api-docs`);
+          console.log(`📚 Swagger API Documentation available at: ${envConfig.BACKEND_URL}/api-docs`);
         } else {
           console.log(`❌ Swagger API Documentation not available (check dependencies and environment config)`);
-        }
+        } 
       });
 
       return conn;
@@ -228,10 +221,7 @@ const connectDB = async () => {
 
 // Database Connection
 connectDB().catch((err) => {
-  console.error(
-    "💀 Fatal: Could not establish MongoDB connection:",
-    err.message,
-  );
+  console.error("💀 Fatal: Could not establish MongoDB connection:", err.message);
   process.exit(1);
 });
 

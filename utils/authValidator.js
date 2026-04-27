@@ -272,6 +272,23 @@ const adminVerificationConfirmSchema = Joi.object({
   adminKey: Joi.string().required(),
 });
 
+// Existing admin OTP verification schema (no admin key required)
+const existingAdminVerificationSchema = Joi.object({
+  email: Joi.string().email().required(),
+  verificationCode: Joi.string().length(6).required(),
+});
+
+// Admin resend OTP schema - for resending verification codes
+const adminResendOTPSchema = Joi.object({
+  email: Joi.string().email().required(),
+  adminKey: Joi.string().required(),
+});
+
+// Admin resend OTP schema for existing users - no admin key required
+const existingAdminResendOTPSchema = Joi.object({
+  email: Joi.string().email().required(),
+});
+
 // DTUser password reset schema
 const dtUserPasswordResetSchema = Joi.object({
   oldPassword: Joi.string().required(),
@@ -296,5 +313,8 @@ module.exports = {
   adminCreateSchema,
   adminVerificationRequestSchema,
   adminVerificationConfirmSchema,
+  existingAdminVerificationSchema,
+  adminResendOTPSchema,
+  existingAdminResendOTPSchema,
   dtUserPasswordResetSchema,
 };
