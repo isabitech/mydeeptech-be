@@ -57,6 +57,10 @@ const projectApplicationSchema = new mongoose.Schema(
       type: String,
       default: ""
     },
+    expiryDate: {
+      type: Date,
+      default: null // Set when project has applicationDuration
+    },
 
     // Review details (filled when admin reviews)
     reviewNotes: {
@@ -73,8 +77,9 @@ const projectApplicationSchema = new mongoose.Schema(
         "application_quality",
         "availability_mismatch",
         "rate_mismatch",
+        "expired",
         "other",
-          "qualifications_mismatch",
+        "qualifications_mismatch",
       ],
       default: null
     },

@@ -1182,6 +1182,81 @@ class AdminController {
       });
     }
   }
+
+  // Application Expiry Management
+  static async processExpiredApplications(req, res) {
+    try {
+      const ApplicationExpiryService = require("../services/applicationExpiry.service");
+      const expiryService = new ApplicationExpiryService();
+
+      const result = await expiryService.processExpiredApplications();
+      
+      res.status(200).json({
+        success: true,
+        message: "Expired applications processed successfully",
+        data: {
+          processedCount: result.processedCount,
+          errorCount: result.errorCount,
+          processedApplications: result.processedApplications,
+          errors: result.errors,
+          processedAt: result.processedAt,
+        },
+      });
+    } catch (error) {
+      console.error("Error processing expired applications:", error);
+      res.status(500).json({
+        success: false,
+        message: "Server error processing expired applications",
+        error: error.message,
+      });
+    }
+  }
+
+  static async getExpiryStatistics(req, res) {
+    try {
+      const ApplicationExpiryService = require("../services/applicationExpiry.service");
+      const expiryService = new ApplicationExpiryService();
+
+      const days = parseInt(req.query.days) || 30;
+      const statistics = await expiryService.getExpiryStatistics(days);
+
+      res.status(200).json({
+        success: true,
+        message: "Expiry statistics retrieved successfully",
+        data: statistics,
+      });
+    } catch (error) {
+      console.error("Error getting expiry statistics:", error);
+      res.status(500).json({
+        success: false,
+        message: "Server error getting expiry statistics",
+        error: error.message,
+      });
+    }
+  }
+
+  static async getApplicationsExpiringSoon(req, res) {
+    try {
+      const ApplicationExpiryService = require("../services/applicationExpiry.service");
+      const expiryService = new ApplicationExpiryService();
+
+      const hours = parseInt(req.query.hours) || 24;
+      const expiringSoon = await expiryService.getApplicationsExpiringSoon(hours);
+
+      res.status(200).json({
+        success: true,
+        message: "Applications expiring soon retrieved successfully",
+        data: expiringSoon,
+      });
+    } catch (error) {
+      console.error("Error getting applications expiring soon:", error);
+      res.status(500).json({
+        success: false,
+        message: "Server error getting applications expiring soon",
+        error: error.message,
+      });
+    }
+  }
 }
 
 module.exports = AdminController;

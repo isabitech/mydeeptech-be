@@ -394,4 +394,21 @@ router.get(
   assessmentAnalyticsController.exportAnalyticsCSV,
 );
 
+// Application Expiry Management Routes
+router.post(
+  "/applications/process-expired",
+  authenticateAdmin,
+  AdminController.processExpiredApplications
+);
+router.get(
+  "/applications/expiry-statistics",
+  authenticateAdmin,
+  AdminController.getExpiryStatistics
+);
+router.get(
+  "/applications/expiring-soon",
+  authenticateAdmin,
+  AdminController.getApplicationsExpiringSoon
+);
+
 module.exports = router;

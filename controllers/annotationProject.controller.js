@@ -42,6 +42,12 @@ const createProjectSchema = Joi.object({
       return d;
     }),
   estimatedDuration: Joi.string().max(100).required(),
+  applicationDuration: Joi.number()
+    .valid(1, 2, 3, 4)
+    .optional()
+    .messages({
+      "any.only": "Application duration must be 1, 2, 3, or 4 weeks",
+    }),
   difficultyLevel: Joi.string()
     .valid("beginner", "intermediate", "advanced", "expert")
     .required(),
