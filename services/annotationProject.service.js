@@ -315,6 +315,7 @@ class AnnotationProjectService {
       approvedAnnotators,
       rejectedAnnotators,
       pendingAnnotators,
+      removedAnnotators,
       recentReviewActivity,
     ] = await Promise.all([
       this.repository.aggregateApplications([
@@ -330,6 +331,9 @@ class AnnotationProjectService {
       ),
       this.repository.aggregateApplications(
         buildSearchPipeline("pending", "appliedAt"),
+      ),
+      this.repository.aggregateApplications(
+        buildSearchPipeline("removed", "removedAt"),
       ),
       this.repository.aggregateApplications([
         {
@@ -374,8 +378,10 @@ class AnnotationProjectService {
 
     const formatAnnotatorData = (applications) => {
       return applications.map((app) => ({
+        _id: app._id, // Application unique ID for table rowKey
+        applicationId: app._id, // Alternative key for consistency
         applicantId: {
-          _id: app._id,
+          _id: app.applicantId?._id, // Applicant's user ID
           fullName: app.applicantId?.fullName || "N/A",
           email: app.applicantId?.email || "N/A",
           annotatorStatus: app.applicantId?.annotatorStatus || "pending",
@@ -449,10 +455,12 @@ class AnnotationProjectService {
       total:
         approvedAnnotators.length +
         rejectedAnnotators.length +
-        pendingAnnotators.length,
+        pendingAnnotators.length +
+        removedAnnotators.length,
       approved: approvedAnnotators.length,
       rejected: rejectedAnnotators.length,
       pending: pendingAnnotators.length,
+      removed: removedAnnotators.length,
       approvalRate:
         approvedAnnotators.length + rejectedAnnotators.length > 0
           ? Math.round(
@@ -512,6 +520,7 @@ class AnnotationProjectService {
         approved: formatAnnotatorData(approvedAnnotators),
         rejected: formatAnnotatorData(rejectedAnnotators),
         pending: formatAnnotatorData(pendingAnnotators),
+        removed: formatAnnotatorData(removedAnnotators),
       },
       recentReviewActivity,
       searchFilter: search || null,
@@ -519,10 +528,12 @@ class AnnotationProjectService {
         approved: approvedAnnotators.length,
         rejected: rejectedAnnotators.length,
         pending: pendingAnnotators.length,
+        removed: removedAnnotators.length,
         total:
           approvedAnnotators.length +
           rejectedAnnotators.length +
-          pendingAnnotators.length,
+          pendingAnnotators.length +
+          removedAnnotators.length,
       },
     };
   };
@@ -566,6 +577,28 @@ class AnnotationProjectService {
     return project;
   };
 
+    approveProjectApplicant = async (projectId, updateData) => {
+    const project = await this.repository.updateProject(projectId, {
+      ...updateData,
+      updatedAt: new Date(),
+    });
+    if (!project) throw new Error("Project not found");
+    return await this.repository.findProjectByIdWithPopulate(project._id, [
+      { path: "createdBy", select: "fullName email" },
+      { path: "assignedAdmins", select: "fullName email" },
+    ]);
+  };
+
+  approveAnnotationProject = async (projectId, applicantId) => {
+    const project = await this.repository.findProjectById(projectId);
+    if (!project) throw new Error("Project not found");
+
+    project.isActive = !project.isActive;
+    project.status = project.isActive ? "active" : "inactive";
+    await project.save();
+    return project;
+  };
+
   toggleProjectVisibility = async (projectId) => {
     const project = await this.repository.findProjectById(projectId);
     if (!project) throw new Error("Project not found");
@@ -582,7 +615,7 @@ class AnnotationProjectService {
 
     const activeApplications = await this.repository.countApplications({
       projectId,
-      status: { $in: ["pending", "approved"] },
+      status: { $in: ["ai_interview_required", "pending", "approved"] },
     });
 
     if (activeApplications > 0) {
@@ -605,7 +638,7 @@ class AnnotationProjectService {
 
     const activeApplications = await this.repository.countApplications({
       projectId,
-      status: { $in: ["pending", "approved"] },
+      status: { $in: ["ai_interview_required", "pending", "approved"] },
     });
     const allApplicationsCount = await this.repository.countApplications({
       projectId,
@@ -680,7 +713,7 @@ class AnnotationProjectService {
 
     const activeApplicationsCount = await this.repository.countApplications({
       projectId,
-      status: { $in: ["pending", "approved"] },
+      status: { $in: ["ai_interview_required", "pending", "approved"] },
     });
 
     const allApplications = await this.repository.findApplications({
@@ -1040,6 +1073,125 @@ class AnnotationProjectService {
       projectName: application.projectId.projectName,
       applicantName: application.applicantId.fullName,
       emailNotificationSent: true,
+    };
+  };
+
+  approveRejectedApplicant = async (projectId, applicantId, admin, reviewNotes) => {
+    // Find the application by project and applicant ID
+    const application = await this.repository.findOneApplication(
+      { projectId, applicantId },
+      {
+        populate: [
+          {
+            path: "projectId",
+            select:
+              "projectName projectCategory payRate approvedAnnotators maxAnnotators projectGuidelineLink projectGuidelineVideo projectCommunityLink projectTrackerLink isActive status",
+          },
+          { path: "applicantId", select: "fullName email" },
+        ],
+        lean: false,
+      }
+    );
+
+    if (!application) throw new Error("Application not found");
+
+    // Check if the project exists and is active
+    const project = application.projectId;
+    if (!project) throw new Error("Project not found");
+    if (!project.isActive) throw new Error("Project is not active");
+
+    // Validate that the applicant was previously rejected or removed
+    if (application.status !== "rejected" && application.status !== "removed") {
+      throw new Error("Only rejected or removed applicants can be re-approved");
+    }
+
+    // Check if project has reached maximum annotators
+    if (
+      project.maxAnnotators &&
+      project.approvedAnnotators >= project.maxAnnotators
+    ) {
+      throw new Error("Project has reached maximum number of annotators");
+    }
+
+    // Update application status back to approved
+    application.status = "approved";
+    application.reviewedBy = admin.userId;
+    application.reviewedAt = new Date();
+    application.reviewNotes = reviewNotes || "";
+    application.workStartedAt = new Date(); // Reset work start time
+
+    // Clear rejection-related fields
+    if (application.rejectionReason) {
+      application.rejectionReason = undefined;
+    }
+
+    // Clear removal-related fields if this was a removed applicant
+    if (application.removedAt) {
+      application.removedAt = undefined;
+      application.removedBy = undefined;
+      application.removalReason = undefined;
+      application.removalNotes = undefined;
+      application.workEndedAt = undefined;
+    }
+
+    await application.save();
+
+    // Increment approved annotators count
+    await this.repository.updateProject(project._id, {
+      $inc: { approvedAnnotators: 1 },
+    });
+
+    try {
+      // Send approval notification email
+      const projectData = {
+        projectName: project.projectName,
+        projectCategory: project.projectCategory,
+        payRate: project.payRate,
+        adminName: admin.fullName,
+        reviewNotes: reviewNotes || "",
+        projectGuidelineLink: project.projectGuidelineLink,
+        projectGuidelineVideo: project.projectGuidelineVideo,
+        projectCommunityLink: project.projectCommunityLink,
+        projectTrackerLink: project.projectTrackerLink,
+        isReapproval: true, // Flag to indicate this is a re-approval
+      };
+      await MailService.sendProjectApprovalNotification(
+        application.applicantId.email,
+        application.applicantId.fullName,
+        projectData,
+      );
+    } catch (emailError) {
+      console.error(
+        `⚠️ Failed to send re-approval notification:`,
+        emailError.message,
+      );
+    }
+
+    try {
+      // Create notification for the applicant
+      await NotificationService.createApplicationStatusNotification(
+        application.applicantId._id,
+        "approved",
+        {
+          _id: application.projectId._id,
+          projectName: application.projectId.projectName,
+          projectCategory: application.projectId.projectCategory,
+        },
+        { _id: application._id },
+      );
+    } catch (notificationError) {
+      console.error(
+        `⚠️ Failed to create re-approval notification:`,
+        notificationError.message,
+      );
+    }
+
+    return {
+      application,
+      projectName: project.projectName,
+      applicantName: application.applicantId.fullName,
+      emailNotificationSent: true,
+      message: "Applicant successfully re-approved",
     };
   };
 
@@ -1777,10 +1929,13 @@ class AnnotationProjectService {
     if (!project) throw new Error("project_not_found");
     if (project.status !== "active") throw new Error("project_closed");
 
-    const existingApplication = await this.repository.findOneApplication({
-      projectId,
-      applicantId: userId,
-    }, { lean: false });
+    const existingApplication = await this.repository.findOneApplication(
+      {
+        projectId,
+        applicantId: userId,
+      },
+      { lean: false },
+    );
 
     if (existingApplication) {
       if (existingApplication.status === "ai_interview_required") {
@@ -1865,16 +2020,25 @@ class AnnotationProjectService {
     const { coverLetter, proposedRate, availability, estimatedCompletionTime } =
       body || {};
 
+    let expiryDate = null;
+    if (project.applicationDuration) {
+      expiryDate = new Date(
+        Date.now() +
+          project.applicationDuration * 7 * 24 * 60 * 60 * 1000,
+      );
+    }
+
     if (!project.aiInterviewRequired) {
       const application = await this.repository.createApplication({
         projectId,
         applicantId: userId,
         coverLetter: coverLetter || "",
         resumeUrl: user.attachments.resume_url,
-        proposedRate: proposedRate || project.payRate,
+        proposedRate: proposedRate ?? project.payRate ?? null,
         availability: availability || "flexible",
         estimatedCompletionTime: estimatedCompletionTime || "",
         status: "pending",
+        expiryDate,
       });
 
       await this.repository.updateProject(projectId, {
@@ -1899,11 +2063,12 @@ class AnnotationProjectService {
       applicantId: userId,
       coverLetter: coverLetter || "",
       resumeUrl: user.attachments.resume_url,
-      proposedRate: proposedRate || project.payRate,
+      proposedRate: proposedRate ?? project.payRate ?? null,
       availability: availability || "flexible",
       estimatedCompletionTime: estimatedCompletionTime || "",
       status: "ai_interview_required",
       aiInterviewTrackId: buildProjectTrackId(project._id),
+      expiryDate,
     });
 
     await this.repository.updateProject(projectId, {
@@ -1954,51 +2119,7 @@ class AnnotationProjectService {
     };
 
     return refreshedApplication;
-
-    /* Legacy apply flow removed.
-    if (!assessmentTriggered) {
-      try {
-        const projectWithAdmins =
-          await this.repository.findProjectByIdWithPopulate(projectId, [
-            { path: "createdBy", select: "fullName email" },
-            { path: "assignedAdmins", select: "fullName email" },
-          ]);
-
-        const adminEmails = [projectWithAdmins.createdBy.email];
-        if (projectWithAdmins.assignedAdmins) {
-          projectWithAdmins.assignedAdmins.forEach((adm) => {
-            if (!adminEmails.includes(adm.email)) adminEmails.push(adm.email);
-          });
-        }
-
-        const notificationData = {
-          applicantName: user.fullName,
-          projectName: project.projectName,
-          appliedAt: application.appliedAt,
-        };
-
-        for (const email of adminEmails) {
-          await MailService.sendProjectApplicationNotification(
-            email,
-            "Project Admin",
-            notificationData,
-          );
-        }
-      } catch (err) {
-        console.error(
-          "⚠️ Failed to notify admins of application:",
-          err.message,
-        );
-      }
-    }
-
-    return await this.repository.findApplicationByIdWithPopulate(
-      application._id,
-      [{ path: "projectId", select: "projectName projectCategory payRate" }],
-    );
-    */
   };
-
   /**
    * Annotator: Get project guidelines.
    */

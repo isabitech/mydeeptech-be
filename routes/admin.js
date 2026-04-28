@@ -189,6 +189,13 @@ router.delete(
   annotationProjectController.removeApprovedApplicant,
 );
 
+// Approve rejected applicant route
+router.post(
+  "/applications/approve-rejected-project-applicant",
+  authenticateAdmin,
+  annotationProjectController.approveRejectedProjectApplicant,
+);
+
 // Bulk Application Management Routes
 router.post(
   "/applications/bulk/approve",
@@ -385,6 +392,23 @@ router.get(
   "/assessments/analytics/export",
   authenticateAdmin,
   assessmentAnalyticsController.exportAnalyticsCSV,
+);
+
+// Application Expiry Management Routes
+router.post(
+  "/applications/process-expired",
+  authenticateAdmin,
+  AdminController.processExpiredApplications
+);
+router.get(
+  "/applications/expiry-statistics",
+  authenticateAdmin,
+  AdminController.getExpiryStatistics
+);
+router.get(
+  "/applications/expiring-soon",
+  authenticateAdmin,
+  AdminController.getApplicationsExpiringSoon
 );
 
 module.exports = router;
