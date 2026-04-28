@@ -402,6 +402,12 @@ class DtUserService {
         reviewNotes: app.reviewNotes,
         coverLetter: app.coverLetter,
         availability: app.availability,
+        aiInterviewSessionId: app.aiInterviewSessionId || null,
+        aiInterviewTrackId: app.aiInterviewTrackId || "",
+        aiInterviewStatus: app.aiInterviewStatus || "",
+        aiInterviewScore: app.aiInterviewScore ?? null,
+        aiInterviewSummary: app.aiInterviewSummary || "",
+        aiInterviewCompletedAt: app.aiInterviewCompletedAt || null,
       });
     });
 
@@ -431,7 +437,7 @@ class DtUserService {
         {
           $match: {
             projectId: { $in: projectIds },
-            status: { $in: ["pending", "approved"] },
+            status: { $in: ["ai_interview_required", "pending", "approved"] },
           },
         },
         { $group: { _id: "$projectId", count: { $sum: 1 } } },
@@ -497,6 +503,9 @@ class DtUserService {
           appliedProjects: allUserApplications.length,
           totalApplications: allUserApplications.length,
           applicationStats: {
+            aiInterviewRequired: allUserApplications.filter(
+              (a) => a.status === "ai_interview_required",
+            ).length,
             pending: allUserApplications.filter((a) => a.status === "pending")
               .length,
             approved: allUserApplications.filter((a) => a.status === "approved")
