@@ -83,7 +83,17 @@ class DTUserController {
       );
       let responseMessage = "Application submitted successfully";
       let additionalData = {};
-      if (application.status === "assessment_required") {
+      let statusCode = 201;
+      if (application.status === "ai_interview_required") {
+        responseMessage =
+          "Project AI interview created. Complete the interview before your application is submitted for admin review.";
+        additionalData = {
+          aiInterviewRequired: true,
+          aiInterview: application.aiInterview || null,
+          applicationStatus: application.status,
+        };
+        statusCode = application.aiInterview?.session ? 200 : 201;
+      } else if (application.status === "assessment_required") {
         responseMessage =
           "Application submitted. Please check your email for assessment instructions.";
         additionalData = {
@@ -93,7 +103,7 @@ class DTUserController {
             "You must complete the multimedia assessment before your application can be reviewed.",
         };
       }
-      res.status(201).json({
+      res.status(statusCode).json({
         success: true,
         message: responseMessage,
         data: {
@@ -144,6 +154,21 @@ class DTUserController {
         return res.status(400).json({
           success: false,
           message: "Project has reached maximum number of applicants",
+        });
+      }
+      if (
+        error.message === "project_application_not_found" ||
+        error.message === "track_not_found"
+      ) {
+        return res.status(404).json({
+          success: false,
+          message: "Project interview could not be created for this application",
+        });
+      }
+      if (error.message === "ai_interview_setup_failed") {
+        return res.status(500).json({
+          success: false,
+          message: "Failed to create project AI interview",
         });
       }
       if (error.message === "assessment_cooldown") {

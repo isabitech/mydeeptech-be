@@ -17,7 +17,15 @@ const projectApplicationSchema = new mongoose.Schema(
     // Application status and timeline
     status: {
       type: String,
-      enum: ["pending", "approved", "rejected", "withdrawn", "removed", "assessment_required"],
+      enum: [
+        "pending",
+        "approved",
+        "rejected",
+        "withdrawn",
+        "removed",
+        "assessment_required",
+        "ai_interview_required",
+      ],
       default: "pending"
     },
     appliedAt: {
@@ -74,8 +82,38 @@ const projectApplicationSchema = new mongoose.Schema(
         "availability_mismatch",
         "rate_mismatch",
         "other",
-          "qualifications_mismatch",
+        "qualifications_mismatch",
+        "ai_interview_failed",
       ],
+      default: null
+    },
+
+    aiInterviewSessionId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "AiInterviewSession",
+      default: null
+    },
+    aiInterviewTrackId: {
+      type: String,
+      default: ""
+    },
+    aiInterviewStatus: {
+      type: String,
+      default: ""
+    },
+    aiInterviewScore: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: null
+    },
+    aiInterviewSummary: {
+      type: String,
+      maxlength: 1000,
+      default: ""
+    },
+    aiInterviewCompletedAt: {
+      type: Date,
       default: null
     },
 
@@ -193,7 +231,8 @@ projectApplicationSchema.set('toJSON', { virtuals: true });
 
 // Pre-save middleware to update timestamps
 projectApplicationSchema.pre('save', function(next) {
-  if (this.isModified('status') && this.status !== 'pending') {
+  const reviewedStatuses = new Set(['approved', 'rejected', 'removed']);
+  if (this.isModified('status') && reviewedStatuses.has(this.status)) {
     this.reviewedAt = new Date();
   }
   next();

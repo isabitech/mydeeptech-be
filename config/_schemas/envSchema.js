@@ -63,6 +63,13 @@ const Joi = require("joi");
   EXCHANGE_RATE_API_KEY: Joi.string().required(),
   EXCHANGE_RATES_API_KEY: Joi.string().required(),
 
+  // AI / Groq
+  GROQ_API_KEY: Joi.string().allow("").optional(),
+  AI_MODEL_MAIN: Joi.string().allow("").optional(),
+  AI_MODEL_SCORE: Joi.string().allow("").optional(),
+  AI_BASE_URL: Joi.string().uri().optional(),
+  AI_PROMPT_VERSION: Joi.string().allow("").optional(),
+
   // Swagger Configuration
   SWAGGER_URL: Joi.string().uri().optional(),
   SWAGGER_ENABLED: Joi.string().valid('true', 'false').optional(),

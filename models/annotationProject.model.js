@@ -65,6 +65,10 @@ const annotationProjectSchema = new mongoose.Schema(
       enum: ["open", "close"],
       default: "open"
     },
+    aiInterviewRequired: {
+      type: Boolean,
+      default: false
+    },
     maxAnnotators: {
       type: Number,
       default: null // null means unlimited

@@ -33,6 +33,7 @@ const createProjectSchema = Joi.object({
   payRateType: Joi.string()
     .valid("per_task", "per_hour", "per_project", "per_annotation")
     .default("per_task"),
+  aiInterviewRequired: Joi.boolean().optional(),
   maxAnnotators: Joi.number().min(1).allow(null).optional(),
   deadline: Joi.date()
     .greater("now")
