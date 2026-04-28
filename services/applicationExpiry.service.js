@@ -1,12 +1,9 @@
 const ProjectApplication = require("../models/projectApplication.model");
-const AnnotationProject = require("../models/annotationProject.model");
 const MailService = require("./mail-service/mail-service");
-const NotificationService = require("./notification.service");
 
 class ApplicationExpiryService {
   constructor() {
     this.mailService = new MailService();
-    this.notificationService = new NotificationService();
   }
 
   /**
@@ -19,10 +16,11 @@ class ApplicationExpiryService {
       
       const currentDate = new Date();
       
-      // Find all applications that are past their expiry date and still pending/assessment_required
+      // Find all applications that are past their expiry date and still
+      // eligible for review or interview completion.
       const expiredApplications = await ProjectApplication.find({
         expiryDate: { $lt: currentDate },
-        status: { $in: ["pending", "assessment_required"] }
+        status: { $in: ["pending", "assessment_required", "ai_interview_required"] }
       }).populate([
         {
           path: "applicantId",
@@ -220,7 +218,7 @@ class ApplicationExpiryService {
           $lt: alertDate,
           $gt: new Date()
         },
-        status: { $in: ["pending", "assessment_required"] }
+        status: { $in: ["pending", "assessment_required", "ai_interview_required"] }
       }).populate([
         {
           path: "applicantId",

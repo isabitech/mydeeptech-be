@@ -1,13 +1,16 @@
 const mongoose = require("mongoose");
 const MailService = require("./mail-service/mail-service");
-const NotificationService = require("./notification.service");
+const NotificationService = require("../utils/notificationService");
 const MultimediaAssessmentConfig = require("../models/multimediaAssessmentConfig.model");
 const UserRepository = require("../repositories/user.repository");
+const aiInterviewService = require("./aiInterview.service");
+const { buildProjectTrackId } = require("./ai-interview/trackCatalog");
 
 class AnnotationProjectService {
   constructor(repository) {
     this.repository = repository;
     this.userRepository = new UserRepository();
+    this.aiInterviewService = aiInterviewService;
   }
 
   // Project methods
@@ -19,6 +22,7 @@ class AnnotationProjectService {
 
     const data = {
       ...projectData,
+      aiInterviewRequired: Boolean(projectData.aiInterviewRequired),
       createdBy: adminId,
       assignedAdmins: [adminId],
     };
@@ -28,6 +32,108 @@ class AnnotationProjectService {
       { path: "createdBy", select: "fullName email" },
       { path: "assignedAdmins", select: "fullName email" },
     ]);
+  };
+
+  clearApplicationAiInterviewMetadata(application) {
+    application.aiInterviewSessionId = null;
+    application.aiInterviewTrackId = "";
+    application.aiInterviewStatus = "";
+    application.aiInterviewScore = null;
+    application.aiInterviewSummary = "";
+    application.aiInterviewCompletedAt = null;
+  }
+
+  notifyApplicantPendingReview = async ({ application, project, applicant }) => {
+    try {
+      await NotificationService.createApplicationStatusNotification(
+        applicant._id,
+        "pending",
+        {
+          _id: project._id,
+          projectName: project.projectName,
+          projectCategory: project.projectCategory,
+        },
+        { _id: application._id },
+      );
+    } catch (error) {
+      console.error(
+        "Failed to create pending application notification:",
+        error.message,
+      );
+    }
+  };
+
+  markApplicationPendingForAdminReview = async ({
+    application,
+    project,
+    applicant,
+    clearAiInterview = false,
+  }) => {
+    application.status = "pending";
+    application.reviewedBy = null;
+    application.reviewedAt = null;
+    application.rejectionReason = null;
+    application.reviewNotes = "";
+
+    if (clearAiInterview) {
+      this.clearApplicationAiInterviewMetadata(application);
+    }
+
+    await application.save();
+
+    try {
+      await this.aiInterviewService.notifyProjectAdminsOfPendingApplication({
+        project,
+        application,
+        applicant,
+      });
+      application.adminNotified = true;
+      await application.save();
+    } catch (error) {
+      console.error(
+        "Failed to notify project admins of pending application:",
+        error.message,
+      );
+    }
+
+    await this.notifyApplicantPendingReview({
+      application,
+      project,
+      applicant,
+    });
+
+    return application;
+  };
+
+  releaseAiInterviewRequiredApplicationsForProject = async (project) => {
+    const gatedApplications = await this.repository.findApplications(
+      {
+        projectId: project._id,
+        status: "ai_interview_required",
+      },
+      {
+        lean: false,
+        populate: [
+          {
+            path: "applicantId",
+            select: "fullName email attachments.resume_url",
+          },
+        ],
+      },
+    );
+
+    for (const application of gatedApplications) {
+      if (!application?.applicantId) {
+        continue;
+      }
+
+      await this.markApplicationPendingForAdminReview({
+        application,
+        project,
+        applicant: application.applicantId,
+        clearAiInterview: true,
+      });
+    }
   };
 
   getAllProjects = async (query) => {
@@ -433,11 +539,28 @@ class AnnotationProjectService {
   };
 
   updateProject = async (projectId, updateData) => {
+    const existingProject = await this.repository.findProjectById(projectId);
+    if (!existingProject) throw new Error("Project not found");
+
+    const nextAiInterviewRequired = Object.prototype.hasOwnProperty.call(
+      updateData,
+      "aiInterviewRequired",
+    )
+      ? Boolean(updateData.aiInterviewRequired)
+      : Boolean(existingProject.aiInterviewRequired);
+
     const project = await this.repository.updateProject(projectId, {
       ...updateData,
+      ...(Object.prototype.hasOwnProperty.call(updateData, "aiInterviewRequired")
+        ? { aiInterviewRequired: nextAiInterviewRequired }
+        : {}),
       updatedAt: new Date(),
     });
-    if (!project) throw new Error("Project not found");
+
+    if (Boolean(existingProject.aiInterviewRequired) && !nextAiInterviewRequired) {
+      await this.releaseAiInterviewRequiredApplicationsForProject(project);
+    }
+
     return await this.repository.findProjectByIdWithPopulate(project._id, [
       { path: "createdBy", select: "fullName email" },
       { path: "assignedAdmins", select: "fullName email" },
@@ -492,7 +615,7 @@ class AnnotationProjectService {
 
     const activeApplications = await this.repository.countApplications({
       projectId,
-      status: { $in: ["pending", "approved"] },
+      status: { $in: ["ai_interview_required", "pending", "approved"] },
     });
 
     if (activeApplications > 0) {
@@ -515,7 +638,7 @@ class AnnotationProjectService {
 
     const activeApplications = await this.repository.countApplications({
       projectId,
-      status: { $in: ["pending", "approved"] },
+      status: { $in: ["ai_interview_required", "pending", "approved"] },
     });
     const allApplicationsCount = await this.repository.countApplications({
       projectId,
@@ -590,7 +713,7 @@ class AnnotationProjectService {
 
     const activeApplicationsCount = await this.repository.countApplications({
       projectId,
-      status: { $in: ["pending", "approved"] },
+      status: { $in: ["ai_interview_required", "pending", "approved"] },
     });
 
     const allApplications = await this.repository.findApplications({
@@ -971,7 +1094,7 @@ class AnnotationProjectService {
     );
 
     if (!application) throw new Error("Application not found");
-    
+
     // Check if the project exists and is active
     const project = application.projectId;
     if (!project) throw new Error("Project not found");
@@ -996,12 +1119,12 @@ class AnnotationProjectService {
     application.reviewedAt = new Date();
     application.reviewNotes = reviewNotes || "";
     application.workStartedAt = new Date(); // Reset work start time
-    
+
     // Clear rejection-related fields
     if (application.rejectionReason) {
       application.rejectionReason = undefined;
     }
-    
+
     // Clear removal-related fields if this was a removed applicant
     if (application.removedAt) {
       application.removedAt = undefined;
@@ -1651,6 +1774,12 @@ class AnnotationProjectService {
           reviewNotes: app.reviewNotes,
           coverLetter: app.coverLetter,
           availability: app.availability,
+          aiInterviewSessionId: app.aiInterviewSessionId || null,
+          aiInterviewTrackId: app.aiInterviewTrackId || "",
+          aiInterviewStatus: app.aiInterviewStatus || "",
+          aiInterviewScore: app.aiInterviewScore ?? null,
+          aiInterviewSummary: app.aiInterviewSummary || "",
+          aiInterviewCompletedAt: app.aiInterviewCompletedAt || null,
         },
       ]),
     );
@@ -1714,7 +1843,7 @@ class AnnotationProjectService {
           {
             $match: {
               projectId: { $in: projectIds },
-              status: { $in: ["pending", "approved"] },
+              status: { $in: ["ai_interview_required", "pending", "approved"] },
             },
           },
           { $group: { _id: "$projectId", count: { $sum: 1 } } },
@@ -1800,12 +1929,78 @@ class AnnotationProjectService {
     if (!project) throw new Error("project_not_found");
     if (project.status !== "active") throw new Error("project_closed");
 
-    const existingApplication = await this.repository.findOneApplication({
-      projectId,
-      applicantId: userId,
-    });
+    const existingApplication = await this.repository.findOneApplication(
+      {
+        projectId,
+        applicantId: userId,
+      },
+      { lean: false },
+    );
 
     if (existingApplication) {
+      if (existingApplication.status === "ai_interview_required") {
+        if (!project.aiInterviewRequired) {
+          await this.markApplicationPendingForAdminReview({
+            application: existingApplication,
+            project,
+            applicant: user,
+            clearAiInterview: true,
+          });
+
+          return await this.repository.findApplicationByIdWithPopulate(
+            existingApplication._id,
+            [{ path: "projectId", select: "projectName projectCategory payRate" }],
+          );
+        }
+
+        const interviewResult =
+          await this.aiInterviewService.startProjectApplicationSession({
+            userId,
+            projectId,
+            projectApplicationId: existingApplication._id,
+            body: {
+              coverLetter:
+                body?.coverLetter ?? existingApplication.coverLetter ?? "",
+              proposedRate:
+                body?.proposedRate ?? existingApplication.proposedRate ?? null,
+              availability:
+                body?.availability ??
+                existingApplication.availability ??
+                "flexible",
+              estimatedCompletionTime:
+                body?.estimatedCompletionTime ??
+                existingApplication.estimatedCompletionTime ??
+                "",
+              resumeName: body?.resumeName || "",
+              languageCode: body?.languageCode || "en-US",
+            },
+          });
+
+        if (interviewResult.status !== 200) {
+          const err = new Error(
+            interviewResult.reason || "ai_interview_setup_failed",
+          );
+          err.interviewResult = interviewResult;
+          throw err;
+        }
+
+        const refreshedApplication =
+          await this.repository.findApplicationByIdWithPopulate(
+            existingApplication._id,
+            [{ path: "projectId", select: "projectName projectCategory payRate" }],
+          );
+
+        refreshedApplication.aiInterview = {
+          required: true,
+          trackId:
+            refreshedApplication.aiInterviewTrackId ||
+            buildProjectTrackId(project._id),
+          session: interviewResult.payload?.session || null,
+        };
+
+        return refreshedApplication;
+      }
+
       const err = new Error("duplicate");
       err.applicationStatus = existingApplication.status;
       throw err;
@@ -1814,7 +2009,7 @@ class AnnotationProjectService {
     if (project.maxAnnotators) {
       const currentApplications = await this.repository.countApplications({
         projectId,
-        status: { $in: ["pending", "approved"] },
+        status: { $in: ["ai_interview_required", "pending", "approved"] },
       });
 
       if (currentApplications >= project.maxAnnotators) {
@@ -1825,64 +2020,42 @@ class AnnotationProjectService {
     const { coverLetter, proposedRate, availability, estimatedCompletionTime } =
       body || {};
 
-    // Assessment logic
-    const requiresAssessment =
-      project.assessment?.isRequired && project.assessment?.assessmentId;
-    let assessmentTriggered = false;
-
-    if (requiresAssessment) {
-      if (user.multimediaAssessmentStatus === "failed") {
-        const cooldownHours = 24;
-        const lastFailedAt =
-          user.multimediaAssessmentLastFailedAt || new Date(0);
-        const cooldownEnd = new Date(
-          lastFailedAt.getTime() + cooldownHours * 60 * 60 * 1000,
-        );
-        if (Date.now() < cooldownEnd.getTime()) {
-          const err = new Error("assessment_cooldown");
-          err.cooldownEndsAt = cooldownEnd;
-          err.hoursRemaining = Math.ceil(
-            (cooldownEnd - new Date()) / (60 * 60 * 1000),
-          );
-          throw err;
-        }
-      }
-
-      if (user.multimediaAssessmentStatus !== "approved") {
-        const assessmentConfig = await MultimediaAssessmentConfig.findById(
-          project.assessment.assessmentId,
-        ).populate("projectId", "projectName");
-        if (!assessmentConfig || !assessmentConfig.isActive) {
-          throw new Error("assessment_config_missing");
-        }
-
-        user.multimediaAssessmentStatus = "pending";
-        await user.save();
-
-        await MailService.sendAssessmentInvitationEmail(
-          user.email,
-          user.fullName,
-          {
-            title: assessmentConfig.title,
-            timeLimit: assessmentConfig.estimatedDuration || "60 minutes",
-            description: `Complete assessment for ${project.projectName}`,
-          },
-        );
-
-        assessmentTriggered = true;
-      }
-    }
-
-    let applicationStatus = "pending";
-    if (requiresAssessment && user.multimediaAssessmentStatus !== "approved") {
-      applicationStatus = "assessment_required";
-    }
-
-    // Calculate expiry date if project has applicationDuration
     let expiryDate = null;
     if (project.applicationDuration) {
-      const currentDate = new Date();
-      expiryDate = new Date(currentDate.getTime() + (project.applicationDuration * 7 * 24 * 60 * 60 * 1000));
+      expiryDate = new Date(
+        Date.now() +
+          project.applicationDuration * 7 * 24 * 60 * 60 * 1000,
+      );
+    }
+
+    if (!project.aiInterviewRequired) {
+      const application = await this.repository.createApplication({
+        projectId,
+        applicantId: userId,
+        coverLetter: coverLetter || "",
+        resumeUrl: user.attachments.resume_url,
+        proposedRate: proposedRate ?? project.payRate ?? null,
+        availability: availability || "flexible",
+        estimatedCompletionTime: estimatedCompletionTime || "",
+        status: "pending",
+        expiryDate,
+      });
+
+      await this.repository.updateProject(projectId, {
+        $inc: { totalApplications: 1 },
+      });
+
+      await this.markApplicationPendingForAdminReview({
+        application,
+        project,
+        applicant: user,
+        clearAiInterview: true,
+      });
+
+      return await this.repository.findApplicationByIdWithPopulate(
+        application._id,
+        [{ path: "projectId", select: "projectName projectCategory payRate" }],
+      );
     }
 
     const application = await this.repository.createApplication({
@@ -1890,10 +2063,11 @@ class AnnotationProjectService {
       applicantId: userId,
       coverLetter: coverLetter || "",
       resumeUrl: user.attachments.resume_url,
-      proposedRate: proposedRate || project.payRate,
+      proposedRate: proposedRate ?? project.payRate ?? null,
       availability: availability || "flexible",
       estimatedCompletionTime: estimatedCompletionTime || "",
-      status: applicationStatus,
+      status: "ai_interview_required",
+      aiInterviewTrackId: buildProjectTrackId(project._id),
       expiryDate,
     });
 
@@ -1901,49 +2075,51 @@ class AnnotationProjectService {
       $inc: { totalApplications: 1 },
     });
 
-    // Send project application notification to admins
-    if (!assessmentTriggered) {
-      try {
-        const projectWithAdmins =
-          await this.repository.findProjectByIdWithPopulate(projectId, [
-            { path: "createdBy", select: "fullName email" },
-            { path: "assignedAdmins", select: "fullName email" },
-          ]);
+    const interviewResult =
+      await this.aiInterviewService.startProjectApplicationSession({
+        userId,
+        projectId,
+        projectApplicationId: application._id,
+        body: {
+          coverLetter: coverLetter || "",
+          proposedRate: proposedRate ?? project.payRate ?? null,
+          availability: availability || "flexible",
+          estimatedCompletionTime: estimatedCompletionTime || "",
+          resumeName: body?.resumeName || "",
+          languageCode: body?.languageCode || "en-US",
+        },
+      });
 
-        const adminEmails = [projectWithAdmins.createdBy.email];
-        if (projectWithAdmins.assignedAdmins) {
-          projectWithAdmins.assignedAdmins.forEach((adm) => {
-            if (!adminEmails.includes(adm.email)) adminEmails.push(adm.email);
-          });
-        }
+    if (interviewResult.status !== 200) {
+      await Promise.all([
+        this.repository.deleteApplicationsMany({ _id: application._id }),
+        this.repository.updateProject(projectId, {
+          $inc: { totalApplications: -1 },
+        }),
+      ]);
 
-        const notificationData = {
-          applicantName: user.fullName,
-          projectName: project.projectName,
-          appliedAt: application.appliedAt,
-        };
-
-        for (const email of adminEmails) {
-          await MailService.sendProjectApplicationNotification(
-            email,
-            "Project Admin",
-            notificationData,
-          );
-        }
-      } catch (err) {
-        console.error(
-          "⚠️ Failed to notify admins of application:",
-          err.message,
-        );
-      }
+      const err = new Error(
+        interviewResult.reason || "ai_interview_setup_failed",
+      );
+      err.interviewResult = interviewResult;
+      throw err;
     }
 
-    return await this.repository.findApplicationByIdWithPopulate(
-      application._id,
-      [{ path: "projectId", select: "projectName projectCategory payRate" }],
-    );
-  };
+    const refreshedApplication =
+      await this.repository.findApplicationByIdWithPopulate(application._id, [
+        { path: "projectId", select: "projectName projectCategory payRate" },
+      ]);
 
+    refreshedApplication.aiInterview = {
+      required: true,
+      trackId:
+        refreshedApplication.aiInterviewTrackId ||
+        buildProjectTrackId(project._id),
+      session: interviewResult.payload?.session || null,
+    };
+
+    return refreshedApplication;
+  };
   /**
    * Annotator: Get project guidelines.
    */
@@ -2092,6 +2268,9 @@ class AnnotationProjectService {
       appliedProjects: applications.length,
       totalApplications: applications.length,
       applicationStats: {
+        aiInterviewRequired: applications.filter(
+          (app) => app.status === "ai_interview_required",
+        ).length,
         pending: applications.filter((app) => app.status === "pending").length,
         approved: applications.filter((app) => app.status === "approved")
           .length,
