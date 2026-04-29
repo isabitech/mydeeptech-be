@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Support Ticket Created</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Support Ticket Created - MyDeeptech</title>
     <style>
         body { 
             font-family: 'Segoe UI', Arial, sans-serif; 
@@ -41,6 +42,13 @@
             padding: 20px; 
             text-align: center; 
             color: #6c757d; 
+        }
+        .visually-hidden {
+            position: absolute !important;
+            left: -9999px !important;
+            width: 1px !important;
+            height: 1px !important;
+            overflow: hidden !important;
         }
         .btn { 
             display: inline-block; 
@@ -85,12 +93,12 @@
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1 style="margin: 0; font-size: 28px;">🎫 Support Ticket Created</h1>
+        <header class="header" role="banner">
+            <h1 style="margin: 0; font-size: 28px;">🎫 Ticket Created Successfully</h1>
             <p style="margin: 10px 0 0 0; opacity: 0.9;">We've received your support request</p>
-        </div>
+        </header>
         
-        <div class="content">
+        <main class="content" role="main">
             <p style="font-size: 16px; margin-bottom: 25px;">
                 Hello {{recipientName}}! Your support ticket has been successfully created and our team has been notified.
             </p>
@@ -127,9 +135,9 @@
                     View Ticket in Dashboard
                 </a>
             </div>
-        </div>
+        </main>
         
-        <div class="footer">
+        <footer class="footer" role="contentinfo">
             <p style="margin: 0 0 10px 0; color: #333;"><strong>📞 Need Immediate Help?</strong></p>
             <p style="margin: 5px 0;">
                 📧 Email: <a href="mailto:support@mydeeptech.ng" style="color: #007bff;">support@mydeeptech.ng</a><br>
@@ -142,7 +150,7 @@
                 This email was sent regarding your support ticket {{ticketNumber}}.<br>
                 MyDeepTech Support Team | <a href="https://mydeeptech.ng" style="color: #007bff;">mydeeptech.ng</a>
             </p>
-        </div>
+        </footer>
     </div>
 </body>
 </html>

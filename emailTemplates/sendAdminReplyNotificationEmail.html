@@ -74,20 +74,32 @@
             color: #4ecdc4;
             font-weight: 600;
         }
+        .visually-hidden {
+            position: absolute !important;
+            left: -9999px !important;
+            width: 1px !important;
+            height: 1px !important;
+            overflow: hidden !important;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
+        <header class="header" role="banner">
             <h1>💬 Admin Reply</h1>
-        </div>
+        </header>
         
-        <div class="content">
-            <p class="message">Hello {{userName}},</p>
+        <main class="content" role="main">
+            <section aria-labelledby="greeting-heading">
+                <h2 id="greeting-heading" class="visually-hidden">Message</h2>
+                <p class="message">Hello {{userName}},</p>
+                
+                <p class="message">You have received a new reply from our support team regarding your ticket.</p>
+            </section>
             
-            <p class="message">You have received a new reply from our support team regarding your ticket.</p>
-            
-            <div class="reply-details">
+            <section aria-labelledby="reply-details-heading">
+                <h2 id="reply-details-heading" class="visually-hidden">Reply Details</h2>
+                <div class="reply-details">
                 <div class="detail-row">
                     <span class="label">Ticket ID:</span> {{ticketId}}
                 </div>
@@ -105,25 +117,25 @@
                     <span class="label">Reply:</span><br><br>
                     {{replyMessage}}
                 </div>
-            </div>
+                </div>
+            </section>
             
-            <p class="message">You can view the full conversation and reply by logging into your account.</p>
-            
-            <p class="message" style="margin-top: 30px;">
-                Best regards,<br>
-                <span class="brand">The MyDeeptech Team</span>
-            </p>
-        </div>
+            <section aria-labelledby="next-steps-heading">
+                <h2 id="next-steps-heading" class="visually-hidden">Next Steps</h2>
+                <p class="message">You can view the full conversation and reply by logging into your account.</p>
+                
+                <p class="message" style="margin-top: 30px;">
+                    Best regards,<br>
+                    <span class="brand">The MyDeeptech Team</span>
+                </p>
+            </section>
+        </main>
         
-         <div class="footer">
-                <p>&copy; <span id="year"></span> MyDeepTech. All rights reserved.</p>
+         <footer class="footer" role="contentinfo">
+                <p>&copy; 2026 MyDeepTech. All rights reserved.</p>
                 <p>This email was sent from a trusted source. Please do not reply to this email.</p>
-            </div>
+            </footer>
         </div>
 
-        <!-- Inline JavaScript -->
-        <script>
-            document.getElementById("year").textContent = new Date().getFullYear();
-        </script>
 </body>
 </html>

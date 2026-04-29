@@ -36,7 +36,7 @@ class BaseMailService {
         // Get email provider from config (default to 'brevo')
         const emailProvider = envConfig.email?.defaultProvider || 'brevo';
 
-        // console.log("MAIL OPTIONS:", {
+        // console.log("📧 EMAIL SEND REQUEST:", {
         //     recipientEmail: options.recipientEmail,
         //     recipientName: options.recipientName,
         //     subject: options.subject,
@@ -47,16 +47,19 @@ class BaseMailService {
         // });
 
         try {
-            console.log(`Sending email via ${emailProvider.toUpperCase()} provider`);
+            let result;
             switch (emailProvider.toLowerCase()) {
                 case 'brevo':
-                    return await this.sendMailWithBrevo(options);
+                    result = await this.sendMailWithBrevo(options);
+                    break;
                 case 'mailjet':
                 default:
-                    return await this.sendMailWithMailJet(options);
+                    result = await this.sendMailWithMailJet(options);
+                    break;
             }
+            return result;
         } catch (primaryError) {
-            console.error(`Primary email provider (${emailProvider}) failed:`, primaryError.message);
+            console.error(`❌ Primary email provider (${emailProvider}) failed:`, primaryError.message);
 
             // Implement fallback logic
             const fallbackProvider = emailProvider === 'mailjet' ? 'brevo' : 'mailjet';
@@ -120,11 +123,11 @@ class BaseMailService {
                       },
                   ],
               });
-              console.log('Email sent successfully via MailJet:', {
-                  recipient: recipientEmail,
-                  subject: subject,
-                  timestamp: new Date().toISOString()
-              });
+            //   console.log('Email sent successfully via MailJet:', {
+            //       recipient: recipientEmail,
+            //       subject: subject,
+            //       timestamp: new Date().toISOString()
+            //   });
              return infoMail;
           } catch (error) {
               console.error("ERROR SENDING EMAIL VIA MAIL_JET:", {
@@ -180,18 +183,39 @@ class BaseMailService {
             // Send email using the properly configured API instance
             const result = await brevoApiInstance.sendTransacEmail(sendSmtpEmail);
             
-            // console.log('Email sent successfully:', {
+            // console.log('✅ BREVO API RESPONSE - SUCCESS:', {
             //     recipient: recipientEmail,
             //     subject: subject,
-            //     messageId: result.messageId,
+            //     messageId: result.body?.messageId || result.messageId || 'No messageId returned',
+            //     brevoMessageId: result.body?.messageId,
+            //     statusCode: result.response?.statusCode,
+            //     // brevoResponse: result,
+            //     deliveryInfo: {
+            //         provider: 'Brevo',
+            //         status: 'Queued for delivery',
+            //         note: 'Email accepted by Brevo API - check recipient spam/junk folder if not received'
+            //     },
             //     timestamp: new Date().toISOString()
             // });
-           return result;
+
+            // Return enhanced result with delivery tracking info
+            return {
+                // ...result,
+                deliveryInfo: {
+                    provider: 'Brevo', 
+                    messageId: result.body?.messageId || result.messageId,
+                    status: 'accepted',
+                    timestamp: new Date().toISOString()
+                }
+            };
         } catch (error) {
-            console.error("ERROR SENDING EMAIL VIA BREVO:", {
+            console.error("❌ BREVO API RESPONSE - ERROR:", {
                 message: error.message,
                 statusCode: error.statusCode,
                 response: error.response?.data,
+                recipient: recipientEmail,
+                subject: subject,
+                fullError: error,
                 timestamp: new Date().toISOString()
             });
             throw new AppError({ message: `Error sending email via Brevo: ${error.message}`, statusCode: 500 });

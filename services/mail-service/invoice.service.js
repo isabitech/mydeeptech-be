@@ -1,4 +1,5 @@
 const BaseMailService = require('./base.service');
+const envConfig = require('../../config/envConfig');
 
 class InvoiceMailService extends BaseMailService {
 
@@ -31,8 +32,8 @@ class InvoiceMailService extends BaseMailService {
             subject: `New Invoice ${invoiceNumber} - MyDeepTech`,
             htmlTemplate,
             message,
-            senderEmail: 'payments@mydeeptech.ng',
-            senderName: 'MyDeepTech Payments'
+            senderEmail: envConfig.email.senders.payments.email,
+            senderName: envConfig.email.senders.payments.name
         });
     }
 
@@ -69,8 +70,8 @@ class InvoiceMailService extends BaseMailService {
             subject: `Invoice from ${companyName} - MyDeepTech`,
             htmlTemplate,
             message,
-            senderEmail: 'payments@mydeeptech.ng',
-            senderName: 'MyDeepTech Payments'
+            senderEmail: envConfig.email.senders.payments.email,
+            senderName: envConfig.email.senders.payments.name
         });
     }
 

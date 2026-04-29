@@ -40,6 +40,28 @@ const envConfig = {
 
   email: {
     defaultProvider: env.EMAIL_PROVIDER || 'brevo', // 'mailjet' or 'brevo'
+    
+    // Email sender constants by purpose
+    senders: {
+      default: {
+        email: env.BREVO_SENDER_EMAIL || 'no-reply@mydeeptech.ng',
+        name: env.BREVO_SENDER_NAME || 'MyDeepTech Team'
+      },
+      projects: {
+        // Try alternative sender for better deliverability
+        email: env.BREVO_PROJECT_SENDER_EMAIL || env.BREVO_SENDER_EMAIL || 'projects@mydeeptech.ng',
+        name: env.BREVO_PROJECT_SENDER_NAME || 'MyDeepTech Projects'
+      },
+      payments: {
+        email: env.BREVO_PAYMENTS_SENDER_EMAIL || 'payments@mydeeptech.ng',
+        name: env.BREVO_PAYMENTS_SENDER_NAME || 'MyDeepTech Payments'
+      },
+      support: {
+        email: env.BREVO_SUPPORT_SENDER_EMAIL || 'support@mydeeptech.ng', 
+        name: env.BREVO_SUPPORT_SENDER_NAME || 'MyDeepTech Support'
+      }
+    },
+    
     mailjet: {
       MAILJET_API_KEY: env.MAILJET_API_KEY,
       MAILJET_SECRET_KEY: env.MAILJET_SECRET_KEY,

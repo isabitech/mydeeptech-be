@@ -66,25 +66,25 @@
 </head>
 <body>
     <div class="container">
-        <div class="header">
+        <header class="header" role="banner">
             <h1>🎯 Assessment Invitation</h1>
             <p>You're invited to complete an assessment</p>
-        </div>
+        </header>
         
-        <div class="content">
+        <main class="content" role="main">
             <h2>Hello {{recipientName}},</h2>
             
             <p>You have been invited to complete an important assessment as part of your MyDeeptech journey. This assessment will help us better understand your skills and match you with suitable projects.</p>
             
-            <div class="assessment-details">
-                <h3>📋 Assessment Details</h3>
+            <section class="assessment-details" aria-labelledby="assessment-details-heading">
+                <h3 id="assessment-details-heading">📋 Assessment Details</h3>
                 <p><strong>Assessment Title:</strong> {{assessmentTitle}}</p>
                 <p><strong>Time Limit:</strong> {{timeLimit}}</p>
                 <p><strong>Description:</strong> {{description}}</p>
-            </div>
+            </section>
             
-            <div class="important">
-                <h4>⚠️ Important Information</h4>
+            <section class="important" aria-labelledby="important-info-heading">
+                <h4 id="important-info-heading">⚠️ Important Information</h4>
                 <ul>
                     <li>Complete the assessment in one sitting</li>
                     <li>Ensure stable internet connection</li>
@@ -92,7 +92,7 @@
                     <li>Read all instructions carefully before starting</li>
                     <li>Save your work frequently if prompted</li>
                 </ul>
-            </div>
+            </section>
             
             <div style="text-align: center; margin: 30px 0;">
                 <a href="https://mydeeptech.ng/assessment" class="button">
@@ -113,9 +113,9 @@
             If you encounter any technical issues during the assessment, please contact our support team immediately at <a href="mailto:support@mydeeptech.ng">support@mydeeptech.ng</a></p>
             
             <p>We wish you the best of luck with your assessment!</p>
-        </div>
+        </main>
         
-        <div class="footer">
+        <footer class="footer" role="contentinfo">
             <p><strong>MyDeeptech Assessment Team</strong><br>
             <a href="https://mydeeptech.ng">mydeeptech.ng</a></p>
             <p>This assessment invitation was sent to {{recipientName}}</p>

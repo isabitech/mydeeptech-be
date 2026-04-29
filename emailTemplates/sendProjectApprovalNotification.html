@@ -73,46 +73,50 @@
             color: #28a745;
             font-weight: 600;
         }
+        .visually-hidden {
+            position: absolute !important;
+            left: -9999px !important;
+            width: 1px !important;
+            height: 1px !important;
+            overflow: hidden !important;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
+        <header class="header" role="banner">
             <h1>🎉 Application Approved!</h1>
-        </div>
+        </header>
         
-        <div class="content">
-            <p class="message">Hello {{applicantName}},</p>
+        <main class="content" role="main">
+            <section aria-labelledby="greeting-heading">
+                <h2 id="greeting-heading" class="visually-hidden">Message</h2>
+                <p class="message">Hello {{applicantName}},</p>
+                
+                <p class="message">Congratulations! Your application has been approved.</p>
+            </section>
             
-            <p class="message">Congratulations! Your application has been approved.</p>
-            
-            <div class="project-details">
+            <section aria-labelledby="project-details-heading">
+                <h2 id="project-details-heading" class="visually-hidden">Project Details</h2>
+                <div class="project-details">
                 <div class="detail-row">
                     <span class="label">Project:</span> {{projectName}}
                 </div>
                 <div class="detail-row">
                     <span class="label">Category:</span> {{projectCategory}}
                 </div>
-                {{#if payRate}}
                 <div class="detail-row">
                     <span class="label">Pay Rate:</span> ${{payRate}}/hour
                 </div>
-                {{/if}}
-                {{#if projectGuidelineVideo}}
                 <div class="detail-row">
                     <span class="label">Guidelines Video:</span> <a href="{{projectGuidelineVideo}}" style="color: #28a745;">Watch Here</a>
                 </div>
-                {{/if}}
-                {{#if projectCommunityLink}}
                 <div class="detail-row">
                     <span class="label">Community:</span> <a href="{{projectCommunityLink}}" style="color: #28a745;">Join Here</a>
                 </div>
-                {{/if}}
-                {{#if projectTrackerLink}}
                 <div class="detail-row">
                     <span class="label">Tracker:</span> <a href="{{projectTrackerLink}}" style="color: #28a745;">Access Here</a>
                 </div>
-                {{/if}}
             </div>
             
             <div class="next-steps">
@@ -131,16 +135,12 @@
                 Best regards,<br>
                 <span class="brand">The MyDeeptech Team</span>
             </p>
-        </div>
+        </main>
         
-        <div class="footer">
-                <p>&copy; <span id="year"></span> MyDeepTech. All rights reserved.</p>
-        </div>
+        <footer class="footer" role="contentinfo">
+                <p>&copy; 2026 MyDeepTech. All rights reserved.</p>
+</footer>
         </div>
 
-        <!-- Inline JavaScript -->
-    <script>
-        document.getElementById("year").textContent = new Date().getFullYear();
-    </script>
 </body>
 </html>

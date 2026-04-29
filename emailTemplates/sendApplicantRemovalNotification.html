@@ -71,11 +71,11 @@
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>📋 Project Status Update</h1>
-        </div>
+        <header class="header" role="banner">
+            <h1>📄 Application Status Update</h1>
+        </header>
         
-        <div class="content">
+        <main class="content" role="main">
             <p class="message">Hello {{applicantName}},</p>
             
             <p class="message">We regret to inform you that you have been removed from the following project:</p>
@@ -93,12 +93,10 @@
                 <div class="detail-row">
                     <span class="label">Date:</span> {{removedAt}}
                 </div>
-                {{#if removalReason}}
                 <div class="detail-row" style="margin-top: 15px;">
                     <span class="label">Reason:</span><br>
                     <div style="margin-top: 5px;">{{removalReason}}</div>
                 </div>
-                {{/if}}
             </div>
             
             <p class="message">If you believe this removal was in error, please contact our support team.</p>
@@ -109,17 +107,12 @@
                 Best regards,<br>
                 <span class="brand">The MyDeeptech Team</span>
             </p>
-        </div>
+        </main>
         
-         <div class="footer">
-                <p>&copy; <span id="year"></span> MyDeepTech. All rights reserved.</p>
+         <footer class="footer" role="contentinfo">
+                <p>&copy; 2026 MyDeepTech. All rights reserved.</p>
                 <p>This email was sent from a trusted source. Please do not reply to this email.</p>
-            </div>
+            </footer>
         </div>
-
-        <!-- Inline JavaScript -->
-        <script>
-            document.getElementById("year").textContent = new Date().getFullYear();
-        </script>
 </body>
 </html>
