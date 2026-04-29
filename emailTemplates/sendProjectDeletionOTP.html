@@ -82,16 +82,22 @@
                 <h3>⚠️ URGENT ACTION REQUIRED</h3>
                 <p><strong>A project deletion request has been submitted and requires your authorization.</strong></p>
             </div>
+            </section>
             
-            <div class="details">
+            <section aria-labelledby="project-details-heading">
+                <h2 id="project-details-heading" class="visually-hidden">Project Details</h2>
+                <div class="details">
                 <h3>📋 Deletion Request Details</h3>
                 <p><strong>Project Name:</strong> {{projectName}}</p>
                 <p><strong>Requested By:</strong> {{requestedBy}}</p>
                 <p><strong>Reason:</strong> {{reason}}</p>
                 <p><strong>Request Time:</strong> {{expiryTime}}</p>
             </div>
+            </section>
             
-            <div class="otp-box">
+            <section aria-labelledby="otp-heading">
+                <h2 id="otp-heading" class="visually-hidden">Verification Code</h2>
+                <div class="otp-box">
                 <h3>🔐 Your Authorization OTP</h3>
                 <div class="otp-code">{{otp}}</div>
                 <p><strong style="color: #e74c3c;">Expires at: {{expiryTime}}</strong></p>
@@ -111,12 +117,13 @@
             <p><strong>⚠️ WARNING:</strong> Project deletion will permanently remove all associated data, applications, and history. This action cannot be undone.</p>
             
             <p>If you did not expect this request or have concerns, please contact the system administrator immediately.</p>
-        </div>
+            </section>
+        </main>
         
-        <div class="footer">
+        <footer class="footer" role="contentinfo">
             <p><strong>MyDeeptech Security System</strong><br>
             This is an automated security notification</p>
-        </div>
+        </footer>
     </div>
 </body>
 </html>

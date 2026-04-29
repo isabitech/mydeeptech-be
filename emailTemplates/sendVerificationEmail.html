@@ -1,7 +1,10 @@
 <!DOCTYPE html>
-                <html>
-                <head>
-                    <style>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Verification - MyDeeptech</title>
+    <style>
                     body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
                     .container { max-width: 600px; margin: 0 auto; padding: 20px; }
                     .header { background: #007bff; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
@@ -19,13 +22,12 @@
                     .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
                     .link { color: #007bff; word-break: break-all; }
                     </style>
-                </head>
                 <body>
                     <div class="container">
-                    <div class="header">
+                    <header class="header" role="banner">
                         <h1>Welcome to MyDeepTech!</h1>
-                    </div>
-                    <div class="content">
+                    </header>
+                    <main class="content" role="main">
                         <h2>Hello {{name}},</h2>
                         <p>Thank you for signing up with MyDeepTech! We're excited to have you on board.</p>
                         <p>To complete your registration and verify your email address, please click the button below:</p>
@@ -36,16 +38,13 @@
                         <a class="link" href="{{verificationUrl}}">{{verificationUrl}}</a>
                         <p>If you didn't create an account with us, please ignore this email.</p>
                         <p>Best regards,<br>The MyDeepTech Team</p>
-                    </div>
-                <div class="footer">
-                        <p>&copy; <span id="year"></span> MyDeepTech. All rights reserved.</p>
+                    </main>
+                <footer class="footer" role="contentinfo">
+                        <p>&copy; 2026 MyDeepTech. All rights reserved.</p>
                     <p>This email was sent from a trusted source. Please do not reply to this email.</p>
                 </div>
                 </div>
 
-                <!-- Inline JavaScript -->
-            <script>
-                document.getElementById("year").textContent = new Date().getFullYear();
-            </script>
+
     </body>
 </html>

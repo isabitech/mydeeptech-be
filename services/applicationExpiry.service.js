@@ -1,24 +1,31 @@
 const ProjectApplication = require("../models/projectApplication.model");
 const AnnotationProject = require("../models/annotationProject.model");
+const DTUser = require("../models/dtUser.model"); // Required for applicantId populate
 const MailService = require("./mail-service/mail-service");
-const NotificationService = require("./notification.service");
 
 class ApplicationExpiryService {
   constructor() {
-    this.mailService = new MailService();
-    this.notificationService = new NotificationService();
+    // MailService uses static methods, no need to instantiate
   }
 
   /**
    * Find and auto-reject expired applications
    * This method should be called by a scheduled job/cron
+   * @param {Object} options - Processing options
+   * @param {number} options.batchSize - Number of applications to process per batch (default: 20)
+   * @param {number} options.delayBetweenBatches - Delay in ms between email batches (default: 5000)
+   * @param {number} options.emailBatchSize - Number of emails to send per batch (default: 10)
    */
-  async processExpiredApplications() {
+  async processExpiredApplications(options = {}) {
+    const {
+      batchSize = 20,
+      delayBetweenBatches = 5000, // 5 seconds
+      emailBatchSize = 10
+    } = options;
+
     try {
-      console.log("🕐 Processing expired applications...");
-      
       const currentDate = new Date();
-      
+ 
       // Find all applications that are past their expiry date and still pending/assessment_required
       const expiredApplications = await ProjectApplication.find({
         expiryDate: { $lt: currentDate },
@@ -34,76 +41,99 @@ class ApplicationExpiryService {
         }
       ]);
 
-      console.log(`📋 Found ${expiredApplications.length} expired applications to process`);
+      if (expiredApplications.length === 0) {
+        console.log("✅ No expired applications found - process complete");
+        return { 
+          processedCount: 0, 
+          errorCount: 0, 
+          processedApplications: [], 
+          errors: [], 
+          processedAt: currentDate 
+        };
+      }
+
+      console.log(`📊 Found ${expiredApplications.length} expired applications`);
+      console.log(`⚙️  Processing in batches of ${batchSize} with email batches of ${emailBatchSize}`);
 
       const processedApplications = [];
       const errors = [];
+      const emailQueue = [];
 
-      for (const application of expiredApplications) {
-        try {
-          // Update application status to rejected with expiry reason
-          await ProjectApplication.findByIdAndUpdate(application._id, {
-            status: "rejected",
-            rejectionReason: "expired",
-            reviewedAt: currentDate,
-            reviewNotes: `Application automatically rejected due to expiry on ${currentDate.toISOString()}`,
-            applicantNotified: false // Will be set to true after email is sent
-          });
+      // Process applications in batches
+      for (let i = 0; i < expiredApplications.length; i += batchSize) {
+        const batch = expiredApplications.slice(i, i + batchSize);
+        const batchNumber = Math.floor(i / batchSize) + 1;
+        const totalBatches = Math.ceil(expiredApplications.length / batchSize);
 
-          // Send expiry notification email to applicant
-          if (application.applicantId?.email) {
-            try {
-              await this.sendExpiryNotificationEmail(
-                application.applicantId.email,
-                application.applicantId.fullName,
-                application.projectId.projectName,
-                application.expiryDate
-              );
+        console.log(`📦 Processing batch ${batchNumber}/${totalBatches} (${batch.length} applications)`);
 
-              // Mark as notified
-              await ProjectApplication.findByIdAndUpdate(application._id, {
-                applicantNotified: true
-              });
+        // Process database updates for this batch
+        for (const application of batch) {
+          try {
+            // Update application status to rejected with expiry reason
+            await ProjectApplication.findByIdAndUpdate(application._id, {
+              status: "rejected",
+              rejectionReason: "expired",
+              reviewedAt: currentDate,
+              reviewNotes: `Application automatically rejected due to expiry on ${currentDate.toISOString()}`,
+              applicantNotified: false // Will be set to true after email is sent
+            });
 
-              console.log(`📧 Expiry notification sent to ${application.applicantId.email} for project "${application.projectId.projectName}"`);
-            } catch (emailError) {
-              console.error(`❌ Failed to send expiry email to ${application.applicantId.email}:`, emailError);
-              errors.push({
+            // Add to email queue instead of sending immediately
+            if (application.applicantId?.email) {
+              emailQueue.push({
                 applicationId: application._id,
-                error: "Failed to send email notification",
-                details: emailError.message
+                email: application.applicantId.email,
+                fullName: application.applicantId.fullName,
+                projectName: application.projectId.projectName,
+                expiryDate: application.expiryDate
               });
             }
+
+            processedApplications.push({
+              applicationId: application._id,
+              applicantName: application.applicantId?.fullName,
+              projectName: application.projectId?.projectName,
+              expiryDate: application.expiryDate
+            });
+
+          } catch (applicationError) {
+            console.error(`❌ Failed processing application ${application._id}:`, applicationError);
+            errors.push({
+              applicationId: application._id,
+              error: "Failed to update application",
+              details: applicationError.message
+            });
           }
-
-          processedApplications.push({
-            applicationId: application._id,
-            applicantName: application.applicantId?.fullName,
-            projectName: application.projectId?.projectName,
-            expiryDate: application.expiryDate
-          });
-
-        } catch (applicationError) {
-          console.error(`❌ Failed to process expired application ${application._id}:`, applicationError);
-          errors.push({
-            applicationId: application._id,
-            error: "Failed to update application",
-            details: applicationError.message
-          });
         }
+        console.log(`✅ Batch ${batchNumber} database updates complete`);
       }
+      // Process email queue in batches with delays
+      console.log(`📧 Processing ${emailQueue.length} emails in batches of ${emailBatchSize}`);
+      await this.processEmailQueue(emailQueue, {
+        emailBatchSize,
+        delayBetweenBatches,
+        errors
+      });
 
       const result = {
         processedCount: processedApplications.length,
         errorCount: errors.length,
         processedApplications,
         errors,
-        processedAt: currentDate
+        processedAt: currentDate,
+        batchingStats: {
+          totalApplications: expiredApplications.length,
+          applicationBatchSize: batchSize,
+          emailBatchSize: emailBatchSize,
+          totalEmailsSent: emailQueue.length - errors.filter(e => e.error.includes('email')).length
+        }
       };
 
-      console.log(`✅ Successfully processed ${processedApplications.length} expired applications`);
       if (errors.length > 0) {
         console.log(`⚠️  ${errors.length} errors occurred during processing`);
+      } else {
+        console.log(`🎉 All ${expiredApplications.length} applications processed successfully!`);
       }
 
       return result;
@@ -115,48 +145,83 @@ class ApplicationExpiryService {
   }
 
   /**
+   * Process email queue in batches with proper delays and error handling
+   */
+  async processEmailQueue(emailQueue, options = {}) {
+    const { emailBatchSize, delayBetweenBatches, errors } = options;
+    
+    for (let i = 0; i < emailQueue.length; i += emailBatchSize) {
+      const emailBatch = emailQueue.slice(i, i + emailBatchSize);
+      const batchNumber = Math.floor(i / emailBatchSize) + 1;
+      const totalEmailBatches = Math.ceil(emailQueue.length / emailBatchSize);
+      
+      console.log(`📧 Sending email batch ${batchNumber}/${totalEmailBatches} (${emailBatch.length} emails)`);
+
+      // Send emails in parallel within the batch
+      const emailPromises = emailBatch.map(async (emailData) => {
+        try {
+          await this.sendExpiryNotificationEmail(
+            emailData.email,
+            emailData.fullName,
+            emailData.projectName,
+            emailData.expiryDate
+          );
+
+          // Mark as notified on success
+          await ProjectApplication.findByIdAndUpdate(emailData.applicationId, {
+            applicantNotified: true
+          });
+
+          return { success: true, applicationId: emailData.applicationId };
+        } catch (emailError) {
+          console.error(`❌ Email failed for ${emailData.email}:`, emailError);
+          errors.push({
+            applicationId: emailData.applicationId,
+            error: "Failed to send email notification",
+            details: emailError.message,
+            email: emailData.email
+          });
+          return { success: false, applicationId: emailData.applicationId };
+        }
+      });
+
+      // Wait for all emails in this batch to complete
+      const results = await Promise.allSettled(emailPromises);
+      const successful = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
+      const failed = emailBatch.length - successful;
+      
+      console.log(`📧 Email batch ${batchNumber} complete: ${successful} sent, ${failed} failed`);
+
+      // Add delay between batches (except for the last batch)
+      if (i + emailBatchSize < emailQueue.length) {
+        console.log(`⏰ Waiting ${delayBetweenBatches}ms before next email batch...`);
+        await new Promise(resolve => setTimeout(resolve, delayBetweenBatches));
+      }
+    }
+  }
+
+  /**
    * Send expiry notification email to applicant
    */
   async sendExpiryNotificationEmail(email, fullName, projectName, expiryDate) {
-    const emailSubject = `Application Expired: ${projectName}`;
-    const emailContent = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #e74c3c;">Application Expired</h2>
-        
-        <p>Dear ${fullName},</p>
-        
-        <p>We regret to inform you that your application for the project <strong>"${projectName}"</strong> has expired.</p>
-        
-        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
-          <p><strong>Application Details:</strong></p>
-          <ul style="margin: 10px 0; padding-left: 20px;">
-            <li>Project: ${projectName}</li>
-            <li>Expiry Date: ${expiryDate.toLocaleDateString()} at ${expiryDate.toLocaleTimeString()}</li>
-            <li>Status: Automatically Rejected</li>
-          </ul>
-        </div>
-        
-        <p>Applications expire based on the project's application duration policy to ensure timely processing of all submissions.</p>
-        
-        <p><strong>What's Next?</strong></p>
-        <ul>
-          <li>You can apply to other available projects on our platform</li>
-          <li>Check for new project opportunities that match your skills</li>
-          <li>Ensure your profile is up-to-date for future applications</li>
-        </ul>
-        
-        <p>Thank you for your interest in working with MyDeepTech. We encourage you to explore other opportunities on our platform.</p>
-        
-        <p>Best regards,<br>The MyDeepTech Team</p>
-        
-        <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
-        <p style="font-size: 12px; color: #666;">
-          This is an automated notification. If you have any questions, please contact our support team.
-        </p>
-      </div>
-    `;
+    try {
+      // Create a more specific email for expiry notifications to avoid spam filters
+      const subject = `Application Status Update - ${projectName}`;
+      
+      const projectData = {
+        projectName: projectName,
+        projectCategory: "Project Application", // Generic to avoid issues
+        adminName: "MyDeepTech Team",
+        rejectionReason: "application_period_expired",
+        reviewNotes: `Your application for "${projectName}" has been automatically closed due to the application period ending on ${expiryDate.toLocaleDateString()}. The application deadline for this project has passed. Please feel free to apply to other available projects on our platform.`
+      };
 
-    await this.mailService.sendHTMLEmail(email, emailSubject, emailContent);
+      await MailService.sendProjectRejectionNotification(email, fullName, projectData);
+
+    } catch (error) {
+      console.error(`❌ Failed to send expiry notification to ${email}:`, error);
+      throw error; // Re-throw to be caught by the calling code
+    }
   }
 
   /**

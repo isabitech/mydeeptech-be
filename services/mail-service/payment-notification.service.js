@@ -1,4 +1,5 @@
 const BaseMailService = require('./base.service');
+const envConfig = require('../../config/envConfig');
 
 class PaymentNotificationService extends BaseMailService {
     /**
@@ -82,8 +83,8 @@ class PaymentNotificationService extends BaseMailService {
             subject: `Payment Sent - Invoice #${invoiceNumber} (${formattedAmountNGN})`,
             message: textContent,
             htmlTemplate,
-            senderEmail: 'payments@mydeeptech.ng',
-            senderName: 'MyDeepTech Payments'
+            senderEmail: envConfig.email.senders.payments.email,
+            senderName: envConfig.email.senders.payments.name
         });
     }
 
@@ -161,17 +162,9 @@ class PaymentNotificationService extends BaseMailService {
         htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{formattedDate}}', formattedDate);
         htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{invoiceRows}}', invoiceRows);
 
-        // Handle conditional content for errors
-        if (errors.length > 0) {
-            htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{#if hasErrors}}', '');
-            htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{/if}}', '');
-            htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{errorCount}}', errors.length.toString());
-            htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{errorRows}}', errorRows);
-        } else {
-            // Remove error section if no errors
-            const errorSectionRegex = /{{#if hasErrors}}.*?{{\/if}}/gs;
-            htmlTemplate = htmlTemplate.replace(errorSectionRegex, '');
-        }
+        // Handle error section - always populate since template always shows it
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{errorCount}}', errors.length.toString());
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{errorRows}}', errorRows);
 
         const textContent = `
             Bulk Payment Complete - Batch ID: ${batchId}
@@ -214,8 +207,8 @@ class PaymentNotificationService extends BaseMailService {
             subject: `💰 Bulk Payment Complete - ${successfulTransfers}/${totalTransfers} Transfers (${formattedTotalNGN})`,
             message: textContent,
             htmlTemplate,
-            senderEmail: 'payments@mydeeptech.ng',
-            senderName: 'MyDeepTech Payments'
+            senderEmail: envConfig.email.senders.payments.email,
+            senderName: envConfig.email.senders.payments.name
         });
     }
 
@@ -305,8 +298,8 @@ class PaymentNotificationService extends BaseMailService {
             subject: `💰 Transfer Completed - Invoice #${invoiceNumber} (${formattedAmountNGN})`,
             message: textContent,
             htmlTemplate,
-            senderEmail: 'payments@mydeeptech.ng',
-            senderName: 'MyDeepTech Payments'
+            senderEmail: envConfig.email.senders.payments.email,
+            senderName: envConfig.email.senders.payments.name
         });
     }
 }

@@ -1,4 +1,5 @@
 const BaseMailService = require('./base.service');
+const envConfig = require('../../config/envConfig');
 
 class SupportMailService extends BaseMailService {
 
@@ -23,8 +24,8 @@ class SupportMailService extends BaseMailService {
             subject: `Support Ticket Created: ${ticketNumber} - MyDeepTech`,
             htmlTemplate,
             message,
-            senderEmail: 'no-reply@mydeeptech.ng',
-            senderName: 'MyDeepTech'
+            senderEmail: envConfig.email.senders.support.email,
+            senderName: envConfig.email.senders.support.name
         });
     }
 
@@ -52,8 +53,8 @@ class SupportMailService extends BaseMailService {
             subject: `[ADMIN] New Support Ticket: ${ticketNumber} - MyDeepTech`,
             htmlTemplate,
             message,
-            senderEmail: 'no-reply@mydeeptech.ng',
-            senderName: 'MyDeepTech'
+            senderEmail: envConfig.email.senders.support.email,
+            senderName: envConfig.email.senders.support.name
         });
     }
 
@@ -84,8 +85,8 @@ class SupportMailService extends BaseMailService {
             subject: 'New Support Ticket - MyDeepTech',
             message,
             htmlTemplate,
-            senderEmail: 'no-reply@mydeeptech.ng',
-            senderName: 'MyDeepTech'
+            senderEmail: envConfig.email.senders.support.email,
+            senderName: envConfig.email.senders.support.name
         });
     }
 
@@ -115,8 +116,8 @@ class SupportMailService extends BaseMailService {
             subject: 'Admin Reply to Your Ticket - MyDeepTech',
             message,
             htmlTemplate,
-            senderEmail: 'no-reply@mydeeptech.ng',
-            senderName: 'MyDeepTech'
+            senderEmail: envConfig.email.senders.support.email,
+            senderName: envConfig.email.senders.support.name
         });
     }
 

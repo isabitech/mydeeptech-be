@@ -1,5 +1,7 @@
 const dtUserService = require("../services/dtUser.service");
 const annotationProjectService = require("../services/annotationProject.service");
+const ApplicationExpiryService = require("../services/applicationExpiry.service");
+
 class AdminController {
   // Admin function: Get all DTUsers
   static async getAllDTUsers(req, res) {
@@ -1186,7 +1188,7 @@ class AdminController {
   // Application Expiry Management
   static async processExpiredApplications(req, res) {
     try {
-      const ApplicationExpiryService = require("../services/applicationExpiry.service");
+    
       const expiryService = new ApplicationExpiryService();
 
       const result = await expiryService.processExpiredApplications();

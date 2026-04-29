@@ -83,7 +83,17 @@ class DTUserController {
       );
       let responseMessage = "Application submitted successfully";
       let additionalData = {};
-      if (application.status === "assessment_required") {
+      let statusCode = 201;
+      if (application.status === "ai_interview_required") {
+        responseMessage =
+          "Project AI interview created. Complete the interview before your application is submitted for admin review.";
+        additionalData = {
+          aiInterviewRequired: true,
+          aiInterview: application.aiInterview || null,
+          applicationStatus: application.status,
+        };
+        statusCode = application.aiInterview?.session ? 200 : 201;
+      } else if (application.status === "assessment_required") {
         responseMessage =
           "Application submitted. Please check your email for assessment instructions.";
         additionalData = {
@@ -93,7 +103,7 @@ class DTUserController {
             "You must complete the multimedia assessment before your application can be reviewed.",
         };
       }
-      res.status(201).json({
+      res.status(statusCode).json({
         success: true,
         message: responseMessage,
         data: {
@@ -144,6 +154,21 @@ class DTUserController {
         return res.status(400).json({
           success: false,
           message: "Project has reached maximum number of applicants",
+        });
+      }
+      if (
+        error.message === "project_application_not_found" ||
+        error.message === "track_not_found"
+      ) {
+        return res.status(404).json({
+          success: false,
+          message: "Project interview could not be created for this application",
+        });
+      }
+      if (error.message === "ai_interview_setup_failed") {
+        return res.status(500).json({
+          success: false,
+          message: "Failed to create project AI interview",
         });
       }
       if (error.message === "assessment_cooldown") {
@@ -199,6 +224,55 @@ class DTUserController {
       res.status(500).json({
         success: false,
         message: "Server error fetching user projects",
+        error: error.message,
+      });
+    }
+  }
+
+  // DTUser function: Get a single project by ID
+  static async getProjectById(req, res) {
+    try {
+      const { projectId } = req.params;
+      const userId = req.user.userId;
+      
+      const result = await dtUserService.getProjectById(userId, projectId);
+
+      if (result.status === 404) {
+        if (result.reason === "user_not_found") {
+          return res.status(404).json({
+            success: false,
+            message: "User not found."
+          });
+        }
+        return res.status(404).json({
+          success: false,
+          message: "Project not found."
+        });
+      }
+
+      if (result.status === 403) {
+        if (result.reason === "forbidden") {
+          return res.status(403).json({
+            success: false,
+            message: "Access denied. Only approved annotators can view projects."
+          });
+        }
+        return res.status(403).json({
+          success: false,
+          message: "Project not accessible."
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Project details retrieved successfully",
+        data: result.data,
+      });
+    } catch (error) {
+      console.error("Error fetching project:", error);
+      res.status(500).json({
+        success: false,
+        message: "Server error",
         error: error.message,
       });
     }

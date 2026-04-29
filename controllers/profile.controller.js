@@ -87,6 +87,7 @@ class ProfileController {
           status: user.annotatorStatus,
           isEmailVerified: user.isEmailVerified,
           hasSetPassword: user.hasSetPassword,
+          isAssessmentSubmitted: Boolean(user.assessmentSubmission || false),
         },
       };
 

@@ -1,11 +1,12 @@
 const BaseMailService = require('./base.service');
+const envConfig = require('../../config/envConfig');
 
 class ProjectMailService extends BaseMailService {
 
     static async sendProjectApplicationNotification(recipientEmail, recipientName, applicationData) {
-        
+
         let htmlTemplate = this.getMailTemplate('sendProjectApplicationNotification');
-        
+
         const message = `
             New Project Application
             
@@ -23,22 +24,22 @@ class ProjectMailService extends BaseMailService {
         htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{payRate}}', applicationData.payRate || 0);
         htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{appliedAt}}', new Date(applicationData.appliedAt).toLocaleString());
         htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{coverLetter}}', applicationData.coverLetter || '');
-        
+
         return await this.sendMail({
             recipientEmail,
             recipientName,
             subject: 'New Project Application - MyDeepTech',
             message,
             htmlTemplate,
-            senderEmail: 'projects@mydeeptech.ng',
-            senderName: 'MyDeepTech Projects'
+            senderEmail: envConfig.email.senders.projects.email,
+            senderName: envConfig.email.senders.projects.name
         });
     }
 
     static async sendProjectApprovalNotification(recipientEmail, recipientName, projectData) {
-        
+
         let htmlTemplate = this.getMailTemplate('sendProjectApprovalNotification');
-        
+
         const message = `
             Congratulations! Your application has been approved.
             
@@ -53,15 +54,15 @@ class ProjectMailService extends BaseMailService {
         htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{projectGuidelineVideo}}', projectData.projectGuidelineVideo || '');
         htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{projectCommunityLink}}', projectData.projectCommunityLink || '');
         htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{projectTrackerLink}}', projectData.projectTrackerLink || '');
-        
+
         return await this.sendMail({
             recipientEmail,
             recipientName,
             subject: 'Application Approved - MyDeepTech',
             message,
             htmlTemplate,
-            senderEmail: 'projects@mydeeptech.ng',
-            senderName: 'MyDeepTech Projects'
+            senderEmail: envConfig.email.senders.projects.email,
+            senderName: envConfig.email.senders.projects.name
         });
     }
 
@@ -84,15 +85,15 @@ class ProjectMailService extends BaseMailService {
         htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{adminName}}', projectData.adminName || 'Admin');
         htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{rejectionReason}}', projectData.rejectionReason || '');
         htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{reviewNotes}}', projectData.reviewNotes || '');
-        
+
         return await this.sendMail({
             recipientEmail,
             recipientName,
             subject: 'Application Update - MyDeepTech',
             message,
             htmlTemplate,
-            senderEmail: 'projects@mydeeptech.ng',
-            senderName: 'MyDeepTech Projects'
+            senderEmail: envConfig.email.senders.projects.email,
+            senderName: envConfig.email.senders.projects.name
         });
     }
 
@@ -123,8 +124,8 @@ class ProjectMailService extends BaseMailService {
             subject: 'Project Status Update - MyDeepTech',
             message,
             htmlTemplate,
-            senderEmail: 'projects@mydeeptech.ng',
-            senderName: 'MyDeepTech Projects'
+            senderEmail: envConfig.email.senders.projects.email,
+            senderName: envConfig.email.senders.projects.name
         });
     }
 
@@ -156,8 +157,8 @@ class ProjectMailService extends BaseMailService {
             subject: 'Project Team Update - MyDeepTech',
             message,
             htmlTemplate,
-            senderEmail: 'projects@mydeeptech.ng',
-            senderName: 'MyDeepTech Projects'
+            senderEmail: envConfig.email.senders.projects.email,
+            senderName: envConfig.email.senders.projects.name
         });
     }
 
@@ -181,8 +182,36 @@ class ProjectMailService extends BaseMailService {
             subject: `🚨 PROJECT DELETION AUTHORIZATION REQUIRED - ${projectName}`,
             htmlTemplate,
             message,
-            senderEmail: 'projects@mydeeptech.ng',
-            senderName: 'MyDeepTech Projects'
+            senderEmail: envConfig.email.senders.projects.email,
+            senderName: envConfig.email.senders.projects.name
+        });
+    }
+
+    static async sendProjectInvitation(recipientEmail, recipientName, templateData) {
+        let htmlTemplate = this.getMailTemplate('project-invitation');
+        
+        // Replace all template placeholders
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{annotatorName}}', templateData.annotatorName);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{projectName}}', templateData.projectName);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{projectCategory}}', templateData.projectCategory);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{projectDescription}}', templateData.projectDescription);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{customMessage}}', templateData.customMessage);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{projectUrl}}', templateData.projectUrl);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{payRate}}', templateData.payRate);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{deadline}}', templateData.deadline);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{companyName}}', templateData.companyName);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{supportEmail}}', templateData.supportEmail);
+        
+        const message = `You've been invited to apply for the project "${templateData.projectName}" - ${templateData.projectCategory}. ${templateData.customMessage}`;
+        
+        return await this.sendMail({
+            recipientEmail,
+            recipientName,
+            subject: `Invitation: ${templateData.projectName} - AI Recommended Project`,
+            htmlTemplate,
+            message,
+            senderEmail: envConfig.email.senders.projects.email,
+            senderName: envConfig.email.senders.projects.name
         });
     }
 

@@ -25,7 +25,7 @@
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
         }
         .header {
-            background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+            background: linear-gradient(135deg, #333333 0%, #F6921E 100%);
             color: white;
             text-align: center;
             padding: 30px 20px;
@@ -42,10 +42,10 @@
             margin-bottom: 25px;
         }
         .project-details {
-            background-color: #f8d7da;
+            background-color: #fff8f0;
             padding: 20px;
             border-radius: 8px;
-            border-left: 4px solid #dc3545;
+            border-left: 4px solid #F6921E;
             margin: 25px 0;
         }
         .detail-row {
@@ -53,7 +53,7 @@
         }
         .label {
             font-weight: 600;
-            color: #721c24;
+            color: #333333;
         }
         .reason-section {
             background-color: #f8f9fa;
@@ -70,23 +70,33 @@
             color: #6c757d;
         }
         .brand {
-            color: #dc3545;
+            color: #F6921E;
             font-weight: 600;
+        }
+        .visually-hidden {
+            position: absolute !important;
+            left: -9999px !important;
+            width: 1px !important;
+            height: 1px !important;
+            overflow: hidden !important;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>📋 Application Update</h1>
-        </div>
-        
-        <div class="content">
-            <p class="message">Hello {{applicantName}},</p>
+        <header class="header">
+            <h1>Application Update</h1>
+        </header>
+
+<main class="content" role="main">
+            <section class="message-section">
+                <p class="message">Hello {{applicantName}},</p>
             
-            <p class="message">Thank you for your interest in our project. After careful review, we regret to inform you that your application was not approved at this time.</p>
-            
-            <div class="project-details">
+                <p class="message">Thank you for your interest in our project. After careful review, we regret to inform you that your application was not approved at this time.</p>
+            </section>
+
+            <section class="project-details" aria-labelledby="project-info-heading">
+                <h2 id="project-info-heading" style="position: absolute; left: -9999px; font-size: 1px; opacity: 0;">Project Information</h2>
                 <div class="detail-row">
                     <span class="label">Project:</span> {{projectName}}
                 </div>
@@ -96,39 +106,27 @@
                 <div class="detail-row">
                     <span class="label">Reviewed by:</span> {{adminName}}
                 </div>
-            </div>
+            </section>
             
-            {{#if rejectionReason}}
-            <div class="reason-section">
-                <p style="font-weight: 600; color: #721c24; margin-bottom: 10px;">Reason:</p>
-                <p>{{rejectionReason}}</p>
-            </div>
-            {{/if}}
-            
-            {{#if reviewNotes}}
-            <div class="reason-section">
-                <p style="font-weight: 600; color: #721c24; margin-bottom: 10px;">Additional Notes:</p>
+            <section class="reason-section" aria-labelledby="review-notes-heading">
+                <h2 id="review-notes-heading" style="font-weight: 600; color: #333333; margin-bottom: 10px;">Additional Information:</h2>
                 <p>{{reviewNotes}}</p>
-            </div>
-            {{/if}}
+            </section>
             
-            <p class="message">We encourage you to continue exploring other projects that may be a better fit for your skills and experience.</p>
-            
-            <p class="message" style="margin-top: 30px;">
-                Best regards,<br>
-                <span class="brand">The MyDeeptech Team</span>
-            </p>
-        </div>
-        
-        <div class="footer">
-                <p>&copy; <span id="year"></span> MyDeepTech. All rights reserved.</p>
-            <p>This email was sent from a trusted source. Please do not reply to this email.</p>
-        </div>
-        </div>
+            <section class="closing-section">
+                <p class="message">We encourage you to continue exploring other projects that may be a better fit for your skills and experience.</p>
 
-        <!-- Inline JavaScript -->
-    <script>
-        document.getElementById("year").textContent = new Date().getFullYear();
-    </script>
+                <p class="message" style="margin-top: 30px;">
+                    Best regards,<br>
+                    <span class="brand">The MyDeeptech Team</span>
+                </p>
+            </section>
+        </main>
+        
+        <footer class="footer" role="contentinfo">
+            <p>&copy; 2026 MyDeepTech. All rights reserved.</p>
+            <p>This email was sent from a trusted source. Please do not reply to this email.</p>
+        </footer>
+    </div>
 </body>
 </html>

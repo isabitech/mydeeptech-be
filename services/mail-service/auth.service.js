@@ -39,8 +39,8 @@ class AuthMailService extends BaseMailService {
       subject: "Verify Your Email Address - MyDeepTech",
       message,
       htmlTemplate,
-      senderEmail: "support@mydeeptech.ng",
-      senderName: "MyDeepTech",
+      senderEmail: envConfig.email.senders.support.email,
+      senderName: envConfig.email.senders.support.name,
     });
   }
 
@@ -70,8 +70,8 @@ class AuthMailService extends BaseMailService {
       message,
       subject: "Reset Your Password - MyDeepTech",
       htmlTemplate,
-      senderEmail: "no-reply@mydeeptech.ng",
-      senderName: "MyDeepTech",
+      senderEmail: envConfig.email.senders.default.email,
+      senderName: envConfig.email.senders.default.name,
     });
   }
 
@@ -116,8 +116,8 @@ class AuthMailService extends BaseMailService {
       subject: "Reset Your Password - MyDeepTech",
       htmlTemplate,
       message,
-      senderEmail: "no-reply@mydeeptech.ng",
-      senderName: "MyDeepTech",
+      senderEmail: envConfig.email.senders.default.email,
+      senderName: envConfig.email.senders.default.name,
     });
   }
 
@@ -159,8 +159,8 @@ class AuthMailService extends BaseMailService {
       subject: "Password Reset Confirmation - MyDeepTech",
       message,
       htmlTemplate,
-      senderEmail: "no-reply@mydeeptech.ng",
-      senderName: "MyDeepTech",
+      senderEmail: envConfig.email.senders.default.email,
+      senderName: envConfig.email.senders.default.name,
     });
   }
 
@@ -191,8 +191,8 @@ class AuthMailService extends BaseMailService {
       subject: "🔐 Admin Account Verification - MyDeepTech",
       htmlTemplate,
       message,
-      senderEmail: "no-reply@mydeeptech.ng",
-      senderName: "MyDeepTech",
+      senderEmail: envConfig.email.senders.default.email,
+      senderName: envConfig.email.senders.default.name,
     });
   }
 
@@ -215,8 +215,8 @@ class AuthMailService extends BaseMailService {
         "Congratulations! You are now an approved annotator - MyDeepTech",
       htmlTemplate,
       message,
-      senderEmail: "no-reply@mydeeptech.ng",
-      senderName: "MyDeepTech",
+      senderEmail: envConfig.email.senders.default.email,
+      senderName: envConfig.email.senders.default.name,
     });
   }
 
@@ -238,8 +238,8 @@ class AuthMailService extends BaseMailService {
       subject: "Application Update - Micro Tasker Approval - MyDeepTech",
       htmlTemplate,
       message,
-      senderEmail: "no-reply@mydeeptech.ng",
-      senderName: "MyDeepTech",
+      senderEmail: envConfig.email.senders.default.email,
+      senderName: envConfig.email.senders.default.name,
     });
   }
 }

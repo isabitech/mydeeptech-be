@@ -46,6 +46,14 @@ const RESOURCE_DEFINITIONS = [
     actions: ALL_ACTIONS,
   },
   {
+    key: "interviews",
+    label: "AI Interview",
+    icon: "",
+    resource: "interviews",
+    path: "/interviews",
+    actions: ALL_ACTIONS,
+  },
+  {
     key: "projects",
     label: "Projects",
     icon: "CodeSandboxOutlined",

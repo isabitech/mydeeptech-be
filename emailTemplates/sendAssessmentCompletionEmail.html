@@ -66,12 +66,12 @@
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>🎉 Assessment Completed!</h1>
-            <p>Thank you for completing your assessment</p>
-        </div>
+        <header class="header" role="banner">
+            <h1>Assessment Completed!</h1>
+            <p>Thank you for your submission</p>
+        </header>
         
-        <div class="content">
+        <main class="content" role="main">
             <h2>Hello {{recipientName}},</h2>
             
             <p>Congratulations! You have successfully completed your assessment. Thank you for taking the time to demonstrate your skills and capabilities.</p>
@@ -85,8 +85,11 @@
                 <p><strong>Total Time Spent:</strong> {{totalTimeSpent}}</p>
                 <p><strong>Submitted At:</strong> {{submittedAt}}</p>
             </div>
-            
-            <div class="next-steps">
+            </section>
+
+            <section aria-labelledby="next-steps-heading">
+                <h2 id="next-steps-heading" class="visually-hidden">Next Steps</h2>
+                <div class="next-steps">
                 <h3>🚀 What Happens Next?</h3>
                 <ol>
                     <li>Our team will review your assessment submission</li>
@@ -117,13 +120,14 @@
             <p>If you have any questions about your assessment or the review process, please don't hesitate to contact our team.</p>
                 
             <p><strong>Thank you for being part of MyDeeptech!</strong></p>
-        </div>
+            </section>
+        </main>
         
-        <div class="footer">
+        <footer class="footer" role="contentinfo">
             <p><strong>MyDeeptech Assessment Team</strong><br>
             <a href="https://mydeeptech.ng">mydeeptech.ng</a></p>
             <p>Assessment completed: {{submissionTime}}</p>
-        </div>
+        </footer>
     </div>
 </body>
 </html>

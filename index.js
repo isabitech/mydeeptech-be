@@ -29,6 +29,9 @@ const assessmentRoute = require("./routes/assessment");
 const supportRoute = require("./routes/support");
 const chatRoute = require("./routes/chat");
 const qaRoute = require("./routes/qa");
+const aiInterviewRoute = require("./routes/aiInterview.routes");
+const adminAiInterviewRoute = require("./routes/admin-aiInterview.routes");
+const aiRecommendationRoute = require("./routes/ai-recommendation.routes");
 const domainsRoute = require("./routes/domains.routes");
 const newDomainsRoute = require("./routes/domain.routes");
 const rolesPermissionRoute = require("./routes/roles-permission.routes");
@@ -43,6 +46,7 @@ const { healthCheck } = require("./controllers/health-check.controller");
 const { corsOptions } = require("./utils/cors-options.utils");
 const errorMiddleware = require("./middleware/error.middleware");
 const notFoundMiddleware = require("./middleware/notfound-middleware");
+const SchedulerService = require("./services/scheduler.service");
 
 // Rate limiting
 const { rateLimiters } = require("./middleware/simpleRateLimit");
@@ -110,6 +114,9 @@ app.use("/api", rateLimiters.api); // General API rate limiting
 
 // Routes
 app.use("/api/auth", route);
+app.use("/api/ai-interviews", aiInterviewRoute);
+app.use("/api/admin/ai-interviews", adminAiInterviewRoute);
+app.use("/api/ai-recommendations", aiRecommendationRoute);
 app.use("/api/admin", adminRoute);
 app.use("/api/admin/email-tracking", adminEmailTrackingRoute);
 app.use("/api/debug/email", debugEmailRoute);
@@ -179,10 +186,13 @@ const connectDB = async () => {
       initializeSocketIO(server);
       initializeHVNCSocket(server);
 
+      // Initialize application schedulers
+      SchedulerService.initializeSchedulers();
+
       // Start server only after everything is initialized
       const PORT = envConfig.PORT || 4000;
       server.listen(PORT, () => {
-        console.log(`🚀 Server running on port ${PORT}`);
+        console.log(`🚀 Server running on port: ${PORT}`);
         console.log(`🔗 Health check available at: http://localhost:${PORT}/health`);
         console.log(`🔧 HVNC API endpoints available at: http://localhost:${PORT}/api/hvnc/`);
         
@@ -193,24 +203,16 @@ const connectDB = async () => {
           console.log(`❌ Swagger API Documentation not available (check dependencies and environment config)`);
         } 
       });
-
       return conn;
     } catch (error) {
       console.log(`❌ MongoDB connection attempt  failed:`, error);
-      console.log(envConfig.NODE_ENV);
       retries++;
-      console.error(
-        `❌ MongoDB connection attempt ${retries} failed:`,
-        error.message,
-      );
+      console.error(`❌ MongoDB connection attempt ${retries} failed:`,error.message);
 
       if (retries === maxRetries) {
         console.error("💀 All MongoDB connection attempts failed");
-        throw new Error(
-          `Failed to connect to MongoDB after ${maxRetries} attempts: ${error.message}`,
-        );
+        throw new Error(`Failed to connect to MongoDB after ${maxRetries} attempts: ${error.message}`);
       }
-
       // Exponential backoff: wait 2^retries seconds before retry
       const waitTime = Math.pow(2, retries) * 1000;
       console.log(`⏳ Waiting ${waitTime}ms before retry...`);
@@ -231,6 +233,11 @@ initializeRedis();
 // Graceful shutdown handler
 const gracefulShutdown = async (signal) => {
   try {
+    console.log(`📢 Received ${signal}. Starting graceful shutdown...`);
+    
+    // Stop schedulers
+    SchedulerService.stopApplicationExpiryScheduler();
+    
     // Close Redis connection
     await closeRedis();
 

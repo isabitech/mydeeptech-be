@@ -7,6 +7,7 @@ const DtuserInvoiceService = require("./dtuser-service/dtuser-invoice.service");
 const DtuserUploadService = require("./dtuser-service/dtuser-upload.service");
 const AdminService = require("./dtuser-service/admin.service");
 const UserDashboardService = require("./dtuser-service/dtuserdashboard.service");
+const mongoose = require("mongoose");
 
 class DtUserService {
   constructor(
@@ -402,6 +403,12 @@ class DtUserService {
         reviewNotes: app.reviewNotes,
         coverLetter: app.coverLetter,
         availability: app.availability,
+        aiInterviewSessionId: app.aiInterviewSessionId || null,
+        aiInterviewTrackId: app.aiInterviewTrackId || "",
+        aiInterviewStatus: app.aiInterviewStatus || "",
+        aiInterviewScore: app.aiInterviewScore ?? null,
+        aiInterviewSummary: app.aiInterviewSummary || "",
+        aiInterviewCompletedAt: app.aiInterviewCompletedAt || null,
       });
     });
 
@@ -431,7 +438,7 @@ class DtUserService {
         {
           $match: {
             projectId: { $in: projectIds },
-            status: { $in: ["pending", "approved"] },
+            status: { $in: ["ai_interview_required", "pending", "approved"] },
           },
         },
         { $group: { _id: "$projectId", count: { $sum: 1 } } },
@@ -497,6 +504,9 @@ class DtUserService {
           appliedProjects: allUserApplications.length,
           totalApplications: allUserApplications.length,
           applicationStats: {
+            aiInterviewRequired: allUserApplications.filter(
+              (a) => a.status === "ai_interview_required",
+            ).length,
             pending: allUserApplications.filter((a) => a.status === "pending")
               .length,
             approved: allUserApplications.filter((a) => a.status === "approved")
@@ -504,6 +514,106 @@ class DtUserService {
             rejected: allUserApplications.filter((a) => a.status === "rejected")
               .length,
           },
+        },
+      },
+    };
+  }
+
+  /**
+   * Get a single project by ID (only for approved annotators)
+   */
+  async getProjectById(userId, projectId) {
+    // 1️⃣ Fetch user
+    const user = await this.repository.findById(userId);
+    if (!user) return { status: 404, reason: "user_not_found" };
+    if (user.annotatorStatus !== "approved")
+      return { status: 403, reason: "forbidden" };
+
+    // 2️⃣ Fetch the project
+    const project = await this.projectRepository.findProjectByIdWithPopulate(projectId, [
+      { path: "createdBy", select: "fullName email" }
+    ]);
+    if (!project) return { status: 404, reason: "project_not_found" };
+
+    // 3️⃣ Check if project is active and public
+    if (project.status !== "active" || !project.isPublic) {
+      return { status: 403, reason: "project_not_accessible" };
+    }
+
+    // 4️⃣ Fetch user applications for this project
+    const userApplications = await this.projectRepository.findApplications({
+      applicantId: userId,
+      projectId: projectId,
+    });
+
+    // 5️⃣ Get application count for this project
+    const applicationCounts = await this.projectRepository.aggregateApplications([
+      {
+        $match: {
+          projectId: new mongoose.Types.ObjectId(projectId),
+          status: { $in: ["ai_interview_required", "pending", "approved"] },
+        },
+      },
+      { $group: { _id: "$projectId", count: { $sum: 1 } } },
+    ]);
+    const appCount = applicationCounts[0]?.count || 0;
+
+    // 6️⃣ Enrich project with user data, slots, and deadlines
+    const now = new Date();
+    const proj = project.toObject ? project.toObject() : project;
+    
+    proj.currentApplications = appCount;
+    proj.availableSlots = proj.maxAnnotators
+      ? Math.max(0, proj.maxAnnotators - appCount)
+      : null;
+    proj.canApply = !proj.maxAnnotators || appCount < proj.maxAnnotators;
+
+    const userApp = userApplications[0];
+    if (userApp) {
+      proj.userApplication = {
+        applicationId: userApp._id,
+        status: userApp.status,
+        appliedAt: userApp.appliedAt,
+        approvedAt: userApp.approvedAt,
+        rejectedAt: userApp.rejectedAt,
+        rejectionReason: userApp.rejectionReason,
+        reviewNotes: userApp.reviewNotes,
+        coverLetter: userApp.coverLetter,
+        availability: userApp.availability,
+        aiInterviewSessionId: userApp.aiInterviewSessionId || null,
+        aiInterviewTrackId: userApp.aiInterviewTrackId || "",
+        aiInterviewStatus: userApp.aiInterviewStatus || "",
+        aiInterviewScore: userApp.aiInterviewScore ?? null,
+        aiInterviewSummary: userApp.aiInterviewSummary || "",
+        aiInterviewCompletedAt: userApp.aiInterviewCompletedAt || null,
+      };
+      proj.hasApplied = true;
+      proj.canApply = false;
+    } else {
+      proj.hasApplied = false;
+    }
+
+    if (proj.applicationDeadline) {
+      const deadline = new Date(proj.applicationDeadline);
+      proj.applicationOpen = now < deadline;
+      proj.daysUntilDeadline = Math.ceil(
+        (deadline - now) / (1000 * 60 * 60 * 24),
+      );
+      if (!proj.applicationOpen) proj.canApply = false;
+    } else {
+      proj.applicationOpen = true;
+      proj.daysUntilDeadline = null;
+    }
+
+    // 7️⃣ Return the enriched project
+    return {
+      status: 200,
+      data: {
+        project: proj,
+        userInfo: {
+          annotatorStatus: user.annotatorStatus,
+          hasApplied: proj.hasApplied,
+          canApply: proj.canApply,
         },
       },
     };

@@ -1,7 +1,9 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bulk Payment Summary - MyDeeptech</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }
         .header { background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
@@ -84,7 +86,6 @@
             <p><strong>📧 Email Notifications:</strong> All recipients have been sent payment confirmation emails with transaction details.</p>
         </div>
 
-        {{#if hasErrors}}
         <div class="warning">
             <h4>⚠️ Failed Transfers ({{errorCount}})</h4>
             <table class="table">
@@ -103,7 +104,6 @@
             </table>
             <p><strong>⚠️ Action Required:</strong> Please review the failed transfers and retry them individually or contact the Paystack support team.</p>
         </div>
-        {{/if}}
 
         <div class="highlight">
             <h4>🏦 Transfer Timeline</h4>
@@ -134,13 +134,9 @@
     <div class="footer">
          <p><strong>MyDeepTech Admin Notifications</strong></p>
          <p>Automated bulk payment report</p>
-        <p>&copy; <span id="year"></span> MyDeepTech. All rights reserved.</p>
+            <p>&copy; 2026 MyDeepTech. All rights reserved.</p>
     </div>
 </div>
 
-        <!-- Inline JavaScript -->
-        <script>
-            document.getElementById("year").textContent = new Date().getFullYear();
-        </script>
 </body>
 </html>
