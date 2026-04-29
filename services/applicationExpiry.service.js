@@ -106,13 +106,10 @@ class ApplicationExpiryService {
             });
           }
         }
-
         console.log(`✅ Batch ${batchNumber} database updates complete`);
       }
-
       // Process email queue in batches with delays
       console.log(`📧 Processing ${emailQueue.length} emails in batches of ${emailBatchSize}`);
-      
       await this.processEmailQueue(emailQueue, {
         emailBatchSize,
         delayBetweenBatches,
