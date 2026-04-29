@@ -187,6 +187,34 @@ class ProjectMailService extends BaseMailService {
         });
     }
 
+    static async sendProjectInvitation(recipientEmail, recipientName, templateData) {
+        let htmlTemplate = this.getMailTemplate('project-invitation');
+        
+        // Replace all template placeholders
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{annotatorName}}', templateData.annotatorName);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{projectName}}', templateData.projectName);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{projectCategory}}', templateData.projectCategory);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{projectDescription}}', templateData.projectDescription);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{customMessage}}', templateData.customMessage);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{projectUrl}}', templateData.projectUrl);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{payRate}}', templateData.payRate);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{deadline}}', templateData.deadline);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{companyName}}', templateData.companyName);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{supportEmail}}', templateData.supportEmail);
+        
+        const message = `You've been invited to apply for the project "${templateData.projectName}" - ${templateData.projectCategory}. ${templateData.customMessage}`;
+        
+        return await this.sendMail({
+            recipientEmail,
+            recipientName,
+            subject: `Invitation: ${templateData.projectName} - AI Recommended Project`,
+            htmlTemplate,
+            message,
+            senderEmail: envConfig.email.senders.projects.email,
+            senderName: envConfig.email.senders.projects.name
+        });
+    }
+
 }
 
 module.exports = ProjectMailService;

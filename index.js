@@ -31,6 +31,7 @@ const chatRoute = require("./routes/chat");
 const qaRoute = require("./routes/qa");
 const aiInterviewRoute = require("./routes/aiInterview.routes");
 const adminAiInterviewRoute = require("./routes/admin-aiInterview.routes");
+const aiRecommendationRoute = require("./routes/ai-recommendation.routes");
 const domainsRoute = require("./routes/domains.routes");
 const newDomainsRoute = require("./routes/domain.routes");
 const rolesPermissionRoute = require("./routes/roles-permission.routes");
@@ -115,6 +116,7 @@ app.use("/api", rateLimiters.api); // General API rate limiting
 app.use("/api/auth", route);
 app.use("/api/ai-interviews", aiInterviewRoute);
 app.use("/api/admin/ai-interviews", adminAiInterviewRoute);
+app.use("/api/ai-recommendations", aiRecommendationRoute);
 app.use("/api/admin", adminRoute);
 app.use("/api/admin/email-tracking", adminEmailTrackingRoute);
 app.use("/api/debug/email", debugEmailRoute);

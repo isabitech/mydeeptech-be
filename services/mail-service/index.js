@@ -59,6 +59,10 @@ class MailService {
         return await ProjectMailService.sendProjectDeletionOTP(recipientEmail, recipientName, deletionData);
     }
 
+    static async sendProjectInvitation(recipientEmail, recipientName, templateData) {
+        return await ProjectMailService.sendProjectInvitation(recipientEmail, recipientName, templateData);
+    }
+
     // Assessment related emails
     static async sendAssessmentInvitationEmail(recipientEmail, recipientName, assessmentData = {}) {
         return await AssessmentMailService.sendAssessmentInvitationEmail(recipientEmail, recipientName, assessmentData);

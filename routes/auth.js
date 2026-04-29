@@ -148,6 +148,11 @@ router.get(
   authenticateToken,
   dtUserController.getAvailableProjects,
 );
+router.get(
+  "/projects/:projectId",
+  authenticateToken,
+  dtUserController.getProjectById,
+);
 // router.post("/projects/manually-apply", dtUserController.manuallyAddUserToProject);
 router.post(
   "/projects/:projectId/apply",

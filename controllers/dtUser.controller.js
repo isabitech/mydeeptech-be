@@ -229,6 +229,55 @@ class DTUserController {
     }
   }
 
+  // DTUser function: Get a single project by ID
+  static async getProjectById(req, res) {
+    try {
+      const { projectId } = req.params;
+      const userId = req.user.userId;
+      
+      const result = await dtUserService.getProjectById(userId, projectId);
+
+      if (result.status === 404) {
+        if (result.reason === "user_not_found") {
+          return res.status(404).json({
+            success: false,
+            message: "User not found."
+          });
+        }
+        return res.status(404).json({
+          success: false,
+          message: "Project not found."
+        });
+      }
+
+      if (result.status === 403) {
+        if (result.reason === "forbidden") {
+          return res.status(403).json({
+            success: false,
+            message: "Access denied. Only approved annotators can view projects."
+          });
+        }
+        return res.status(403).json({
+          success: false,
+          message: "Project not accessible."
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Project details retrieved successfully",
+        data: result.data,
+      });
+    } catch (error) {
+      console.error("Error fetching project:", error);
+      res.status(500).json({
+        success: false,
+        message: "Server error",
+        error: error.message,
+      });
+    }
+  }
+
   // DTUser Dashboard - Personal overview for authenticated users
   static async getDTUserDashboard(req, res) {
     try {

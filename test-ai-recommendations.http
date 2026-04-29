@@ -1,0 +1,23 @@
+### AI Recommendation API Tests
+
+# 1. Check service status
+GET http://localhost:4000/api/ai-recommendations/status
+Authorization: Bearer YOUR_JWT_TOKEN
+
+###
+
+# 2. Get recommendations for a project (replace PROJECT_ID)
+GET http://localhost:4000/api/ai-recommendations/projects/PROJECT_ID/annotators?maxRecommendations=10
+Authorization: Bearer YOUR_JWT_TOKEN
+
+###
+
+# 3. Send bulk invitations (replace PROJECT_ID and ANNOTATOR_IDS)
+POST http://localhost:4000/api/ai-recommendations/projects/PROJECT_ID/send-invitations
+Authorization: Bearer YOUR_JWT_TOKEN
+Content-Type: application/json
+
+{
+  "annotatorIds": ["ANNOTATOR_ID_1", "ANNOTATOR_ID_2"],
+  "customMessage": "We're excited to invite you to this special project!"
+}
