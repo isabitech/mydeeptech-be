@@ -251,9 +251,14 @@ class AnnotationProjectService {
       { $unwind: { path: "$reviewedBy", preserveNullAndEmptyArrays: true } },
     ];
 
-    const buildSearchPipeline = (status, sortField = "appliedAt") => {
+    const buildSearchPipeline = (statuses, sortField = "appliedAt") => {
+      // Handle both single status and array of statuses
+      const statusFilter = Array.isArray(statuses) 
+        ? { $in: statuses }
+        : statuses;
+        
       const pipeline = [
-        { $match: { projectId: project._id, status: status } },
+        { $match: { projectId: project._id, status: statusFilter } },
         ...buildApplicantLookupStages(),
       ];
 
@@ -278,7 +283,8 @@ class AnnotationProjectService {
       pipeline.push(...buildReviewedByLookupStages());
 
       const sortOrder =
-        status === "approved" || status === "rejected"
+        (Array.isArray(statuses) && (statuses.includes("approved") || statuses.includes("rejected"))) || 
+        statuses === "approved" || statuses === "rejected"
           ? { reviewedAt: -1 }
           : { [sortField]: -1 };
       pipeline.push({ $sort: sortOrder });
@@ -330,7 +336,7 @@ class AnnotationProjectService {
         buildSearchPipeline("rejected", "reviewedAt"),
       ),
       this.repository.aggregateApplications(
-        buildSearchPipeline("pending", "appliedAt"),
+        buildSearchPipeline(["pending", "ai_interview_required"], "appliedAt"),
       ),
       this.repository.aggregateApplications(
         buildSearchPipeline("removed", "removedAt"),
