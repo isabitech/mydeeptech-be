@@ -83,32 +83,57 @@ class GroqProvider {
     }
 
     const startedAt = Date.now();
-    const response = await client.chat.completions.create({
-      model,
-      messages,
-      temperature,
-      max_tokens: maxTokens,
-      response_format: { type: "json_object" },
-    });
-
-    const latencyMs = Date.now() - startedAt;
-    const rawContent = this.extractContent(response);
-    const data = this.parseJson(rawContent);
-
-    return {
-      data,
-      rawContent,
-      metadata: {
-        agent,
-        provider: GROQ_PROVIDER,
+    
+    try {
+      const response = await client.chat.completions.create({
         model,
-        promptVersion: this.promptVersion,
-        latencyMs,
-        tokensUsed: response?.usage?.total_tokens || 0,
-        promptTokens: response?.usage?.prompt_tokens || 0,
-        completionTokens: response?.usage?.completion_tokens || 0,
-      },
-    };
+        messages,
+        temperature,
+        max_tokens: maxTokens,
+        response_format: { type: "json_object" },
+      });
+
+      const latencyMs = Date.now() - startedAt;
+      const rawContent = this.extractContent(response);
+      const data = this.parseJson(rawContent);
+
+      return {
+        data,
+        rawContent,
+        metadata: {
+          agent,
+          provider: GROQ_PROVIDER,
+          model,
+          promptVersion: this.promptVersion,
+          latencyMs,
+          tokensUsed: response?.usage?.total_tokens || 0,
+          promptTokens: response?.usage?.prompt_tokens || 0,
+          completionTokens: response?.usage?.completion_tokens || 0,
+        },
+      };
+    } catch (error) {
+      // Check if this is a rate limit error
+      if (this.isRateLimitError(error)) {
+        const userFriendlyError = new Error(
+          "Our AI system is currently experiencing high demand. Please wait a moment and try again."
+        );
+        userFriendlyError.code = 'AI_RATE_LIMIT';
+        userFriendlyError.retryAfter = this.extractRetryAfter(error);
+        throw userFriendlyError;
+      }
+      
+      // For other API errors, provide a generic message
+      if (error?.response?.status >= 400) {
+        const userFriendlyError = new Error(
+          "Our AI system is temporarily unavailable. Please try again shortly."
+        );
+        userFriendlyError.code = 'AI_SERVICE_ERROR';
+        throw userFriendlyError;
+      }
+      
+      // Re-throw other errors as-is
+      throw error;
+    }
   }
 
   generateInterviewQuestion({ messages }) {
@@ -169,6 +194,42 @@ class GroqProvider {
       temperature: 0.1,
       maxTokens: 500,
     });
+  }
+
+  /**
+   * Check if error is a rate limit error from Groq API
+   * @param {Error} error - The error object
+   * @returns {boolean} - Whether this is a rate limit error
+   */
+  isRateLimitError(error) {
+    return (
+      error?.code === 'rate_limit_exceeded' ||
+      error?.response?.status === 429 ||
+      (error?.message && error.message.toLowerCase().includes('rate limit'))
+    );
+  }
+
+  /**
+   * Extract retry after time from rate limit error
+   * @param {Error} error - The error object
+   * @returns {number|null} - Retry after time in seconds
+   */
+  extractRetryAfter(error) {
+    // Try to extract from error message
+    if (error?.message) {
+      const match = error.message.match(/try again in ([0-9.]+)s/);
+      if (match) {
+        return Math.ceil(parseFloat(match[1]));
+      }
+    }
+    
+    // Try to extract from headers
+    if (error?.response?.headers?.['retry-after']) {
+      return parseInt(error.response.headers['retry-after']);
+    }
+    
+    // Default fallback
+    return 10;
   }
 }
 

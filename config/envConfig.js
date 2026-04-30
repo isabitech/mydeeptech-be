@@ -120,10 +120,10 @@ const envConfig = {
 
   ai: {
     GROQ_API_KEY: env.GROQ_API_KEY,
-    AI_MODEL_MAIN: env.AI_MODEL_MAIN || "openai/gpt-oss-120b",
-    AI_MODEL_SCORE: env.AI_MODEL_SCORE || env.AI_MODEL_MAIN || "openai/gpt-oss-20b",
-    AI_BASE_URL: env.AI_BASE_URL || "https://api.groq.com/openai/v1",
-    AI_PROMPT_VERSION: env.AI_PROMPT_VERSION || "v1.0",
+    AI_MODEL_MAIN: env.AI_MODEL_MAIN,
+    AI_MODEL_SCORE: env.AI_MODEL_SCORE,
+    AI_BASE_URL: env.AI_BASE_URL || 'https://api.groq.com/openai/v1',
+    AI_PROMPT_VERSION: env.AI_PROMPT_VERSION || 'v1.0',
   },
 
  NODE_ENV: env.NODE_ENV || nodeEnv,

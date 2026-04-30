@@ -1376,6 +1376,11 @@ class AiInterviewService {
         ...deterministic,
       });
     } catch (error) {
+      // If it's a user-friendly AI error (rate limit), preserve and throw it
+      if (error.code === 'AI_RATE_LIMIT' || error.code === 'AI_SERVICE_ERROR') {
+        throw error;
+      }
+      
       this.recordAiMetadata(
         session,
         deterministic.metadata
@@ -1430,6 +1435,11 @@ class AiInterviewService {
       this.recordAiMetadata(session, response.metadata);
       return this.sanitizeScorePayload(response.data, deterministic);
     } catch (error) {
+      // If it's a user-friendly AI error (rate limit), preserve and throw it
+      if (error.code === 'AI_RATE_LIMIT' || error.code === 'AI_SERVICE_ERROR') {
+        throw error;
+      }
+      
       this.recordAiMetadata(
         session,
         deterministic.metadata,
