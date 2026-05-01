@@ -88,10 +88,12 @@ router.post("/createProject", projectController.createProject);
 router.get("/getProject", projectController.getProject);
 router.put("/updateProject/:id", projectController.updateProject);
 router.delete("/deleteProject/:id", projectController.deleteProject);
-router.post("/createTasks", taskController.createTask);
+router.post("/createTasks", authenticateToken, taskController.createTask);
 router.get("/getTask/:id", taskController.getTask);
-router.get("/getAllTasks", taskController.getAllTasks);
-router.post("/assignTask", taskController.assignTask);
+router.get("/getAllTasks", authenticateToken, taskController.getAllTasks);
+router.post("/assignTask", authenticateToken, taskController.assignTask);
+router.delete("/deleteTask/:id", authenticateToken, taskController.deleteTask);
+router.put("/updateTask/:id", authenticateToken, taskController.updateTask);
 router.post("/emailValidation", validateVisitor);
 router.post(
   "/createDTuser",

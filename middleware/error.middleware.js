@@ -1,33 +1,41 @@
 const envConfig = require("../config/envConfig");
 
 const formatErrorMessage = (error) => {
- if(error instanceof Error) {
-  return error.message;
- }
+  // Handle Mongoose duplicate key error first
+  if (error?.code === 11000) {
+    const field = Object.keys(error.keyValue)[0];
+    const value = Object.values(error.keyValue)[0];
+    return `${field} "${value}" already exists.`;
+  }
 
- if(error && typeof error === 'object' && "message" in error) {
-  return String(error.message);
- }
+  if (error instanceof Error) {
+    return error.message;
+  }
 
- if(error && typeof error === "string") {
-   return error;
- }
- 
- return "An unexpected error occurred";
-}
+  if (error && typeof error === "object" && "message" in error) {
+    return String(error.message);
+  }
 
-const errorMiddleware =  (err, _req, res, _next) => {
+  if (error && typeof error === "string") {
+    return error;
+  }
 
-  if(envConfig.NODE_ENV === "development") {
+  return "An unexpected error occurred";
+};
+
+const errorMiddleware = (err, _req, res, _next) => {
+  if (envConfig.NODE_ENV === "development") {
     console.error("Error =>", err);
   }
 
-  return res.status(err.statusCode || 500).json({
+  // Use 409 Conflict for duplicate key errors
+  const statusCode = err?.code === 11000 ? 409 : err.statusCode || 500;
+
+  return res.status(statusCode).json({
     message: formatErrorMessage(err) || "Internal Server Error",
-    statusCode: err.statusCode || 500,
+    statusCode,
     data: err.data || {},
   });
-
 };
 
 module.exports = errorMiddleware;
