@@ -70,6 +70,38 @@ class SubmissionService {
 
       const savedSubmission = await submission.save();
 
+      // Create appropriate slots based on task category
+      let slots = [];
+      try {
+        if (task.category === "mask_collection") {
+          slots = TaskSlot.generateMaskCollectionSlots(task._id);
+          console.log("Generated mask collection slots:", slots.length);
+        } else if (task.category === "age_progression") {
+          slots = TaskSlot.generateAgeProgressionSlots(task._id);
+          console.log("Generated age progression slots:", slots.length);
+        } else {
+          console.log("Unknown task category:", task.category);
+        }
+
+        // Insert slots if they don't already exist for this task
+        if (slots.length > 0) {
+          const existingSlots = await TaskSlot.find({ taskId: task._id });
+          console.log("Existing slots found:", existingSlots.length);
+          
+          if (existingSlots.length === 0) {
+            const insertedSlots = await TaskSlot.insertMany(slots);
+            console.log(`Successfully created ${insertedSlots.length} slots for task ${task._id} (${task.category})`);
+          } else {
+            console.log("Slots already exist for this task");
+          }
+        } else {
+          console.log("No slots generated for task category:", task.category);
+        }
+      } catch (error) {
+        console.error("Error creating slots:", error);
+        // Don't fail the submission creation if slot creation fails
+      }
+
       return await this.getSubmissionById(savedSubmission._id);
 
     } catch (error) {
@@ -280,6 +312,39 @@ class SubmissionService {
       const allSlots = await TaskSlot.find({ taskId: submission.taskId._id })
         .sort({ sequence: 1 });
 
+      // If no slots exist, create them based on task category
+      if (allSlots.length === 0) {
+        console.log(`No slots found for task ${submission.taskId._id} (${submission.taskId.category}), creating them...`);
+        let slots = [];
+        
+        try {
+          if (submission.taskId.category === "mask_collection") {
+            slots = TaskSlot.generateMaskCollectionSlots(submission.taskId._id);
+            console.log("Generated mask collection slots:", slots.length);
+          } else if (submission.taskId.category === "age_progression") {
+            slots = TaskSlot.generateAgeProgressionSlots(submission.taskId._id);
+            console.log("Generated age progression slots:", slots.length);
+          } else {
+            console.log("Unknown task category for slot generation:", submission.taskId.category);
+          }
+
+          if (slots.length > 0) {
+            const createdSlots = await TaskSlot.insertMany(slots);
+            console.log(`Successfully created ${createdSlots.length} slots for task ${submission.taskId._id}`);
+            
+            // Refetch the slots
+            const newSlots = await TaskSlot.find({ taskId: submission.taskId._id })
+              .sort({ sequence: 1 });
+            allSlots.splice(0, allSlots.length, ...newSlots);
+            console.log("Refetched slots:", allSlots.length);
+          } else {
+            console.log("No slots generated for task category:", submission.taskId.category);
+          }
+        } catch (error) {
+          console.error("Error creating slots during submission fetch:", error);
+        }
+      }
+
       // Map images to slots
       const slotsWithImages = allSlots.map(slot => {
         const image = images.find(img => img.slotId._id.toString() === slot._id.toString());
@@ -291,10 +356,27 @@ class SubmissionService {
         };
       });
 
+      // Create slots array in the format expected by frontend
+      const slots = allSlots.map(slot => {
+        const image = images.find(img => img.slotId._id.toString() === slot._id.toString());
+        return {
+          _id: slot._id,
+          angle: slot.metadata?.angle || slot.slot_name,
+          time_period: slot.metadata?.time_period,
+          description: slot.slot_instructions || slot.slot_name,
+          sort_order: slot.sequence,
+          uploaded: !!image,
+          image_url: image?.cloudinary_data?.secure_url,
+          image_id: image?._id,
+          metadata: slot.metadata || {}
+        };
+      });
+
       return {
         ...submission.toJSON(),
         images,
-        slotsWithImages,
+        slots, // Add frontend-compatible slots array
+        slotsWithImages, // Keep for backward compatibility
         progress: {
           uploaded: images.length,
           total: submission.total_slots,
@@ -305,6 +387,89 @@ class SubmissionService {
 
     } catch (error) {
       throw new Error(`Error fetching submission: ${error.message}`);
+    }
+  }
+
+  /**
+   * Create slots for a task if they don't exist
+   * @param {String} taskId - Task ID  
+   * @returns {Array} Created slots
+   */
+  async createTaskSlots(taskId) {
+    try {
+      // Get task details
+      const task = await MicroTask.findById(taskId);
+      if (!task) {
+        throw new Error("Task not found");
+      }
+
+      // Check if slots already exist
+      const existingSlots = await TaskSlot.find({ taskId });
+      if (existingSlots.length > 0) {
+        return existingSlots;
+      }
+
+      // Generate slots based on task category
+      let slots = [];
+      if (task.category === "mask_collection") {
+        // Create basic mask collection slots manually if static method fails
+        slots = [
+          {
+            taskId,
+            slot_name: "Front Mask A",
+            sequence: 1,
+            metadata: { angle: "Front", mask_type: "A", image_category: "mask" },
+            validation_rules: { required_face_size: 240, lighting_requirements: "good", face_visibility: true },
+            slot_instructions: "Upload Front Mask A - Ensure good lighting and face visibility"
+          },
+          {
+            taskId,
+            slot_name: "Left 45° Mask A",
+            sequence: 2,
+            metadata: { angle: "Left 45°", mask_type: "A", image_category: "mask" },
+            validation_rules: { required_face_size: 240, lighting_requirements: "good", face_visibility: true },
+            slot_instructions: "Upload Left 45° Mask A - Ensure good lighting and face visibility"
+          },
+          {
+            taskId,
+            slot_name: "Right 45° Mask A", 
+            sequence: 3,
+            metadata: { angle: "Right 45°", mask_type: "A", image_category: "mask" },
+            validation_rules: { required_face_size: 240, lighting_requirements: "good", face_visibility: true },
+            slot_instructions: "Upload Right 45° Mask A - Ensure good lighting and face visibility"
+          }
+        ];
+      } else if (task.category === "age_progression") {
+        // Create basic age progression slots
+        slots = [
+          {
+            taskId,
+            slot_name: "2021 Image 1",
+            sequence: 1,
+            metadata: { time_period: "2021", image_category: "age_progression" },
+            validation_rules: { required_face_size: 240, lighting_requirements: "good", face_visibility: true },
+            slot_instructions: "Upload image from 2021 - No selfies, face must be > 240px"
+          },
+          {
+            taskId,
+            slot_name: "2022 Image 1", 
+            sequence: 2,
+            metadata: { time_period: "2022", image_category: "age_progression" },
+            validation_rules: { required_face_size: 240, lighting_requirements: "good", face_visibility: true },
+            slot_instructions: "Upload image from 2022 - No selfies, face must be > 240px"
+          }
+        ];
+      }
+
+      if (slots.length > 0) {
+        const createdSlots = await TaskSlot.insertMany(slots);
+        console.log(`Manually created ${createdSlots.length} slots for task ${taskId}`);
+        return createdSlots;
+      }
+
+      return [];
+    } catch (error) {
+      throw new Error(`Error creating task slots: ${error.message}`);
     }
   }
 

@@ -31,7 +31,7 @@ router.get("/me",
   authenticateToken,
   async (req, res) => {
     try {
-      const submissions = await microTaskSubmissionService.getUserSubmissions(req.user.id);
+      const submissions = await microTaskSubmissionService.getUserSubmissions(req.user.userId);
       
       res.json({
         success: true,
@@ -67,7 +67,7 @@ router.get("/tasks/:taskId/eligibility",
         });
       }
 
-      const eligibility = await microTaskSubmissionService.checkUserEligibility(req.user.id, req.params.taskId);
+      const eligibility = await microTaskSubmissionService.checkUserEligibility(req.user.userId, req.params.taskId);
       
       res.json({
         success: true,
@@ -103,7 +103,7 @@ router.post("/tasks/:taskId/start",
         });
       }
 
-      const submission = await microTaskSubmissionService.startTaskSubmission(req.user.id, req.params.taskId);
+      const submission = await microTaskSubmissionService.startTaskSubmission(req.user.userId, req.params.taskId);
       
       res.status(201).json({
         success: true,
@@ -132,7 +132,9 @@ router.post("/tasks/:taskId/start",
       if (error.message === "Existing submission found") {
         return res.status(400).json({
           success: false,
-          message: "You already have an active submission for this task"
+          code: "EXISTING_SUBMISSION",
+          message: "You already have an active submission for this task",
+          existingSubmission: error.existingSubmission || null
         });
       }
       
@@ -164,7 +166,7 @@ router.get("/:submissionId",
         });
       }
 
-      const submission = await microTaskSubmissionService.getSubmissionDetails(req.params.submissionId, req.user.id);
+      const submission = await microTaskSubmissionService.getSubmissionDetails(req.params.submissionId, req.user.userId);
       
       if (!submission) {
         return res.status(404).json({
@@ -220,7 +222,7 @@ router.post("/:submissionId/upload",
         req.params.submissionId,
         req.body.slotId,
         req.file,
-        req.user.id
+        req.user.userId
       );
       
       res.json({
@@ -277,7 +279,7 @@ router.delete("/:submissionId/slots/:slotId/image",
       await microTaskSubmissionService.deleteSubmissionImage(
         req.params.submissionId,
         req.params.slotId,
-        req.user.id
+        req.user.userId
       );
       
       res.json({
@@ -329,7 +331,7 @@ router.post("/:submissionId/submit",
         });
       }
 
-      const submission = await microTaskSubmissionService.submitTaskForReview(req.params.submissionId, req.user.id);
+      const submission = await microTaskSubmissionService.submitTaskForReview(req.params.submissionId, req.user.userId);
       
       res.json({
         success: true,
@@ -444,7 +446,7 @@ router.post("/admin/:submissionId/review",
         feedback: req.body.feedback,
         quality_score: req.body.quality_score,
         slot_reviews: req.body.slot_reviews,
-        reviewer_id: req.user.id
+        reviewer_id: req.user.userId
       };
 
       const result = await microTaskSubmissionService.reviewSubmission(req.params.submissionId, reviewData);
@@ -468,6 +470,63 @@ router.post("/admin/:submissionId/review",
         return res.status(400).json({
           success: false,
           message: "Submission cannot be reviewed in its current state"
+        });
+      }
+      
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message
+      });
+    }
+  }
+);
+
+// @route   POST /api/micro-task-submissions/:submissionId/create-slots
+// @desc    Create task slots for submission
+// @access  Private
+router.post("/:submissionId/create-slots",
+  authenticateToken,
+  [
+    param("submissionId").isMongoId().withMessage("Invalid submission ID")
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: "Validation error",
+          errors: errors.array()
+        });
+      }
+
+      console.log(`Creating slots for submission ${req.params.submissionId} by user ${req.user.userId}`);
+      
+      const slots = await microTaskSubmissionService.createTaskSlots(req.params.submissionId, req.user.userId);
+      
+      res.status(200).json({
+        success: true,
+        message: "Task slots created successfully",
+        data: { 
+          slotsCreated: slots.length,
+          slots: slots 
+        }
+      });
+    } catch (error) {
+      console.error("Error creating task slots:", error);
+      
+      if (error.message === "Submission not found") {
+        return res.status(404).json({
+          success: false,
+          message: "Submission not found"
+        });
+      }
+      
+      if (error.message === "Not authorized to access this submission") {
+        return res.status(403).json({
+          success: false,
+          message: "Not authorized to access this submission"
         });
       }
       

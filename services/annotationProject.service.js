@@ -184,6 +184,8 @@ class AnnotationProjectService {
       ]),
     ]);
 
+    // console.log("Projects found:", JSON.stringify(projects, null, 2));
+
     const totalPages = Math.ceil(totalProjects / limit);
 
     return {

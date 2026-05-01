@@ -346,10 +346,7 @@ const dtUserSchema = new mongoose.Schema(
   dtUserSchema.methods.isMicroTaskProfileComplete = function() {
     const required = [
       this.fullName,
-      this.personal_info.date_of_birth,
-      this.personal_info.gender,
-      this.personal_info.country,
-      this.personal_info.country_of_origin
+      this.personal_info?.country
     ];
     
     return required.every(field => field && field !== "");

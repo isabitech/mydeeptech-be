@@ -32,7 +32,7 @@ const checkUserEligibility = async (userId, taskId) => {
   try {
     // Check if task exists and is active
     const task = await MicroTask.findById(taskId);
-    if (!task || !task.is_active) {
+    if (!task || task.status !== "active") {
       return {
         canStart: false,
         reason: "Task not available"
@@ -41,14 +41,17 @@ const checkUserEligibility = async (userId, taskId) => {
 
     // Check if user has complete profile
     const user = await DTUser.findById(userId);
+    if (!user) {
+      return {
+        canStart: false,
+        reason: "User not found"
+      };
+    }
+    
     if (!user.isMicroTaskProfileComplete()) {
       const requiredFields = [
-        !user.first_name && "First Name",
-        !user.last_name && "Last Name", 
-        !user.personal_info?.age && "Age",
-        !user.personal_info?.gender && "Gender",
-        !user.personal_info?.country && "Country",
-        !user.personal_info?.city && "City"
+        !user.fullName && "Full Name",
+        !user.personal_info?.country && "Country"
       ].filter(Boolean);
 
       return {
@@ -70,7 +73,7 @@ const checkUserEligibility = async (userId, taskId) => {
         canStart: false,
         reason: "Existing submission found",
         existingSubmission: {
-          id: existingSubmission._id,
+          id: existingSubmission._id.toString(),
           status: existingSubmission.status
         }
       };
@@ -119,6 +122,16 @@ const startTaskSubmission = async (userId, taskId) => {
     // Re-check eligibility within transaction
     const eligibilityCheck = await checkUserEligibility(userId, taskId);
     if (!eligibilityCheck.canStart) {
+      if (eligibilityCheck.reason === "Profile incomplete") {
+        const error = new Error("Profile incomplete");
+        error.required_fields = eligibilityCheck.requiredFields;
+        throw error;
+      }
+      if (eligibilityCheck.reason === "Existing submission found") {
+        const error = new Error("Existing submission found");
+        error.existingSubmission = eligibilityCheck.existingSubmission;
+        throw error;
+      }
       throw new Error(eligibilityCheck.reason);
     }
 
@@ -132,21 +145,36 @@ const startTaskSubmission = async (userId, taskId) => {
     const user = await DTUser.findById(userId).session(session);
     const userMetadata = user.getMicroTaskMetadata();
 
-    // Create submission
+    // Calculate total slots based on task category
+    let totalSlots = 0;
+    if (task.category === "mask_collection") {
+      totalSlots = 20; // 10 Mask A + 10 Mask B slots
+    } else if (task.category === "age_progression") {
+      totalSlots = 15; // 6 years with varying slots per year
+    }
+
+    // Create submission with total_slots
     const submission = new MicroTaskSubmission({
       taskId,
       userId,
+      total_slots: totalSlots,
       user_metadata: userMetadata
     });
 
     await submission.save({ session });
 
-    // Generate task slots based on category
-    const slots = await TaskSlot.generateSlots(taskId, task.category, submission._id);
+    // Generate task slots based on category (slots are saved separately)
+    let slots;
+    if (task.category === "mask_collection") {
+      slots = TaskSlot.generateMaskCollectionSlots(taskId);
+    } else if (task.category === "age_progression") {
+      slots = TaskSlot.generateAgeProgressionSlots(taskId);
+    }
     
-    // Update submission with slot count
-    submission.total_slots = slots.length;
-    await submission.save({ session });
+    // Save the generated slots to the database
+    if (slots && slots.length > 0) {
+      await TaskSlot.insertMany(slots, { session });
+    }
 
     await session.commitTransaction();
 
@@ -578,6 +606,70 @@ const reviewSubmission = async (submissionId, reviewData) => {
   }
 };
 
+/**
+ * Create task slots for a submission if they don't exist
+ */
+const createTaskSlots = async (submissionId, userId) => {
+  try {
+    console.log(`Creating task slots for submission ${submissionId}`);
+    
+    // Get submission details
+    const submission = await MicroTaskSubmission.findById(submissionId).populate('taskId');
+    if (!submission) {
+      throw new Error("Submission not found");
+    }
+    
+    // Check if user owns this submission (unless admin)
+    if (submission.userId.toString() !== userId) {
+      throw new Error("Not authorized to access this submission");
+    }
+    
+    console.log(`Found submission for task ${submission.taskId._id} with category ${submission.taskId.category}`);
+    
+    // Check if slots already exist for this task
+    const existingSlots = await TaskSlot.find({ taskId: submission.taskId._id });
+    if (existingSlots.length > 0) {
+      console.log(`Task already has ${existingSlots.length} slots`);
+      return existingSlots;
+    }
+    
+    // Generate slots based on task category
+    let slots = [];
+    if (submission.taskId.category === "mask_collection") {
+      slots = TaskSlot.generateMaskCollectionSlots(submission.taskId._id);
+      console.log(`Generated ${slots.length} mask collection slots`);
+    } else if (submission.taskId.category === "age_progression") {
+      slots = TaskSlot.generateAgeProgressionSlots(submission.taskId._id);
+      console.log(`Generated ${slots.length} age progression slots`);
+    } else {
+      // Create basic slots for unknown categories
+      slots = [
+        {
+          taskId: submission.taskId._id,
+          slot_name: "Front Mask A",
+          sequence: 1,
+          metadata: { angle: "Front", mask_type: "A", image_category: "mask" },
+          validation_rules: { required_face_size: 240, lighting_requirements: "good", face_visibility: true },
+          slot_instructions: "Upload Front Mask A - Ensure good lighting and face visibility"
+        }
+      ];
+      console.log(`Generated ${slots.length} default slots for category ${submission.taskId.category}`);
+    }
+    
+    if (slots.length > 0) {
+      const createdSlots = await TaskSlot.insertMany(slots);
+      console.log(`Successfully created ${createdSlots.length} slots for task ${submission.taskId._id}`);
+      return createdSlots;
+    }
+    
+    throw new Error(`Could not generate slots for task category: ${submission.taskId.category}`);
+    
+  } catch (error) {
+    console.error("Error creating task slots:", error);
+    throw error;
+  }
+};
+
 module.exports = {
   getUserSubmissions,
   checkUserEligibility,
@@ -588,5 +680,6 @@ module.exports = {
   submitTaskForReview,
   updateSubmissionProgress,
   getReviewQueue,
-  reviewSubmission
+  reviewSubmission,
+  createTaskSlots
 };

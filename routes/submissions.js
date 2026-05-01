@@ -105,10 +105,17 @@ router.delete("/:submissionId/images/:imageId",
 );
 
 router.post("/:submissionId/submit", 
-  verifyToken, 
-  checkRole(["ANNOTATOR", "USER"]), 
+  authenticateToken, 
+  requireRole("ANNOTATOR", "USER"), 
   submissionIdValidation, 
   submissionController.submitForReview
+);
+
+router.post("/:submissionId/create-slots", 
+  authenticateToken, 
+  requireRole("ANNOTATOR", "USER"), 
+  submissionIdValidation, 
+  submissionController.createTaskSlots
 );
 
 // Error handling middleware for multer

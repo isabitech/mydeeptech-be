@@ -198,6 +198,48 @@ class SubmissionController {
   }
 
   /**
+   * Create slots for a task
+   */
+  async createTaskSlots(req, res) {
+    try {
+      const { submissionId } = req.params;
+      
+      // Get submission to find taskId
+      const submission = await submissionService.getSubmissionById(submissionId);
+      if (!submission) {
+        return res.status(404).json({
+          success: false,
+          message: "Submission not found"
+        });
+      }
+
+      // Check if user owns this submission (unless admin)
+      if (req.user.role !== "ADMIN" && 
+          submission.userId._id.toString() !== req.user.id) {
+        return res.status(403).json({
+          success: false,
+          message: "Not authorized to access this submission"
+        });
+      }
+
+      const slots = await submissionService.createTaskSlots(submission.taskId._id);
+
+      res.status(200).json({
+        success: true,
+        message: "Task slots created successfully",
+        data: { slots: slots.length }
+      });
+
+    } catch (error) {
+      console.error("Error creating task slots:", error);
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to create task slots"
+      });
+    }
+  }
+
+  /**
    * Delete an uploaded image
    */
   async deleteImage(req, res) {

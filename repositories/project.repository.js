@@ -5,6 +5,8 @@ class ProjectRepository {
      * Find all projects
      */
     async findAll() {
+        const projects = await this.findAll();
+        // console.log("Projects found:", JSON.stringify(projects, null, 2));
         return await projects.find();
     }
 
