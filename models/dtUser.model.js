@@ -148,7 +148,21 @@ const dtUserSchema = new mongoose.Schema(
     // Extended profile information
     personal_info: {
       country: { type: String, default: "" },
+      country_of_origin: { type: String, default: "" },
       time_zone: { type: String, default: "" },
+      date_of_birth: { type: Date, default: null },
+      age: { type: Number, default: null },
+      gender: {
+        type: String,
+        enum: ["male", "female", "other", "prefer_not_to_say", ""],
+        default: ""
+      },
+      recruiter_name: { type: String, default: "" },
+      recruiter_id: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "DTUser",
+        default: null
+      },
       available_hours_per_week: { type: Number, default: 0 },
       preferred_communication_channel: {
         type: String,
@@ -310,6 +324,51 @@ const dtUserSchema = new mongoose.Schema(
 
   dtUserSchema.set("toObject", { virtuals: true });
   dtUserSchema.set("toJSON", { virtuals: true });
+
+  // Pre-save middleware to calculate age from date of birth
+  dtUserSchema.pre("save", function(next) {
+    if (this.personal_info.date_of_birth) {
+      const today = new Date();
+      const birthDate = new Date(this.personal_info.date_of_birth);
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      
+      this.personal_info.age = age;
+    }
+    next();
+  });
+
+  // Method to check if profile is complete for micro tasks
+  dtUserSchema.methods.isMicroTaskProfileComplete = function() {
+    const required = [
+      this.fullName,
+      this.personal_info?.country
+    ];
+    
+    return required.every(field => field && field !== "");
+  };
+
+  // Method to get micro task metadata
+  dtUserSchema.methods.getMicroTaskMetadata = function() {
+    return {
+      full_name: this.fullName || "",
+      user_id: this._id.toString(),
+      country_of_residence: this.personal_info.country || "",
+      country_of_origin: this.personal_info.country_of_origin || "",
+      age: this.personal_info.age || null,
+      date_of_birth: this.personal_info.date_of_birth || null,
+      gender: this.personal_info.gender || "",
+      recruiter_name: this.personal_info.recruiter_name || "",
+      contact_info: {
+        email: this.email || "",
+        phone: this.phone || ""
+      }
+    };
+  };
 
   dtUserSchema.pre("findOneAndDelete", async function (next) {
     const userId = this.getQuery()._id;

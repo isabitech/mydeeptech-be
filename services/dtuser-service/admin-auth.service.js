@@ -7,6 +7,7 @@ const envConfig = require("../../config/envConfig");
 const adminVerificationStore = require("../../utils/adminVerificationStore");
 const Role = require("../../models/roles.model");
 const AdminRegistrationState = require("../../models/adminRegistrationState.model");
+const { RoleType } = require("../../utils/role");
 const {
   dtUserLoginSchema,
   adminCreateSchema,
@@ -69,6 +70,7 @@ class AdminAuthService {
       annotatorStatus: "approved",
       microTaskerStatus: "approved",
       resultLink: "",
+      role: RoleType.ADMIN, // Set admin role using enum
     };
   }
 
@@ -418,9 +420,13 @@ class AdminAuthService {
     try {
       await session.startTransaction();
 
-      assignedRole = await Role.findOne({ name: "moderator" }).session(session);
+      assignedRole = await Role.findOne({ name: "admin" }).session(session);
       if (!assignedRole) {
-        throw new Error('Role "moderator" not found');
+        // Fallback to moderator if admin role doesn't exist
+        assignedRole = await Role.findOne({ name: "moderator" }).session(session);
+        if (!assignedRole) {
+          throw new Error('Neither "admin" nor "moderator" role found');
+        }
       }
 
       newAdmin = new DTUser({
@@ -521,6 +527,7 @@ class AdminAuthService {
     }
 
     admin.isEmailVerified = true;
+    admin.role = RoleType.ADMIN; // Ensure role is set to admin upon verification
     await this.repository.saveUser(admin);
 
     await adminVerificationStore.removeVerificationCode(normalizedEmail);
@@ -573,6 +580,7 @@ class AdminAuthService {
     }
 
     admin.isEmailVerified = true;
+    admin.role = RoleType.ADMIN; // Ensure role is set to admin upon verification
     await this.repository.saveUser(admin);
 
     await adminVerificationStore.removeVerificationCode(normalizedEmail);

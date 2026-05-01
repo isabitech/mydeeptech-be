@@ -40,8 +40,8 @@ class AnnotationProjectRepository {
 
     let query = AnnotationProject.find(filter)
       .sort(sort)
-      .skip(skip)
-      .limit(limit)
+      // .skip(skip)
+      // .limit(limit)
       .select(select);
 
     if (populate) {

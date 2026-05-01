@@ -180,6 +180,8 @@ class AnnotationProjectController {
   }
 
   async getAllAnnotationProjects(req, res) {
+
+
     try {
       const data = await this.service.getAllProjects(req.query);
       res.status(200).json({

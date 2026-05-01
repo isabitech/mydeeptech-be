@@ -184,6 +184,8 @@ class AnnotationProjectService {
       ]),
     ]);
 
+    // console.log("Projects found:", JSON.stringify(projects, null, 2));
+
     const totalPages = Math.ceil(totalProjects / limit);
 
     return {
@@ -251,9 +253,14 @@ class AnnotationProjectService {
       { $unwind: { path: "$reviewedBy", preserveNullAndEmptyArrays: true } },
     ];
 
-    const buildSearchPipeline = (status, sortField = "appliedAt") => {
+    const buildSearchPipeline = (statuses, sortField = "appliedAt") => {
+      // Handle both single status and array of statuses
+      const statusFilter = Array.isArray(statuses) 
+        ? { $in: statuses }
+        : statuses;
+        
       const pipeline = [
-        { $match: { projectId: project._id, status: status } },
+        { $match: { projectId: project._id, status: statusFilter } },
         ...buildApplicantLookupStages(),
       ];
 
@@ -278,7 +285,8 @@ class AnnotationProjectService {
       pipeline.push(...buildReviewedByLookupStages());
 
       const sortOrder =
-        status === "approved" || status === "rejected"
+        (Array.isArray(statuses) && (statuses.includes("approved") || statuses.includes("rejected"))) || 
+        statuses === "approved" || statuses === "rejected"
           ? { reviewedAt: -1 }
           : { [sortField]: -1 };
       pipeline.push({ $sort: sortOrder });
@@ -330,7 +338,7 @@ class AnnotationProjectService {
         buildSearchPipeline("rejected", "reviewedAt"),
       ),
       this.repository.aggregateApplications(
-        buildSearchPipeline("pending", "appliedAt"),
+        buildSearchPipeline(["pending", "ai_interview_required"], "appliedAt"),
       ),
       this.repository.aggregateApplications(
         buildSearchPipeline("removed", "removedAt"),
@@ -615,7 +623,7 @@ class AnnotationProjectService {
 
     const activeApplications = await this.repository.countApplications({
       projectId,
-      status: { $in: ["ai_interview_required", "pending", "approved"] },
+      status: { $in: ["pending", "approved"] },
     });
 
     if (activeApplications > 0) {
@@ -638,7 +646,7 @@ class AnnotationProjectService {
 
     const activeApplications = await this.repository.countApplications({
       projectId,
-      status: { $in: ["ai_interview_required", "pending", "approved"] },
+      status: { $in: ["pending", "approved"] },
     });
     const allApplicationsCount = await this.repository.countApplications({
       projectId,
@@ -713,7 +721,7 @@ class AnnotationProjectService {
 
     const activeApplicationsCount = await this.repository.countApplications({
       projectId,
-      status: { $in: ["ai_interview_required", "pending", "approved"] },
+      status: { $in: ["pending", "approved"] },
     });
 
     const allApplications = await this.repository.findApplications({
@@ -1094,7 +1102,7 @@ class AnnotationProjectService {
     );
 
     if (!application) throw new Error("Application not found");
-
+    
     // Check if the project exists and is active
     const project = application.projectId;
     if (!project) throw new Error("Project not found");
@@ -1119,12 +1127,12 @@ class AnnotationProjectService {
     application.reviewedAt = new Date();
     application.reviewNotes = reviewNotes || "";
     application.workStartedAt = new Date(); // Reset work start time
-
+    
     // Clear rejection-related fields
     if (application.rejectionReason) {
       application.rejectionReason = undefined;
     }
-
+    
     // Clear removal-related fields if this was a removed applicant
     if (application.removedAt) {
       application.removedAt = undefined;
@@ -1929,13 +1937,10 @@ class AnnotationProjectService {
     if (!project) throw new Error("project_not_found");
     if (project.status !== "active") throw new Error("project_closed");
 
-    const existingApplication = await this.repository.findOneApplication(
-      {
-        projectId,
-        applicantId: userId,
-      },
-      { lean: false },
-    );
+    const existingApplication = await this.repository.findOneApplication({
+      projectId,
+      applicantId: userId,
+    }, { lean: false });
 
     if (existingApplication) {
       if (existingApplication.status === "ai_interview_required") {
@@ -2020,25 +2025,16 @@ class AnnotationProjectService {
     const { coverLetter, proposedRate, availability, estimatedCompletionTime } =
       body || {};
 
-    let expiryDate = null;
-    if (project.applicationDuration) {
-      expiryDate = new Date(
-        Date.now() +
-          project.applicationDuration * 7 * 24 * 60 * 60 * 1000,
-      );
-    }
-
     if (!project.aiInterviewRequired) {
       const application = await this.repository.createApplication({
         projectId,
         applicantId: userId,
         coverLetter: coverLetter || "",
         resumeUrl: user.attachments.resume_url,
-        proposedRate: proposedRate ?? project.payRate ?? null,
+        proposedRate: proposedRate || project.payRate,
         availability: availability || "flexible",
         estimatedCompletionTime: estimatedCompletionTime || "",
         status: "pending",
-        expiryDate,
       });
 
       await this.repository.updateProject(projectId, {
@@ -2058,17 +2054,24 @@ class AnnotationProjectService {
       );
     }
 
+    // Calculate expiry date if project has applicationDuration
+    let expiryDate = null;
+    if (project.applicationDuration) {
+      const currentDate = new Date();
+      expiryDate = new Date(currentDate.getTime() + (project.applicationDuration * 7 * 24 * 60 * 60 * 1000));
+    }
+
     const application = await this.repository.createApplication({
       projectId,
       applicantId: userId,
       coverLetter: coverLetter || "",
       resumeUrl: user.attachments.resume_url,
-      proposedRate: proposedRate ?? project.payRate ?? null,
+      proposedRate: proposedRate || project.payRate,
       availability: availability || "flexible",
       estimatedCompletionTime: estimatedCompletionTime || "",
       status: "ai_interview_required",
       aiInterviewTrackId: buildProjectTrackId(project._id),
-      expiryDate,
+      expiryDate
     });
 
     await this.repository.updateProject(projectId, {
@@ -2119,7 +2122,51 @@ class AnnotationProjectService {
     };
 
     return refreshedApplication;
+
+    /* Legacy apply flow removed.
+    if (!assessmentTriggered) {
+      try {
+        const projectWithAdmins =
+          await this.repository.findProjectByIdWithPopulate(projectId, [
+            { path: "createdBy", select: "fullName email" },
+            { path: "assignedAdmins", select: "fullName email" },
+          ]);
+
+        const adminEmails = [projectWithAdmins.createdBy.email];
+        if (projectWithAdmins.assignedAdmins) {
+          projectWithAdmins.assignedAdmins.forEach((adm) => {
+            if (!adminEmails.includes(adm.email)) adminEmails.push(adm.email);
+          });
+        }
+
+        const notificationData = {
+          applicantName: user.fullName,
+          projectName: project.projectName,
+          appliedAt: application.appliedAt,
+        };
+
+        for (const email of adminEmails) {
+          await MailService.sendProjectApplicationNotification(
+            email,
+            "Project Admin",
+            notificationData,
+          );
+        }
+      } catch (err) {
+        console.error(
+          "⚠️ Failed to notify admins of application:",
+          err.message,
+        );
+      }
+    }
+
+    return await this.repository.findApplicationByIdWithPopulate(
+      application._id,
+      [{ path: "projectId", select: "projectName projectCategory payRate" }],
+    );
+    */
   };
+
   /**
    * Annotator: Get project guidelines.
    */

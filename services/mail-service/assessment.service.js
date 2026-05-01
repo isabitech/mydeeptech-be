@@ -1,4 +1,5 @@
 const BaseMailService = require('./base.service');
+const envConfig = require('../../config/envConfig');
 
 class AssessmentMailService extends BaseMailService {
 
@@ -30,8 +31,8 @@ class AssessmentMailService extends BaseMailService {
             subject: `Assessment Invitation: ${assessmentTitle} - MyDeepTech`,
             htmlTemplate,
             message,
-            senderEmail: 'no-reply@mydeeptech.ng',
-            senderName: 'MyDeepTech'
+            senderEmail: envConfig.email.senders.default.email,
+            senderName: envConfig.email.senders.default.name
         });
     }
 
@@ -65,8 +66,8 @@ class AssessmentMailService extends BaseMailService {
             subject: `Assessment Completed: ${assessmentTitle} - MyDeepTech`,
             htmlTemplate,
             message,
-            senderEmail: 'no-reply@mydeeptech.ng',
-            senderName: 'MyDeepTech'
+            senderEmail: envConfig.email.senders.default.email,
+            senderName: envConfig.email.senders.default.name
         });
     }
 

@@ -47,6 +47,28 @@ const envConfig = {
 
   email: {
     defaultProvider: env.EMAIL_PROVIDER || 'brevo', // 'mailjet' or 'brevo'
+    
+    // Email sender constants by purpose
+    senders: {
+      default: {
+        email: env.BREVO_SENDER_EMAIL || 'no-reply@mydeeptech.ng',
+        name: env.BREVO_SENDER_NAME || 'MyDeepTech Team'
+      },
+      projects: {
+        // Try alternative sender for better deliverability
+        email: env.BREVO_PROJECT_SENDER_EMAIL || env.BREVO_SENDER_EMAIL || 'projects@mydeeptech.ng',
+        name: env.BREVO_PROJECT_SENDER_NAME || 'MyDeepTech Projects'
+      },
+      payments: {
+        email: env.BREVO_PAYMENTS_SENDER_EMAIL || 'payments@mydeeptech.ng',
+        name: env.BREVO_PAYMENTS_SENDER_NAME || 'MyDeepTech Payments'
+      },
+      support: {
+        email: env.BREVO_SUPPORT_SENDER_EMAIL || 'support@mydeeptech.ng', 
+        name: env.BREVO_SUPPORT_SENDER_NAME || 'MyDeepTech Support'
+      }
+    },
+    
     mailjet: {
       MAILJET_API_KEY: env.MAILJET_API_KEY,
       MAILJET_SECRET_KEY: env.MAILJET_SECRET_KEY,
@@ -98,10 +120,10 @@ const envConfig = {
 
   ai: {
     GROQ_API_KEY: env.GROQ_API_KEY,
-    AI_MODEL_MAIN: env.AI_MODEL_MAIN || "openai/gpt-oss-120b",
-    AI_MODEL_SCORE: env.AI_MODEL_SCORE || env.AI_MODEL_MAIN || "openai/gpt-oss-20b",
-    AI_BASE_URL: env.AI_BASE_URL || "https://api.groq.com/openai/v1",
-    AI_PROMPT_VERSION: env.AI_PROMPT_VERSION || "v1.0",
+    AI_MODEL_MAIN: env.AI_MODEL_MAIN,
+    AI_MODEL_SCORE: env.AI_MODEL_SCORE,
+    AI_BASE_URL: env.AI_BASE_URL || 'https://api.groq.com/openai/v1',
+    AI_PROMPT_VERSION: env.AI_PROMPT_VERSION || 'v1.0',
   },
 
  NODE_ENV: env.NODE_ENV || nodeEnv,

@@ -125,6 +125,7 @@ class AdminService {
       hasPassword,
       search,
       country,
+      language,
     } = query;
 
     const filter = this.getNonAdminUserFilter();
@@ -141,26 +142,82 @@ class AdminService {
       filter.hasSetPassword = hasPassword === "true";
     }
 
+    // Build search conditions
+    let searchConditions = [];
     if (search) {
-      filter.$or = this.buildSearchQuery(search, [
+      const searchQuery = this.buildSearchQuery(search, [
         "fullName",
         "email",
         "phone",
-      ]).$or;
+      ]);
+      searchConditions.push(...searchQuery.$or);
     }
 
+    // Handle country filter
     if (country && country !== 'all') {
       if (country.toLowerCase() === 'unknown') {
         // Filter for users with no country (null, undefined, empty, or field doesn't exist)
-        filter.$or = [
+        const countryConditions = [
           { 'personal_info.country': { $exists: false } },
           { 'personal_info.country': null },
           { 'personal_info.country': '' },
           { 'personal_info.country': /^\s*$/ } // Only whitespace
         ];
+        
+        if (searchConditions.length > 0) {
+          // Combine search and country conditions
+          filter.$and = [
+            { $or: searchConditions },
+            { $or: countryConditions }
+          ];
+        } else {
+          filter.$or = countryConditions;
+        }
       } else {
         // Filter by country in personal_info.country field
         filter['personal_info.country'] = new RegExp(`^${country}$`, 'i'); // Case-insensitive exact match
+        
+        // Add search conditions if they exist
+        if (searchConditions.length > 0) {
+          filter.$or = searchConditions;
+        }
+      }
+    } else if (searchConditions.length > 0) {
+      // Only search conditions, no country filter
+      filter.$or = searchConditions;
+    }
+
+    // Handle language filter
+    if (language && language !== 'all') {
+      // Filter by language in native_languages or other_languages
+      const languageCondition = {
+        $or: [
+          { 'language_proficiency.native_languages': language },
+          { 'language_proficiency.other_languages': language }
+        ]
+      };
+      
+      // If we already have $and conditions, add to them
+      if (filter.$and) {
+        filter.$and.push(languageCondition);
+      } else if (filter.$or && (country && country !== 'all' && searchConditions.length > 0)) {
+        // If we have search + country, convert to $and
+        filter.$and = [
+          { $or: filter.$or },
+          languageCondition
+        ];
+        delete filter.$or;
+      } else {
+        // Simple case: add language condition with existing $or
+        if (filter.$or) {
+          filter.$and = [
+            { $or: filter.$or },
+            languageCondition
+          ];
+          delete filter.$or;
+        } else {
+          Object.assign(filter, languageCondition);
+        }
       }
     }
 

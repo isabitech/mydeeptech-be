@@ -23,8 +23,8 @@ const taskSchema = new mongoose.Schema({
         required: true 
     },
     createdBy: {
-        type: String,
-        minlength: 4,
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'DTUser',
         required: true 
     },
     dateCreated:{

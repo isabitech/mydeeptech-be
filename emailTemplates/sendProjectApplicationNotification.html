@@ -73,21 +73,31 @@
         .brand {
             color: #667eea;
             font-weight: 600;
-        }
-    </style>
+        }        .visually-hidden {
+            position: absolute !important;
+            left: -9999px !important;
+            width: 1px !important;
+            height: 1px !important;
+            overflow: hidden !important;
+        }    </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>📋 New Project Application</h1>
-        </div>
+        <header class="header" role="banner">
+            <h1>📨 New Project Application</h1>
+        </header>
         
-        <div class="content">
-            <p class="message">Hello {{adminName}},</p>
+        <main class="content" role="main">
+            <section aria-labelledby="greeting-heading">
+                <h2 id="greeting-heading" class="visually-hidden">Notification Message</h2>
+                <p class="message">Hello {{adminName}},</p>
+                
+                <p class="message">A new project application has been submitted and requires your review.</p>
+            </section>
             
-            <p class="message">A new application has been submitted for one of your projects.</p>
-            
-            <div class="application-details">
+            <section aria-labelledby="application-details-heading">
+                <h2 id="application-details-heading" class="visually-hidden">Application Details</h2>
+                <div class="application-details">
                 <div class="detail-row">
                     <span class="label">Project:</span> {{projectName}}
                 </div>
@@ -107,12 +117,10 @@
                     <span class="label">Applied:</span> {{appliedAt}}
                 </div>
                 
-                {{#if coverLetter}}
                 <div class="cover-letter">
                     <span class="label">Cover Letter:</span><br><br>
                     {{coverLetter}}
                 </div>
-                {{/if}}
             </div>
             
             <p class="message">Please log into the admin panel to review this application and take appropriate action.</p>
@@ -121,16 +129,13 @@
                 Best regards,<br>
                 <span class="brand">The MyDeeptech Team</span>
             </p>
-        </div>
+            </section>
+        </main>
         
-        <div class="footer">
-                <p>&copy; <span id="year"></span> MyDeepTech. All rights reserved.</p>
-        </div>
+        <footer class="footer" role="contentinfo">
+                <p>&copy; 2026 MyDeepTech. All rights reserved.</p>
+</footer>
         </div>
 
-        <!-- Inline JavaScript -->
-    <script>
-        document.getElementById("year").textContent = new Date().getFullYear();
-    </script>
 </body>
 </html>

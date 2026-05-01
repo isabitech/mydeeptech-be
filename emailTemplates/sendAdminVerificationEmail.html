@@ -67,22 +67,32 @@
             color: #666; 
             font-size: 12px; 
         }
+        .visually-hidden {
+            position: absolute !important;
+            left: -9999px !important;
+            width: 1px !important;
+            height: 1px !important;
+            overflow: hidden !important;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
+        <header class="header" role="banner">
             <h1>👑 Admin Account Verification</h1>
             <p>Secure access verification required</p>
-        </div>
+        </header>
         
-        <div class="content">
-            <h2>Hello {{recipientName}},</h2>
+        <main class="content" role="main">
+            <section aria-labelledby="greeting-heading">
+                <h2 id="greeting-heading">Hello {{recipientName}},</h2>
+                
+                <p>You have requested admin account verification for MyDeepTech. Please use the verification code below to complete your admin account setup:</p>
+            </section>
             
-            <p>You have requested admin account verification for MyDeepTech. Please use the verification code below to complete your admin account setup:</p>
-            
-            <div class="verification-code">
-                <h3>Your Verification Code</h3>
+            <section aria-labelledby="verification-code-heading">
+                <div class="verification-code">
+                <h3 id="verification-code-heading">Your Verification Code</h3>
                 <div class="code">{{verificationCode}}</div>
                 <p style="margin: 10px 0 0 0; font-size: 14px; color: #666;">
                     This code expires in <strong>15 minutes</strong>
@@ -108,13 +118,14 @@
             
             <p><strong>Security Contact:</strong><br>
             Email: <a href="mailto:security@mydeeptech.ng">security@mydeeptech.ng</a></p>
-        </div>
+            </section>
+        </main>
         
-        <div class="footer">
+        <footer class="footer" role="contentinfo">
             <p><strong>MyDeepTech Security Team</strong><br>
             <a href="https://mydeeptech.ng">mydeeptech.ng</a></p>
             <p>This verification email was generated automatically.</p>
-        </div>
+        </footer>
     </div>
 </body>
 </html>

@@ -44,7 +44,7 @@ const emailTemplates = {
                             • Duration: {{estimatedDuration}} minutes<br>
                             • Tasks: {{numberOfTasks}} tasks<br>
                             • Type: Multimedia conversation creation<br>
-                            {{#hasDeadline}}• Deadline: {{deadline}}{{/hasDeadline}}
+                            • Deadline: {{deadline}}
                         </div>
                         
                         <p><strong>What to expect:</strong></p>
@@ -55,12 +55,10 @@ const emailTemplates = {
                             <li>Professional review of your work</li>
                         </ul>
                         
-                        {{#hasRetakeInfo}}
                         <div style="background-color: #e7f3ff; border-left: 4px solid #007bff; padding: 10px; margin: 15px 0;">
                             <strong>Retake Information:</strong><br>
                             This is attempt #{{attemptNumber}}. You have {{retriesLeft}} retries remaining.
                         </div>
-                        {{/hasRetakeInfo}}
                         
                         <a href="{{assessmentLink}}" class="button">Start Assessment</a>
                         
@@ -203,7 +201,7 @@ const emailTemplates = {
                             <strong>📈 Your Results:</strong><br>
                             • Overall Score: {{overallScore}}/10<br>
                             • Review Date: {{reviewDate}}<br>
-                            {{#hasFeedback}}• Feedback: {{feedback}}{{/hasFeedback}}
+                            • Feedback: {{feedback}}
                         </div>
                         
                         <a href="{{projectLink}}" class="button">Access Project</a>
@@ -254,12 +252,10 @@ const emailTemplates = {
                             Unfortunately, your submission did not meet the required standards for this project.
                         </div>
                         
-                        {{#hasFeedback}}
                         <div class="feedback">
                             <strong>📝 Reviewer Feedback:</strong><br>
                             {{feedback}}
                         </div>
-                        {{/hasFeedback}}
                         
                         <div class="feedback">
                             <strong>📊 Your Results:</strong><br>
@@ -267,22 +263,13 @@ const emailTemplates = {
                             • Review Date: {{reviewDate}}
                         </div>
                         
-                        {{#canRetake}}
                         <div class="retake">
                             <strong>🔄 Retake Opportunity:</strong><br>
                             You can retake this assessment after the 24-hour cooldown period.<br>
-                            {{#nextAttemptTime}}Next attempt available: {{nextAttemptTime}}{{/nextAttemptTime}}
+                            Next attempt available: {{nextAttemptTime}}
                         </div>
                         
                         <a href="{{retakeLink}}" class="button">Retake Assessment</a>
-                        {{/canRetake}}
-                        
-                        {{^canRetake}}
-                        <div class="retake">
-                            <strong>Maximum attempts reached.</strong><br>
-                            You have used all available retake attempts for this assessment.
-                        </div>
-                        {{/canRetake}}
                         
                         <p><strong>Improvement Tips:</strong></p>
                         <ul>
@@ -323,8 +310,8 @@ const emailTemplates = {
                         
                         <div class="urgent">
                             <strong>⚠️ Time Sensitive:</strong><br>
-                            {{#hasDeadline}}Assessment deadline: {{deadline}}{{/hasDeadline}}<br>
-                            {{#timeRemaining}}Time remaining: {{timeRemaining}}{{/timeRemaining}}
+                            Assessment deadline: {{deadline}}<br>
+                            Time remaining: {{timeRemaining}}
                         </div>
                         
                         <p>Complete your assessment now to remain eligible for the <strong>{{projectTitle}}</strong> project.</p>
@@ -386,8 +373,6 @@ const sendAssessmentInvitation = async ({
             }
         });
 
-        // Handle Handlebars-style conditionals (basic implementation)
-        htmlContent = processConditionals(htmlContent, templateData);
 
         const emailData = {
             sender: {
@@ -583,8 +568,6 @@ const sendAssessmentResult = async ({
             }
         });
 
-        // Process conditionals
-        htmlContent = processConditionals(htmlContent, templateData);
 
         const emailData = {
             sender: {
@@ -626,8 +609,9 @@ const sendAssessmentReminder = async ({
     timeRemaining = null
 }) => {
     try {
+
         const template = emailTemplates.assessmentReminder;
-        
+
         const templateData = {
             userName,
             assessmentTitle,
@@ -649,8 +633,6 @@ const sendAssessmentReminder = async ({
             }
         });
 
-        htmlContent = processConditionals(htmlContent, templateData);
-
         const emailData = {
             sender: {
                 name: 'Deep Tech Platform',
@@ -666,7 +648,7 @@ const sendAssessmentReminder = async ({
 
         const result = await apiInstance.sendTransacEmail(emailData);
         console.log('Assessment reminder email sent successfully:', result.messageId);
-        
+
         return {
             success: true,
             messageId: result.messageId,
@@ -676,24 +658,6 @@ const sendAssessmentReminder = async ({
         console.error('Error sending assessment reminder email:', error);
         throw new Error(`Failed to send assessment reminder email: ${error.message}`);
     }
-};
-
-/**
- * Process basic Handlebars-style conditionals
- */
-const processConditionals = (content, data) => {
-    // Handle {{#variable}} ... {{/variable}} blocks
-    const conditionalRegex = /{{#(\w+)}}(.*?){{\/\1}}/gs;
-    
-    return content.replace(conditionalRegex, (match, variable, innerContent) => {
-        const value = data[variable];
-        // Show content if variable is truthy
-        return value ? innerContent : '';
-    }).replace(/{{[\^#](\w+)}}(.*?){{\/\1}}/gs, (match, variable, innerContent) => {
-        const value = data[variable];
-        // Show content if variable is falsy (for {{^variable}} syntax)
-        return !value ? innerContent : '';
-    });
 };
 
 /**

@@ -22,9 +22,9 @@ const signup = async (req, res) => {
     const newUser = new DTUser({ firstname, lastname, username, email, password: hashedPassword, phone, role: RoleType.USER });
     await newUser.save();
 
-    res.status(200).send({
-      responseCode: "90",
-      responseMessage: 'User registered successfully',
+    res.status(200).json({
+      code: "90",
+      message: 'User registered successfully',
       data: newUser
     });
   } catch (error) {
@@ -55,71 +55,90 @@ const login = async (req, res) => {
   }
 };
 const getAllUsers = async (req, res) => {
-  const user = await DTUser.find({ role: req.params.role });
-  try {
-    if (!user) {
-      return res.status(400).send({
-        responseCode: "90",
-        responseMessage: "No user found",
+
+  const {role, search  } = req.query;
+  const LIMIT = 200; // Limit to 200 users per request
+
+    const query = {};
+
+    query.role = role ? role.toLowerCase() : "user";
+
+    // Add search functionality for username or email
+    if (search && typeof search === 'string') {
+      const searchTerm = search.trim();
+      query.$or = [
+        { username: { $regex: searchTerm, $options: 'i' } },
+        { email: { $regex: searchTerm, $options: 'i' } },
+        { firstname: { $regex: searchTerm, $options: 'i' } },
+        { lastname: { $regex: searchTerm, $options: 'i' } },
+        { fullName: { $regex: searchTerm, $options: 'i' } }
+      ];
+    }
+
+  const user = await DTUser.find(query).limit(LIMIT).select('-password');
+
+      if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "No user found",
         data: null,
+        error: null
       });
     }
 
-    res.status(200).send({
-      responseCode: "90",
-      responseMessage: "User retrieved successfully",
-      data: user
-    });
-  } catch (error) {
-    res.status(500).send({
-      responseCode: "90",
-      responseMessage: "Internal server error",
-      data: error.message,
+    res.status(200).json({
+      message: "User retrieved successfully",
+      data: user,
+      success: true,
+      error: null
     });
 
-    console.log(error);
-  }
 };
 const getUsers = async (req, res) => {
  
   try {
+
     const query = {};
 
-    if (req.query.role) {
-      query.role = req.query.role.toUpperCase();
+    query.role = req.query.role.toLowerCase() ?? "user";
+
+
+    // Add search functionality for username or email
+    if (req.query.search) {
+      const searchTerm = req.query.search;
+      query.$or = [
+        { username: { $regex: searchTerm, $options: 'i' } },
+        { email: { $regex: searchTerm, $options: 'i' } },
+        { firstname: { $regex: searchTerm, $options: 'i' } },
+        { lastname: { $regex: searchTerm, $options: 'i' } },
+        { fullName: { $regex: searchTerm, $options: 'i' } }
+      ];
     }
    
-    // const user = await DTUser.find(query);
-    const user = await DTUser.find(query).select('-password');
+    const user = await DTUser.find(query).limit(200).select('-password');
 
     if (!user || user.length === 0) {
-      return res.status(400).send({
-        responseCode: "99",
-        responseMessage: "No user found",
+      return res.status(400).json({
+        success: false,
+        message: "No user found",
         data: null,
+        error: "No user found",
       });
     }
-    // const sanitizedUsers = user.map(user => {
-    //   const userObj = user.toObject(); 
-    //   delete userObj.password;
-    //   return userObj;
-    // });
   
-
-    
-    res.status(200).send({
-      responseCode: "90",
-      responseMessage: "User retrieved successfully",
-      data: user
+    res.status(200).json({
+      success: true,
+      message: "User retrieved successfully",
+      data: user,
+      error: null
     });
   } catch (error) {
-    res.status(500).send({
-      responseCode: "99",
-      responseMessage: "Internal server error",
-      data: error.message,
+    res.status(500).json({
+      success: false,
+      message: error.message || "Internal server error",
+      data: null,
+      error: error.message,
     });
-
-    console.log(error);
   }
 };
 
@@ -132,24 +151,27 @@ const getUserById = async (req, res) => {
     const user = await DTUser.findById(userId).select('-password');
     if (!user) {
       return res.status(404).json({
-        responseCode: "99",
-        responseMessage: "User not found",
-        data: null
+        success: false,
+        message: "User not found",
+        data: null,
+        error: null
       });
     }
 
     res.status(200).json({
-      responseCode: "90",
-      responseMessage: "User retrieved successfully",
-      data: user
+      success: true,
+      message: "User retrieved successfully",
+      data: user,
+      error: null
     });
 
   } catch (error) {
     console.error('Error fetching user:', error);
     res.status(500).json({
-      responseCode: "99",
-      responseMessage: "Internal server error",
-      data: error.message
+      success: false,
+      message: "Internal server error",
+      data: null,
+      error: error.message
     });
   }
 };
@@ -166,17 +188,18 @@ const getRoles = async (req, res) => {
     }));
 
     res.status(200).json({
-      responseCode: "90",
-      responseMessage: "Roles retrieved successfully",
+      code: "90",
+      message: "Roles retrieved successfully",
       data: roles
     });
 
   } catch (error) {
     console.error('Error fetching roles:', error);
     res.status(500).json({
-      responseCode: "99",
-      responseMessage: "Internal server error",
-      data: error.message
+      success: false,
+      message: "Internal server error",
+      data: null,
+      error: error.message
     });
   }
 };
@@ -206,17 +229,18 @@ const getRoleStatistics = async (req, res) => {
     });
 
     res.status(200).json({
-      responseCode: "90",
-      responseMessage: "Role statistics retrieved successfully",
+      success: true,
+      message: "Role statistics retrieved successfully",
       data: roleStats
     });
 
   } catch (error) {
     console.error('Error fetching role statistics:', error);
     res.status(500).json({
-      responseCode: "99",
-      responseMessage: "Internal server error",
-      data: error.message
+      success: false,
+      message: "Internal server error",
+      data: null,
+      error: error.message
     });
   }
 };

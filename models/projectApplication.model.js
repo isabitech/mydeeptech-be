@@ -88,7 +88,7 @@ const projectApplicationSchema = new mongoose.Schema(
         "expired",
         "other",
         "qualifications_mismatch",
-        "ai_interview_failed",
+        "ai_interview_failed"
       ],
       default: null
     },

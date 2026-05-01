@@ -80,23 +80,34 @@
             background: #ffebee; 
             color: #d32f2f; 
         }
+        .visually-hidden {
+            position: absolute !important;
+            left: -9999px !important;
+            width: 1px !important;
+            height: 1px !important;
+            overflow: hidden !important;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
+        <header class="header" role="banner">
             <h1 style="margin: 0; font-size: 28px;">🚨 New Support Ticket</h1>
             <p style="margin: 10px 0 0 0; opacity: 0.9;">Immediate attention required</p>
-        </div>
+        </header>
         
-        <div class="content">
-            <p style="font-size: 16px; margin-bottom: 25px;">
-                Hello {{recipientName}},<br>
-                A new support ticket has been created and requires your attention.
-            </p>
+        <main class="content" role="main">
+            <section aria-labelledby="greeting-heading">
+                <h2 id="greeting-heading" class="visually-hidden">Notification Message</h2>
+                <p style="font-size: 16px; margin-bottom: 25px;">
+                    Hello {{recipientName}},<br>
+                    A new support ticket has been created and requires your attention.
+                </p>
+            </section>
             
-            <div class="ticket-info">
-                <h3 style="margin-top: 0; color: #dc3545;">🎫 Ticket Information</h3>
+            <section aria-labelledby="ticket-info-heading">
+                <div class="ticket-info">
+                <h3 id="ticket-info-heading" style="margin-top: 0; color: #dc3545;">🎫 Ticket Information</h3>
                 <p><strong>Ticket Number:</strong> {{ticketNumber}}</p>
                 <p><strong>Subject:</strong> {{subject}}</p>
                 <p><strong>Category:</strong> {{category}}</p>
@@ -105,9 +116,11 @@
                 </p>
                 <p><strong>Created:</strong> {{createdAt}}</p>
             </div>
-            
-            <div class="user-info">
-                <h3 style="margin-top: 0; color: #007bff;">👤 User Information</h3>
+            </section>
+
+            <section aria-labelledby="user-info-heading">
+                <div class="user-info">
+                <h3 id="user-info-heading" style="margin-top: 0; color: #007bff;">👤 User Information</h3>
                 <p><strong>Name:</strong> {{userFullName}}</p>
                 <p><strong>Email:</strong> <a href="mailto:{{userEmail}}">{{userEmail}}</a></p>
             </div>
@@ -144,7 +157,7 @@
                 Admin notification for ticket {{ticketNumber}}<br>
                 MyDeepTech Support System | <a href="https://mydeeptech.ng" style="color: #dc3545;">mydeeptech.ng</a>
             </p>
-        </div>
+        </footer>
     </div>
 </body>
 </html>

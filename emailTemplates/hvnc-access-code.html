@@ -86,35 +86,52 @@
         .danger { color: #e74c3c; font-weight: bold; }
         ul { padding-left: 20px; }
         li { margin: 8px 0; }
+        .visually-hidden {
+            position: absolute !important;
+            left: -9999px !important;
+            width: 1px !important;
+            height: 1px !important;
+            overflow: hidden !important;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
+        <header class="header" role="banner">
             <h1>🔐 HVNC Access Code</h1>
             <p>Secure Remote Desktop Access</p>
-        </div>
+        </header>
         
-        <div class="content">
-            <h2>Hello {{userName}},</h2>
+        <main class="content" role="main">
+            <section aria-labelledby="greeting-heading">
+                <h2 id="greeting-heading">Hello {{userName}},</h2>
+                
+                <p>Your HVNC access code has been generated for secure remote desktop access.</p>
+            </section>
             
-            <p>Your HVNC access code has been generated for secure remote desktop access.</p>
-            
-            <div class="device-info">
+            <section aria-labelledby="device-info-heading">
+                <h2 id="device-info-heading" class="visually-hidden">Device Information</h2>
+                <div class="device-info">
                 <h3>📱 Device Information</h3>
                 <p><span class="strong">Device Name:</span> {{deviceName}}</p>
                 <p><span class="strong">Device ID:</span> {{deviceId}}</p>
                 <p><span class="strong">User Email:</span> {{userEmail}}</p>
             </div>
 
-            <div class="access-code-section">
-                <h3>🔑 Your Access Code</h3>
+            </section>
+
+            <section aria-labelledby="access-code-heading">
+                <div class="access-code-section">
+                <h3 id="access-code-heading">🔑 Your Access Code</h3>
                 <div class="access-code">{{accessCode}}</div>
                 <p><em>Enter this code exactly as shown above</em></p>
             </div>
 
-            <div class="expiry-warning">
-                <h3>⏰ Important Timing Information</h3>
+            </section>
+
+            <section aria-labelledby="timing-info-heading">
+                <div class="expiry-warning">
+                <h3 id="timing-info-heading">⏰ Important Timing Information</h3>
                 <p><span class="strong">Expires in:</span> <span class="highlight">{{expiresInMinutes}} minutes</span></p>
                 <p><span class="strong">Expiration Time:</span> {{expiresAt}}</p>
                 <p class="danger">This code will be automatically deleted after expiration for security.</p>
@@ -148,21 +165,13 @@
                 <p><span class="strong">What is HVNC?</span></p>
                 <p>HVNC (Hidden Virtual Network Computing) provides secure, monitored remote desktop access for work purposes. All sessions are logged for security and compliance.</p>
             </div>
-        </div>
+        </main>
         
-        <div class="footer">
+        <footer class="footer" role="contentinfo">
             <p>This is an automated message from MyDeepTech HVNC System</p>
             <p>&copy; {{currentYear}} MyDeepTech. All rights reserved.</p>
             <p><em>Do not reply to this email. For support, use the links above.</em></p>
-        </div>
+        </footer>
     </div>
-
-    <script>
-        // Add current year to the template
-        document.addEventListener('DOMContentLoaded', function() {
-            const currentYear = new Date().getFullYear();
-            document.body.innerHTML = document.body.innerHTML.replace('{{currentYear}}', currentYear);
-        });
-    </script>
 </body>
 </html>

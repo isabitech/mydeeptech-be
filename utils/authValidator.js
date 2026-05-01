@@ -74,7 +74,7 @@ const taskSchema = Joi.object({
       "any.required": "URL is required.",
     }),
   taskName: Joi.string().min(4).required(),
-  createdBy: Joi.string().min(4).required(),
+  // createdBy will be set automatically from JWT token
   dueDate: Joi.date()
     .greater("now") // Ensure the date is in the future
     .required() // Ensure the field is mandatory

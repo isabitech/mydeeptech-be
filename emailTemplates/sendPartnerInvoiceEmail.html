@@ -59,22 +59,32 @@
             color: #666; 
             font-size: 14px; 
         }
+        .visually-hidden {
+            position: absolute !important;
+            left: -9999px !important;
+            width: 1px !important;
+            height: 1px !important;
+            overflow: hidden !important;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
+        <header class="header" role="banner">
             <h1>📧 Invoice from {{companyName}}</h1>
             <p>Professional Services Invoice</p>
-        </div>
+        </header>
         
-        <div class="content">
-            <h2>Hello {{recipientName}},</h2>
+        <main class="content" role="main">
+            <section aria-labelledby="greeting-heading">
+                <h2 id="greeting-heading">Hello {{recipientName}},</h2>
+                
+                <p>We hope this email finds you well. Please find your invoice details below for the services provided.</p>
+            </section>
             
-            <p>We hope this email finds you well. Please find your invoice details below for the services provided.</p>
-            
-            <div class="invoice-details">
-                <h3>📋 Invoice Summary</h3>
+            <section aria-labelledby="invoice-details-heading">
+                <div class="invoice-details">
+                <h3 id="invoice-details-heading">📋 Invoice Summary</h3>
                 <p><strong>Service Provider:</strong> {{companyName}}</p>
                 <p><strong>Description:</strong> {{description}}</p>
                 <p><strong>Amount Due:</strong> <span class="amount">{{currency}} {{formattedAmount}}</span></p>
@@ -97,13 +107,14 @@
             
             <p><strong>Questions about this invoice?</strong><br>
             Contact us at <a href="mailto:billing@mydeeptech.ng">billing@mydeeptech.ng</a></p>
-        </div>
+            </section>
+        </main>
         
-        <div class="footer">
+        <footer class="footer" role="contentinfo">
             <p><strong>{{companyName}}</strong><br>
             <a href="https://mydeeptech.ng">mydeeptech.ng</a></p>
             <p>Thank you for your business partnership.</p>
-        </div>
+        </footer>
     </div>
 </body>
 </html>
