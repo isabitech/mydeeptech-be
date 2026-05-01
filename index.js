@@ -119,7 +119,6 @@ app.use("/api", rateLimiters.api); // General API rate limiting
 
 // Routes
 app.use("/api/auth", route);
-app.use("/api/auth", taskRoute); // Task routes under /api/auth
 app.use("/api/ai-interviews", aiInterviewRoute);
 app.use("/api/admin/ai-interviews", adminAiInterviewRoute);
 app.use("/api/ai-recommendations", aiRecommendationRoute);
