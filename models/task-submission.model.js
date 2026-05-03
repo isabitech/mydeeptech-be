@@ -22,7 +22,7 @@ const uploadedImageSchema = new mongoose.Schema({
 const taskSubmissionSchema = new mongoose.Schema({
     assignment: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'TaskAssignment',
+        ref: 'TaskApplication',
         required: true,
         unique: true, // One submission document per assignment
     },

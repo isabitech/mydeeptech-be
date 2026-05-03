@@ -21,7 +21,7 @@ router.get("/getTask/:taskId",
   taskController.getTask
 );
 
-router.get("/getSingleTask/:assignmentId",
+router.get("/getSingleTask/:applicationId",
   authenticateToken,
   taskController.getSingleTask
 );
@@ -56,6 +56,7 @@ router.get("/assigned-tasks",
   authenticateAdmin,
   taskController.getUsersAssignedToTask
 );
+
 // Admin routes - Assigned tasks
 router.get("/get-paginated-users",
   authenticateAdmin,

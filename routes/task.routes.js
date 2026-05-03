@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const microTaskController = require("../controllers/microTask.controller");
+const microTaskController = require("../controllers/task.controller");
 const { body, param, query } = require("express-validator");
 const { authenticateToken } = require("../middleware/auth");
 const { requireRole } = require("../middleware/permission-role.middleware");
@@ -92,7 +92,7 @@ const taskIdValidation = [
     .withMessage("Invalid task ID")
 ];
 
-// Admin routes - Task management
+// Admin routes - Create Task
 router.post("/",
   authenticateToken,
   requireRole("admin", "super_admin", "QA_REVIEWER"),
@@ -100,28 +100,46 @@ router.post("/",
   microTaskController.createMicroTask
 );
 
+// Admin routes - Fetch All Task
 router.get("/",
   authenticateToken,
   requireRole("admin", "super_admin", "QA_REVIEWER"),
   microTaskController.getAllMicroTasks
 );
 
+// User routes - Available tasks
+router.get("/all",
+  authenticateToken,
+  microTaskController.getAllMicroTasks
+);
+
+router.get("/filters",
+  authenticateToken,
+  microTaskController.getTasksByFilters
+);
+
+
+// User routes - Apply for a task
+router.post("/apply",
+  authenticateToken,
+  microTaskController.applyForTask
+);
+
+router.post("/approve_or_reject_application",
+  authenticateToken,
+  microTaskController.approveOrRejectApplication
+);
+
+// User routes - Task Statistics
 router.get("/statistics", 
   authenticateToken, 
   requireRole("admin", "super_admin", "QA_REVIEWER"), 
   microTaskController.getTaskStatistics
 );
 
-router.get("/submission/:submissionId", 
-  authenticateToken,
-  microTaskController.getTaskSubmissionById
-);
 
-router.delete("/submission/:submissionId/deleteImage", 
-  authenticateToken,
-  microTaskController.getTaskSubmissionByIdAndDeleteImage
-);
 
+// User routes - Get Task details for a specific application
 router.get("/:taskId", 
   authenticateToken, 
   requireRole("admin", "super_admin", "QA_REVIEWER"), 
@@ -129,6 +147,7 @@ router.get("/:taskId",
   microTaskController.getMicroTaskById
 );
 
+// User routes - Update Task details for a specific application
 router.put("/:taskId",
   authenticateToken,
   requireRole("admin", "super_admin", "QA_REVIEWER"),
@@ -137,6 +156,7 @@ router.put("/:taskId",
   microTaskController.updateMicroTask
 );
 
+// User routes - Delete a specific task
 router.delete("/:taskId",
   authenticateToken,
   requireRole("admin", "super_admin", "QA_REVIEWER"),
@@ -144,6 +164,7 @@ router.delete("/:taskId",
   microTaskController.deleteMicroTask
 );
 
+// User routes - Toggle task status
 router.patch("/:taskId/status",
   authenticateToken,
   requireRole("admin", "super_admin", "QA_REVIEWER"),
@@ -184,19 +205,22 @@ router.get("/available/me",
   microTaskController.getAvailableTasksForUser
 );
 
-// User routes - Available tasks
-router.get("/available/me",
-  authenticateToken,
-  requireRole("annotator", "user"),
-  microTaskController.getAvailableTasksForUser
-);
-
 router.post('/upload',
   authenticateToken,
   uploadMicroTaskImages,
   microTaskController.uploadTaskImages
 );
 
+// User routes - Get applied task details
+router.get("/submission/:submissionId", 
+  authenticateToken,
+  microTaskController.getTaskSubmissionById
+);
 
+// User routes - Delete uploaded image from a application
+router.delete("/submission/:submissionId/deleteImage", 
+  authenticateToken,
+  microTaskController.getTaskSubmissionByIdAndDeleteImage
+);
 
 module.exports = router;

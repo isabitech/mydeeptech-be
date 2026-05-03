@@ -2,6 +2,8 @@ const MicroTask = require("../models/microTask.model");
 const TaskSlot = require("../models/taskSlot.model");
 const MicroTaskSubmission = require("../models/microTaskSubmission.model");
 const SubmissionImage = require("../models/submissionImage.model");
+const Task = require("../models/task.model");
+const TaskApplication = require("../models/taskApplication.model");
 
 class MicroTaskService {
   
@@ -20,21 +22,8 @@ class MicroTaskService {
       }
 
       // Create the task
-      const task = new MicroTask(taskData);
+      const task = new Task(taskData);
       const savedTask = await task.save();
-
-      // Generate slots based on category
-      let slots = [];
-      if (taskData.category === "mask_collection") {
-        slots = TaskSlot.generateMaskCollectionSlots(savedTask._id);
-      } else if (taskData.category === "age_progression") {
-        slots = TaskSlot.generateAgeProgressionSlots(savedTask._id);
-      }
-
-      // Save all slots
-      if (slots.length > 0) {
-        await TaskSlot.insertMany(slots);
-      }
 
       // Return task with slots
       return await this.getMicroTaskById(savedTask._id);
@@ -49,7 +38,7 @@ class MicroTaskService {
    * @param {Object} query - Filter and pagination options
    * @returns {Object} Tasks with pagination info
    */
-  async getAllMicroTasks(query) {
+  async getAllMicroTasks(query, userId) {
     try {
       const {
         page = 1,
@@ -68,20 +57,30 @@ class MicroTaskService {
       if (createdBy) filter.createdBy = createdBy;
       if (search) {
         filter.$or = [
-          { title: { $regex: search, $options: 'i' } },
+          { taskTitle: { $regex: search, $options: 'i' } },
           { description: { $regex: search, $options: 'i' } }
         ];
       }
 
+    if(userId) {
+    // Get all task IDs a user has already applied for
+      const appliedTaskIds = await TaskApplication.find(
+          { applicant: userId },
+          { task: 1, _id: 0 }
+      ).distinct('task');
+      filter._id = { $nin: appliedTaskIds };
+      filter.isActive = true;
+    }
+
       const skip = (page - 1) * limit;
 
       const [tasks, total] = await Promise.all([
-        MicroTask.find(filter)
+        Task.find(filter)
           .populate("createdBy", "fullName email")
           .sort({ createdAt: -1 })
           .skip(skip)
           .limit(parseInt(limit)),
-        MicroTask.countDocuments(filter)
+        Task.countDocuments(filter)
       ]);
 
       // Get submission counts for each task
@@ -133,6 +132,61 @@ class MicroTaskService {
     }
   }
 
+  async getTasksByFilters(query = {}, userId = null) {
+
+        const {
+        page = 1,
+        limit = 10,
+        status,
+        category,
+        createdBy,
+        search
+      } = query;
+
+      let filter = {
+          status: { $in: ['pending', 'ongoing', 'approved', 'processing', 'active', 'paused', 'completed', 'cancelled'] }
+      };
+
+      if(userId) filter.applicant = userId;
+      if(status && status.trim()) filter.status = status;
+      if(category && category.trim()) filter["task.category"] = category;
+
+      if(search && search.trim()) {
+        filter.$or = [
+          { "task.taskTitle": { $regex: search, $options: 'i' } },
+          { "task.category": { $regex: search, $options: 'i' } },
+        ]; 
+      }
+
+      if(status === "all")  delete filter.status;
+      if(category === "all") delete filter["task.category"];
+
+
+      const skip = (page - 1) * limit;
+
+      const [tasks, total] = await Promise.all([
+          TaskApplication.find(filter)
+        .populate("task", "taskTitle category description currency payRate totalImagesRequired")
+        .populate("applicant", "fullName email")
+        .populate("assignedBy", "fullName email")
+        .populate("assignedBy", "fullName email")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit)),
+          TaskApplication.countDocuments(filter)
+        ]);
+
+      return {
+        tasks,
+        pagination: {
+          current_page: parseInt(page),
+          per_page: parseInt(limit),
+          total_items: total,
+          total_pages: Math.ceil(total / limit)
+        }
+      };
+  } 
+
   /**
    * Get micro task by ID with slots and submission stats
    * @param {String} taskId - Task ID
@@ -140,15 +194,13 @@ class MicroTaskService {
    */
   async getMicroTaskById(taskId) {
     try {
-      const task = await MicroTask.findById(taskId)
+      const task = await Task.findById(taskId)
         .populate("createdBy", "fullName email");
 
       if (!task) {
         throw new Error("Micro task not found");
       }
 
-      // Get task slots
-      const slots = await TaskSlot.find({ taskId }).sort({ sequence: 1 });
 
       // Get submission statistics
       const submissionStats = await MicroTaskSubmission.aggregate([
@@ -177,7 +229,6 @@ class MicroTaskService {
 
       return {
         ...task.toJSON(),
-        slots,
         submissionStats: stats
       };
 
@@ -192,9 +243,10 @@ class MicroTaskService {
    * @param {Object} updateData - Update data
    * @returns {Object} Updated task
    */
+  
   async updateMicroTask(taskId, updateData) {
     try {
-      const task = await MicroTask.findByIdAndUpdate(
+      const task = await Task.findByIdAndUpdate(
         taskId,
         updateData,
         { new: true, runValidators: true }
@@ -218,7 +270,7 @@ class MicroTaskService {
    */
   async deleteMicroTask(taskId) {
     try {
-      const task = await MicroTask.findById(taskId);
+      const task = await Task.findById(taskId);
       if (!task) {
         throw new Error("Micro task not found");
       }
@@ -228,11 +280,12 @@ class MicroTaskService {
       const submissionIds = submissions.map(sub => sub._id);
 
       // Delete in order: images, submissions, slots, task
-      await SubmissionImage.deleteMany({ submissionId: { $in: submissionIds } });
-      await MicroTaskSubmission.deleteMany({ taskId });
-      await TaskSlot.deleteMany({ taskId });
-      await MicroTask.findByIdAndDelete(taskId);
-
+      await Promise.all([
+        SubmissionImage.deleteMany({ submissionId: { $in: submissionIds } }),
+        MicroTaskSubmission.deleteMany({ taskId }),
+        TaskSlot.deleteMany({ taskId }),
+        Task.findByIdAndDelete(taskId)
+      ]);
       return {
         success: true,
         message: "Micro task and all associated data deleted successfully"
@@ -254,7 +307,7 @@ class MicroTaskService {
       const existingSubmissions = await MicroTaskSubmission.find({ userId }).select('taskId');
       const submittedTaskIds = existingSubmissions.map(sub => sub.taskId);
 
-      const availableTasks = await MicroTask.find({
+      const availableTasks = await Task.find({
         status: 'active',
         _id: { $nin: submittedTaskIds }
       })
@@ -315,7 +368,7 @@ class MicroTaskService {
   async getTaskStatistics() {
     try {
       const [taskStats, submissionStats] = await Promise.all([
-        MicroTask.aggregate([
+        Task.aggregate([
           {
             $group: {
               _id: "$status",

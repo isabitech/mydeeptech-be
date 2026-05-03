@@ -1,6 +1,6 @@
 const TaskSubmission = require("../models/task-submission.model");
 const Task = require("../models/task.model");
-const TaskAssignment = require("../models/taskAssignment.model");
+const TaskApplication = require("../models/taskApplication.model");
 
 /**
  * POST /api/task-assignments
@@ -43,7 +43,7 @@ const assignTask = async (req, res) => {
         }
 
         // ── 3. Find already assigned users to avoid duplicates
-        const existingAssignments = await TaskAssignment.find({
+        const existingAssignments = await TaskApplication.find({
             task: taskId,
             assignedTo: { $in: userIds },
         }).select('assignedTo');
@@ -61,7 +61,7 @@ const assignTask = async (req, res) => {
         }
 
         // ── 4. Bulk create assignments
-        const assignments = await TaskAssignment.insertMany(
+        const assignments = await TaskApplication.insertMany(
             newUserIds.map(userId => ({
                 task: taskId,
                 assignedTo: userId,
@@ -88,7 +88,6 @@ const assignTask = async (req, res) => {
         });
 };
 
-
 /**
  * GET /api/task-assignments/all
  * Admin fetches all assignments with optional filters
@@ -101,7 +100,7 @@ const getAllAssignments = async (req, res) => {
         if (taskId) filter.task   = taskId;
         if (userId) filter.assignedTo = userId;
 
-        const assignments = await TaskAssignment.find(filter)
+        const assignments = await TaskApplication.find(filter)
             .populate('task',       'taskName dueDate')
             .populate('assignedTo', 'name email')
             .populate('assignedBy', 'name email')
@@ -109,7 +108,7 @@ const getAllAssignments = async (req, res) => {
             .skip((page - 1) * limit)
             .limit(Number(limit));
 
-        const total = await TaskAssignment.countDocuments(filter);
+        const total = await TaskApplication.countDocuments(filter);
 
         return res.status(200).json({
             success: true,
@@ -132,7 +131,7 @@ const reviewAssignment = async (req, res) => {
     try {
         const { status, reviewNote } = req.body;
 
-        // ── 1. Only allow valid review statuses ───────────────────────────
+        // ── 1. Only allow valid review statuses
         if (!['Approved', 'Rejected'].includes(status)) {
             return res.status(400).json({
                 success: false,
@@ -140,7 +139,7 @@ const reviewAssignment = async (req, res) => {
             });
         }
 
-        // ── 2. Rejection requires a note ──────────────────────────────────
+        // ── 2. Rejection requires a note
         if (status === 'Rejected' && !reviewNote) {
             return res.status(400).json({
                 success: false,
@@ -148,7 +147,7 @@ const reviewAssignment = async (req, res) => {
             });
         }
 
-        const assignment = await TaskAssignment.findById(req.params.assignmentId);
+        const assignment = await TaskApplication.findById(req.params.assignmentId);
 
         if (!assignment) {
             return res.status(404).json({
@@ -207,13 +206,13 @@ const getMyAssignments = async (req, res) => {
         const filter = { assignedTo: userId };
         if (status) filter.status = status;
 
-        const assignments = await TaskAssignment.find(filter)
+        const assignments = await TaskApplication.find(filter)
             .populate('task', 'taskName taskLink taskGuidelineLink dueDate')
             .sort({ createdAt: -1 })
             .skip((page - 1) * limit)
             .limit(Number(limit));
 
-        const total = await TaskAssignment.countDocuments(filter);
+        const total = await TaskApplication.countDocuments(filter);
 
         return res.status(200).json({
             success: true,
@@ -244,7 +243,7 @@ const getAssignmentById = async (req, res) => {
     try {
         const userId = req.user._id;
 
-        const assignment = await TaskAssignment.findOne({
+        const assignment = await TaskApplication.findOne({
             _id: req.params.assignmentId,
             assignedTo: userId,
         }).populate('task', 'taskName taskLink taskGuidelineLink dueDate imageRequirements');

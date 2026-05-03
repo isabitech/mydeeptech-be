@@ -1,5 +1,6 @@
 const TaskSubmission = require("../models/task-submission.model");
-const TaskAssignment = require("../models/taskAssignment.model");
+const Task = require("../models/task.model");
+const TaskApplication = require("../models/taskApplication.model");
 const microTaskService = require("../services/microTask.service");
 const { validationResult } = require("express-validator");
 
@@ -49,23 +50,165 @@ class MicroTaskController {
    * Get all micro tasks with filters
    */
   async getAllMicroTasks(req, res) {
-    try {
-      const tasks = await microTaskService.getAllMicroTasks(req.query);
-
+    const { userId } = req.user || {};
+     const tasks = await microTaskService.getAllMicroTasks(req.query, userId);
       res.status(200).json({
         success: true,
         message: "Micro tasks retrieved successfully",
         data: tasks
       });
-
-    } catch (error) {
-      console.error("Error fetching micro tasks:", error);
-      res.status(500).json({
-        success: false,
-        message: error.message || "Failed to fetch micro tasks"
-      });
-    }
   }
+
+   /**
+   * Get all micro tasks with filters
+   */
+  async getTasksByFilters(req, res) {
+   
+    const userId = req.user && req.user.role === "user" ? req.user.userId : null;
+  
+    const tasks = await microTaskService.getTasksByFilters(req.query, userId);
+      res.status(200).json({
+        success: true,
+        message: "Micro tasks retrieved successfully",
+        data: tasks
+      });
+  }
+
+    async getAllMicroTasksForUser(req, res) {
+    const { userId } = req.user || {};
+    const tasks = await microTaskService.getAllMicroTasks(req.query, userId);
+      res.status(200).json({
+        success: true,
+        message: "Micro tasks retrieved successfully",
+        data: tasks
+      });
+  }
+
+  /**
+   * POST /api/apply-for-task
+   * User applies for a task (creates an assignment with pending status for admin review)
+   */
+  async applyForTask(req, res) {
+  
+          const { userId } = req.user || {};
+          const { taskId } = req.body;
+  
+          if (!taskId) {
+              return res.status(400).json({
+                  success: false,
+                  message: 'Task ID is required.',
+              });
+          }
+  
+          const task = await Task.findById(taskId);
+    
+          if (!task) {
+              return res.status(404).json({
+                  success: false,
+                  message: 'Task not found.',
+              });
+          }
+  
+          if (!task.isActive) {
+              return res.status(400).json({
+                  success: false,
+                  message: 'Cannot apply for a deactivated task.',
+              });
+          }
+  
+          if (task.dueDate && new Date() > new Date(task.dueDate)) {
+              return res.status(400).json({
+                  success: false,
+                  message: 'Cannot apply for a task whose due date has already passed.',
+              });
+          }
+  
+          // Check if user has already applied
+          const existingAssignment = await TaskApplication.findOne({
+              task: taskId,
+              applicant: userId,
+          });
+  
+          if (existingAssignment) {
+              return res.status(400).json({
+                  success: false,
+                  message: 'You have already applied for this task.',
+              });
+          }
+  
+          const newAssignment = new TaskApplication({
+              task: taskId,
+              applicant: userId,
+              assignedBy: null,
+              dueDate: task.dueDate,
+              status: 'pending',
+          });
+  
+          const savedAssignment = await newAssignment.save();
+  
+          if (!savedAssignment) {
+              return res.status(500).json({
+                  success: false,
+                  message: 'Failed to apply for task.',
+              });
+          }
+  
+          return res.status(201).json({
+              success: true,
+              message: 'Applied for task successfully. Awaiting admin review.',
+              data: savedAssignment,
+          });
+  };
+
+  async approveOrRejectApplication(req, res) {
+    const { userId } = req.user || {};
+    const { applicationId, action } = req.body;
+
+    if (!applicationId || !action) {
+        return res.status(400).json({
+            success: false,
+            message: 'AApplicationId and Action are required.',
+        });
+    }
+
+    if (!['approve', 'reject'].includes(action)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid action!',
+        });
+    }
+
+    const application = await TaskApplication.findById(applicationId).populate('task');
+
+    if (!application) {
+        return res.status(404).json({
+            success: false,
+            message: 'Application not found.',
+        });
+    }
+
+    if (application.status !== 'pending') {
+        return res.status(400).json({
+            success: false,
+            message: `Cannot ${action} an application that is not pending.`,
+        });
+    }
+
+    if (action === 'approve') {
+        application.status = 'approved';
+        application.approvedBy = userId;
+    } else {
+        application.status = 'rejected';
+    }
+
+    await application.save();
+
+    return res.status(200).json({
+        success: true,
+        message: `Application ${action}d successfully.`,
+        data: application,
+    });
+  } 
 
   /**
    * Get micro task by ID
@@ -151,7 +294,7 @@ class MicroTaskController {
    */
   async getAvailableTasksForUser(req, res) {
     try {
-      const userId = req.user.id;
+      const { userId } = req.user || {};
       const tasks = await microTaskService.getAvailableTasksForUser(userId);
 
       res.status(200).json({
@@ -308,7 +451,7 @@ class MicroTaskController {
  * User uploads images for an assigned task (supports incremental uploads)
  */
 async uploadTaskImages(req, res) {
-        const { userId } = req.user;
+        const { userId } = req.user || {};
         const { assignmentId, taskId } = req.body;
         const rawFiles = req.files;
         const uploadedFiles = Array.isArray(rawFiles)
@@ -336,9 +479,9 @@ async uploadTaskImages(req, res) {
             });
         }
 
-        const assignment = await TaskAssignment.findOne({
+        const assignment = await TaskApplication.findOne({
             _id: assignmentId,
-            assignedTo: userId,
+            applicant: userId,
         }).populate('task', 'taskTitle category');
 
 
@@ -478,7 +621,7 @@ async uploadTaskImages(req, res) {
   async getTaskSubmissionById(req, res) {
 
     const { submissionId } = req.params;
-    const { userId } = req.user;
+    const { userId } = req.user || {};
 
     const submission = await TaskSubmission.findOne({ assignment: submissionId, submittedBy: userId })
     .populate('assignment')
@@ -512,7 +655,7 @@ async uploadTaskImages(req, res) {
   async getTaskSubmissionByIdAndDeleteImage(req, res) {
 
       const { submissionId } = req.params;
-      const { userId } = req.user;
+      const { userId } = req.user || {};
       const { publicId, taskId } = req.query;
   
       if (!publicId) {
@@ -531,9 +674,9 @@ async uploadTaskImages(req, res) {
         });
       }
 
-      const assignment = await TaskAssignment.findOne({
+      const assignment = await TaskApplication.findOne({
           _id: submissionId,
-          assignedTo: userId,
+          applicant: userId,
       }).populate('task', 'taskTitle category');
 
       if (!assignment) {

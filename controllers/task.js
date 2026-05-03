@@ -1,5 +1,5 @@
 const Task = require('../models/task.model');
-const TaskAssignment = require('../models/taskAssignment.model');
+const TaskApplication = require('../models/taskApplication.model');
 const { taskAssignmentSchema, createTaskValidator} = require('../utils/authValidator');
 const DTUser = require('../models/dtUser.model');
 
@@ -135,14 +135,12 @@ const assignTaskToUsers = async (req, res) => {
         }
 
         // Prevent duplicate assignments
-        const existingAssignments = await TaskAssignment.find({
+        const existingAssignments = await TaskApplication.find({
             task: taskId,
             assignedTo: { $in: userIds },
         });
 
-        const alreadyAssignedUserIds = existingAssignments.map(a =>
-            a.assignedTo.toString()
-        );
+        const alreadyAssignedUserIds = existingAssignments.map(a =>  a.assignedTo.toString());
 
         const newUserIds = userIds.filter(
             id => !alreadyAssignedUserIds.includes(id)
@@ -165,7 +163,7 @@ const assignTaskToUsers = async (req, res) => {
         }));
 
         // Insert many
-        const createdAssignments = await TaskAssignment.insertMany(assignments);
+        const createdAssignments = await TaskApplication.insertMany(assignments);
 
         return res.status(200).json({
             success: true,
@@ -189,7 +187,7 @@ const getUsersAssignedToTask = async (req, res) => {
         }
 
         // Find all users for this task
-      const assignedUsers = await TaskAssignment.find({ task: taskId })
+      const assignedUsers = await TaskApplication.find({ task: taskId })
         .populate({
             path: 'task',
             select: 'taskTitle createdBy',
@@ -209,7 +207,7 @@ const getUsersAssignedToTask = async (req, res) => {
         .skip((page - 1) * limit)
         .limit(limit);
 
-        const total = await TaskAssignment.countDocuments({ task: taskId });
+        const total = await TaskApplication.countDocuments({ task: taskId });
 
         res.status(200).json({
             success: true,
@@ -252,13 +250,13 @@ const getMyTasks = async (req, res) => {
     const { page = 1, limit = 20 } = req.query;
 
     const { userId } = req.user
-    const assignments = await TaskAssignment.find({ assignedTo: userId })
+    const assignments = await TaskApplication.find({ assignedTo: userId })
         .populate('task', 'taskTitle description dueDate createdBy payRate currency category')
         .populate('assignedBy', 'fullName email')
         .skip((page - 1) * limit)
         .limit(limit);
 
-    const total = await TaskAssignment.countDocuments({ assignedTo: userId });
+    const total = await TaskApplication.countDocuments({ assignedTo: userId });
 
     res.status(200).json({
         success: true,
@@ -274,16 +272,16 @@ const getMyTasks = async (req, res) => {
 };
 
 const getSingleTask = async (req, res) => {
- const { assignmentId } = req.params;
+ const { applicationId } = req.params;
         const { userId } = req.user;
     
-        const taskAssignment = await TaskAssignment.findOne({
-            _id: assignmentId,
-            assignedTo: userId,
+        const taskAssignment = await TaskApplication.findOne({
+            _id: applicationId,
+            applicant: userId,
         })
             .populate('task', 'taskTitle description dueDate createdBy payRate currency category')
             .populate('assignedBy', 'fullName email')
-            .populate('assignedTo', 'fullName email');
+            .populate('applicant', 'fullName email');
 
         if (!taskAssignment) {
             return res.status(404).json({
@@ -345,7 +343,7 @@ const getAssignedTasks = async (req, res) => {
         console.log("🔍 Looking for assignments for userId:", userId);
 
         // Find all task assignments for this user
-        const assignments = await TaskAssignment.find({ userId })
+        const assignments = await TaskApplication.find({ userId })
             .populate({
                 path: 'taskId',
                 populate: {
@@ -360,7 +358,7 @@ const getAssignedTasks = async (req, res) => {
 
         // Format the response to include task details
         const assignedTasks = validAssignments.map(assignment => ({
-            assignmentId: assignment._id,
+            applicationId: assignment._id,
             task: assignment.taskId, // This will now be the full populated task object
             assignedDate: assignment.createdAt,
             status: assignment.status || 'pending'

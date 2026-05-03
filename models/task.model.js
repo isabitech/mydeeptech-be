@@ -1,11 +1,16 @@
 const mongoose = require('mongoose');
 
-const taskSchema = new mongoose.Schema({
+const TaskSchema = new mongoose.Schema({
     taskTitle: {
         type: String,
         minlength: 4,
         required: true,
         trim: true,
+    },
+    status: {
+        type: String,
+        enum: ["pending", "draft", "ongoing", "processing", 'active', 'paused', 'completed', 'cancelled'],
+        default: 'pending',
     },
     description: {
         type: String,
@@ -87,5 +92,5 @@ const taskSchema = new mongoose.Schema({
     },
 }, { timestamps: true }); // use timestamps instead of manual dateCreated
 
-const Task = mongoose.model('Task', taskSchema);
+const Task = mongoose.model('Task', TaskSchema);
 module.exports = Task;
