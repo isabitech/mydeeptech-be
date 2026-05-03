@@ -1,24 +1,44 @@
 const mongoose = require('mongoose');
 
-
 const taskAssignmentSchema = new mongoose.Schema({
-    taskId: {
+    task: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Task',
-        required: true
+        required: true,
     },
-    userId: {
+    assignedTo: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'DTUser',
-        required: true
+        required: true,
+    },
+    assignedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'DTUser',
+        required: true,
     },
     status: {
         type: String,
-        enum: ['pending', 'in-progress', 'completed'],
-        default: 'pending'
-    }
+        enum: ['Pending', 'In Progress', 'Submitted', 'Approved', 'Rejected'],
+        default: 'Pending',
+    },
+    // Snapshot of due date at assignment time (task due date may change later)
+    dueDate: {
+        type: Date,
+        required: true,
+    },
+    submittedAt: {
+        type: Date,
+    },
+    reviewedAt: {
+        type: Date,
+    },
+    reviewNote: {
+        type: String, // Admin feedback on rejection or approval
+    },
 }, { timestamps: true });
 
-const TaskAssignment = mongoose.model( 'TaskAssignment', taskAssignmentSchema)
+// Prevent duplicate assignments of the same task to the same user
+taskAssignmentSchema.index({ task: 1, assignedTo: 1 }, { unique: true });
 
+const TaskAssignment = mongoose.model('TaskAssignment', taskAssignmentSchema);
 module.exports = TaskAssignment;

@@ -3,6 +3,8 @@ const MicroTask = require("../models/microTask.model");
 const TaskSlot = require("../models/taskSlot.model");
 const SubmissionImage = require("../models/submissionImage.model");
 const DTUser = require("../models/dtUser.model");
+const Task = require("../models/task.model");
+const TaskAssignment = require("../models/taskAssignment.model");
 const cloudinary = require("../config/cloudinary");
 const mongoose = require("mongoose");
 
@@ -30,9 +32,36 @@ const getUserSubmissions = async (userId) => {
  */
 const checkUserEligibility = async (userId, taskId) => {
   try {
-    // Check if task exists and is active
-    const task = await MicroTask.findById(taskId);
-    if (!task || task.status !== "active") {
+    // First, check if it's a regular micro task
+    let task = await MicroTask.findById(taskId);
+    let isAssignedTask = false;
+    
+    // If not found in MicroTask collection, check if it's an assigned task
+    if (!task) {
+      // Check if user has this task assigned to them
+      const assignment = await TaskAssignment.findOne({ taskId, userId });
+      if (assignment) {
+        // Get the task details from Task collection
+        const assignedTask = await Task.findById(taskId);
+        if (assignedTask) {
+          isAssignedTask = true;
+          console.log(`✅ Found assigned task: ${taskId} for user: ${userId}`);
+          // Treat assigned task as valid for submission
+          task = assignedTask; // Use assigned task for eligibility check
+        }
+      }
+    }
+
+    // If still no task found, it's not available
+    if (!task) {
+      return {
+        canStart: false,
+        reason: "Task not available"
+      };
+    }
+
+    // For micro tasks, check if they're active
+    if (!isAssignedTask && task.status !== "active") {
       return {
         canStart: false,
         reason: "Task not available"
@@ -135,23 +164,50 @@ const startTaskSubmission = async (userId, taskId) => {
       throw new Error(eligibilityCheck.reason);
     }
 
-    // Get task details
-    const task = await MicroTask.findById(taskId).session(session);
+    // Get task details - check both MicroTask and Task collections
+    let task = await MicroTask.findById(taskId).session(session);
+    let isAssignedTask = false;
+    
+    if (!task) {
+      // Check if it's an assigned task
+      const assignment = await TaskAssignment.findOne({ taskId, userId }).session(session);
+      if (assignment) {
+        const assignedTask = await Task.findById(taskId).session(session);
+        if (assignedTask) {
+          // Create a micro task from the assigned task for submission purposes
+          task = new MicroTask({
+            _id: taskId, // Use the same ID as the assigned task
+            title: assignedTask.taskName,
+            description: `Assigned task: ${assignedTask.taskName}`,
+            category: "mask_collection", // Default to mask collection for assigned tasks
+            required_count: 20,
+            status: "active",
+            payRate: 0, // Assigned tasks may not have pay rates
+            payRateCurrency: "USD",
+            createdBy: assignedTask.createdBy,
+            deadline: assignedTask.dueDate
+          });
+          
+          // Save the micro task to enable submission
+          await task.save({ session });
+          isAssignedTask = true;
+          console.log(`✅ Created micro task from assigned task: ${assignedTask.taskName}`);
+        }
+      }
+    }
+    
     if (!task) {
       throw new Error("Task not found");
     }
+
+    console.log(`📋 Starting submission for: ${isAssignedTask ? 'Assigned Task (converted)' : 'Micro Task'} - ${task.title || task.taskName}`);
 
     // Get user metadata for auto-population
     const user = await DTUser.findById(userId).session(session);
     const userMetadata = user.getMicroTaskMetadata();
 
-    // Calculate total slots based on task category
-    let totalSlots = 0;
-    if (task.category === "mask_collection") {
-      totalSlots = 20; // 10 Mask A + 10 Mask B slots
-    } else if (task.category === "age_progression") {
-      totalSlots = 15; // 6 years with varying slots per year
-    }
+    // Calculate total slots based on task type
+    let totalSlots = 20; // Default to 20 slots for all tasks
 
     // Create submission with total_slots
     const submission = new MicroTaskSubmission({
@@ -163,13 +219,9 @@ const startTaskSubmission = async (userId, taskId) => {
 
     await submission.save({ session });
 
-    // Generate task slots based on category (slots are saved separately)
-    let slots;
-    if (task.category === "mask_collection") {
-      slots = TaskSlot.generateMaskCollectionSlots(taskId);
-    } else if (task.category === "age_progression") {
-      slots = TaskSlot.generateAgeProgressionSlots(taskId);
-    }
+    // Generate task slots 
+    let slots = TaskSlot.generateMaskCollectionSlots(taskId);
+    console.log(`📸 Generated ${slots.length} mask collection slots for task`);
     
     // Save the generated slots to the database
     if (slots && slots.length > 0) {
@@ -209,7 +261,8 @@ const getSubmissionDetails = async (submissionId, userId) => {
     const submission = await MicroTaskSubmission.findOne({
       _id: submissionId,
       userId
-    }).populate({
+    })
+    .populate({
       path: "taskId",
       select: "title description category required_count payRate payRateCurrency instructions quality_guidelines estimated_time deadline"
     });
@@ -220,12 +273,12 @@ const getSubmissionDetails = async (submissionId, userId) => {
 
     // Get task slots with uploaded images
     const slots = await TaskSlot.find({ submissionId }).sort({ sort_order: 1 });
-    
+
     // For each slot, check if there's an uploaded image
     const slotsWithImages = await Promise.all(
       slots.map(async (slot) => {
         const image = await SubmissionImage.findOne({ slotId: slot._id });
-        
+ 
         return {
           ...slot.toObject(),
           uploaded: !!image,

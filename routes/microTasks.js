@@ -4,6 +4,7 @@ const microTaskController = require("../controllers/microTask.controller");
 const { body, param, query } = require("express-validator");
 const { authenticateToken } = require("../middleware/auth");
 const { requireRole } = require("../middleware/permission-role.middleware");
+const { imageUpload, uploadMicroTaskImages } = require("../config/cloudinary");
 
 // Validation rules
 const createTaskValidation = [
@@ -111,6 +112,16 @@ router.get("/statistics",
   microTaskController.getTaskStatistics
 );
 
+router.get("/submission/:submissionId", 
+  authenticateToken,
+  microTaskController.getTaskSubmissionById
+);
+
+router.delete("/submission/:submissionId/deleteImage", 
+  authenticateToken,
+  microTaskController.getTaskSubmissionByIdAndDeleteImage
+);
+
 router.get("/:taskId", 
   authenticateToken, 
   requireRole("admin", "super_admin", "QA_REVIEWER"), 
@@ -172,5 +183,20 @@ router.get("/available/me",
   requireRole("annotator", "user"),
   microTaskController.getAvailableTasksForUser
 );
+
+// User routes - Available tasks
+router.get("/available/me",
+  authenticateToken,
+  requireRole("annotator", "user"),
+  microTaskController.getAvailableTasksForUser
+);
+
+router.post('/upload',
+  authenticateToken,
+  uploadMicroTaskImages,
+  microTaskController.uploadTaskImages
+);
+
+
 
 module.exports = router;

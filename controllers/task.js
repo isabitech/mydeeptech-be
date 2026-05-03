@@ -1,61 +1,62 @@
-const Tasks = require('../models/task.model');
-const taskAssignment = require('../models/taskAssignment.model');
-const {taskSchema, taskAssignmentSchema} = require('../utils/authValidator');
+const Task = require('../models/task.model');
+const TaskAssignment = require('../models/taskAssignment.model');
+const { taskAssignmentSchema, createTaskValidator} = require('../utils/authValidator');
 const DTUser = require('../models/dtUser.model');
 
 const createTask = async (req, res) =>  {
-    try {
-        const {error} = taskSchema.validate(req.body);
-        if (error) return res.status(400).json({ message: error.details[0].message });
 
-        const {taskLink, taskGuidelineLink, taskName, dueDate} = req.body;
-        
-        // Check if a task with the same taskLink already exists
-        const existingTask = await Tasks.findOne({ taskLink });
-        if (existingTask) {
-            return res.status(409).json({
-                message: `A task with this link already exists. Task: "${existingTask.taskName}"`,
-                success: false,
-                error: "Duplicate task link",
-                data: null,
-            });
-        }
+    const { userId } = req.admin;
 
-        // Set createdBy automatically from authenticated user
-        const task = {
-            taskLink, 
-            taskGuidelineLink, 
-            taskName, 
-            createdBy: req.user.userId,
-            dueDate
-        };
+    const { error, value } = createTaskValidator.validate(req.body, {
+            abortEarly: true,
+    });
 
-        const newTask = new Tasks(task);
-        await newTask.save();
+     if (error) return res.status(400).json({ message: error.details[0]?.message });
+    const { taskLink, taskGuidelineLink, taskTitle, dueDate, description, category, currency, payRate, quality_guidelines, instructions, maxParticipants } = value;
 
-        res.status(200).send({
-            success: true,
-            responseMessage: 'Task created successfully',
-            data: newTask,
+   // Check if a task with the same taskTitle already exists
+    const existingTask = await Task.findOne({ taskTitle }).populate('createdBy', 'fullName email');
+
+    if (existingTask) {
+        return res.status(409).json({
+            message: `A task with the same title already exists. Task: "${existingTask.taskTitle}"`,
+            success: false,
+            error: "Please use a different task title.",
+            data: null,
         });
-        
-    } catch (error) {
-        console.error(error);
-        // Handle MongoDB duplicate key error
-        if (error.code === 11000) {
-            const duplicatedField = Object.keys(error.keyPattern)[0];
-            return res.status(409).json({ 
-                message: `A task with this ${duplicatedField} already exists. Please use a different ${duplicatedField}.` 
-            });
-        }
-
-        res.status(500).json({ message: error.details ? error.details[0].message : error.message });
     }
+
+    // Set createdBy automatically from authenticated user
+    const task = {
+        taskLink,
+        taskGuidelineLink,
+        taskTitle,
+        description,
+        createdBy: userId,
+        dueDate,
+        description,
+        category,
+        currency,
+        payRate,
+        quality_guidelines,
+        instructions,
+        maxParticipants,
+        isActive: true,
+    };
+
+    const newTask = new Task(task);
+    await newTask.save();
+
+    res.status(200).json({
+        success: true,
+        message: 'Task created successfully',
+        data: newTask,
+    });
 };
 
 const getTask = async (req, res) => {
     try {
-        const task = await Tasks.findById({ id : req.params.id })
+        const task = await Task.findById(req.params.id);
         if (!task) 
             return res.status(404).send('Task not found')
 
@@ -71,59 +72,156 @@ const getTask = async (req, res) => {
 };
 
 const getAllTasks = async (req, res) => {
-    try {
-        const tasks = await Tasks.find().populate('createdBy', 'fullName email');
-        if(!tasks)
-            return res.status(404).send('Task not found');
 
-        res.status(200).send({
-            success: true,
-            message: 'All Tasks fetched successfully',
-            data: tasks
-        });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: error.details ? error.details[0]?.message : error.message }); 
-    }
+    const { status, page = 1, limit = 20 } = req.query;
+
+    const filter = {};
+    if (status !== undefined) filter.isActive = status === 'active';
+
+    const tasks = await Task.find(filter)
+        .populate('createdBy', 'fullName email')
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+
+    const total = await Task.countDocuments(filter);
+
+    res.status(200).send({
+        success: true,
+        message: 'All Tasks fetched successfully',
+        data: tasks,
+        pagination: {
+            total,
+            page: Number(page),
+            limit: Number(limit),
+            totalPages: Math.ceil(total / limit),
+        },
+    });
 };
 
-const assignTask = async (req, res) => {
-    try {
-        // Step 1: Validate input with Joi
-        const { error } = taskAssignmentSchema.validate(req.body);
+const assignTaskToUsers = async (req, res) => {
+     // Step 1: Validate input with Joi
+        const { error, value } = taskAssignmentSchema.validate(req.body, {
+            abortEarly: true,
+        });
+
         if (error) {
             return res.status(400).json({ message: error.details[0]?.message });
         }
 
-        const { taskId, userId } = req.body;
+        // userIds: Array of user IDs to assign the task to
+        const { taskId, userIds } = value;
+
+        if (!taskId || !Array.isArray(userIds) || userIds.length === 0) {
+        return res.status(400).json({
+            success: false,
+            message: "taskId and userIds (array) are required",
+        });
+        }
 
         // Step 2: Check if Task exists
-        const task = await Tasks.findById(taskId);
+        const task = await Task.findById(taskId);
         if (!task) {
             return res.status(404).json({ message: `Task with ID ${taskId} does not exist.` });
         }
 
         // Step 3: Check if User exists
-        const user = await DTUser.findById(userId);
-        if (!user) {
-            return res.status(404).json({ success: false, message: `User with ID ${userId} does not exist.` });
+         const users = await DTUser.find({ _id: { $in: userIds } });
+          if (users.length !== userIds.length) {
+            return res.status(404).json({
+                success: false,
+                message: "One or more users not found",
+            });
         }
 
-        // Step 4: Create a new task assignment
-        const taskAssign = { taskId, userId }; // Construct assignment object
-        const newAssignment = new taskAssignment(taskAssign);
-        await newAssignment.save();
-
-        // Step 5: Return success response
-        res.status(200).send({
-            success: true,
-            message: 'Task assigned successfully',
-            data: newAssignment,
+        // Prevent duplicate assignments
+        const existingAssignments = await TaskAssignment.find({
+            task: taskId,
+            assignedTo: { $in: userIds },
         });
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: error.message || 'Internal server error', success: false, data: null });
-    }
+
+        const alreadyAssignedUserIds = existingAssignments.map(a =>
+            a.assignedTo.toString()
+        );
+
+        const newUserIds = userIds.filter(
+            id => !alreadyAssignedUserIds.includes(id)
+        );
+
+
+        if (task.maxParticipants && existingAssignments.length + newUserIds.length > task.maxParticipants) {
+            return res.status(400).json({
+                success: false,
+                message: `Max participants exceeded. Max participants for this task is ${task.maxParticipants}`,
+            });
+        }
+
+        // Build assignments
+        const assignments = newUserIds.map(userId => ({
+            task: taskId,
+            assignedTo: userId,
+            assignedBy: req.admin.userId,
+            dueDate: task.dueDate,
+        }));
+
+        // Insert many
+        const createdAssignments = await TaskAssignment.insertMany(assignments);
+
+        return res.status(200).json({
+            success: true,
+            message: "Task assigned successfully",
+            data: createdAssignments,
+        });
+};
+
+const getUsersAssignedToTask = async (req, res) => {
+
+        const { taskId, page = 1, limit = 20 } = req.query;
+    
+        if (!taskId) {
+            return res.status(400).json({ message: "Task ID is required", success: false, data: null });
+        }
+
+        // Check if Task exists
+        const task = await Task.findById(taskId);
+        if (!task) {
+            return res.status(404).json({ message: `Task with ID ${taskId} does not exist.`, success: false, data: null });
+        }
+
+        // Find all users for this task
+      const assignedUsers = await TaskAssignment.find({ task: taskId })
+        .populate({
+            path: 'task',
+            select: 'taskTitle createdBy',
+            populate: {
+            path: 'createdBy',
+            select: 'fullName email _id',
+            },
+        })
+        .populate({
+            path: 'assignedTo',
+            select: 'fullName email _id',
+        })
+        .populate({
+            path: 'assignedBy',
+            select: 'fullName email _id',
+        })
+        .skip((page - 1) * limit)
+        .limit(limit);
+
+        const total = await TaskAssignment.countDocuments({ task: taskId });
+
+        res.status(200).json({
+            success: true,
+            message: 'Users assigned to task fetched successfully',
+            data: assignedUsers,
+            pagination: {
+                total,
+                page: Number(page),
+                limit: Number(limit),
+                totalPages: Math.ceil(total / limit),
+            },
+        });
 };
 
 const deleteTask = async (req, res) => {
@@ -131,13 +229,13 @@ const deleteTask = async (req, res) => {
         const { id } = req.params;
 
         // Check if Task exists
-        const task = await Tasks.findById(id);
+        const task = await Task.findById(id);
         if (!task) {
             return res.status(404).json({ success: false, message: `Task with ID ${id} does not exist.` });
         }
 
         // Delete the task
-        await Tasks.findByIdAndDelete(id);
+        await Task.findByIdAndDelete(id);
 
         res.status(200).send({
             success: true,
@@ -150,40 +248,85 @@ const deleteTask = async (req, res) => {
     }
 };
 
-const updateTask = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { taskLink, taskGuidelineLink, taskName, dueDate } = req.body;
+const getMyTasks = async (req, res) => {
+    const { page = 1, limit = 20 } = req.query;
 
-        // Check if task exists
-        const existingTask = await Tasks.findById(id);
-        if (!existingTask) {
-            return res.status(404).json({ success: false, message: `Task with ID ${id} does not exist.`,  });
+    const { userId } = req.user
+    const assignments = await TaskAssignment.find({ assignedTo: userId })
+        .populate('task', 'taskTitle description dueDate createdBy payRate currency category')
+        .populate('assignedBy', 'fullName email')
+        .skip((page - 1) * limit)
+        .limit(limit);
+
+    const total = await TaskAssignment.countDocuments({ assignedTo: userId });
+
+    res.status(200).json({
+        success: true,
+        message: 'My assigned tasks fetched successfully',
+        data: assignments,
+        pagination: {
+            total,
+            page: Number(page),
+            limit: Number(limit),
+            totalPages: Math.ceil(total / limit),
+        },
+    });
+};
+
+const getSingleTask = async (req, res) => {
+ const { assignmentId } = req.params;
+        const { userId } = req.user;
+    
+        const taskAssignment = await TaskAssignment.findOne({
+            _id: assignmentId,
+            assignedTo: userId,
+        })
+            .populate('task', 'taskTitle description dueDate createdBy payRate currency category')
+            .populate('assignedBy', 'fullName email')
+            .populate('assignedTo', 'fullName email');
+
+        if (!taskAssignment) {
+            return res.status(404).json({
+                success: false,
+                message: 'Task assignment not found',
+                data: null,
+            });
         }
 
-        // If taskLink is being updated, check for duplicates
-        if (taskLink && taskLink !== existingTask.taskLink) {
-            const duplicateTask = await Tasks.findOne({ 
-                taskLink, 
-                _id: { $ne: id } // Exclude current task from duplicate check
-            });
-            if (duplicateTask) {
-                return res.status(409).json({ 
-                    success: false,
-                    message: `A task with this link already exists. Task: "${duplicateTask.taskName}"`,
-                    data: null
-                });
-            }
+        res.status(200).json({
+            success: true,
+            message: 'Task fetched successfully',
+            data: taskAssignment,
+        });
+};
+const updateTask = async (req, res) => {
+
+        const { taskId } = req.params;
+
+        const { taskTitle, taskLink, taskGuidelineLink, dueDate, isActive, description, category, currency, payRate, quality_guidelines, instructions, maxParticipants } = req.body;
+
+        // Check if task exists
+        const existingTask = await Task.findById(taskId);
+        if (!existingTask) {
+            return res.status(404).json({ success: false, message: `Task with ID ${taskId} does not exist.`,  });
         }
 
         // Update the task
-        const updatedTask = await Tasks.findByIdAndUpdate(
-            id,
+        const updatedTask = await Task.findByIdAndUpdate(
+            taskId,
             {
                 ...(taskLink && { taskLink }),
                 ...(taskGuidelineLink && { taskGuidelineLink }),
-                ...(taskName && { taskName }),
-                ...(dueDate && { dueDate })
+                ...(taskTitle && { taskTitle }),
+                ...(dueDate && { dueDate }),
+                ...(description && { description }),
+                ...(isActive !== undefined && { isActive }),
+                ...(category && { category }),
+                ...(currency && { currency }),
+                ...(payRate && { payRate }),
+                ...(quality_guidelines && { quality_guidelines }),
+                ...(instructions && { instructions }),
+                ...(maxParticipants && { maxParticipants }),
             },
             { new: true, runValidators: true }
         );
@@ -193,20 +336,6 @@ const updateTask = async (req, res) => {
             message: 'Task updated successfully',
             data: updatedTask
         });
-    } catch (error) {
-        console.error(error);
-        
-        // Handle MongoDB duplicate key error
-        if (error.code === 11000) {
-            const duplicatedField = Object.keys(error.keyPattern)[0];
-            return res.status(409).json({ 
-                success: false,
-                message: `A task with this ${duplicatedField} already exists. Please use a different ${duplicatedField}.` 
-            });
-        }
-        
-        res.status(500).json({ message: error.message || 'Internal server error', success: false, data: null });
-    }
 };
 
 const getAssignedTasks = async (req, res) => {
@@ -216,7 +345,7 @@ const getAssignedTasks = async (req, res) => {
         console.log("🔍 Looking for assignments for userId:", userId);
 
         // Find all task assignments for this user
-        const assignments = await taskAssignment.find({ userId })
+        const assignments = await TaskAssignment.find({ userId })
             .populate({
                 path: 'taskId',
                 populate: {
@@ -252,5 +381,39 @@ const getAssignedTasks = async (req, res) => {
     }
 };
 
+const getPaginatedUsers = async (req, res) => {
 
-module.exports = {createTask, getTask, getAllTasks, assignTask, deleteTask, updateTask, getAssignedTasks};
+    const { page = 1, limit = 20, searchQuery } = req.query;
+
+    const filter = {
+        role: 'user',
+    };
+
+    if (searchQuery) {
+        filter.$or = [
+            { fullName: { $regex: searchQuery, $options: 'i' } },
+            { email: { $regex: searchQuery, $options: 'i' } },
+        ];
+    } 
+
+        const users = await DTUser.find(filter)
+            .skip((page - 1) * limit)
+            .limit(limit);
+
+        const total = await DTUser.countDocuments(filter);
+
+        res.status(200).json({
+            success: true,
+            message: 'Users fetched successfully',
+            data: users,
+            pagination: {
+                total,
+                page: Number(page),
+                limit: Number(limit),
+                totalPages: Math.ceil(total / limit),
+            },
+        });
+};
+
+
+module.exports = { createTask, getTask, getAllTasks, assignTaskToUsers, deleteTask, updateTask, getAssignedTasks, getUsersAssignedToTask, getPaginatedUsers, getMyTasks, getSingleTask};

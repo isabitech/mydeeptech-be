@@ -1,8 +1,13 @@
+const TaskSubmission = require("../models/task-submission.model");
+const TaskAssignment = require("../models/taskAssignment.model");
 const microTaskService = require("../services/microTask.service");
 const { validationResult } = require("express-validator");
 
-class MicroTaskController {
+const VALID_LABELS = ['Front', 'Right', 'Left', 'Bottom'];
+const REQUIRED_PER_LABEL = 4;
+const TOTAL_REQUIRED = 20;
 
+class MicroTaskController {
   /**
    * Create a new micro task (Admin only)
    */
@@ -297,6 +302,323 @@ class MicroTaskController {
       });
     }
   }
+
+/**
+ * POST /api/task-submissions/upload
+ * User uploads images for an assigned task (supports incremental uploads)
+ */
+async uploadTaskImages(req, res) {
+        const { userId } = req.user;
+        const { assignmentId, taskId } = req.body;
+        const rawFiles = req.files;
+        const uploadedFiles = Array.isArray(rawFiles)
+            ? rawFiles
+            : Object.values(rawFiles || {}).flat();
+
+        if (!assignmentId) {
+            return res.status(400).json({
+                success: false,
+                message: 'assignmentId is required.',
+            });
+        }
+
+        if (!taskId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Task ID is required.',
+            });
+        }
+
+       if (!uploadedFiles || uploadedFiles.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'No files were uploaded.',
+            });
+        }
+
+        const assignment = await TaskAssignment.findOne({
+            _id: assignmentId,
+            assignedTo: userId,
+        }).populate('task', 'taskTitle category');
+
+
+        if (!assignment) {
+            return res.status(404).json({
+                success: false,
+                message: 'Assignment not found or does not belong to you.',
+            });
+        }
+
+        if (['Submitted', 'Approved'].includes(assignment.status)) {
+            return res.status(400).json({
+                success: false,
+                message: `This assignment has already been ${assignment.status.toLowerCase()} and cannot be modified.`,
+            });
+        }
+
+        if (new Date() > new Date(assignment.dueDate)) {
+            return res.status(400).json({
+                success: false,
+                message: 'The due date for this assignment has passed.',
+            });
+        }
+
+        const invalidFiles = uploadedFiles.filter(
+            (file) => !VALID_LABELS.includes(file.fieldname)
+        );
+
+        if (invalidFiles.length > 0) {
+            return res.status(400).json({
+                success: false,
+                message: `Invalid image label(s): ${[...new Set(invalidFiles.map(f => f.fieldname))].join(', ')}. Must be one of: ${VALID_LABELS.join(', ')}.`,
+            });
+        }
+
+        let submission = await TaskSubmission.findOne({ assignment: assignmentId });
+
+        if (!submission) {
+            submission = new TaskSubmission({
+                assignment: assignmentId,
+                submittedBy: userId,
+                images: [],
+            });
+        }
+
+        if (submission.isComplete) {
+            return res.status(400).json({
+                success: false,
+                message: 'All 20 images have already been uploaded for this task.',
+            });
+        }
+
+        // Check per-label capacity before inserting
+        const errors = [];
+        const currentCounts = { ...submission.uploadProgress };
+
+        for (const file of uploadedFiles) {
+            const label = file.fieldname;
+            const currentForLabel = currentCounts[label] || 0;
+
+            // Count how many of this label are in the current batch too
+            const incomingForLabel = uploadedFiles.filter(f => f.fieldname === label).length;
+            const projectedCount = currentForLabel + incomingForLabel;
+
+            if (projectedCount > REQUIRED_PER_LABEL) {
+                errors.push(
+                    `"${label}" already has ${currentForLabel}/${REQUIRED_PER_LABEL} images. ` +
+                    `You are trying to add ${incomingForLabel} more, which exceeds the limit.`
+                );
+            }
+        }
+
+        // Deduplicate error messages per label
+        const uniqueErrors = [...new Set(errors)];
+        if (uniqueErrors.length > 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Upload exceeds allowed image count for one or more labels.',
+                details: uniqueErrors,
+            });
+        }
+
+        // Check total capacity 
+        const projectedTotal = submission.images.length + uploadedFiles.length;
+        if (projectedTotal > TOTAL_REQUIRED) {
+            return res.status(400).json({
+                success: false,
+                message: `Upload would exceed the total image limit of ${TOTAL_REQUIRED}. You currently have ${submission.images.length} and are trying to add ${uploadedFiles.length}.`,
+            });
+        }
+
+        //  Map uploaded files to image sub-documents 
+        // Assumes multer-storage-cloudinary or similar attaches .path & .filename
+        const newImages = uploadedFiles.map((file) => ({
+            url: file.path, 
+            label: file.fieldname, 
+            publicId: file.filename,
+        }));
+
+        submission.images.push(...newImages);
+
+       if (!submission.task) {
+          submission.task = taskId;
+        }
+
+        await submission.save();
+
+          // Sync assignment status
+        if (submission.isComplete) {
+            assignment.status = 'Submitted';
+            assignment.submittedAt = new Date();
+        } else if (assignment.status === 'Pending') {
+            // First upload moves assignment to In Progress
+            assignment.status = 'In Progress';
+        }
+
+        // Respond with progress
+        return res.status(200).json({
+            success: true,
+            message: submission.isComplete
+                ? 'All images uploaded successfully. Task submitted for review!'
+                : `${uploadedFiles.length} image(s) uploaded. Keep going!`,
+            data: {
+                submissionId: submission._id,
+                assignmentStatus: assignment.status,
+                isComplete: submission.isComplete,
+                uploadProgress: submission.uploadProgress,
+                remaining: buildRemainingBreakdown(submission.uploadProgress),
+            },
+        });
+
+}
+
+  /**
+   * Get task statistics (Admin only)
+   */
+  async getTaskSubmissionById(req, res) {
+
+    const { submissionId } = req.params;
+    const { userId } = req.user;
+
+    const submission = await TaskSubmission.findOne({ assignment: submissionId, submittedBy: userId })
+    .populate('assignment')
+    .populate('task', 'taskTitle category');
+
+    if (!submission) {
+      return res.status(404).json({
+        success: false,
+        message: "Submission not found",
+        data: null,
+      });
+    }
+
+    const progress = submission.uploadProgress || {};
+    
+    const submissionResponse = {
+      ...submission.toObject(),
+      totalImages: submission.images?.length || 0,
+      progress,
+      remaining: buildRemainingBreakdown(progress),
+    };
+
+    return res.status(200).json({
+        success: true,
+        message: "Task submission retrieved successfully",
+        data: submissionResponse,
+      });
+  }
+
+
+  async getTaskSubmissionByIdAndDeleteImage(req, res) {
+
+      const { submissionId } = req.params;
+      const { userId } = req.user;
+      const { publicId, taskId } = req.query;
+  
+      if (!publicId) {
+        return res.status(400).json({
+          success: false,
+          message: "publicId query parameter is required",
+          data: null,
+        });
+      }
+
+      if (!taskId) {
+        return res.status(400).json({
+          success: false,
+          message: "taskId query parameter is required",
+          data: null,
+        });
+      }
+
+      const assignment = await TaskAssignment.findOne({
+          _id: submissionId,
+          assignedTo: userId,
+      }).populate('task', 'taskTitle category');
+
+      if (!assignment) {
+          return res.status(404).json({
+              success: false,
+              message: 'Assignment not found or does not belong to you.',
+              data: null,
+          });
+      }
+
+      if (['Submitted', 'Approved'].includes(assignment.status)) {
+          return res.status(400).json({
+              success: false,
+              message: `This assignment has already been ${assignment.status.toLowerCase()} and cannot be modified.`,
+              data: null,
+          });
+      }
+  
+      const submission = await TaskSubmission.findOne({ assignment: submissionId, submittedBy: userId });
+  
+      if (!submission) {
+        return res.status(404).json({
+          success: false,
+          message: "Submission not found",
+          data: null,
+        });
+      }
+  
+      const imageIndex = submission.images.findIndex(img => img.publicId === publicId);
+      
+      if (imageIndex === -1) {
+        return res.status(404).json({
+          success: false,
+          message: "Image not found in submission",
+          data: null,
+        });
+      }
+  
+      // Remove image from Cloudinary
+      const cloudinary = require('cloudinary').v2;
+      try {
+        await cloudinary.uploader.destroy(publicId);
+      } catch (error) {
+        console.error("Error deleting image from Cloudinary:", error);
+        return res.status(500).json({
+          success: false,
+          message: "Failed to delete image from storage",
+          data: null,
+        });
+      }
+
+      if(!submission.task){
+        submission.task = taskId;
+      }
+  
+      // Remove image from submission
+      submission.images.splice(imageIndex, 1);
+      await submission.save();
+
+      // Update assignment status if needed
+      if (submission.images.length === 0 && assignment.status === 'In Progress') {
+        assignment.status = 'Pending';
+        await assignment.save();
+      }
+  
+      return res.status(200).json({
+          success: true,
+          message: "Image deleted successfully",
+          data: {
+            submissionId: submission._id,
+            assignmentStatus: assignment.status,
+            remainingImages: submission.images.length,
+            uploadProgress: submission.uploadProgress,
+            remaining: buildRemainingBreakdown(submission.uploadProgress),
+            task: submission.task || null,
+          },
+        });
+    } 
+}
+
+ function buildRemainingBreakdown(progress) {
+    return VALID_LABELS.reduce((acc, label) => {
+        acc[label] = Math.max(0, REQUIRED_PER_LABEL - (progress[label] || 0));
+        return acc;
+    }, {});
 }
 
 module.exports = new MicroTaskController();

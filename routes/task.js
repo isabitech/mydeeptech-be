@@ -1,50 +1,67 @@
 const express = require('express');
 const router = express.Router();
 const taskController = require('../controllers/task');
-const { authenticateToken } = require('../middleware/auth');
 const { requireRole } = require('../middleware/permission-role.middleware');
+const { authenticateAdmin } = require('../middleware/adminAuth');
+const { authenticateToken } = require('../middleware/auth');
 
 // Admin routes - Task management
 router.post("/createTasks", 
-  authenticateToken, 
-  requireRole(['admin']), 
+  authenticateAdmin, 
   taskController.createTask
 );
 
 router.get("/getAllTasks", 
-  authenticateToken, 
-  requireRole(['admin']), 
+  authenticateAdmin, 
   taskController.getAllTasks
 );
 
-router.get("/getTask/:id", 
-  authenticateToken, 
-  requireRole(['admin']), 
+router.get("/getTask/:taskId", 
+  authenticateAdmin, 
   taskController.getTask
 );
 
-router.put("/updateTask/:id",
+router.get("/getSingleTask/:assignmentId",
   authenticateToken,
-  requireRole(['admin']),
+  taskController.getSingleTask
+);
+
+router.put("/updateTask/:taskId",
+  authenticateAdmin,
   taskController.updateTask
 );
 
-router.delete("/deleteTask/:id",
-  authenticateToken,
-  requireRole(['admin']),
+router.delete("/deleteTask/:taskId",
+  authenticateAdmin,
   taskController.deleteTask
 );
 
-router.post("/assignTask",
+router.get("/me",
   authenticateToken,
-  requireRole(['admin']),
-  taskController.assignTask
+  taskController.getMyTasks
 );
 
-// User routes - Assigned tasks
-router.get("/assigned-tasks",
-  authenticateToken,
-  taskController.getAssignedTasks
+router.post("/assignTaskToUsers",
+  authenticateAdmin,
+  taskController.assignTaskToUsers
 );
+
+router.get("/usersAssignToTask",
+  authenticateAdmin,
+  taskController.getUsersAssignedToTask
+);
+
+// Admin routes - Assigned tasks
+router.get("/assigned-tasks",
+  authenticateAdmin,
+  taskController.getUsersAssignedToTask
+);
+// Admin routes - Assigned tasks
+router.get("/get-paginated-users",
+  authenticateAdmin,
+  taskController.getPaginatedUsers
+);
+
+
 
 module.exports = router;
