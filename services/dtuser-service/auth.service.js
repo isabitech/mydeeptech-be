@@ -459,6 +459,10 @@ class AuthService {
           body.languageProficiency.primaryLanguage !== undefined
             ? body.languageProficiency.primaryLanguage
             : user.language_proficiency?.primary_language,
+        native_languages:
+          body.languageProficiency.nativeLanguages !== undefined
+            ? body.languageProficiency.nativeLanguages
+            : user.language_proficiency?.native_languages,
         other_languages:
           body.languageProficiency.otherLanguages !== undefined
             ? body.languageProficiency.otherLanguages

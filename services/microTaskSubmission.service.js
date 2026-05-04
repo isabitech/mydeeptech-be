@@ -3,6 +3,8 @@ const MicroTask = require("../models/microTask.model");
 const TaskSlot = require("../models/taskSlot.model");
 const SubmissionImage = require("../models/submissionImage.model");
 const DTUser = require("../models/dtUser.model");
+const Task = require("../models/task.model");
+const TaskApplication = require("../models/taskApplication.model");
 const cloudinary = require("../config/cloudinary");
 const mongoose = require("mongoose");
 
@@ -30,9 +32,36 @@ const getUserSubmissions = async (userId) => {
  */
 const checkUserEligibility = async (userId, taskId) => {
   try {
-    // Check if task exists and is active
-    const task = await MicroTask.findById(taskId);
-    if (!task || task.status !== "active") {
+    // First, check if it's a regular micro task
+    let task = await MicroTask.findById(taskId);
+    let isAssignedTask = false;
+    
+    // If not found in MicroTask collection, check if it's an assigned task
+    if (!task) {
+      // Check if user has this task assigned to them
+      const assignment = await TaskApplication.findOne({ taskId, userId });
+      if (assignment) {
+        // Get the task details from Task collection
+        const assignedTask = await Task.findById(taskId);
+        if (assignedTask) {
+          isAssignedTask = true;
+          console.log(`✅ Found assigned task: ${taskId} for user: ${userId}`);
+          // Treat assigned task as valid for submission
+          task = assignedTask; // Use assigned task for eligibility check
+        }
+      }
+    }
+
+    // If still no task found, it's not available
+    if (!task) {
+      return {
+        canStart: false,
+        reason: "Task not available"
+      };
+    }
+
+    // For micro tasks, check if they're active
+    if (!isAssignedTask && task.status !== "active") {
       return {
         canStart: false,
         reason: "Task not available"
@@ -135,23 +164,50 @@ const startTaskSubmission = async (userId, taskId) => {
       throw new Error(eligibilityCheck.reason);
     }
 
-    // Get task details
-    const task = await MicroTask.findById(taskId).session(session);
+    // Get task details - check both MicroTask and Task collections
+    let task = await MicroTask.findById(taskId).session(session);
+    let isAssignedTask = false;
+    
+    if (!task) {
+      // Check if it's an assigned task
+      const assignment = await TaskApplication.findOne({ taskId, userId }).session(session);
+      if (assignment) {
+        const assignedTask = await Task.findById(taskId).session(session);
+        if (assignedTask) {
+          // Create a micro task from the assigned task for submission purposes
+          task = new MicroTask({
+            _id: taskId, // Use the same ID as the assigned task
+            title: assignedTask.taskName,
+            description: `Assigned task: ${assignedTask.taskName}`,
+            category: "mask_collection", // Default to mask collection for assigned tasks
+            required_count: 20,
+            status: "active",
+            payRate: 0, // Assigned tasks may not have pay rates
+            payRateCurrency: "USD",
+            createdBy: assignedTask.createdBy,
+            deadline: assignedTask.dueDate
+          });
+          
+          // Save the micro task to enable submission
+          await task.save({ session });
+          isAssignedTask = true;
+          console.log(`✅ Created micro task from assigned task: ${assignedTask.taskName}`);
+        }
+      }
+    }
+    
     if (!task) {
       throw new Error("Task not found");
     }
+
+    console.log(`📋 Starting submission for: ${isAssignedTask ? 'Assigned Task (converted)' : 'Micro Task'} - ${task.title || task.taskName}`);
 
     // Get user metadata for auto-population
     const user = await DTUser.findById(userId).session(session);
     const userMetadata = user.getMicroTaskMetadata();
 
-    // Calculate total slots based on task category
-    let totalSlots = 0;
-    if (task.category === "mask_collection") {
-      totalSlots = 20; // 10 Mask A + 10 Mask B slots
-    } else if (task.category === "age_progression") {
-      totalSlots = 15; // 6 years with varying slots per year
-    }
+    // Calculate total slots based on task type
+    let totalSlots = 20; // Default to 20 slots for all tasks
 
     // Create submission with total_slots
     const submission = new MicroTaskSubmission({
@@ -163,13 +219,9 @@ const startTaskSubmission = async (userId, taskId) => {
 
     await submission.save({ session });
 
-    // Generate task slots based on category (slots are saved separately)
-    let slots;
-    if (task.category === "mask_collection") {
-      slots = TaskSlot.generateMaskCollectionSlots(taskId);
-    } else if (task.category === "age_progression") {
-      slots = TaskSlot.generateAgeProgressionSlots(taskId);
-    }
+    // Generate task slots 
+    let slots = TaskSlot.generateMaskCollectionSlots(taskId);
+    console.log(`📸 Generated ${slots.length} mask collection slots for task`);
     
     // Save the generated slots to the database
     if (slots && slots.length > 0) {
@@ -209,7 +261,8 @@ const getSubmissionDetails = async (submissionId, userId) => {
     const submission = await MicroTaskSubmission.findOne({
       _id: submissionId,
       userId
-    }).populate({
+    })
+    .populate({
       path: "taskId",
       select: "title description category required_count payRate payRateCurrency instructions quality_guidelines estimated_time deadline"
     });
@@ -220,12 +273,12 @@ const getSubmissionDetails = async (submissionId, userId) => {
 
     // Get task slots with uploaded images
     const slots = await TaskSlot.find({ submissionId }).sort({ sort_order: 1 });
-    
+
     // For each slot, check if there's an uploaded image
     const slotsWithImages = await Promise.all(
       slots.map(async (slot) => {
         const image = await SubmissionImage.findOne({ slotId: slot._id });
-        
+ 
         return {
           ...slot.toObject(),
           uploaded: !!image,
@@ -670,6 +723,232 @@ const createTaskSlots = async (submissionId, userId) => {
   }
 };
 
+/**
+ * Get user earning statistics from micro task submissions
+ * @param {String} userId - User ID
+ * @returns {Object} Earnings statistics
+ */
+const getUserEarningStatistics = async (userId) => {
+  try {
+    const objectId = new mongoose.Types.ObjectId(userId);
+    
+    // Get total available tasks
+    const Task = require("../models/task.model");
+    const totalAvailableTasks = await Task.countDocuments({
+      isActive: true,
+      status: "active"
+    });
+    
+    // Get earnings statistics
+    const earningStats = await MicroTaskSubmission.aggregate([
+      { $match: { userId: objectId } },
+      {
+        $lookup: {
+          from: "tasks", // micro tasks collection
+          localField: "taskId",
+          foreignField: "_id",
+          as: "task"
+        }
+      },
+      { $unwind: "$task" },
+      {
+        $group: {
+          _id: null,
+          totalSubmissions: { $sum: 1 },
+          approvedSubmissions: {
+            $sum: {
+              $cond: [{ $eq: ["$payment_status", "approved"] }, 1, 0]
+            }
+          },
+          paidSubmissions: {
+            $sum: {
+              $cond: [{ $eq: ["$payment_status", "paid"] }, 1, 0]
+            }
+          },
+          pendingSubmissions: {
+            $sum: {
+              $cond: [{ $eq: ["$payment_status", "pending"] }, 1, 0]
+            }
+          },
+          rejectedSubmissions: {
+            $sum: {
+              $cond: [{ $eq: ["$payment_status", "rejected"] }, 1, 0]
+            }
+          },
+          totalEarnings: {
+            $sum: {
+              $cond: [
+                { $in: ["$payment_status", ["approved", "paid"]] },
+                "$task.payRate",
+                0
+              ]
+            }
+          },
+          paidEarnings: {
+            $sum: {
+              $cond: [
+                { $eq: ["$payment_status", "paid"] },
+                "$payment_amount",
+                0
+              ]
+            }
+          },
+          pendingEarnings: {
+            $sum: {
+              $cond: [
+                { $eq: ["$payment_status", "approved"] },
+                "$task.payRate",
+                0
+              ]
+            }
+          }
+        }
+      }
+    ]);
+
+    // Get recent submissions for activity
+    const recentSubmissions = await MicroTaskSubmission.find({ userId: objectId })
+      .populate({
+        path: "taskId",
+        select: "taskTitle payRate currency category"
+      })
+      .sort({ createdAt: -1 })
+      .limit(5);
+
+    // Get monthly earnings breakdown
+    const monthlyEarnings = await MicroTaskSubmission.aggregate([
+      { 
+        $match: { 
+          userId: objectId,
+          payment_status: { $in: ["approved", "paid"] }
+        } 
+      },
+      {
+        $lookup: {
+          from: "tasks",
+          localField: "taskId",
+          foreignField: "_id",
+          as: "task"
+        }
+      },
+      { $unwind: "$task" },
+      {
+        $group: {
+          _id: {
+            year: { $year: "$createdAt" },
+            month: { $month: "$createdAt" }
+          },
+          earnings: { $sum: "$task.payRate" },
+          taskCount: { $sum: 1 }
+        }
+      },
+      {
+        $sort: { "_id.year": -1, "_id.month": -1 }
+      },
+      {
+        $limit: 6 // Last 6 months
+      }
+    ]);
+
+    // Get task category breakdown
+    const categoryBreakdown = await MicroTaskSubmission.aggregate([
+      { $match: { userId: objectId } },
+      {
+        $lookup: {
+          from: "tasks",
+          localField: "taskId",
+          foreignField: "_id",
+          as: "task"
+        }
+      },
+      { $unwind: "$task" },
+      {
+        $group: {
+          _id: "$task.category",
+          count: { $sum: 1 },
+          earnings: {
+            $sum: {
+              $cond: [
+                { $in: ["$payment_status", ["approved", "paid"]] },
+                "$task.payRate",
+                0
+              ]
+            }
+          },
+          approvedCount: {
+            $sum: {
+              $cond: [{ $eq: ["$payment_status", "approved"] }, 1, 0]
+            }
+          },
+          paidCount: {
+            $sum: {
+              $cond: [{ $eq: ["$payment_status", "paid"] }, 1, 0]
+            }
+          }
+        }
+      }
+    ]);
+
+    const stats = earningStats[0] || {
+      totalSubmissions: 0,
+      approvedSubmissions: 0,
+      paidSubmissions: 0,
+      pendingSubmissions: 0,
+      rejectedSubmissions: 0,
+      totalEarnings: 0,
+      paidEarnings: 0,
+      pendingEarnings: 0
+    };
+
+    // Calculate total completed tasks (approved + paid)
+    const totalCompletedTasks = stats.approvedSubmissions + stats.paidSubmissions;
+
+    return {
+      summary: {
+        totalTasksAvailable: totalAvailableTasks,
+        totalTasksSubmitted: stats.totalSubmissions,
+        totalTasksCompleted: totalCompletedTasks,
+        myEarnings: stats.totalEarnings,
+        // Additional useful metrics
+        pendingEarnings: stats.pendingEarnings,
+        approvalRate: stats.totalSubmissions > 0 
+          ? Math.round((totalCompletedTasks / stats.totalSubmissions) * 100) 
+          : 0
+      },
+      recentActivity: recentSubmissions.map(submission => ({
+        _id: submission._id,
+        taskTitle: submission.taskId?.taskTitle || "Unknown Task",
+        category: submission.taskId?.category || "unknown",
+        payRate: submission.taskId?.payRate || 0,
+        currency: submission.taskId?.currency || "USD",
+        status: submission.status,
+        paymentStatus: submission.payment_status,
+        submittedAt: submission.submission_date,
+        createdAt: submission.createdAt
+      })),
+      monthlyBreakdown: monthlyEarnings.map(month => ({
+        year: month._id.year,
+        month: month._id.month,
+        earnings: month.earnings,
+        taskCount: month.taskCount
+      })),
+      categoryBreakdown: categoryBreakdown.map(category => ({
+        category: category._id,
+        totalTasks: category.count,
+        totalEarnings: category.earnings,
+        approvedTasks: category.approvedCount,
+        paidTasks: category.paidCount,
+        averageEarnings: category.approvedCount > 0 
+          ? Math.round(category.earnings / category.approvedCount)
+          : 0
+      }))
+    };
+  } catch (error) {
+    console.error("Error getting user earning statistics:", error);
+    throw new Error("Failed to get earning statistics");
+  }
+};
+
 module.exports = {
   getUserSubmissions,
   checkUserEligibility,
@@ -681,5 +960,6 @@ module.exports = {
   updateSubmissionProgress,
   getReviewQueue,
   reviewSubmission,
-  createTaskSlots
+  createTaskSlots,
+  getUserEarningStatistics
 };

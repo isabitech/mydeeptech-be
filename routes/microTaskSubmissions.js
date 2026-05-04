@@ -147,6 +147,30 @@ router.post("/tasks/:taskId/start",
   }
 );
 
+// @route   GET /api/micro-task-submissions/earnings
+// @desc    Get user's micro task earning statistics
+// @access  Private
+router.get("/earnings",
+  authenticateToken,
+  async (req, res) => {
+    try {
+      const earningStats = await microTaskSubmissionService.getUserEarningStatistics(req.user.userId);
+      
+      res.status(200).json({
+        success: true,
+        message: "User earning statistics retrieved successfully",
+        data: earningStats
+      });
+    } catch (error) {
+      console.error("Error getting user earning statistics:", error);
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to get earning statistics"
+      });
+    }
+  }
+);
+
 // @route   GET /api/micro-task-submissions/:submissionId
 // @desc    Get submission details
 // @access  Private

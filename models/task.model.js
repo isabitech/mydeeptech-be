@@ -1,49 +1,96 @@
 const mongoose = require('mongoose');
 
-const taskSchema = new mongoose.Schema({
-
+const TaskSchema = new mongoose.Schema({
+    taskTitle: {
+        type: String,
+        minlength: 4,
+        required: true,
+        trim: true,
+    },
+    status: {
+        type: String,
+        enum: ["pending", "draft", "ongoing", "processing", 'active', 'paused', 'completed', 'cancelled'],
+        default: 'pending',
+    },
+    description: {
+        type: String,
+        trim: true,
+    },
     taskLink: {
         type: String,
-        required: true,
-        validate: {
-            validator: function (v) {
-                return /^(http|https):\/\/[^\s$.?#].[^\s]*$/.test(v); // Regex for URL validation
-            },
-            message: props => `${props.value} is not a valid URL!`,
-    }
     },
     taskGuidelineLink: {
         type: String,
         minlength: 4,
-        required: true
     },
-    taskName: {
-        type: String,
-        minlength: 4,
-        required: true 
-    },
+    category: { type: String, enum: ['mask_collection', 'text_annotation', 'audio_annotation', 'video_annotation', 'age_progression'], required: true },
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'DTUser',
-        required: true 
+        required: true,
     },
-    dateCreated:{
+    payRate: {
+        type: Number,
+        required: true,
+        min: [0, 'Pay rate must be a positive number'],
+    },
+    currency: {
         type: String,
-        default: new Date().toJSON()
+        required: true,
+        enum: ['USD', 'NGN', 'EUR', 'GBP'],
+        default: 'USD',
+    },
+
+   instructions: {
+        type: String,
+        minlength: 10,
+        required: [true, 'Instructions are required'],
+        trim: true,
+    },
+    
+    quality_guidelines: {
+        type: String,
+        minlength: 10,
+        required: [true, 'Quality guidelines are required'],
+        trim: true,
+    },
+    maxParticipants: {
+        type: Number,
+        required: false,
+        min: [1, 'Max participants must be at least 1'],
     },
     dueDate: {
-        type: Date, // Specifies the data type as Date
-        required: [true, 'Due date is required'], // Makes the field mandatory and provides a custom error message
-        validate: { // Adds custom validation logic for this field
-          validator: function (value) {
-            return value > Date.now(); // Ensure the due date is in the future
-          },
-          message: 'Due date must be in the future', // Error message shown if validation fails
+        type: Date,
+        required: [true, 'Due date is required'],
+        validate: {
+            validator: (value) => value > Date.now(),
+            message: 'Due date must be in the future',
         },
-    }
+    },
+    // Defines the image categories and required count per category
+    imageRequirements: {
+        type: [
+            {
+                label: { type: String, enum: ['Front', 'Right', 'Left', 'Bottom'], required: true, },
+                requiredCount: { type: Number, default: 4 },
+            },
+        ],
+        default: [
+            { label: 'Front',  requiredCount: 4 },
+            { label: 'Right',  requiredCount: 4 },
+            { label: 'Left',   requiredCount: 4 },
+            { label: 'Bottom', requiredCount: 4 },
+        ],
+    },
+    totalImagesRequired: {
+        type: Number,
+        default: 20,
+    },
+    isActive: {
+        type: Boolean,
+        default: true,
+    },
+}, { timestamps: true }); // use timestamps instead of manual dateCreated
 
-});
-
-const Task = mongoose.model('Task', taskSchema);
-
+const Task = mongoose.model('Task', TaskSchema);
 module.exports = Task;
