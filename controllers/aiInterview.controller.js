@@ -234,6 +234,21 @@ class AiInterviewController {
       );
     } catch (error) {
       console.error("Error starting AI interview session:", error);
+      
+      // Handle AI service errors with user-friendly messages
+      if (error.code === 'AI_RATE_LIMIT') {
+        return sendError(res, 429, error.message, {
+          code: 'AI_RATE_LIMIT',
+          retryAfter: error.retryAfter
+        });
+      }
+      
+      if (error.code === 'AI_SERVICE_ERROR') {
+        return sendError(res, 503, error.message, {
+          code: 'AI_SERVICE_ERROR'
+        });
+      }
+      
       return sendError(res, 500, "Server error starting AI interview session", {
         error: error.message,
       });
@@ -316,6 +331,21 @@ class AiInterviewController {
       );
     } catch (error) {
       console.error("Error submitting AI interview answer:", error);
+      
+      // Handle AI service errors with user-friendly messages
+      if (error.code === 'AI_RATE_LIMIT') {
+        return sendError(res, 429, error.message, {
+          code: 'AI_RATE_LIMIT',
+          retryAfter: error.retryAfter
+        });
+      }
+      
+      if (error.code === 'AI_SERVICE_ERROR') {
+        return sendError(res, 503, error.message, {
+          code: 'AI_SERVICE_ERROR'
+        });
+      }
+      
       return sendError(res, 500, "Server error submitting AI interview answer", {
         error: error.message,
       });

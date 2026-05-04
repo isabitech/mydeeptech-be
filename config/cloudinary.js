@@ -210,13 +210,28 @@ const resultFileUpload = multer({
   }
 });
 
+
+const VALID_LABELS = ['View 1', 'View 2', 'View 3', 'View 4'];
+const uploadMicroTaskImages = multer({
+   storage: imageStorage,
+     limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit for resumes
+  },
+  fileFilter: (req, file, cb) => {
+    if (!VALID_LABELS.includes(file.fieldname)) {
+        return cb(new Error(`Invalid field name: ${file.fieldname}`), false);
+      }
+      cb(null, true);
+  },
+}).fields(VALID_LABELS.map((label) => ({ name: label, maxCount: 4 })));
+
 // Helper functions for file operations
 const deleteCloudinaryFile = async (publicId) => {
   try {
     const result = await cloudinary.uploader.destroy(publicId);
     return result;
   } catch (error) {
-    console.error(`❌ Error deleting file from Cloudinary: ${publicId}`, error);
+    console.error(`Error deleting file from Cloudinary: ${publicId}`, error);
     throw error;
   }
 };
@@ -226,7 +241,7 @@ const getCloudinaryFileInfo = async (publicId) => {
     const result = await cloudinary.api.resource(publicId);
     return result;
   } catch (error) {
-    console.error(`❌ Error getting file info from Cloudinary: ${publicId}`, error);
+    console.error(`Error getting file info from Cloudinary: ${publicId}`, error);
     throw error;
   }
 };
@@ -292,5 +307,6 @@ module.exports = {
   audioStorage,
   generalStorage,
   idDocumentStorage,
-  resumeStorage
+  resumeStorage,
+  uploadMicroTaskImages
 };

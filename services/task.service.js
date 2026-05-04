@@ -1,5 +1,5 @@
 const Tasks = require('../models/task.model');
-const taskAssignment = require('../models/taskAssignment.model');
+const TaskApplication = require('../models/taskApplication.model');
 const { taskSchema, taskAssignmentSchema } = require('../utils/authValidator');
 const Users = require('../models/user');
 
@@ -38,7 +38,7 @@ class TaskService {
         const user = await Users.findById(userId);
         if (!user) throw { status: 404, message: `User with ID ${userId} does not exist.` };
 
-        const newAssignment = new taskAssignment({ taskId, userId });
+        const newAssignment = new TaskApplication({ taskId, userId });
         await newAssignment.save();
         return newAssignment;
     }

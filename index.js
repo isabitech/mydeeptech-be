@@ -20,6 +20,7 @@ try {
 }
 
 const route = require("./routes/auth");
+const taskRoute = require("./routes/task");
 const adminRoute = require("./routes/admin");
 const adminEmailTrackingRoute = require("./routes/adminEmailTracking.routes");
 const debugEmailRoute = require("./routes/debugEmail.routes");
@@ -35,6 +36,11 @@ const aiRecommendationRoute = require("./routes/ai-recommendation.routes");
 const domainsRoute = require("./routes/domains.routes");
 const newDomainsRoute = require("./routes/domain.routes");
 const rolesPermissionRoute = require("./routes/roles-permission.routes");
+const TasksRoute = require("./routes/task.routes");
+const taskAssignmentRoute = require("./routes/task-assignment.routes");
+const microTaskSubmissionsRoute = require("./routes/microTaskSubmissions");
+// const submissionsRoute = require("./routes/submissions");  // Temporarily disabled due to import issues
+const microTaskQARoute = require("./routes/microTaskQA");
 const envConfig = require("./config/envConfig");
 const partnerInvoiceRoute = require("./routes/partnerInvoice.routes");
 const paymentRoutes = require("./routes/payment.routes");
@@ -135,6 +141,11 @@ app.use("/api/roles-permission", rolesPermissionRoute);
 app.use("/api/hvnc", hvncRoutes);
 app.use("/api/resources", resourceRoutes);
 app.use("/api/assessment-reviews", assessmentReviewRoute);
+app.use("/api/tasks", taskRoute);
+app.use("/api/task-assignments", taskAssignmentRoute);
+app.use("/api/micro-tasks", TasksRoute);
+app.use("/api/micro-task-submissions", microTaskSubmissionsRoute);
+app.use("/api/micro-task-qa", microTaskQARoute);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);

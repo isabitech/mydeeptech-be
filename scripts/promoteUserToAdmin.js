@@ -38,18 +38,12 @@ const run = async () => {
 
   try {
     await mongoose.connect(mongoUri);
-    console.log("Connected to MongoDB.");
 
     const user = await DTUser.findOne({ email });
     if (!user) {
       console.error(`User not found for email: ${email}`);
       return;
     }
-
-    console.log("User found:");
-    console.log(`Name: ${user.fullName || "N/A"}`);
-    console.log(`Email: ${user.email}`);
-    console.log(`Current role: ${user.role}`);
 
     const shouldContinue = await askForConfirmation(
       "Promote this user to admin? (y/N): ",
@@ -66,13 +60,8 @@ const run = async () => {
     if (adminRole) {
       user.role_permission = adminRole._id;
     }
-
     await user.save();
 
-    console.log("User updated successfully.");
-    console.log(`Name: ${user.fullName || "N/A"}`);
-    console.log(`Email: ${user.email}`);
-    console.log(`New role: ${user.role}`);
     if (adminRole) {
       console.log(`Role permission: ${adminRole._id}`);
     }

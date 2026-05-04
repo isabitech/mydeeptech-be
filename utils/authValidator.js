@@ -56,36 +56,146 @@ const projectSchema = Joi.object({
     }),
 });
 
-const taskSchema = Joi.object({
+const VALID_LABELS = ['Front', 'Right', 'Left', 'Bottom'];
+
+const createTaskValidator = Joi.object({
+  taskTitle: Joi.string()
+    .min(4)
+    .required()
+    .messages({
+      "string.base": "Task title must be a string.",
+      "string.empty": "Task title cannot be empty.",
+      "string.min": "Task title must be at least 4 characters.",
+      "any.required": "Task title is required.",
+    }),
+
+    description: Joi.string()
+    .min(10)
+    .max(500)
+    .required()
+    .messages({
+      "string.base": "Description must be a string.",
+      "string.empty": "Description cannot be empty.",
+      "string.min": "Description must be at least 10 characters.",
+      "string.max": "Description cannot exceed 500 characters.",
+      "any.required": "Description is required.",
+    }),
+
+    category: Joi.string()
+    .valid('mask_collection', 'text_annotation', 'audio_annotation', 'video_annotation', 'age_progression')
+    .required()
+    .messages({
+      "any.only": "Category must be one of mask_collection, text_annotation, audio_annotation, video_annotation, or age_progression.",
+      "any.required": "Category is required.",
+    }),
+
+      payRate: Joi.number()
+    .positive()
+    .required()
+    .messages({
+      "number.base": "Pay rate must be a number.",
+      "number.positive": "Pay rate must be greater than 0.",
+      "any.required": "Pay rate is required.",
+    }),
+
+  currency: Joi.string()
+    .valid('USD', 'NGN', 'EUR', 'GBP')
+    .required()
+    .messages({
+      "any.only": "Currency must be one of USD, NGN, EUR, GBP.",
+      "any.required": "Currency is required.",
+    }),
+  maxParticipants: Joi.number()
+    .integer()
+    .min(1)
+    .optional()
+    .messages({
+      "number.base": "Max participants must be a number.",
+      "number.integer": "Max participants must be an integer.",
+      "number.min": "Max participants must be at least 1.",
+    }),
+
   taskLink: Joi.string()
-    .uri({ scheme: ["http", "https"] }) // Validates URLs with http/https
-    .required()
+    .uri({ scheme: ["http", "https"] })
+    .optional()
     .messages({
-      "string.base": "URL must be a string.",
-      "string.uri": "Invalid URL format.",
-      "any.required": "URL is required.",
+      "string.uri": "Invalid task link format.",
     }),
+
   taskGuidelineLink: Joi.string()
-    .uri({ scheme: ["http", "https"] }) // Validates URLs with http/https
+    .uri({ scheme: ["http", "https"] })
+    .optional()
+    .messages({
+      "string.uri": "Invalid guideline link format.",
+    }),
+
+  instructions: Joi.string()
+    .min(10)
     .required()
     .messages({
-      "string.base": "URL must be a string.",
-      "string.uri": "Invalid URL format.",
-      "any.required": "URL is required.",
+      "string.base": "Instructions must be a string.",
+      "string.empty": "Instructions cannot be empty.",
+      "string.min": "Instructions must be at least 10 characters.",
+      "any.required": "Instructions are required.",
     }),
-  taskName: Joi.string().min(4).required(),
-  createdBy: Joi.string().min(4).required(),
-  dueDate: Joi.date()
-    .greater("now") // Ensure the date is in the future
-    .required() // Ensure the field is mandatory
+
+  quality_guidelines: Joi.string()
+    .min(10)
+    .required()
     .messages({
-      "date.greater": "Due date must be in the future", // Custom error message for invalid due date
-      "any.required": "Due date is required", // Custom error message for missing due date
+      "string.base": "Quality guidelines must be a string.",
+      "string.empty": "Quality guidelines cannot be empty.",
+      "string.min": "Quality guidelines must be at least 10 characters.",
+      "any.required": "Quality guidelines are required.",
     }),
+
+  dueDate: Joi.date()
+    .greater("now")
+    .required()
+    .messages({
+      "date.base": "Due date must be a valid date.",
+      "date.greater": "Due date must be in the future.",
+      "any.required": "Due date is required.",
+    }),
+
+  imageRequirements: Joi.array()
+    .items(
+      Joi.object({
+        label: Joi.string()
+          .valid(...VALID_LABELS)
+          .required()
+          .messages({
+            "any.only": "Label must be one of Front, Right, Left, Bottom.",
+            "any.required": "Image label is required.",
+          }),
+
+        requiredCount: Joi.number()
+          .integer()
+          .min(1)
+          .default(4)
+          .messages({
+            "number.base": "Required count must be a number.",
+            "number.min": "Required count must be at least 1.",
+          }),
+      })
+    )
+    .length(4) // enforce all 4 labels present
+    .optional(),
+
+  totalImagesRequired: Joi.number()
+    .integer()
+    .min(1)
+    .default(20)
+    .messages({
+      "number.base": "Total images must be a number.",
+    }),
+
+  isActive: Joi.boolean().optional(),
 });
+
 const taskAssignmentSchema = Joi.object({
   taskId: Joi.string().min(5).required(),
-  userId: Joi.string().min(5).required(),
+  userIds: Joi.array().items(Joi.string().min(5)).required(),
 });
 
 // DTUser password setup schema
@@ -305,7 +415,6 @@ module.exports = {
   signupSchema,
   loginSchema,
   projectSchema,
-  taskSchema,
   taskAssignmentSchema,
   dtUserPasswordSchema,
   dtUserLoginSchema,
@@ -317,4 +426,5 @@ module.exports = {
   adminResendOTPSchema,
   existingAdminResendOTPSchema,
   dtUserPasswordResetSchema,
+  createTaskValidator,
 };
