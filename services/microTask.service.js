@@ -1,9 +1,11 @@
+const mongoose = require("mongoose");
 const MicroTask = require("../models/microTask.model");
 const TaskSlot = require("../models/taskSlot.model");
 const MicroTaskSubmission = require("../models/microTaskSubmission.model");
 const SubmissionImage = require("../models/submissionImage.model");
 const Task = require("../models/task.model");
 const TaskApplication = require("../models/taskApplication.model");
+const TaskSubmission = require("../models/task-submission.model");
 
 class MicroTaskService {
   
@@ -49,76 +51,175 @@ class MicroTaskService {
         search
       } = query;
 
-      const filter = {};
+    const pageNumber = parseInt(page) || 1;
+    const pageSize = parseInt(limit) || 10;
+    const skip = (pageNumber - 1) * pageSize;
 
-      // Apply filters
-      if (status) filter.status = status;
-      if (category) filter.category = category;
-      if (createdBy) filter.createdBy = createdBy;
-      if (search) {
-        filter.$or = [
-          { taskTitle: { $regex: search, $options: 'i' } },
-          { description: { $regex: search, $options: 'i' } }
-        ];
-      }
 
-    if(userId) {
-    // Get all task IDs a user has already applied for
-      const appliedTaskIds = await TaskApplication.find(
-          { applicant: userId },
-          { task: 1, _id: 0 }
-      ).distinct('task');
-      filter._id = { $nin: appliedTaskIds };
-      filter.isActive = true;
+    let matchStage = {};
+
+    if (status && status !== "all") matchStage.status = status;
+    if (category && category !== "all") matchStage.category = category;
+    if (createdBy) matchStage.createdBy = new mongoose.Types.ObjectId(createdBy);
+
+
+    if (search && search.trim()) {
+      const searchValue = search.trim();
+
+      matchStage.$or = [
+        { taskTitle: { $regex: searchValue, $options: "i" } },
+        { description: { $regex: searchValue, $options: "i" } }
+      ];
     }
 
-      const skip = (page - 1) * limit;
 
-      const [tasks, total] = await Promise.all([
-        Task.find(filter)
-          .populate("createdBy", "fullName email")
-          .sort({ createdAt: -1 })
-          .skip(skip)
-          .limit(parseInt(limit)),
-        Task.countDocuments(filter)
+    let appliedTaskIds = [];
+    if (userId) {
+      appliedTaskIds = await TaskApplication.distinct("task", {
+        applicant: userId,
+      });
+
+      matchStage._id = { $nin: appliedTaskIds };
+      matchStage.isActive = true;
+    }
+
+     const result = await Task.aggregate([
+        {
+          $match: matchStage,
+        },
+
+        // Join createdBy
+        {
+          $lookup: {
+            from: "dtusers",
+            localField: "createdBy",
+            foreignField: "_id",
+            as: "createdBy",
+          },
+        },
+        { $unwind: "$createdBy" },
+
+        // 🔥 Join TaskApplications + compute stats
+        {
+          $lookup: {
+            from: "taskapplications",
+            let: { taskId: "$_id" },
+            pipeline: [
+              {
+                $match: {
+                  $expr: { $eq: ["$task", "$$taskId"] },
+                },
+              },
+              {
+                $group: {
+                  _id: "$status",
+                  count: { $sum: 1 },
+                },
+              },
+            ],
+            as: "submissionStatsRaw",
+          },
+        },
+
+        // 🔥 Transform stats into your desired structure
+        {
+          $addFields: {
+            submissionStats: {
+              total: { $sum: "$submissionStatsRaw.count" },
+
+              pending: {
+                $sum: {
+                  $map: {
+                    input: "$submissionStatsRaw",
+                    as: "s",
+                    in: {
+                      $cond: [{ $eq: ["$$s._id", "pending"] }, "$$s.count", 0],
+                    },
+                  },
+                },
+              },
+
+              in_progress: {
+                $sum: {
+                  $map: {
+                    input: "$submissionStatsRaw",
+                    as: "s",
+                    in: {
+                      $cond: [
+                        { $in: ["$$s._id", ["ongoing", "processing", "active"]] },
+                        "$$s.count",
+                        0,
+                      ],
+                    },
+                  },
+                },
+              },
+
+              completed: {
+                $sum: {
+                  $map: {
+                    input: "$submissionStatsRaw",
+                    as: "s",
+                    in: {
+                      $cond: [{ $eq: ["$$s._id", "completed"] }, "$$s.count", 0],
+                    },
+                  },
+                },
+              },
+
+              approved: {
+                $sum: {
+                  $map: {
+                    input: "$submissionStatsRaw",
+                    as: "s",
+                    in: {
+                      $cond: [{ $eq: ["$$s._id", "approved"] }, "$$s.count", 0],
+                    },
+                  },
+                },
+              },
+
+              rejected: {
+                $sum: {
+                  $map: {
+                    input: "$submissionStatsRaw",
+                    as: "s",
+                    in: {
+                      $cond: [{ $eq: ["$$s._id", "rejected"] }, "$$s.count", 0],
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+
+        // Clean up
+        {
+          $project: {
+            submissionStatsRaw: 0,
+            "createdBy.password": 0,
+          },
+        },
+
+        // Pagination
+        {
+          $facet: {
+            data: [
+              { $sort: { createdAt: -1 } },
+              { $skip: skip },
+              { $limit: pageSize },
+            ],
+            metadata: [{ $count: "total" }],
+          },
+        },
       ]);
 
-      // Get submission counts for each task
-      const tasksWithStats = await Promise.all(
-        tasks.map(async (task) => {
-          const submissionStats = await MicroTaskSubmission.aggregate([
-            { $match: { taskId: task._id } },
-            {
-              $group: {
-                _id: "$status",
-                count: { $sum: 1 }
-              }
-            }
-          ]);
-
-          const stats = {
-            total: 0,
-            in_progress: 0,
-            completed: 0,
-            under_review: 0,
-            approved: 0,
-            rejected: 0
-          };
-
-          submissionStats.forEach(stat => {
-            stats[stat._id] = stat.count;
-            stats.total += stat.count;
-          });
-
-          return {
-            ...task.toJSON(),
-            submissionStats: stats
-          };
-        })
-      );
+    const tasks = result[0].data;
+    const total = result[0].metadata[0]?.total || 0;
 
       return {
-        tasks: tasksWithStats,
+        tasks,
         pagination: {
           current_page: parseInt(page),
           per_page: parseInt(limit),
@@ -143,11 +244,23 @@ class MicroTaskService {
         search
       } = query;
 
+      console.log({
+       page,
+        limit,
+        status,
+        category,
+        createdBy,
+        search
+      })
+
+
       let filter = {
           status: { $in: ['pending', 'ongoing', 'approved', 'processing', 'active', 'paused', 'completed', 'cancelled'] }
       };
 
       if(userId) filter.applicant = userId;
+      if(createdBy) filter.createdBy = createdBy;
+
       if(status && status.trim()) filter.status = status;
       if(category && category.trim()) filter["task.category"] = category;
 
@@ -155,6 +268,8 @@ class MicroTaskService {
         filter.$or = [
           { "task.taskTitle": { $regex: search, $options: 'i' } },
           { "task.category": { $regex: search, $options: 'i' } },
+          { "applicant.name": { $regex: search, $options: 'i' } },
+          { "applicant.email": { $regex: search, $options: 'i' } },
         ]; 
       }
 
@@ -162,30 +277,95 @@ class MicroTaskService {
       if(category === "all") delete filter["task.category"];
 
 
-      const skip = (page - 1) * limit;
+      const pageNumber = parseInt(page) || 1;
+      const pageSize = parseInt(limit) || 10;
+      const skip = (pageNumber - 1) * pageSize;
 
-      const [tasks, total] = await Promise.all([
-          TaskApplication.find(filter)
-        .populate("task", "taskTitle category description currency payRate totalImagesRequired")
-        .populate("applicant", "fullName email")
-        .populate("assignedBy", "fullName email")
-        .populate("assignedBy", "fullName email")
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(parseInt(limit)),
-          TaskApplication.countDocuments(filter)
-        ]);
+      const result = await TaskApplication.aggregate([
+        {
+          $match: {
+            ...(userId && { applicant: new mongoose.Types.ObjectId(userId) }),
+            ...(createdBy && { createdBy: new mongoose.Types.ObjectId(createdBy) }),
+            ...(status && status !== "all" && { status }),
+          },
+        },
+
+        // Join task
+        {
+          $lookup: {
+            from: "tasks",
+            localField: "task",
+            foreignField: "_id",
+            as: "task",
+          },
+        },
+        { $unwind: "$task" },
+
+        // Join applicant
+        {
+          $lookup: {
+            from: "dtusers",
+            localField: "applicant",
+            foreignField: "_id",
+            as: "applicant",
+          },
+        },
+        { $unwind: "$applicant" },
+
+        // Filtering AFTER joins
+        {
+          $match: {
+            ...(category && category !== "all" && { "task.category": category }),
+            ...(search && {
+              $or: [
+                { "task.taskTitle": { $regex: search, $options: "i" } },
+                { "task.category": { $regex: search, $options: "i" } },
+                { "applicant.fullName": { $regex: search, $options: "i" } },
+                { "applicant.email": { $regex: search, $options: "i" } },
+              ],
+            }),
+          },
+        },
+
+        {
+          $facet: {
+            data: [
+              { $sort: { createdAt: -1 } },
+              { $skip: skip },
+              { $limit: pageSize },
+            ],
+            metadata: [
+              { $count: "total" }
+            ],
+          },
+        },
+      ]);
+
+      const tasks = result[0].data;
+      const total = result[0].metadata[0]?.total || 0;
 
       return {
         tasks,
         pagination: {
-          current_page: parseInt(page),
-          per_page: parseInt(limit),
+          current_page: pageNumber,
+          per_page: pageSize,
           total_items: total,
-          total_pages: Math.ceil(total / limit)
-        }
+          total_pages: Math.ceil(total / pageSize),
+        },
       };
   } 
+
+
+  async getTaskApplicationForUser(taskId, userId){
+      const taskApplication = await TaskApplication.findOne({
+        task: taskId,
+        applicant: userId,
+      })
+      .populate('task', 'taskTitle category description currency payRate totalImagesRequired')
+      .populate('applicant', 'fullName email')
+      .populate('images', 'url publicId label');
+      return taskApplication || null;
+  }
 
   /**
    * Get micro task by ID with slots and submission stats
@@ -270,26 +450,27 @@ class MicroTaskService {
    */
   async deleteMicroTask(taskId) {
     try {
-      const task = await Task.findById(taskId);
-      if (!task) {
-        throw new Error("Micro task not found");
-      }
+  
+    const task = await Task.findById(taskId);
+    if (!task) throw new Error("Micro task not found");
 
-      // Get all submissions for this task
-      const submissions = await MicroTaskSubmission.find({ taskId });
-      const submissionIds = submissions.map(sub => sub._id);
+    // Find all applications for this task
+    const applications = await TaskApplication.find({ task: taskId });
 
-      // Delete in order: images, submissions, slots, task
-      await Promise.all([
-        SubmissionImage.deleteMany({ submissionId: { $in: submissionIds } }),
-        MicroTaskSubmission.deleteMany({ taskId }),
-        TaskSlot.deleteMany({ taskId }),
-        Task.findByIdAndDelete(taskId)
-      ]);
-      return {
-        success: true,
-        message: "Micro task and all associated data deleted successfully"
-      };
+    // Delete each application individually so the pre-middleware fires
+    // (this handles Cloudinary cleanup + task_image_upload deletion)
+    await Promise.all(
+      applications.map((app) =>
+        TaskApplication.findOneAndDelete({ _id: app._id })
+      )
+    );
+
+    await Task.findByIdAndDelete(taskId);
+
+    return {
+      success: true,
+      message: "Micro task and all associated data deleted successfully",
+    };
 
     } catch (error) {
       throw new Error(`Error deleting micro task: ${error.message}`);

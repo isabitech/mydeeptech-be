@@ -215,6 +215,47 @@ class ProjectMailService extends BaseMailService {
         });
     }
 
+    static async sendTaskApplicationRejectionNotification(recipientEmail, recipientName, taskData) {
+        
+        let htmlTemplate = this.getMailTemplate('sendTaskApplicationRejectionNotification');
+        
+        const message = `
+            Task Application Update
+            
+            Thank you for your interest in our task. After careful review, we regret to inform you that your application was not approved at this time.
+            
+            Task: ${taskData.taskTitle}
+            Category: ${taskData.category || 'General'}
+            ${taskData.rejectionReason ? `Reason: ${taskData.rejectionReason}` : ''}
+        `;
+
+        // Build rejection reason section conditionally
+        const rejectionReasonSection = taskData.rejectionReason ? 
+            `<section class="reason-section" aria-labelledby="reason-heading">
+                <h2 id="reason-heading" class="visually-hidden">Rejection Reason</h2>
+                <div class="detail-row">
+                    <span class="label">Reason:</span> ${taskData.rejectionReason}
+                </div>
+            </section>` : '';
+
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{applicantName}}', recipientName);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{taskTitle}}', taskData.taskTitle);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{category}}', taskData.category || 'General');
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{rejectionReasonSection}}', rejectionReasonSection);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{adminName}}', taskData.adminName || 'Admin Team');
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{supportEmail}}', envConfig.email.senders.support.email);
+
+        return await this.sendMail({
+            recipientEmail,
+            recipientName,
+            subject: 'Task Application Update - MyDeepTech',
+            message,
+            htmlTemplate,
+            senderEmail: envConfig.email.senders.projects.email,
+            senderName: envConfig.email.senders.projects.name
+        });
+    }
+
 }
 
 module.exports = ProjectMailService;

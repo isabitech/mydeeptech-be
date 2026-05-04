@@ -125,6 +125,7 @@ router.post("/apply",
   microTaskController.applyForTask
 );
 
+
 router.post("/approve_or_reject_application",
   authenticateToken,
   microTaskController.approveOrRejectApplication
@@ -136,7 +137,6 @@ router.get("/statistics",
   requireRole("admin", "super_admin", "QA_REVIEWER"), 
   microTaskController.getTaskStatistics
 );
-
 
 
 // User routes - Get Task details for a specific application
@@ -182,6 +182,12 @@ router.get("/:taskId/slots",
   requireRole("admin", "super_admin", "QA_REVIEWER"),
   taskIdValidation, 
   microTaskController.getTaskSlots
+);
+
+router.get("/:taskId/application", 
+  authenticateToken, 
+  taskIdValidation, 
+  microTaskController.getTaskApplicationForUser
 );
 
 router.post("/:taskId/duplicate",

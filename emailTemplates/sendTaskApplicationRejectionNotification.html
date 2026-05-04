@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Application Rejected</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.6;
+            background-color: #f4f7fa;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #333333 0%, #F6921E 100%);
+            color: white;
+            text-align: center;
+            padding: 30px 20px;
+        }
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .message {
+            font-size: 16px;
+            margin-bottom: 25px;
+        }
+        .task-details {
+            background-color: #fff8f0;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #F6921E;
+            margin: 25px 0;
+        }
+        .detail-row {
+            margin-bottom: 10px;
+        }
+        .label {
+            font-weight: 600;
+            color: #333333;
+        }
+        .reason-section {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 25px 0;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            text-align: center;
+            padding: 20px;
+            border-top: 1px solid #e9ecef;
+            font-size: 14px;
+            color: #6c757d;
+        }
+        .brand {
+            color: #F6921E;
+            font-weight: 600;
+        }
+        .cta-section {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .cta-button {
+            display: inline-block;
+            background-color: #F6921E;
+            color: white !important;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: 600;
+            margin-top: 15px;
+        }
+        .cta-button:hover {
+            background-color: #d67c17;
+        }
+        .visually-hidden {
+            position: absolute !important;
+            left: -9999px !important;
+            width: 1px !important;
+            height: 1px !important;
+            overflow: hidden !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>Task Application Update</h1>
+        </header>
+
+        <main class="content" role="main">
+            <section class="message-section">
+                <p class="message">Hello {{applicantName}},</p>
+            
+                <p class="message">Thank you for your interest in our task. After careful review, we regret to inform you that your application was not approved at this time.</p>
+            </section>
+
+            <section class="task-details" aria-labelledby="task-info-heading">
+                <h2 id="task-info-heading" class="visually-hidden">Task Information</h2>
+                <div class="detail-row">
+                    <span class="label">Task:</span> {{taskTitle}}
+                </div>
+                <div class="detail-row">
+                    <span class="label">Category:</span> {{category}}
+                </div>
+            </section>
+
+            <section class="rejection-reason-container">
+                {{rejectionReasonSection}}
+            </section>
+
+            <section class="message-section">
+                <p class="message">We appreciate your interest and encourage you to apply for other available tasks that match your skills and interests.</p>
+                
+                <p class="message">If you have any questions or would like feedback on your application, please feel free to reach out to our support team at {{supportEmail}}.</p>
+            </section>
+
+            <section class="cta-section">
+                <p>Explore more opportunities:</p>
+                <a href="#" class="cta-button">View Available Tasks</a>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <p>Thank you for being part of the <span class="brand">MyDeepTech</span> community!</p>
+            <p>Best regards,<br>The {{adminName}} Team</p>
+        </footer>
+    </div>
+</body>
+</html>

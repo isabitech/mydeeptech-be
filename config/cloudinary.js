@@ -211,7 +211,7 @@ const resultFileUpload = multer({
 });
 
 
-const VALID_LABELS = ['Front', 'Right', 'Left', 'Bottom'];
+const VALID_LABELS = ['View 1', 'View 2', 'View 3', 'View 4'];
 const uploadMicroTaskImages = multer({
    storage: imageStorage,
      limits: {

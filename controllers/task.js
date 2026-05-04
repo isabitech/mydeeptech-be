@@ -73,30 +73,113 @@ const getTask = async (req, res) => {
 
 const getAllTasks = async (req, res) => {
 
-    const { status, page = 1, limit = 20 } = req.query;
+  const { status, page = 1, limit = 20, search, category } = req.query;
 
-    const filter = {};
-    if (status !== undefined) filter.isActive = status === 'active';
+  const filter = {};
 
-    const tasks = await Task.find(filter)
-        .populate('createdBy', 'fullName email')
-        .sort({ createdAt: -1 })
-        .skip((page - 1) * limit)
-        .limit(limit)
+  if (status && status !== "all") {
+    filter.isActive = status === "active";
+  }
 
-    const total = await Task.countDocuments(filter);
+  if (category && category !== "all") {
+    filter.category = category;
+  }
 
-    res.status(200).send({
-        success: true,
-        message: 'All Tasks fetched successfully',
-        data: tasks,
-        pagination: {
-            total,
-            page: Number(page),
-            limit: Number(limit),
-            totalPages: Math.ceil(total / limit),
+  if (search && search.trim()) {
+    filter.taskTitle = { $regex: search.trim(), $options: "i" };
+  }
+
+  const pageNumber = Number(page) || 1;
+    const pageSize = Number(limit) || 10;
+    const skip = (pageNumber - 1) * pageSize;
+
+    const result = await Task.aggregate([
+    // 🔹 Base filters
+    {
+        $match: {
+        ...(status && status !== "all" && {
+            isActive: status === "active",
+        }),
+        ...(category && category !== "all" && {
+            category,
+        }),
         },
-    });
+    },
+
+    // 🔹 Join createdBy
+    {
+        $lookup: {
+        from: "dtusers",
+        localField: "createdBy",
+        foreignField: "_id",
+        as: "createdBy",
+        },
+    },
+    { $unwind: "$createdBy" },
+
+    // 🔹 Search across task + user
+    {
+        $match: {
+        ...(search && search.trim() && {
+            $or: [
+            { taskTitle: { $regex: search.trim(), $options: "i" } },
+            { description: { $regex: search.trim(), $options: "i" } },
+            { "createdBy.fullName": { $regex: search.trim(), $options: "i" } },
+            { "createdBy.email": { $regex: search.trim(), $options: "i" } },
+            ],
+        }),
+        },
+    },
+
+    // 🔹 Remove sensitive fields
+    {
+        $project: {
+        taskTitle: 1,
+        description: 1,
+        category: 1,
+        status: 1,
+        isActive: 1,
+        createdAt: 1,
+        payRate: 1,
+        currency: 1,
+        dueDate: 1,
+        totalImagesRequired: 1,
+
+        "createdBy._id": 1,
+        "createdBy.fullName": 1,
+        "createdBy.email": 1,
+        },
+    },
+
+    // 🔥 Pagination + total count in ONE query
+    {
+        $facet: {
+        data: [
+            { $sort: { createdAt: -1 } },
+            { $skip: skip },
+            { $limit: pageSize },
+        ],
+        metadata: [
+            { $count: "total" }
+        ],
+        },
+    },
+    ]);
+
+    const tasks = result[0].data;
+    const total = result[0].metadata[0]?.total || 0;
+
+  res.status(200).send({
+    success: true,
+    message: "All Tasks fetched successfully",
+    data: tasks,
+    pagination: {
+      total,
+      page: Number(page),
+      limit: Number(limit),
+      totalPages: Math.ceil(total / limit),
+    },
+  });
 };
 
 const assignTaskToUsers = async (req, res) => {
@@ -272,21 +355,17 @@ const getMyTasks = async (req, res) => {
 };
 
 const getSingleTask = async (req, res) => {
- const { applicationId } = req.params;
-        const { userId } = req.user;
-    
-        const taskAssignment = await TaskApplication.findOne({
-            _id: applicationId,
-            applicant: userId,
-        })
-            .populate('task', 'taskTitle description dueDate createdBy payRate currency category')
-            .populate('assignedBy', 'fullName email')
-            .populate('applicant', 'fullName email');
 
-        if (!taskAssignment) {
+        const { taskId } = req.params;
+        const { userId } = req.user;
+
+        const task = await Task.findById(taskId)
+        .populate('createdBy', 'fullName email')
+
+        if (!task) {
             return res.status(404).json({
                 success: false,
-                message: 'Task assignment not found',
+                message: 'Task not found',
                 data: null,
             });
         }
@@ -294,9 +373,11 @@ const getSingleTask = async (req, res) => {
         res.status(200).json({
             success: true,
             message: 'Task fetched successfully',
-            data: taskAssignment,
+            data: task,
         });
 };
+
+
 const updateTask = async (req, res) => {
 
         const { taskId } = req.params;

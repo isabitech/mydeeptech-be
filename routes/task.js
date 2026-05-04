@@ -21,7 +21,7 @@ router.get("/getTask/:taskId",
   taskController.getTask
 );
 
-router.get("/getSingleTask/:applicationId",
+router.get("/getSingleTask/:taskId",
   authenticateToken,
   taskController.getSingleTask
 );

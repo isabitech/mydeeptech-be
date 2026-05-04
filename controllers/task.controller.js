@@ -1,10 +1,14 @@
 const TaskSubmission = require("../models/task-submission.model");
+const TaskImageUpload = require("../models/imageUpload.model");
 const Task = require("../models/task.model");
 const TaskApplication = require("../models/taskApplication.model");
 const microTaskService = require("../services/microTask.service");
 const { validationResult } = require("express-validator");
+const cloudinary = require('cloudinary').v2;
+const ProjectMailService = require('../services/mail-service/project.service');
 
-const VALID_LABELS = ['Front', 'Right', 'Left', 'Bottom'];
+
+const VALID_LABELS = ['View 1', 'View 2', 'View 3', 'View 4'];
 const REQUIRED_PER_LABEL = 4;
 const TOTAL_REQUIRED = 20;
 
@@ -51,6 +55,7 @@ class MicroTaskController {
    */
   async getAllMicroTasks(req, res) {
     const { userId } = req.user || {};
+    console.log("Fetching all micro tasks with filters:", req.query, "for user:", userId);
      const tasks = await microTaskService.getAllMicroTasks(req.query, userId);
       res.status(200).json({
         success: true,
@@ -64,7 +69,7 @@ class MicroTaskController {
    */
   async getTasksByFilters(req, res) {
    
-    const userId = req.user && req.user.role === "user" ? req.user.userId : null;
+    const userId = req.user && req.user?.userDoc?.role === "user" ? req.user?.userId : null;
   
     const tasks = await microTaskService.getTasksByFilters(req.query, userId);
       res.status(200).json({
@@ -141,7 +146,6 @@ class MicroTaskController {
               applicant: userId,
               assignedBy: null,
               dueDate: task.dueDate,
-              status: 'pending',
           });
   
           const savedAssignment = await newAssignment.save();
@@ -161,53 +165,81 @@ class MicroTaskController {
   };
 
   async approveOrRejectApplication(req, res) {
-    const { userId } = req.user || {};
-    const { applicationId, action } = req.body;
+    try {
+      const { userId } = req.user || {};
+      const { applicationId, action, rejectionReason } = req.body;
 
-    if (!applicationId || !action) {
-        return res.status(400).json({
-            success: false,
-            message: 'AApplicationId and Action are required.',
-        });
+      if (!applicationId || !action) {
+          return res.status(400).json({
+              success: false,
+              message: 'ApplicationId and Action are required.',
+          });
+      }
+
+      if (!['approve', 'reject'].includes(action)) {
+          return res.status(400).json({
+              success: false,
+              message: 'Invalid action!',
+          });
+      }
+
+      // Populate both task and applicant to get email information
+      const application = await TaskApplication.findById(applicationId)
+        .populate('task', 'taskTitle category')
+        .populate('applicant', 'fullName email');
+
+      if (!application) {
+          return res.status(404).json({
+              success: false,
+              message: 'Application not found.',
+          });
+      }
+
+
+      if (action === 'approve') {
+          application.status = 'approved';
+          application.approvedBy = userId;
+      } else {
+          application.status = 'rejected';
+          
+          // Send rejection email notification
+          if (application.applicant && application.applicant.email) {
+            try {
+              const taskData = {
+                taskTitle: application.task?.taskTitle || 'Untitled Task',
+                category: application.task?.category || 'General',
+                rejectionReason: rejectionReason || '',
+                adminName: 'MyDeepTech Admin'
+              };
+
+              await ProjectMailService.sendTaskApplicationRejectionNotification(
+                application.applicant.email,
+                application.applicant.fullName || 'User',
+                taskData
+              );
+              
+              console.log(`Rejection email sent to ${application.applicant.email} for task application ${applicationId}`);
+            } catch (emailError) {
+              console.error('Failed to send rejection email:', emailError);
+              // Don't fail the entire operation if email fails
+            }
+          }
+      }
+
+      await application.save();
+
+      return res.status(200).json({
+          success: true,
+          message: `Application ${action}d successfully.`,
+          data: application,
+      });
+    } catch (error) {
+      console.error('Error in approveOrRejectApplication:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to process application.',
+      });
     }
-
-    if (!['approve', 'reject'].includes(action)) {
-        return res.status(400).json({
-            success: false,
-            message: 'Invalid action!',
-        });
-    }
-
-    const application = await TaskApplication.findById(applicationId).populate('task');
-
-    if (!application) {
-        return res.status(404).json({
-            success: false,
-            message: 'Application not found.',
-        });
-    }
-
-    if (application.status !== 'pending') {
-        return res.status(400).json({
-            success: false,
-            message: `Cannot ${action} an application that is not pending.`,
-        });
-    }
-
-    if (action === 'approve') {
-        application.status = 'approved';
-        application.approvedBy = userId;
-    } else {
-        application.status = 'rejected';
-    }
-
-    await application.save();
-
-    return res.status(200).json({
-        success: true,
-        message: `Application ${action}d successfully.`,
-        data: application,
-    });
   } 
 
   /**
@@ -231,6 +263,20 @@ class MicroTaskController {
         message: error.message || "Micro task not found"
       });
     }
+  }
+
+  /**
+   * Get micro task by ID
+   */
+  async getTaskApplicationForUser(req, res) {
+    const { taskId } = req.params;
+      const { userId } = req.user || {};
+      const taskApplication = await microTaskService.getTaskApplicationForUser(taskId, userId);
+      res.status(200).json({
+        success: true,
+        message: "Micro task retrieved successfully",
+        data: taskApplication
+      });
   }
 
   /**
@@ -452,19 +498,12 @@ class MicroTaskController {
  */
 async uploadTaskImages(req, res) {
         const { userId } = req.user || {};
-        const { assignmentId, taskId } = req.body;
+        const { taskId } = req.body;
         const rawFiles = req.files;
         const uploadedFiles = Array.isArray(rawFiles)
             ? rawFiles
             : Object.values(rawFiles || {}).flat();
-
-        if (!assignmentId) {
-            return res.status(400).json({
-                success: false,
-                message: 'assignmentId is required.',
-            });
-        }
-
+ 
         if (!taskId) {
             return res.status(400).json({
                 success: false,
@@ -479,30 +518,12 @@ async uploadTaskImages(req, res) {
             });
         }
 
-        const assignment = await TaskApplication.findOne({
-            _id: assignmentId,
-            applicant: userId,
-        }).populate('task', 'taskTitle category');
+        const task = await Task.findById(taskId);
 
-
-        if (!assignment) {
+        if (!task) {
             return res.status(404).json({
                 success: false,
-                message: 'Assignment not found or does not belong to you.',
-            });
-        }
-
-        if (['Submitted', 'Approved'].includes(assignment.status)) {
-            return res.status(400).json({
-                success: false,
-                message: `This assignment has already been ${assignment.status.toLowerCase()} and cannot be modified.`,
-            });
-        }
-
-        if (new Date() > new Date(assignment.dueDate)) {
-            return res.status(400).json({
-                success: false,
-                message: 'The due date for this assignment has passed.',
+                message: 'Task not found',
             });
         }
 
@@ -517,17 +538,18 @@ async uploadTaskImages(req, res) {
             });
         }
 
-        let submission = await TaskSubmission.findOne({ assignment: assignmentId });
+        let taskSubmission = await TaskApplication.findOne({ task: taskId });
 
-        if (!submission) {
-            submission = new TaskSubmission({
-                assignment: assignmentId,
-                submittedBy: userId,
+        if (!taskSubmission && task.status.toLowerCase() === "pending") {
+            taskSubmission = new TaskApplication({
+                task: taskId,
+                applicant: userId,
                 images: [],
+                dueDate: task.dueDate,
             });
         }
 
-        if (submission.isComplete) {
+        if (taskSubmission.isComplete) {
             return res.status(400).json({
                 success: false,
                 message: 'All 20 images have already been uploaded for this task.',
@@ -536,7 +558,7 @@ async uploadTaskImages(req, res) {
 
         // Check per-label capacity before inserting
         const errors = [];
-        const currentCounts = { ...submission.uploadProgress };
+        const currentCounts = { ...taskSubmission.uploadProgress };
 
         for (const file of uploadedFiles) {
             const label = file.fieldname;
@@ -565,51 +587,51 @@ async uploadTaskImages(req, res) {
         }
 
         // Check total capacity 
-        const projectedTotal = submission.images.length + uploadedFiles.length;
+        const projectedTotal = taskSubmission.images.length + uploadedFiles.length;
         if (projectedTotal > TOTAL_REQUIRED) {
             return res.status(400).json({
                 success: false,
-                message: `Upload would exceed the total image limit of ${TOTAL_REQUIRED}. You currently have ${submission.images.length} and are trying to add ${uploadedFiles.length}.`,
+                message: `Upload would exceed the total image limit of ${TOTAL_REQUIRED}. You currently have ${taskSubmission.images.length} and are trying to add ${uploadedFiles.length}.`,
             });
         }
 
         //  Map uploaded files to image sub-documents 
         // Assumes multer-storage-cloudinary or similar attaches .path & .filename
-        const newImages = uploadedFiles.map((file) => ({
-            url: file.path, 
-            label: file.fieldname, 
+        const imageIds = [];
+        for (const file of uploadedFiles) {
+          const image = await TaskImageUpload.create({
+            url: file.path,
             publicId: file.filename,
-        }));
-
-        submission.images.push(...newImages);
-
-       if (!submission.task) {
-          submission.task = taskId;
+            label: file.fieldname,
+          });
+          imageIds.push(image._id);
         }
 
-        await submission.save();
+        taskSubmission.images.push(...imageIds);
+        taskSubmission.task = taskSubmission.task || taskId;
 
-          // Sync assignment status
-        if (submission.isComplete) {
-            assignment.status = 'Submitted';
-            assignment.submittedAt = new Date();
-        } else if (assignment.status === 'Pending') {
-            // First upload moves assignment to In Progress
-            assignment.status = 'In Progress';
+        await taskSubmission.save();
+
+         // Sync assignment status
+        if (taskSubmission.isComplete) {
+          taskSubmission.status = "completed";
+          taskSubmission.submittedAt = new Date();
+        } else if (taskSubmission.status === "pending") {
+          taskSubmission.status = "processing";
         }
 
         // Respond with progress
         return res.status(200).json({
             success: true,
-            message: submission.isComplete
+            message: taskSubmission.isComplete
                 ? 'All images uploaded successfully. Task submitted for review!'
                 : `${uploadedFiles.length} image(s) uploaded. Keep going!`,
             data: {
-                submissionId: submission._id,
-                assignmentStatus: assignment.status,
-                isComplete: submission.isComplete,
-                uploadProgress: submission.uploadProgress,
-                remaining: buildRemainingBreakdown(submission.uploadProgress),
+                submissionId: taskSubmission._id,
+                assignmentStatus: taskSubmission.status,
+                isComplete: taskSubmission.isComplete,
+                uploadProgress: taskSubmission.uploadProgress,
+                remaining: buildRemainingBreakdown(taskSubmission.uploadProgress),
             },
         });
 
@@ -623,11 +645,12 @@ async uploadTaskImages(req, res) {
     const { submissionId } = req.params;
     const { userId } = req.user || {};
 
-    const submission = await TaskSubmission.findOne({ assignment: submissionId, submittedBy: userId })
+    const taskSubmission = await TaskSubmission.findOne({ assignment: submissionId, submittedBy: userId })
     .populate('assignment')
+    .populate('images', 'url publicId label')
     .populate('task', 'taskTitle category');
 
-    if (!submission) {
+    if (!taskSubmission) {
       return res.status(404).json({
         success: false,
         message: "Submission not found",
@@ -635,11 +658,11 @@ async uploadTaskImages(req, res) {
       });
     }
 
-    const progress = submission.uploadProgress || {};
+    const progress = taskSubmission.uploadProgress || {};
     
     const submissionResponse = {
-      ...submission.toObject(),
-      totalImages: submission.images?.length || 0,
+      ...taskSubmission.toObject(),
+      totalImages: taskSubmission.images?.length || 0,
       progress,
       remaining: buildRemainingBreakdown(progress),
     };
@@ -651,8 +674,8 @@ async uploadTaskImages(req, res) {
       });
   }
 
-
-  async getTaskSubmissionByIdAndDeleteImage(req, res) {
+// deleteTaskImage
+  async deleteTaskImage(req, res) {
 
       const { submissionId } = req.params;
       const { userId } = req.user || {};
@@ -675,9 +698,11 @@ async uploadTaskImages(req, res) {
       }
 
       const assignment = await TaskApplication.findOne({
-          _id: submissionId,
+          task: submissionId,
           applicant: userId,
-      }).populate('task', 'taskTitle category');
+      })
+      .populate('task', 'taskTitle category')
+      .populate('images', 'url publicId label')
 
       if (!assignment) {
           return res.status(404).json({
@@ -687,7 +712,7 @@ async uploadTaskImages(req, res) {
           });
       }
 
-      if (['Submitted', 'Approved'].includes(assignment.status)) {
+      if (['submitted', 'approved'].includes(assignment.status)) {
           return res.status(400).json({
               success: false,
               message: `This assignment has already been ${assignment.status.toLowerCase()} and cannot be modified.`,
@@ -695,9 +720,10 @@ async uploadTaskImages(req, res) {
           });
       }
   
-      const submission = await TaskSubmission.findOne({ assignment: submissionId, submittedBy: userId });
+      const taskSubmission = await TaskSubmission.findOne({ assignment: submissionId, submittedBy: userId })
+          .populate('images', 'url publicId label');
   
-      if (!submission) {
+      if (!taskSubmission) {
         return res.status(404).json({
           success: false,
           message: "Submission not found",
@@ -705,7 +731,7 @@ async uploadTaskImages(req, res) {
         });
       }
   
-      const imageIndex = submission.images.findIndex(img => img.publicId === publicId);
+      const imageIndex = taskSubmission.images.findIndex(img => img.publicId === publicId);
       
       if (imageIndex === -1) {
         return res.status(404).json({
@@ -716,7 +742,6 @@ async uploadTaskImages(req, res) {
       }
   
       // Remove image from Cloudinary
-      const cloudinary = require('cloudinary').v2;
       try {
         await cloudinary.uploader.destroy(publicId);
       } catch (error) {
@@ -728,16 +753,16 @@ async uploadTaskImages(req, res) {
         });
       }
 
-      if(!submission.task){
-        submission.task = taskId;
+      if(!taskSubmission.task){
+        taskSubmission.task = taskId;
       }
   
       // Remove image from submission
-      submission.images.splice(imageIndex, 1);
-      await submission.save();
+      taskSubmission.images.splice(imageIndex, 1);
+      await taskSubmission.save();
 
       // Update assignment status if needed
-      if (submission.images.length === 0 && assignment.status === 'In Progress') {
+      if (taskSubmission.images.length === 0 && assignment.status === 'In Progress') {
         assignment.status = 'Pending';
         await assignment.save();
       }
@@ -746,15 +771,111 @@ async uploadTaskImages(req, res) {
           success: true,
           message: "Image deleted successfully",
           data: {
-            submissionId: submission._id,
+            submissionId: taskSubmission._id,
             assignmentStatus: assignment.status,
-            remainingImages: submission.images.length,
-            uploadProgress: submission.uploadProgress,
-            remaining: buildRemainingBreakdown(submission.uploadProgress),
-            task: submission.task || null,
+            remainingImages: taskSubmission.images.length,
+            uploadProgress: taskSubmission.uploadProgress,
+            remaining: buildRemainingBreakdown(taskSubmission.uploadProgress),
+            task: taskSubmission.task || null,
           },
         });
-    } 
+    }
+
+async getTaskSubmissionByIdAndDeleteImage(req, res) {
+
+  const { userId } = req.user || {};
+  const { publicId, imageId, taskApplicationId } = req.body;
+
+  // ── Validate request body
+  if (!publicId || !imageId) {
+    return res.status(400).json({
+      success: false,
+      message: "Image data required.",
+      data: null,
+    });
+  }
+
+  // ── Load the submission
+  const taskSubmission = await TaskApplication.findOne({
+    _id: taskApplicationId,
+    applicant: userId,
+  })
+    .populate("task", "taskTitle category")
+    .populate("images", "url publicId label");
+
+  if (!taskSubmission) {
+    return res.status(404).json({
+      success: false,
+      message: "Submission not found or does not belong to you.",
+      data: null,
+    });
+  }
+
+  // ── Guard: locked statuses
+  // const LOCKED_STATUSES = ["submitted", "approved", "completed"];
+  // if (LOCKED_STATUSES.includes(taskSubmission.status.toLowerCase())) {
+  //   return res.status(400).json({
+  //     success: false,
+  //     message: `This submission has already been ${taskSubmission.status} and cannot be modified.`,
+  //     data: null,
+  //   });
+  // }
+
+  // ── Find the image in the populated array 
+  const imageDoc = taskSubmission.images.find(
+    (img) => img._id.toString() === imageId && img.publicId === publicId
+  );
+
+  if (!imageDoc) {
+    return res.status(404).json({
+      success: false,
+      message: "Image not found in this submission.",
+      data: null,
+    });
+  }
+
+  // ── Delete from Cloudinary
+  try {
+    await cloudinary.uploader.destroy(publicId);
+  } catch (err) {
+    console.error("Cloudinary deletion error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete image from storage. No changes were made.",
+      data: null,
+    });
+  }
+
+  // ── Delete the ImageUpload document
+  await TaskImageUpload.findByIdAndDelete(imageDoc._id);
+
+  // ── Remove the ObjectId ref from the submission
+  taskSubmission.images = taskSubmission.images.filter((img) => img._id.toString() !== imageId);
+
+  // ── Sync status BEFORE saving
+  if (taskSubmission.images.length === 0 && taskSubmission.status === "processing") {
+    taskSubmission.status = "pending";
+  }
+
+  await taskSubmission.save();
+
+  // ── Re-fetch clean uploadProgress (virtuals need plain docs)
+  const refreshed = await TaskApplication.findById(taskApplicationId);
+
+  return res.status(200).json({
+    success: true,
+    message: "Image deleted successfully.",
+    data: {
+      taskApplicationId: taskSubmission._id,
+      assignmentStatus: refreshed.status,
+      isComplete: refreshed.isComplete,
+      remainingImages: refreshed.images.length,
+      uploadProgress: refreshed.uploadProgress,
+      remaining: buildRemainingBreakdown(refreshed.uploadProgress),
+    },
+  });
+}
+
 }
 
  function buildRemainingBreakdown(progress) {

@@ -8,7 +8,7 @@ const uploadedImageSchema = new mongoose.Schema({
     },
     label: {
         type: String,
-        enum: ['Front', 'Right', 'Left', 'Bottom'],
+        enum: ['View 1', 'View 2', 'View 3', 'View 4'],
         required: true,
     },
     uploadedAt: {
@@ -20,11 +20,9 @@ const uploadedImageSchema = new mongoose.Schema({
 }, { _id: true });
 
 const taskSubmissionSchema = new mongoose.Schema({
-    assignment: {
+    taskApplication: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'TaskApplication',
-        required: true,
-        unique: true, // One submission document per assignment
     },
     task:{
         type: mongoose.Schema.Types.ObjectId,
@@ -49,10 +47,10 @@ const taskSubmissionSchema = new mongoose.Schema({
     },
     // Derived progress counts — easy to query without aggregation
     uploadProgress: {
-        Front:  { type: Number, default: 0, max: 4 },
-        Right:  { type: Number, default: 0, max: 4 },
-        Left:   { type: Number, default: 0, max: 4 },
-        Bottom: { type: Number, default: 0, max: 4 },
+        'View 1':  { type: Number, default: 0, max: 4 },
+        'View 2':  { type: Number, default: 0, max: 4 },
+        'View 3':  { type: Number, default: 0, max: 4 },
+        'View 4': { type: Number, default: 0, max: 4 },
         total:  { type: Number, default: 0, max: 20 },
     },
     isComplete: {
@@ -63,7 +61,7 @@ const taskSubmissionSchema = new mongoose.Schema({
 
 // Auto-update uploadProgress whenever images array changes
 taskSubmissionSchema.pre('save', function (next) {
-    const counts = { Front: 0, Right: 0, Left: 0, Bottom: 0 };
+    const counts = { 'View 1': 0, 'View 2': 0, 'View 3': 0, 'View 4': 0 };
     this.images.forEach(img => {
         if (counts[img.label] !== undefined) counts[img.label]++;
     });
