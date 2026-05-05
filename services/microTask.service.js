@@ -42,19 +42,19 @@ class MicroTaskService {
    */
   async getAllMicroTasks(query, userId) {
     try {
+
       const {
         page = 1,
         limit = 10,
         status,
         category,
         createdBy,
-        search
+        search,
       } = query;
 
     const pageNumber = parseInt(page) || 1;
     const pageSize = parseInt(limit) || 10;
     const skip = (pageNumber - 1) * pageSize;
-
 
     let matchStage = {};
 
@@ -241,18 +241,18 @@ class MicroTaskService {
         status,
         category,
         createdBy,
-        search
+        search,
       } = query;
 
       console.log({
-       page,
+        page,
         limit,
         status,
         category,
         createdBy,
-        search
-      })
-
+        search,
+        userId,
+      });
 
       let filter = {
           status: { $in: ['pending', 'ongoing', 'approved', 'processing', 'active', 'paused', 'completed', 'cancelled'] }
@@ -268,14 +268,13 @@ class MicroTaskService {
         filter.$or = [
           { "task.taskTitle": { $regex: search, $options: 'i' } },
           { "task.category": { $regex: search, $options: 'i' } },
-          { "applicant.name": { $regex: search, $options: 'i' } },
+          { "applicant.fullName": { $regex: search, $options: 'i' } },
           { "applicant.email": { $regex: search, $options: 'i' } },
         ]; 
       }
 
       if(status === "all")  delete filter.status;
       if(category === "all") delete filter["task.category"];
-
 
       const pageNumber = parseInt(page) || 1;
       const pageSize = parseInt(limit) || 10;

@@ -496,146 +496,170 @@ class MicroTaskController {
  * POST /api/task-submissions/upload
  * User uploads images for an assigned task (supports incremental uploads)
  */
-async uploadTaskImages(req, res) {
-        const { userId } = req.user || {};
-        const { taskId } = req.body;
-        const rawFiles = req.files;
-        const uploadedFiles = Array.isArray(rawFiles)
-            ? rawFiles
-            : Object.values(rawFiles || {}).flat();
- 
-        if (!taskId) {
-            return res.status(400).json({
-                success: false,
-                message: 'Task ID is required.',
-            });
-        }
 
-       if (!uploadedFiles || uploadedFiles.length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'No files were uploaded.',
-            });
-        }
+  async uploadTaskImages(req, res) {
+    const { userId } = req.user || {};
+    const { taskId } = req.body;
+    const rawFiles = req.files;
+    const uploadedFiles = Array.isArray(rawFiles)
+      ? rawFiles
+      : Object.values(rawFiles || {}).flat();
 
-        const task = await Task.findById(taskId);
+    if (!taskId) {
+      return res.status(400).json({
+        success: false,
+        message: "Task ID is required.",
+      });
+    }
 
-        if (!task) {
-            return res.status(404).json({
-                success: false,
-                message: 'Task not found',
-            });
-        }
+    if (!uploadedFiles || uploadedFiles.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No files were uploaded.",
+      });
+    }
 
-        const invalidFiles = uploadedFiles.filter(
-            (file) => !VALID_LABELS.includes(file.fieldname)
+    const task = await Task.findById(taskId);
+
+    if (!task) {
+      return res.status(404).json({
+        success: false,
+        message: "Task not found",
+      });
+    }
+
+    const invalidFiles = uploadedFiles.filter(
+      (file) => !VALID_LABELS.includes(file.fieldname)
+    );
+
+    if (invalidFiles.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid image label(s): ${[
+          ...new Set(invalidFiles.map((f) => f.fieldname)),
+        ].join(", ")}. Must be one of: ${VALID_LABELS.join(", ")}.`,
+      });
+    }
+
+    let taskSubmission = await TaskApplication.findOne({ task: taskId });
+
+    if (!taskSubmission && task.status.toLowerCase() === "pending") {
+      taskSubmission = new TaskApplication({
+        task: taskId,
+        applicant: userId,
+        images: [],
+        dueDate: task.dueDate,
+      });
+    }
+
+    if (taskSubmission.isComplete) {
+      return res.status(400).json({
+        success: false,
+        message: "All 20 images have already been uploaded for this task.",
+      });
+    }
+
+    // Check per-label capacity before inserting
+    const errors = [];
+    const currentCounts = { ...taskSubmission.uploadProgress };
+
+    for (const file of uploadedFiles) {
+      const label = file.fieldname;
+      const currentForLabel = currentCounts[label] || 0;
+      const incomingForLabel = uploadedFiles.filter(
+        (f) => f.fieldname === label
+      ).length;
+      const projectedCount = currentForLabel + incomingForLabel;
+
+      if (projectedCount > REQUIRED_PER_LABEL) {
+        errors.push(
+          `"${label}" already has ${currentForLabel}/${REQUIRED_PER_LABEL} images. ` +
+            `You are trying to add ${incomingForLabel} more, which exceeds the limit.`
         );
+      }
+    }
 
-        if (invalidFiles.length > 0) {
-            return res.status(400).json({
-                success: false,
-                message: `Invalid image label(s): ${[...new Set(invalidFiles.map(f => f.fieldname))].join(', ')}. Must be one of: ${VALID_LABELS.join(', ')}.`,
-            });
-        }
+    const uniqueErrors = [...new Set(errors)];
+    if (uniqueErrors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Upload exceeds allowed image count for one or more labels.",
+        details: uniqueErrors,
+      });
+    }
 
-        let taskSubmission = await TaskApplication.findOne({ task: taskId });
+    const projectedTotal = taskSubmission.images.length + uploadedFiles.length;
+    if (projectedTotal > TOTAL_REQUIRED) {
+      return res.status(400).json({
+        success: false,
+        message: `Upload would exceed the total image limit of ${TOTAL_REQUIRED}. You currently have ${taskSubmission.images.length} and are trying to add ${uploadedFiles.length}.`,
+      });
+    }
 
-        if (!taskSubmission && task.status.toLowerCase() === "pending") {
-            taskSubmission = new TaskApplication({
-                task: taskId,
-                applicant: userId,
-                images: [],
-                dueDate: task.dueDate,
-            });
-        }
+    // ── Map uploaded files to image sub-documents with metadata
+    const imageIds = [];
 
-        if (taskSubmission.isComplete) {
-            return res.status(400).json({
-                success: false,
-                message: 'All 20 images have already been uploaded for this task.',
-            });
-        }
+    for (const [index, file] of uploadedFiles.entries()) {
 
-        // Check per-label capacity before inserting
-        const errors = [];
-        const currentCounts = { ...taskSubmission.uploadProgress };
+      // ── Resolution: Cloudinary storage attaches width/height directly
+      // If using memoryStorage instead, swap this block for sharp(file.buffer)
+      const resolution = {
+        width: file.width ?? null,
+        height: file.height ?? null,
+      };
 
-        for (const file of uploadedFiles) {
-            const label = file.fieldname;
-            const currentForLabel = currentCounts[label] || 0;
+      const metadata = {
+        angle: file.fieldname,                                      // e.g. "View 1"
+        taskCategory: task.category ?? null,                        // from Task model
+        imageSequence: taskSubmission.images.length + index + 1,   // global sequence
+        uploadTimestamp: new Date(),
+        fileSize: file.size,                                        // bytes
+        fileName: file.originalname,
+        fileType: file.mimetype,                                    // e.g. "image/jpeg"
+        resolution,
+        fileUrl: file.path,                                         // cloudinary URL
+        publicId: file.filename,                                    // cloudinary public ID
+      };
 
-            // Count how many of this label are in the current batch too
-            const incomingForLabel = uploadedFiles.filter(f => f.fieldname === label).length;
-            const projectedCount = currentForLabel + incomingForLabel;
+      const image = await TaskImageUpload.create({
+        url: file.path,
+        publicId: file.filename,
+        label: file.fieldname,
+        metadata,
+      });
 
-            if (projectedCount > REQUIRED_PER_LABEL) {
-                errors.push(
-                    `"${label}" already has ${currentForLabel}/${REQUIRED_PER_LABEL} images. ` +
-                    `You are trying to add ${incomingForLabel} more, which exceeds the limit.`
-                );
-            }
-        }
+      imageIds.push(image._id);
+    }
 
-        // Deduplicate error messages per label
-        const uniqueErrors = [...new Set(errors)];
-        if (uniqueErrors.length > 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'Upload exceeds allowed image count for one or more labels.',
-                details: uniqueErrors,
-            });
-        }
+    taskSubmission.images.push(...imageIds);
+    taskSubmission.task = taskSubmission.task || taskId;
 
-        // Check total capacity 
-        const projectedTotal = taskSubmission.images.length + uploadedFiles.length;
-        if (projectedTotal > TOTAL_REQUIRED) {
-            return res.status(400).json({
-                success: false,
-                message: `Upload would exceed the total image limit of ${TOTAL_REQUIRED}. You currently have ${taskSubmission.images.length} and are trying to add ${uploadedFiles.length}.`,
-            });
-        }
+    await taskSubmission.save();
 
-        //  Map uploaded files to image sub-documents 
-        // Assumes multer-storage-cloudinary or similar attaches .path & .filename
-        const imageIds = [];
-        for (const file of uploadedFiles) {
-          const image = await TaskImageUpload.create({
-            url: file.path,
-            publicId: file.filename,
-            label: file.fieldname,
-          });
-          imageIds.push(image._id);
-        }
+    // Sync assignment status
+    if (taskSubmission.isComplete) {
+      taskSubmission.status = "completed";
+      taskSubmission.submittedAt = new Date();
+      await taskSubmission.save();
+    } else if (taskSubmission.status === "pending") {
+      taskSubmission.status = "processing";
+      await taskSubmission.save();
+    }
 
-        taskSubmission.images.push(...imageIds);
-        taskSubmission.task = taskSubmission.task || taskId;
-
-        await taskSubmission.save();
-
-         // Sync assignment status
-        if (taskSubmission.isComplete) {
-          taskSubmission.status = "completed";
-          taskSubmission.submittedAt = new Date();
-        } else if (taskSubmission.status === "pending") {
-          taskSubmission.status = "processing";
-        }
-
-        // Respond with progress
-        return res.status(200).json({
-            success: true,
-            message: taskSubmission.isComplete
-                ? 'All images uploaded successfully. Task submitted for review!'
-                : `${uploadedFiles.length} image(s) uploaded. Keep going!`,
-            data: {
-                submissionId: taskSubmission._id,
-                assignmentStatus: taskSubmission.status,
-                isComplete: taskSubmission.isComplete,
-                uploadProgress: taskSubmission.uploadProgress,
-                remaining: buildRemainingBreakdown(taskSubmission.uploadProgress),
-            },
-        });
-
-}
+    return res.status(200).json({
+      success: true,
+      message: taskSubmission.isComplete
+        ? "All images uploaded successfully. Task submitted for review!"
+        : `${uploadedFiles.length} image(s) uploaded. Keep going!`,
+      data: {
+        submissionId: taskSubmission._id,
+        assignmentStatus: taskSubmission.status,
+        isComplete: taskSubmission.isComplete,
+        uploadProgress: taskSubmission.uploadProgress,
+        remaining: buildRemainingBreakdown(taskSubmission.uploadProgress),
+      },
+    });
+  }
 
   /**
    * Get task statistics (Admin only)
@@ -712,13 +736,13 @@ async uploadTaskImages(req, res) {
           });
       }
 
-      if (['submitted', 'approved'].includes(assignment.status)) {
-          return res.status(400).json({
-              success: false,
-              message: `This assignment has already been ${assignment.status.toLowerCase()} and cannot be modified.`,
-              data: null,
-          });
-      }
+      // if (['submitted', 'approved'].includes(assignment.status)) {
+      //     return res.status(400).json({
+      //         success: false,
+      //         message: `This assignment has already been ${assignment.status.toLowerCase()} and cannot be modified.`,
+      //         data: null,
+      //     });
+      // }
   
       const taskSubmission = await TaskSubmission.findOne({ assignment: submissionId, submittedBy: userId })
           .populate('images', 'url publicId label');
@@ -781,100 +805,104 @@ async uploadTaskImages(req, res) {
         });
     }
 
-async getTaskSubmissionByIdAndDeleteImage(req, res) {
+    async getTaskSubmissionByIdAndDeleteImage(req, res) {
 
-  const { userId } = req.user || {};
-  const { publicId, imageId, taskApplicationId } = req.body;
+      const { userId } = req.user || {};
+      const { publicId, imageId, taskApplicationId } = req.body;
 
-  // ── Validate request body
-  if (!publicId || !imageId) {
-    return res.status(400).json({
-      success: false,
-      message: "Image data required.",
-      data: null,
-    });
-  }
+      // ── Validate request body
+      if (!publicId || !imageId) {
+        return res.status(400).json({
+          success: false,
+          message: "Image data required.",
+          data: null,
+        });
+      }
 
-  // ── Load the submission
-  const taskSubmission = await TaskApplication.findOne({
-    _id: taskApplicationId,
-    applicant: userId,
-  })
-    .populate("task", "taskTitle category")
-    .populate("images", "url publicId label");
+      // ── Load the submission
+      const taskSubmission = await TaskApplication.findOne({
+        _id: taskApplicationId,
+        applicant: userId,
+      })
+        .populate("task", "taskTitle category")
+        .populate("images", "url publicId label metadata");  // ++ include metadata
 
-  if (!taskSubmission) {
-    return res.status(404).json({
-      success: false,
-      message: "Submission not found or does not belong to you.",
-      data: null,
-    });
-  }
+      if (!taskSubmission) {
+        return res.status(404).json({
+          success: false,
+          message: "Submission not found or does not belong to you.",
+          data: null,
+        });
+      }
 
-  // ── Guard: locked statuses
-  // const LOCKED_STATUSES = ["submitted", "approved", "completed"];
-  // if (LOCKED_STATUSES.includes(taskSubmission.status.toLowerCase())) {
-  //   return res.status(400).json({
-  //     success: false,
-  //     message: `This submission has already been ${taskSubmission.status} and cannot be modified.`,
-  //     data: null,
-  //   });
-  // }
+      // ── Find the image in the populated array
+      const imageDoc = taskSubmission.images.find(
+        (img) => img._id.toString() === imageId && img.publicId === publicId
+      );
 
-  // ── Find the image in the populated array 
-  const imageDoc = taskSubmission.images.find(
-    (img) => img._id.toString() === imageId && img.publicId === publicId
-  );
+      if (!imageDoc) {
+        return res.status(404).json({
+          success: false,
+          message: "Image not found in this submission.",
+          data: null,
+        });
+      }
 
-  if (!imageDoc) {
-    return res.status(404).json({
-      success: false,
-      message: "Image not found in this submission.",
-      data: null,
-    });
-  }
+      // ── Delete from Cloudinary
+      try {
+        await cloudinary.uploader.destroy(publicId);
+      } catch (err) {
+        console.error("Cloudinary deletion error:", err);
+        return res.status(500).json({
+          success: false,
+          message: "Failed to delete image from storage. No changes were made.",
+          data: null,
+        });
+      }
 
-  // ── Delete from Cloudinary
-  try {
-    await cloudinary.uploader.destroy(publicId);
-  } catch (err) {
-    console.error("Cloudinary deletion error:", err);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to delete image from storage. No changes were made.",
-      data: null,
-    });
-  }
+      // ── Delete the ImageUpload document
+      await TaskImageUpload.findByIdAndDelete(imageDoc._id);
 
-  // ── Delete the ImageUpload document
-  await TaskImageUpload.findByIdAndDelete(imageDoc._id);
+      // ── Remove the ObjectId ref from the submission
+      taskSubmission.images = taskSubmission.images.filter(
+        (img) => img._id.toString() !== imageId
+      );
 
-  // ── Remove the ObjectId ref from the submission
-  taskSubmission.images = taskSubmission.images.filter((img) => img._id.toString() !== imageId);
+      // ── Resequence remaining images (gap-free after deletion) ─────────────
+      if (taskSubmission.images.length > 0) {
+        const bulkOps = taskSubmission.images.map((img, index) => ({
+          updateOne: {
+            filter: { _id: img._id },
+            update: { $set: { "metadata.imageSequence": index + 1 } },
+          },
+        }));
 
-  // ── Sync status BEFORE saving
-  if (taskSubmission.images.length === 0 && taskSubmission.status === "processing") {
-    taskSubmission.status = "pending";
-  }
+        await TaskImageUpload.bulkWrite(bulkOps);
+      }
 
-  await taskSubmission.save();
+      // ── Sync status BEFORE saving
+      if (taskSubmission.images.length === 0 && taskSubmission.status === "processing") {
+        taskSubmission.status = "pending";
+      }
 
-  // ── Re-fetch clean uploadProgress (virtuals need plain docs)
-  const refreshed = await TaskApplication.findById(taskApplicationId);
+      await taskSubmission.save();
 
-  return res.status(200).json({
-    success: true,
-    message: "Image deleted successfully.",
-    data: {
-      taskApplicationId: taskSubmission._id,
-      assignmentStatus: refreshed.status,
-      isComplete: refreshed.isComplete,
-      remainingImages: refreshed.images.length,
-      uploadProgress: refreshed.uploadProgress,
-      remaining: buildRemainingBreakdown(refreshed.uploadProgress),
-    },
-  });
-}
+      // ── Re-fetch clean uploadProgress (virtuals need plain docs)
+      const refreshed = await TaskApplication.findById(taskApplicationId);
+
+      return res.status(200).json({
+        success: true,
+        message: "Image deleted successfully.",
+        data: {
+          taskApplicationId: taskSubmission._id,
+          assignmentStatus: refreshed.status,
+          isComplete: refreshed.isComplete,
+          remainingImages: refreshed.images.length,
+          uploadProgress: refreshed.uploadProgress,
+          remaining: buildRemainingBreakdown(refreshed.uploadProgress),
+        },
+      });
+    }
 
 }
 
