@@ -167,7 +167,7 @@ class MicroTaskController {
   async approveOrRejectApplication(req, res) {
     try {
       const { userId } = req.user || {};
-      const { applicationId, action, rejectionReason } = req.body;
+      const { applicationId, action = "reject", rejectionMessage } = req.body;
 
       if (!applicationId || !action) {
           return res.status(400).json({
@@ -208,7 +208,7 @@ class MicroTaskController {
               const taskData = {
                 taskTitle: application.task?.taskTitle || 'Untitled Task',
                 category: application.task?.category || 'General',
-                rejectionReason: rejectionReason || '',
+                rejectionMessage: rejectionMessage || 'Bad image representation',
                 adminName: 'MyDeepTech Admin'
               };
 
@@ -240,7 +240,87 @@ class MicroTaskController {
         message: 'Failed to process application.',
       });
     }
-  } 
+  }
+
+  async rejectTaskImage(req, res) {
+    try {
+  
+      const { userId } = req.admin || {};
+      const { applicationId, imageId, rejectionMessage } = req.body;
+
+      if (!applicationId || !imageId || !rejectionMessage) {
+          return res.status(400).json({
+              success: false,
+              message: 'applicationId, ImageId, and rejectionMessage are required.',
+          });
+      }
+
+      const taskApplication = await TaskApplication.findById(applicationId)
+        .populate('images')
+        .populate('task', 'taskTitle category')
+        .populate('applicant', 'fullName email');
+
+      if (!taskApplication) {
+          return res.status(404).json({
+              success: false,
+              message: 'Task application not found.',
+          });
+      }
+
+      const image = await TaskImageUpload.findOne({
+          _id: imageId,
+        });
+      if (!image) {
+          return res.status(404).json({
+              success: false,
+              message: 'Image not found in task application.',
+          });
+      }
+
+      image.status = 'rejected';
+      image.rejectionMessage = rejectionMessage;
+      image.reviewedBy = userId;
+
+      await image.save();
+
+      // Send rejection email notification
+      if (taskApplication.applicant && taskApplication.applicant.email) {
+        try {
+          const taskData = {
+            taskTitle: taskApplication.task?.taskTitle || 'Untitled Task',
+            category: taskApplication.task?.category || 'General',
+            rejectionMessage: rejectionMessage || 'Bad quality image',
+            adminName: 'MyDeepTech Admin',
+            imageId: imageId
+          };
+
+          // Uncomment to implement email notifications for image rejections
+          // await ProjectMailService.sendTaskImageRejectionNotification(
+          //   taskApplication.applicant.email,
+          //   taskApplication.applicant.fullName || 'User',
+          //   taskData
+          // );
+
+          console.log(`Image rejection email sent to ${taskApplication.applicant.email} for image ${imageId} in task application ${applicationId}`);
+        } catch (emailError) {
+          console.error('Failed to send rejection email:', emailError);
+          // Don't fail the entire operation if email fails
+        }
+      }
+
+      return res.status(200).json({
+          success: true,
+          message: 'Image rejected successfully.',
+          data: image,
+      });
+    } catch (error) {
+      console.error('Error in rejectTaskImage:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to reject image.',
+      });
+    } 
+  }
 
   /**
    * Get micro task by ID

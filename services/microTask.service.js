@@ -233,126 +233,175 @@ class MicroTaskService {
     }
   }
 
-  async getTasksByFilters(query = {}, userId = null) {
 
-        const {
-        page = 1,
-        limit = 10,
-        status,
-        category,
-        createdBy,
-        search,
-      } = query;
+async getTasksByFilters(query = {}, userId = null) {
+  const {
+    page = 1,
+    limit = 10,
+    status,
+    category,
+    createdBy,
+    search,
+  } = query;
 
-      console.log({
-        page,
-        limit,
-        status,
-        category,
-        createdBy,
-        search,
-        userId,
-      });
+  const pageNumber = parseInt(page) || 1;
+  const pageSize = parseInt(limit) || 10;
+  const skip = (pageNumber - 1) * pageSize;
 
-      let filter = {
-          status: { $in: ['pending', 'ongoing', 'approved', 'processing', 'active', 'paused', 'completed', 'cancelled'] }
-      };
+  const result = await TaskApplication.aggregate([
+    // ✅ Initial match
+    {
+      $match: {
+        ...(userId && { applicant: new mongoose.Types.ObjectId(userId) }),
+        ...(createdBy && { createdBy: new mongoose.Types.ObjectId(createdBy) }),
+        ...(status && status !== "all" && { status }),
+      },
+    },
 
-      if(userId) filter.applicant = userId;
-      if(createdBy) filter.createdBy = createdBy;
-
-      if(status && status.trim()) filter.status = status;
-      if(category && category.trim()) filter["task.category"] = category;
-
-      if(search && search.trim()) {
-        filter.$or = [
-          { "task.taskTitle": { $regex: search, $options: 'i' } },
-          { "task.category": { $regex: search, $options: 'i' } },
-          { "applicant.fullName": { $regex: search, $options: 'i' } },
-          { "applicant.email": { $regex: search, $options: 'i' } },
-        ]; 
-      }
-
-      if(status === "all")  delete filter.status;
-      if(category === "all") delete filter["task.category"];
-
-      const pageNumber = parseInt(page) || 1;
-      const pageSize = parseInt(limit) || 10;
-      const skip = (pageNumber - 1) * pageSize;
-
-      const result = await TaskApplication.aggregate([
-        {
-          $match: {
-            ...(userId && { applicant: new mongoose.Types.ObjectId(userId) }),
-            ...(createdBy && { createdBy: new mongoose.Types.ObjectId(createdBy) }),
-            ...(status && status !== "all" && { status }),
+    // ✅ Join task
+    {
+      $lookup: {
+        from: "tasks",
+        let: { taskId: "$task" },
+        pipeline: [
+          { $match: { $expr: { $eq: ["$_id", "$$taskId"] } } },
+          {
+            $project: {
+              taskTitle: 1,
+              category: 1,
+              status: 1,
+              description: 1,
+              payRate: 1,
+              currency: 1,
+              instructions: 1,
+              maxParticipants: 1,
+              dueDate: 1,
+              totalImagesRequired: 1,
+              isActive: 1,
+              taskLink: 1,
+            },
           },
-        },
+        ],
+        as: "task",
+      },
+    },
+    { $unwind: "$task" },
 
-        // Join task
-        {
-          $lookup: {
-            from: "tasks",
-            localField: "task",
-            foreignField: "_id",
-            as: "task",
+    // Join applicant (SAFE)
+    {
+      $lookup: {
+        from: "dtusers",
+        let: { applicantId: "$applicant" },
+        pipeline: [
+          { $match: { $expr: { $eq: ["$_id", "$$applicantId"] } } },
+          {
+            $project: {
+              fullName: 1,
+              email: 1,
+              phone: 1,
+            },
           },
-        },
-        { $unwind: "$task" },
+        ],
+        as: "applicant",
+      },
+    },
+    { $unwind: "$applicant" },
 
-        // Join applicant
-        {
-          $lookup: {
-            from: "dtusers",
-            localField: "applicant",
-            foreignField: "_id",
-            as: "applicant",
+    // Join images (NEW)
+    {
+      $lookup: {
+        from: "task_image_uploads", // confirm collection name
+        let: { imageIds: "$images" },
+        pipeline: [
+          {
+            $match: {
+              $expr: { $in: ["$_id", "$$imageIds"] },
+            },
           },
-        },
-        { $unwind: "$applicant" },
-
-        // Filtering AFTER joins
-        {
-          $match: {
-            ...(category && category !== "all" && { "task.category": category }),
-            ...(search && {
-              $or: [
-                { "task.taskTitle": { $regex: search, $options: "i" } },
-                { "task.category": { $regex: search, $options: "i" } },
-                { "applicant.fullName": { $regex: search, $options: "i" } },
-                { "applicant.email": { $regex: search, $options: "i" } },
-              ],
-            }),
+          {
+            $project: {
+              _id: 1,
+              url: 1,
+              label: 1,
+              publicId: 1,
+              uploadedAt: 1,
+              createdAt: 1,
+              updatedAt: 1,
+              metadata: 1,
+              status: 1,
+              rejectionMessage: 1,
+              reviewedBy: 1,
+              reviewedAt: 1,
+              status: 1,
+            },
           },
-        },
+          // optional: sort images
+          { $sort: { createdAt: -1 } },
+        ],
+        as: "images",
+      },
+    },
 
-        {
-          $facet: {
-            data: [
-              { $sort: { createdAt: -1 } },
-              { $skip: skip },
-              { $limit: pageSize },
-            ],
-            metadata: [
-              { $count: "total" }
-            ],
+    // ✅ Post-join filtering
+    {
+      $match: {
+        ...(category && category !== "all" && {
+          "task.category": category,
+        }),
+        ...(search && {
+          $or: [
+            { "task.taskTitle": { $regex: search, $options: "i" } },
+            { "task.category": { $regex: search, $options: "i" } },
+            { "applicant.fullName": { $regex: search, $options: "i" } },
+            { "applicant.email": { $regex: search, $options: "i" } },
+          ],
+        }),
+      },
+    },
+
+    // ✅ Pagination + final shape
+    {
+      $facet: {
+        data: [
+          { $sort: { createdAt: -1 } },
+          { $skip: skip },
+          { $limit: pageSize },
+
+          {
+            $project: {
+              _id: 1,
+              status: 1,
+              createdAt: 1,
+              task: 1,
+              images: 1, // now populated
+              applicant: 1,
+              isComplete: 1,
+              uploadProgress: 1,
+              dueDate: 1,
+              submittedAt: 1,
+              reviewedAt: 1,
+              reviewNote: 1,
+            },
           },
-        },
-      ]);
+        ],
+        metadata: [{ $count: "total" }],
+      },
+    },
+  ]);
 
-      const tasks = result[0].data;
-      const total = result[0].metadata[0]?.total || 0;
+  const tasks = result[0]?.data || [];
+  const total = result[0]?.metadata[0]?.total || 0;
 
-      return {
-        tasks,
-        pagination: {
-          current_page: pageNumber,
-          per_page: pageSize,
-          total_items: total,
-          total_pages: Math.ceil(total / pageSize),
-        },
-      };
-  } 
+  return {
+    tasks,
+    pagination: {
+      current_page: pageNumber,
+      per_page: pageSize,
+      total_items: total,
+      total_pages: Math.ceil(total / pageSize),
+    },
+  };
+}
 
 
   async getTaskApplicationForUser(taskId, userId){
