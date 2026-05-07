@@ -249,16 +249,22 @@ async getTasksByFilters(query = {}, userId = null) {
   const skip = (pageNumber - 1) * pageSize;
 
   const result = await TaskApplication.aggregate([
-    // ✅ Initial match
+    //  Initial match
     {
       $match: {
         ...(userId && { applicant: new mongoose.Types.ObjectId(userId) }),
         ...(createdBy && { createdBy: new mongoose.Types.ObjectId(createdBy) }),
-        ...(status && status !== "all" && { status }),
+        ...(status &&
+        status !== "all" && {
+          $or: [
+            { status },
+            { status: "completed" },
+          ],
+        }),
       },
     },
 
-    // ✅ Join task
+    // Join task
     {
       $lookup: {
         from: "tasks",
@@ -342,7 +348,7 @@ async getTasksByFilters(query = {}, userId = null) {
       },
     },
 
-    // ✅ Post-join filtering
+    // Post-join filtering
     {
       $match: {
         ...(category && category !== "all" && {
@@ -359,7 +365,7 @@ async getTasksByFilters(query = {}, userId = null) {
       },
     },
 
-    // ✅ Pagination + final shape
+    // Pagination + final shape
     {
       $facet: {
         data: [
@@ -411,7 +417,7 @@ async getTasksByFilters(query = {}, userId = null) {
       })
       .populate('task', 'taskTitle category description currency payRate totalImagesRequired')
       .populate('applicant', 'fullName email')
-      .populate('images', 'url publicId label');
+      .populate('images', 'url publicId label status rejectionMessage dateTaken');
       return taskApplication || null;
   }
 
