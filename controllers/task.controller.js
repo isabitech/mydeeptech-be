@@ -835,7 +835,6 @@ async uploadTaskImages(req, res) {
                         folder: 'mydeeptech/images',
                         resource_type: 'auto',
                     });
-                    console.log(`[Cloudinary Upload] Success for ${file.originalname}: ${cloudinaryResult.secure_url}`);
                 } catch (cloudinaryError) {
                     console.error(`[Cloudinary Upload] Failed for ${file.originalname}:`, cloudinaryError);
                     return res.status(500).json({
@@ -870,13 +869,6 @@ async uploadTaskImages(req, res) {
                     metadata,
                 });
 
-                console.log("[Image Upload] Stored metadata for image:", JSON.stringify({
-                    id: image._id,
-                    url: image.url,
-                    label: image.label,
-                    metadata: image.metadata
-                }, null, 2));
-                
                 imageIds.push(image._id);
                 
                 // Clean up local temp file after successful upload
