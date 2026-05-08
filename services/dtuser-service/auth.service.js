@@ -554,6 +554,8 @@ class AuthService {
       })
       .exec();
 
+      console.log("Updated user after profile update:", updatedUser);
+
     updatedUser = {
       ...updatedUser,
       domains: undefined,
