@@ -314,6 +314,7 @@ const dtUserProfileUpdateSchema = Joi.object({
   // Language proficiency updates
   languageProficiency: Joi.object({
     primaryLanguage: Joi.string().max(50).allow(""),
+    nativeLanguages: Joi.array().items(Joi.string().max(50)),
     otherLanguages: Joi.array().items(Joi.string().max(50)),
     englishFluencyLevel: Joi.string()
       .valid("basic", "intermediate", "advanced", "fluent", "native", "")

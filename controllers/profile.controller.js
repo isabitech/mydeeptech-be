@@ -58,6 +58,7 @@ class ProfileController {
         annotationSkills: user.annotation_skills || [],
         languageProficiency: {
           primaryLanguage: user.language_proficiency?.primary_language || "",
+          nativeLanguages: user.language_proficiency?.native_languages || [],
           otherLanguages: user.language_proficiency?.other_languages || [],
           englishFluencyLevel:
             user.language_proficiency?.english_fluency_level || "",

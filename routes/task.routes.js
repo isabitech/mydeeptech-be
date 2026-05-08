@@ -5,6 +5,7 @@ const { body, param, query } = require("express-validator");
 const { authenticateToken } = require("../middleware/auth");
 const { requireRole } = require("../middleware/permission-role.middleware");
 const { imageUpload, uploadMicroTaskImages } = require("../config/cloudinary");
+const { authenticateAdmin } = require("../middleware/adminAuth.js");
 
 // Validation rules
 const createTaskValidation = [
@@ -129,6 +130,10 @@ router.post("/apply",
 router.post("/approve_or_reject_application",
   authenticateToken,
   microTaskController.approveOrRejectApplication
+);
+router.post("/reject-image",
+    authenticateAdmin,
+  microTaskController.rejectTaskImage
 );
 
 // User routes - Task Statistics

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Image Rejected</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.6;
+            background-color: #f4f7fa;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #dc3545 0%, #F6921E 100%);
+            color: white;
+            text-align: center;
+            padding: 30px 20px;
+        }
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .message {
+            font-size: 16px;
+            margin-bottom: 25px;
+        }
+        .task-details {
+            background-color: #fff8f0;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #F6921E;
+            margin: 25px 0;
+        }
+        .detail-row {
+            margin-bottom: 10px;
+        }
+        .label {
+            font-weight: 600;
+            color: #333333;
+        }
+        .rejection-message-section {
+            background-color: #fdf2f2;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #dc3545;
+            margin: 25px 0;
+        }
+        .rejection-message {
+            color: #721c24;
+            font-weight: 500;
+        }
+        .action-required {
+            background-color: #f0f8ff;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #0066cc;
+            margin: 25px 0;
+            text-align: center;
+        }
+        .action-required h3 {
+            color: #0066cc;
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            text-align: center;
+            padding: 20px;
+            border-top: 1px solid #e9ecef;
+            font-size: 14px;
+            color: #6c757d;
+        }
+        .brand {
+            color: #F6921E;
+            font-weight: 600;
+        }
+        .cta-section {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .cta-button {
+            display: inline-block;
+            background-color: #F6921E;
+            color: white !important;
+            padding: 12px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: 600;
+            margin-top: 15px;
+        }
+        .cta-button:hover {
+            background-color: #d67c17;
+        }
+        .warning-text {
+            color: #dc3545;
+            font-weight: 500;
+            font-size: 16px;
+        }
+        .visually-hidden {
+            position: absolute !important;
+            left: -9999px !important;
+            width: 1px !important;
+            height: 1px !important;
+            overflow: hidden !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>Task Image Rejected</h1>
+        </header>
+
+        <main class="content" role="main">
+            <section class="message-section">
+                <p class="message">Hello {{applicantName}},</p>
+            
+                <p class="message warning-text">We regret to inform you that one of your submitted images for the task has been rejected by our review team.</p>
+            </section>
+
+            <section class="task-details" aria-labelledby="task-info-heading">
+                <h2 id="task-info-heading" class="visually-hidden">Task Information</h2>
+                <div class="detail-row">
+                    <span class="label">Task:</span> {{taskTitle}}
+                </div>
+                <div class="detail-row">
+                    <span class="label">Category:</span> {{category}}
+                </div>
+                <div class="detail-row">
+                    <span class="label">Image ID:</span> {{imageId}}
+                </div>
+            </section>
+
+            <section class="rejection-message-section" aria-labelledby="rejection-heading">
+                <h2 id="rejection-heading" class="visually-hidden">Rejection Reason</h2>
+                <div class="detail-row">
+                    <span class="label">Rejection Reason:</span>
+                </div>
+                <p class="rejection-message">{{rejectionMessage}}</p>
+            </section>
+
+            <section class="action-required">
+                <h3>⚡ Action Required</h3>
+                <p>Please review the feedback above and submit a new image that meets our quality standards and guidelines.</p>
+            </section>
+
+            <section class="message-section">
+                <p class="message">We understand this may be disappointing, but maintaining high quality standards ensures the best experience for all users. Please take the feedback into consideration and resubmit when you're ready.</p>
+                
+                <p class="message">If you have any questions about the feedback or need clarification on our image requirements, please contact our support team at {{supportEmail}}.</p>
+            </section>
+
+            <section class="cta-section">
+                <p>Ready to submit a new image?</p>
+                <a href="#" class="cta-button">Go to Task Dashboard</a>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <p>Thank you for being part of the <span class="brand">MyDeepTech</span> community!</p>
+            <p>Best regards,<br>The {{adminName}} Team</p>
+        </footer>
+    </div>
+</body>
+</html>
