@@ -45,15 +45,17 @@ class DtUserService {
    * Create DTUser and send verification email with timeout.
    */
   async createDTUser(payload) {
-    const { fullName, phone, email, domains, socialsFollowed, consent } =
-      payload;
+    const { fullName, phone, email, country, domains, socialsFollowed, consent, nativeLanguages, otherLanguages } = payload;
     return this.authService.createDTUser(
       fullName,
       phone,
       email,
+      country,
       domains,
       socialsFollowed,
       consent,
+      nativeLanguages,
+      otherLanguages
     );
   }
 
@@ -63,6 +65,7 @@ class DtUserService {
   async createDTUserWithBackgroundEmail(payload) {
     const { fullName, phone, email, domains, socialsFollowed, consent } =
       payload;
+    
     return this.authService.createDTUserWithBackgroundEmail(
       fullName,
       phone,

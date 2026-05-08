@@ -97,12 +97,15 @@ class AuthService {
    * Create DTUser and send verification email with timeout.
    */
   async createDTUser(
-    fullName,
-    phone,
-    email,
-    domains,
-    socialsFollowed,
-    consent,
+    fullName, 
+    phone, 
+    email, 
+    country, 
+    domains, 
+    socialsFollowed, 
+    consent, 
+    nativeLanguages, 
+    otherLanguages 
   ) {
     const existing = await this.repository.findByEmail(email);
     if (existing) {
@@ -113,8 +116,12 @@ class AuthService {
       fullName,
       phone,
       email,
+      country,
+      domains: [],
       socialsFollowed,
       consent,
+      nativeLanguages,
+      otherLanguages,
     });
     const domainIds = domains.map((domain) => domain.id);
     await this.domainToUserService.assignMultipleDomainsToUser(
