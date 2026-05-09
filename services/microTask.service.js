@@ -417,7 +417,7 @@ async getTasksByFilters(query = {}, userId = null) {
       })
       .populate('task', 'taskTitle category description currency payRate totalImagesRequired')
       .populate('applicant', 'fullName email')
-      .populate('images', 'url publicId label status rejectionMessage dateTaken');
+      .populate('images', 'url publicId label status rejectionMessage dateTaken metadata');
       return taskApplication || null;
   }
 
