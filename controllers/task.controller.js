@@ -636,6 +636,7 @@ class MicroTaskController {
    * User uploads images for an assigned task (supports incremental uploads)
    */
 
+
 async uploadTaskImages(req, res) {
     try {
         const { userId } = req.user || {};
@@ -690,7 +691,12 @@ async uploadTaskImages(req, res) {
             });
         }
 
-        let taskSubmission = await TaskApplication.findOne({ task: taskId });
+        // FIX: Find by task AND applicant (specific user)
+        let taskSubmission = await TaskApplication.findOne({ 
+            task: taskId,
+            applicant: userId
+        });
+
         if (!taskSubmission && task.status.toLowerCase() === "pending") {
             const initialProgress = category === 'age_progression'
                 ? { 'View 1': 0, total: 0 }
@@ -702,7 +708,10 @@ async uploadTaskImages(req, res) {
                 images: [],
                 dueDate: task.dueDate,
                 uploadProgress: initialProgress,
+                status: 'ongoing'
             });
+            
+            await taskSubmission.save();
         }
 
         if (!taskSubmission) {
@@ -712,11 +721,11 @@ async uploadTaskImages(req, res) {
             });
         }
 
-        // Check if task is already complete
+        // Check if task is already complete for THIS user
         if (taskSubmission.isComplete) {
             return res.status(400).json({
                 success: false,
-                message: `All ${maxImages} images have already been uploaded for this task.`,
+                message: `You have already uploaded all ${maxImages} images for this task.`,
             });
         }
 
@@ -799,7 +808,6 @@ async uploadTaskImages(req, res) {
         for (const [index, file] of uploadedFiles.entries()) {
             try {
                 // IMPORTANT: Extract metadata from LOCAL file BEFORE Cloudinary upload
-                // file.path should still be the local temp file path at this point
                 const imageMetadata = await extractImageMetadata(file.path);
                 const resolution = imageMetadata.resolution;
                 
@@ -852,7 +860,7 @@ async uploadTaskImages(req, res) {
                     };
                 }
                 
-                // NOW upload to Cloudinary using the local file path
+                // Upload to Cloudinary
                 let cloudinaryResult;
                 try {
                     cloudinaryResult = await cloudinary.uploader.upload(file.path, {
@@ -898,13 +906,12 @@ async uploadTaskImages(req, res) {
 
                 imageIds.push(image._id);
                 
-                // Clean up local temp file after successful upload
+                // Clean up local temp file
                 if (file.path && !file.path.includes('cloudinary')) {
                     await fs.unlink(file.path).catch(console.error);
                 }
             } catch (fileError) {
                 console.error(`Error processing file ${file.originalname}:`, fileError);
-                // Clean up temp file if it exists
                 if (file.path && await fs.access(file.path).catch(() => false)) {
                     await fs.unlink(file.path).catch(console.error);
                 }
