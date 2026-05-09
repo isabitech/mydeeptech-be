@@ -60,10 +60,21 @@ const TaskApplicationSchema = new mongoose.Schema({
     submittedAt: {
         type: Date,
     },
+    
     reviewedAt: {
         type: Date,
     },
     reviewNote: {
+        type: String,
+    },
+     rejectedAt: {
+        type: Date,
+    },
+    rejectedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'DTUser',
+    },
+    rejectionMessage: {
         type: String,
     },
 }, { timestamps: true });

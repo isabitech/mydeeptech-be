@@ -248,19 +248,23 @@ async getTasksByFilters(query = {}, userId = null) {
   const pageSize = parseInt(limit) || 10;
   const skip = (pageNumber - 1) * pageSize;
 
+    let statusFilter = {};
+
+    if (status && status === "ongoing") {
+      statusFilter = {
+        status: { $in: ["pending", "ongoing", "completed"] },
+      };
+    } else if (status && status !== "all") {
+      statusFilter = { status };
+    }
+
   const result = await TaskApplication.aggregate([
     //  Initial match
     {
       $match: {
-        ...(userId && { applicant: new mongoose.Types.ObjectId(userId) }),
-        ...(createdBy && { createdBy: new mongoose.Types.ObjectId(createdBy) }),
-        ...(status &&
-        status !== "all" && {
-          $or: [
-            { status },
-            { status: "completed" },
-          ],
-        }),
+          ...(userId && { applicant: new mongoose.Types.ObjectId(userId) }),
+          ...(createdBy && { createdBy: new mongoose.Types.ObjectId(createdBy) }),
+          ...statusFilter,
       },
     },
 

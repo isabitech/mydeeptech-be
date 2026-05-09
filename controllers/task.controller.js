@@ -130,7 +130,6 @@ class MicroTaskController {
    */
   async getAllMicroTasks(req, res) {
     const { userId } = req.user || {};
-    console.log("Fetching all micro tasks with filters:", req.query, "for user:", userId);
     const tasks = await microTaskService.getAllMicroTasks(req.query, userId);
     res.status(200).json({
       success: true,
@@ -238,7 +237,7 @@ class MicroTaskController {
 
   async approveOrRejectApplication(req, res) {
     try {
-      const { userId } = req.user || {};
+      const { userId } = req.admin || {};
       const { applicationId, action = "reject", rejectionMessage } = req.body;
 
       if (!applicationId || !action) {
@@ -272,6 +271,9 @@ class MicroTaskController {
         application.approvedBy = userId;
       } else {
         application.status = 'rejected';
+        application.rejectedBy = userId;
+        application.rejectionMessage = rejectionMessage ?? "Your application has been rejected.";
+        application.rejectedAt = new Date();
         
         // Send rejection email notification
         if (application.applicant && application.applicant.email) {
@@ -279,7 +281,7 @@ class MicroTaskController {
             const taskData = {
               taskTitle: application.task?.taskTitle || 'Untitled Task',
               category: application.task?.category || 'General',
-              rejectionMessage: rejectionMessage || 'Bad image representation',
+              rejectionMessage: rejectionMessage ?? 'Bad image representation',
               adminName: 'MyDeepTech Admin'
             };
 
