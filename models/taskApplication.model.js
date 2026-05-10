@@ -34,6 +34,9 @@ const TaskApplicationSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'DTUser',
     },
+     approvedDate: {
+        type: Date,
+    },
     assignedBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'DTUser',
@@ -67,7 +70,7 @@ const TaskApplicationSchema = new mongoose.Schema({
     reviewNote: {
         type: String,
     },
-     rejectedAt: {
+    rejectedAt: {
         type: Date,
     },
     rejectedBy: {

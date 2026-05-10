@@ -269,6 +269,7 @@ class MicroTaskController {
       if (action === 'approve') {
         application.status = 'approved';
         application.approvedBy = userId;
+        application.approvedDate = new Date();
       } else {
         application.status = 'rejected';
         application.rejectedBy = userId;
