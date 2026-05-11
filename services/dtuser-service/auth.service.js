@@ -375,7 +375,12 @@ class AuthService {
       };
     }
 
-    const updateData = {};
+    const updateData = {
+          date_of_birth:
+            body.personalInfo.date_of_birth !== undefined
+              ? body.personalInfo.date_of_birth
+              : user.personal_info?.date_of_birth,
+    };
 
     if (body.personalInfo) {
       updateData.personal_info = {
@@ -560,8 +565,6 @@ class AuthService {
         },
       })
       .exec();
-
-      console.log("Updated user after profile update:", updatedUser);
 
     updatedUser = {
       ...updatedUser,

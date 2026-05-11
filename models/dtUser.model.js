@@ -18,6 +18,9 @@ const dtUserSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
+    date_of_birth: {
+      type: String,
+    },
     role: {
       type: String,
       required: "Role name is required",
