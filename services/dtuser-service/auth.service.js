@@ -105,7 +105,9 @@ class AuthService {
     socialsFollowed, 
     consent, 
     nativeLanguages, 
-    otherLanguages 
+    otherLanguages,
+    primaryLanguage,
+    englishFluencyLevel
   ) {
     const existing = await this.repository.findByEmail(email);
     if (existing) {
@@ -120,8 +122,12 @@ class AuthService {
       domains: [],
       socialsFollowed,
       consent,
-      nativeLanguages,
-      otherLanguages,
+      language_proficiency: {
+        primary_language: primaryLanguage ?? 'English',
+        native_languages: nativeLanguages,
+        other_languages: otherLanguages,
+        english_fluency_level: englishFluencyLevel ?? "fluent",
+      },
     });
     const domainIds = domains.map((domain) => domain.id);
     await this.domainToUserService.assignMultipleDomainsToUser(

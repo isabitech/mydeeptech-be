@@ -13,6 +13,8 @@ const signupSchema = Joi.object({
     country: Joi.string().min(2).max(100).optional(),
     nativeLanguages: Joi.array().items(Joi.string().max(50)).optional(),
     otherLanguages: Joi.array().items(Joi.string().max(50)).optional(),
+    primaryLanguage: Joi.string().valid("").optional(),
+    englishFluencyLevel: Joi.string().valid("").optional(),
   domains: Joi.array()
     .items(
       Joi.object({
