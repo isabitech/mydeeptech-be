@@ -110,6 +110,9 @@ class ProfileController {
   }
   // Update DTUser profile (PATCH endpoint)
   static async updateDTUserProfile(req, res) {
+
+    const { email } = req.user;
+
     try {
       const userResult = await dtUserService.getDTUserProfile(
         req.params.userId,
@@ -156,11 +159,15 @@ class ProfileController {
           .json({ success: false, message: "User not found" });
       }
 
-      const user = result.updatedUser._doc; // Convert Mongoose document to plain object
+      const response = await dtUserService.me(email);
+
+      const { user, token } = response;
 
         res.status(200).json({
         success: true,
         message: "Profile updated successfully",
+         _usrinfo: { data: token },
+        token: token,
         user: {
           id: user._id,
           fullName: user.fullName,
