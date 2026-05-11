@@ -18,6 +18,9 @@ const dtUserSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
+    date_of_birth: {
+      type: String,
+    },
     role: {
       type: String,
       required: "Role name is required",
@@ -249,6 +252,7 @@ const dtUserSchema = new mongoose.Schema(
     language_proficiency: {
       primary_language: { type: String, default: "" },
       other_languages: { type: [String], default: [] },
+      native_languages: { type: [String], default: [] },
       english_fluency_level: {
         type: String,
         enum: ["basic", "intermediate", "advanced", "fluent", "native", ""],

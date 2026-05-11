@@ -248,19 +248,23 @@ async getTasksByFilters(query = {}, userId = null) {
   const pageSize = parseInt(limit) || 10;
   const skip = (pageNumber - 1) * pageSize;
 
+    let statusFilter = {};
+
+    if (status && status === "ongoing") {
+      statusFilter = {
+        status: { $in: ["pending", "ongoing", "completed"] },
+      };
+    } else if (status && status !== "all") {
+      statusFilter = { status };
+    }
+
   const result = await TaskApplication.aggregate([
     //  Initial match
     {
       $match: {
-        ...(userId && { applicant: new mongoose.Types.ObjectId(userId) }),
-        ...(createdBy && { createdBy: new mongoose.Types.ObjectId(createdBy) }),
-        ...(status &&
-        status !== "all" && {
-          $or: [
-            { status },
-            { status: "completed" },
-          ],
-        }),
+          ...(userId && { applicant: new mongoose.Types.ObjectId(userId) }),
+          ...(createdBy && { createdBy: new mongoose.Types.ObjectId(createdBy) }),
+          ...statusFilter,
       },
     },
 
@@ -384,9 +388,13 @@ async getTasksByFilters(query = {}, userId = null) {
               isComplete: 1,
               uploadProgress: 1,
               dueDate: 1,
+              approvedDate: 1,
               submittedAt: 1,
               reviewedAt: 1,
               reviewNote: 1,
+              rejectedAt: 1,
+              rejectedBy: 1,
+              rejectionMessage: 1,
             },
           },
         ],
@@ -417,7 +425,7 @@ async getTasksByFilters(query = {}, userId = null) {
       })
       .populate('task', 'taskTitle category description currency payRate totalImagesRequired')
       .populate('applicant', 'fullName email')
-      .populate('images', 'url publicId label status rejectionMessage dateTaken');
+      .populate('images', 'url publicId label status rejectionMessage dateTaken metadata');
       return taskApplication || null;
   }
 

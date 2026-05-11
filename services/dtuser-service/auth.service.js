@@ -97,12 +97,17 @@ class AuthService {
    * Create DTUser and send verification email with timeout.
    */
   async createDTUser(
-    fullName,
-    phone,
-    email,
-    domains,
-    socialsFollowed,
-    consent,
+    fullName, 
+    phone, 
+    email, 
+    country, 
+    domains, 
+    socialsFollowed, 
+    consent, 
+    nativeLanguages, 
+    otherLanguages,
+    primaryLanguage,
+    englishFluencyLevel
   ) {
     const existing = await this.repository.findByEmail(email);
     if (existing) {
@@ -113,8 +118,16 @@ class AuthService {
       fullName,
       phone,
       email,
+      country,
+      domains: [],
       socialsFollowed,
       consent,
+      language_proficiency: {
+        primary_language: primaryLanguage ?? 'English',
+        native_languages: nativeLanguages,
+        other_languages: otherLanguages,
+        english_fluency_level: englishFluencyLevel ?? "fluent",
+      },
     });
     const domainIds = domains.map((domain) => domain.id);
     await this.domainToUserService.assignMultipleDomainsToUser(
@@ -368,7 +381,12 @@ class AuthService {
       };
     }
 
-    const updateData = {};
+    const updateData = {
+          date_of_birth:
+            body.personalInfo.date_of_birth !== undefined
+              ? body.personalInfo.date_of_birth
+              : user.personal_info?.date_of_birth,
+    };
 
     if (body.personalInfo) {
       updateData.personal_info = {

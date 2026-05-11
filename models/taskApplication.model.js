@@ -34,6 +34,9 @@ const TaskApplicationSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'DTUser',
     },
+     approvedDate: {
+        type: Date,
+    },
     assignedBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'DTUser',
@@ -60,41 +63,49 @@ const TaskApplicationSchema = new mongoose.Schema({
     submittedAt: {
         type: Date,
     },
+    
     reviewedAt: {
         type: Date,
     },
     reviewNote: {
         type: String,
     },
+    rejectedAt: {
+        type: Date,
+    },
+    rejectedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'DTUser',
+    },
+    rejectionMessage: {
+        type: String,
+    },
 }, { timestamps: true });
 
 // Auto-update uploadProgress whenever images array changes
+// In your TaskApplication model's pre-save hook, update the metadata handling:
 TaskApplicationSchema.pre('save', async function (next) {
     try {
         if (!this.isModified('images')) return next();
 
-        // Fetch the actual label data for all image refs
+        // Fetch images with all fields including metadata
         const imageDocuments = await mongoose.model('task_image_upload')
-            .find({ _id: { $in: this.images } }, 'label')
-            .lean();
+            .find({ _id: { $in: this.images } })
+            .lean(); // Remove the 'label' filter to get all fields
 
-        // Get task category to determine validation rules
+        // Get task category
         const task = await mongoose.model('Task').findById(this.task).lean();
         const isAgeProgression = task?.category === 'age_progression';
 
         if (isAgeProgression) {
-            // For age_progression: Only View 1 exists, can have up to 15 images
             const view1Count = imageDocuments.filter(img => img.label === 'View 1').length;
             
             this.uploadProgress = {
                 'View 1': view1Count,
                 total: imageDocuments.length,
             };
-            
-            // Age progression is complete when View 1 has 15 images
             this.isComplete = view1Count >= 15 && imageDocuments.length >= 15;
         } else {
-            // For mask_collection: All 4 views, each with max 4 images (total 20)
             const counts = { 'View 1': 0, 'View 2': 0, 'View 3': 0, 'View 4': 0 };
 
             imageDocuments.forEach(img => {
@@ -107,9 +118,7 @@ TaskApplicationSchema.pre('save', async function (next) {
                 ...counts,
                 total: imageDocuments.length,
             };
-
-            // Mask collection is complete when all views have at least 4 images (total 20)
-            this.isComplete = Object.values(counts).every((count) => count >= 4) && imageDocuments.length >= 20;
+            this.isComplete = Object.values(counts).every((count) => count >= 5) && imageDocuments.length >= 20;
         }
 
         next();

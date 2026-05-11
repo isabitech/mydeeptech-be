@@ -130,7 +130,6 @@ class MicroTaskController {
    */
   async getAllMicroTasks(req, res) {
     const { userId } = req.user || {};
-    console.log("Fetching all micro tasks with filters:", req.query, "for user:", userId);
     const tasks = await microTaskService.getAllMicroTasks(req.query, userId);
     res.status(200).json({
       success: true,
@@ -238,7 +237,7 @@ class MicroTaskController {
 
   async approveOrRejectApplication(req, res) {
     try {
-      const { userId } = req.user || {};
+      const { userId } = req.admin || {};
       const { applicationId, action = "reject", rejectionMessage } = req.body;
 
       if (!applicationId || !action) {
@@ -270,8 +269,12 @@ class MicroTaskController {
       if (action === 'approve') {
         application.status = 'approved';
         application.approvedBy = userId;
+        application.approvedDate = new Date();
       } else {
         application.status = 'rejected';
+        application.rejectedBy = userId;
+        application.rejectionMessage = rejectionMessage ?? "Your application has been rejected.";
+        application.rejectedAt = new Date();
         
         // Send rejection email notification
         if (application.applicant && application.applicant.email) {
@@ -279,7 +282,7 @@ class MicroTaskController {
             const taskData = {
               taskTitle: application.task?.taskTitle || 'Untitled Task',
               category: application.task?.category || 'General',
-              rejectionMessage: rejectionMessage || 'Bad image representation',
+              rejectionMessage: rejectionMessage ?? 'Bad image representation',
               adminName: 'MyDeepTech Admin'
             };
 
@@ -633,6 +636,8 @@ class MicroTaskController {
    * POST /api/task-submissions/upload
    * User uploads images for an assigned task (supports incremental uploads)
    */
+
+
 async uploadTaskImages(req, res) {
     try {
         const { userId } = req.user || {};
@@ -668,7 +673,7 @@ async uploadTaskImages(req, res) {
         const category = task.category;
         let maxImages = 20;
         let perLabel = true;
-        let perLabelLimit = REQUIRED_PER_LABEL;
+        let perLabelLimit = 5; // 5 images per label for mask collection
         let requireDate = false;
         let allowedLabels = VALID_LABELS;
         
@@ -676,7 +681,7 @@ async uploadTaskImages(req, res) {
             maxImages = 15;
             perLabel = false;
             requireDate = true;
-            allowedLabels = VALID_LABELS;
+            allowedLabels = ['View 1']; // Only allow View 1 for age progression
         }
 
         const invalidFiles = uploadedFiles.filter((file) => !allowedLabels.includes(file.fieldname));
@@ -687,7 +692,12 @@ async uploadTaskImages(req, res) {
             });
         }
 
-        let taskSubmission = await TaskApplication.findOne({ task: taskId });
+        // FIX: Find by task AND applicant (specific user)
+        let taskSubmission = await TaskApplication.findOne({ 
+            task: taskId,
+            applicant: userId
+        });
+
         if (!taskSubmission && task.status.toLowerCase() === "pending") {
             const initialProgress = category === 'age_progression'
                 ? { 'View 1': 0, total: 0 }
@@ -699,7 +709,10 @@ async uploadTaskImages(req, res) {
                 images: [],
                 dueDate: task.dueDate,
                 uploadProgress: initialProgress,
+                status: 'ongoing'
             });
+            
+            await taskSubmission.save();
         }
 
         if (!taskSubmission) {
@@ -709,15 +722,29 @@ async uploadTaskImages(req, res) {
             });
         }
 
+        // Check if task is already complete for THIS user
         if (taskSubmission.isComplete) {
             return res.status(400).json({
                 success: false,
-                message: `All ${maxImages} images have already been uploaded for this task.`,
+                message: `You have already uploaded all ${maxImages} images for this task.`,
             });
         }
 
-        // Per-label limit
+        // Check total limit first to prevent exceeding
+        const currentTotal = taskSubmission.images.length;
+        const incomingCount = uploadedFiles.length;
+        const projectedTotal = currentTotal + incomingCount;
+        
+        if (projectedTotal > maxImages) {
+            return res.status(400).json({
+                success: false,
+                message: `Upload would exceed the total image limit of ${maxImages}. You have ${currentTotal} uploaded and are trying to add ${incomingCount} more.`,
+            });
+        }
+
+        // Per-label validation or age progression validation
         if (perLabel) {
+            // For mask_collection: validate per-label limits (5 per label)
             const errors = [];
             const currentCounts = { ...taskSubmission.uploadProgress };
             
@@ -728,7 +755,7 @@ async uploadTaskImages(req, res) {
                 const projectedCount = currentForLabel + incomingForLabel;
                 
                 if (projectedCount > perLabelLimit) {
-                    errors.push(`"${label}" already has ${currentForLabel}/${perLabelLimit} images. You are trying to add ${incomingForLabel} more, which exceeds the limit.`);
+                    errors.push(`"${label}" already has ${currentForLabel}/${perLabelLimit} images. You are trying to add ${incomingForLabel} more, which would exceed the limit.`);
                 }
             }
             
@@ -740,34 +767,41 @@ async uploadTaskImages(req, res) {
                 });
             }
             
+            // Update progress counts for mask_collection
             for (const file of uploadedFiles) {
                 const label = file.fieldname;
                 taskSubmission.uploadProgress[label] = (taskSubmission.uploadProgress[label] || 0) + 1;
                 taskSubmission.uploadProgress.total = (taskSubmission.uploadProgress.total || 0) + 1;
             }
         } else {
+            // For age_progression: validate total limit and label
             for (const file of uploadedFiles) {
                 const label = file.fieldname;
-                const newCount = (taskSubmission.uploadProgress[label] || 0) + 1;
                 
-                if (newCount > maxImages) {
+                // Ensure only View 1 is uploaded
+                if (label !== 'View 1') {
                     return res.status(400).json({
                         success: false,
-                        message: `Cannot upload more than ${maxImages} images for ${label}.`,
+                        message: `Age progression only accepts 'View 1' images, but received '${label}'.`,
                     });
                 }
                 
-                taskSubmission.uploadProgress[label] = newCount;
+                // Check individual View 1 limit
+                const currentView1Count = taskSubmission.uploadProgress['View 1'] || 0;
+                if (currentView1Count + 1 > maxImages) {
+                    return res.status(400).json({
+                        success: false,
+                        message: `Cannot upload more than ${maxImages} total images for View 1. Currently have ${currentView1Count} uploaded.`,
+                    });
+                }
+            }
+            
+            // Update progress counts for age_progression
+            for (const file of uploadedFiles) {
+                const label = file.fieldname;
+                taskSubmission.uploadProgress[label] = (taskSubmission.uploadProgress[label] || 0) + 1;
                 taskSubmission.uploadProgress.total = (taskSubmission.uploadProgress.total || 0) + 1;
             }
-        }
-
-        const projectedTotal = taskSubmission.images.length + uploadedFiles.length;
-        if (projectedTotal > maxImages) {
-            return res.status(400).json({
-                success: false,
-                message: `Upload would exceed the total image limit of ${maxImages}.`,
-            });
         }
 
         const imageIds = [];
@@ -775,7 +809,6 @@ async uploadTaskImages(req, res) {
         for (const [index, file] of uploadedFiles.entries()) {
             try {
                 // IMPORTANT: Extract metadata from LOCAL file BEFORE Cloudinary upload
-                // file.path should still be the local temp file path at this point
                 const imageMetadata = await extractImageMetadata(file.path);
                 const resolution = imageMetadata.resolution;
                 
@@ -828,7 +861,7 @@ async uploadTaskImages(req, res) {
                     };
                 }
                 
-                // NOW upload to Cloudinary using the local file path
+                // Upload to Cloudinary
                 let cloudinaryResult;
                 try {
                     cloudinaryResult = await cloudinary.uploader.upload(file.path, {
@@ -837,6 +870,9 @@ async uploadTaskImages(req, res) {
                     });
                 } catch (cloudinaryError) {
                     console.error(`[Cloudinary Upload] Failed for ${file.originalname}:`, cloudinaryError);
+                    if (file.path && await fs.access(file.path).catch(() => false)) {
+                        await fs.unlink(file.path).catch(console.error);
+                    }
                     return res.status(500).json({
                         success: false,
                         message: `Failed to upload ${file.originalname} to cloud storage.`,
@@ -853,8 +889,8 @@ async uploadTaskImages(req, res) {
                     fileName: file.originalname,
                     fileType: file.mimetype,
                     resolution,
-                    fileUrl: cloudinaryResult.secure_url,  // Use Cloudinary URL
-                    publicId: cloudinaryResult.public_id,   // Use Cloudinary publicId
+                    fileUrl: cloudinaryResult.secure_url,
+                    publicId: cloudinaryResult.public_id,
                     exif: exifStore,
                     imageFormat: imageMetadata.format,
                     imageOrientation: imageMetadata.orientation,
@@ -862,8 +898,8 @@ async uploadTaskImages(req, res) {
                 };
                 
                 const image = await TaskImageUpload.create({
-                    url: cloudinaryResult.secure_url,      // Cloudinary URL
-                    publicId: cloudinaryResult.public_id,  // Cloudinary publicId
+                    url: cloudinaryResult.secure_url,
+                    publicId: cloudinaryResult.public_id,
                     label: file.fieldname,
                     ...(requireDate && dateTaken ? { dateTaken } : {}),
                     metadata,
@@ -871,13 +907,12 @@ async uploadTaskImages(req, res) {
 
                 imageIds.push(image._id);
                 
-                // Clean up local temp file after successful upload
+                // Clean up local temp file
                 if (file.path && !file.path.includes('cloudinary')) {
                     await fs.unlink(file.path).catch(console.error);
                 }
             } catch (fileError) {
                 console.error(`Error processing file ${file.originalname}:`, fileError);
-                // Clean up temp file if it exists
                 if (file.path && await fs.access(file.path).catch(() => false)) {
                     await fs.unlink(file.path).catch(console.error);
                 }
@@ -891,6 +926,7 @@ async uploadTaskImages(req, res) {
         taskSubmission.images.push(...imageIds);
         await taskSubmission.save();
 
+        // Check completion status after saving
         if (taskSubmission.isComplete) {
             taskSubmission.status = "completed";
             taskSubmission.submittedAt = new Date();
@@ -1059,94 +1095,94 @@ async uploadTaskImages(req, res) {
     });
   }
 
-  async getTaskSubmissionByIdAndDeleteImage(req, res) {
-    const { userId } = req.user || {};
-    const { publicId, imageId, taskApplicationId } = req.body;
+async getTaskSubmissionByIdAndDeleteImage(req, res) {
+  const { userId } = req.user || {};
+  const { publicId, imageId, taskApplicationId } = req.body;
 
-    if (!publicId || !imageId) {
-      return res.status(400).json({
-        success: false,
-        message: "Image data required.",
-        data: null,
-      });
-    }
-
-    const taskSubmission = await TaskApplication.findOne({
-      _id: taskApplicationId,
-      applicant: userId,
-    })
-      .populate("task", "taskTitle category")
-      .populate("images", "url publicId label metadata");
-
-    if (!taskSubmission) {
-      return res.status(404).json({
-        success: false,
-        message: "Submission not found or does not belong to you.",
-        data: null,
-      });
-    }
-
-    const imageDoc = taskSubmission.images.find(
-      (img) => img._id.toString() === imageId && img.publicId === publicId
-    );
-
-    if (!imageDoc) {
-      return res.status(404).json({
-        success: false,
-        message: "Image not found in this submission.",
-        data: null,
-      });
-    }
-
-    try {
-      await cloudinary.uploader.destroy(publicId);
-    } catch (err) {
-      console.error("Cloudinary deletion error:", err);
-      return res.status(500).json({
-        success: false,
-        message: "Failed to delete image from storage. No changes were made.",
-        data: null,
-      });
-    }
-
-    await TaskImageUpload.findByIdAndDelete(imageDoc._id);
-
-    taskSubmission.images = taskSubmission.images.filter(
-      (img) => img._id.toString() !== imageId
-    );
-
-    if (taskSubmission.images.length > 0) {
-      const bulkOps = taskSubmission.images.map((img, index) => ({
-        updateOne: {
-          filter: { _id: img._id },
-          update: { $set: { "metadata.imageSequence": index + 1 } },
-        },
-      }));
-
-      await TaskImageUpload.bulkWrite(bulkOps);
-    }
-
-    if ((taskSubmission.status === "processing" || taskSubmission.status === "completed")) {
-      taskSubmission.status = "ongoing";
-    }
-
-    await taskSubmission.save();
-
-    const refreshed = await TaskApplication.findById(taskApplicationId);
-
-    return res.status(200).json({
-      success: true,
-      message: "Image deleted successfully.",
-      data: {
-        taskApplicationId: taskSubmission._id,
-        assignmentStatus: refreshed.status,
-        isComplete: refreshed.isComplete,
-        remainingImages: refreshed.images.length,
-        uploadProgress: refreshed.uploadProgress,
-        remaining: buildRemainingBreakdown(refreshed.uploadProgress),
-      },
+  if (!publicId || !imageId) {
+    return res.status(400).json({
+      success: false,
+      message: "Image data required.",
+      data: null,
     });
   }
+
+  const taskSubmission = await TaskApplication.findOne({
+    _id: taskApplicationId,
+    applicant: userId,
+  })
+    .populate("task", "taskTitle category")
+    .populate("images", "url publicId label metadata");
+
+  if (!taskSubmission) {
+    return res.status(404).json({
+      success: false,
+      message: "Submission not found or does not belong to you.",
+      data: null,
+    });
+  }
+
+  const imageDoc = taskSubmission.images.find(
+    (img) => img._id.toString() === imageId && img.publicId === publicId
+  );
+
+  if (!imageDoc) {
+    return res.status(404).json({
+      success: false,
+      message: "Image not found in this submission.",
+      data: null,
+    });
+  }
+
+  try {
+    await cloudinary.uploader.destroy(publicId);
+  } catch (err) {
+    console.error("Cloudinary deletion error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete image from storage. No changes were made.",
+      data: null,
+    });
+  }
+
+  await TaskImageUpload.findByIdAndDelete(imageDoc._id);
+
+  taskSubmission.images = taskSubmission.images.filter(
+    (img) => img._id.toString() !== imageId
+  );
+
+  // REMOVE THIS ENTIRE BLOCK - DO NOT RE-SEQUENCE IMAGES
+  // if (taskSubmission.images.length > 0) {
+  //   const bulkOps = taskSubmission.images.map((img, index) => ({
+  //     updateOne: {
+  //       filter: { _id: img._id },
+  //       update: { $set: { "metadata.imageSequence": index + 1 } },
+  //     },
+  //   }));
+  //   await TaskImageUpload.bulkWrite(bulkOps);
+  // }
+
+  if ((taskSubmission.status === "processing" || taskSubmission.status === "completed")) {
+    taskSubmission.status = "ongoing";
+  }
+
+  await taskSubmission.save();
+
+  const refreshed = await TaskApplication.findById(taskApplicationId);
+
+  return res.status(200).json({
+    success: true,
+    message: "Image deleted successfully.",
+    data: {
+      taskApplicationId: taskSubmission._id,
+      assignmentStatus: refreshed.status,
+      isComplete: refreshed.isComplete,
+      remainingImages: refreshed.images.length,
+      uploadProgress: refreshed.uploadProgress,
+      remaining: buildRemainingBreakdown(refreshed.uploadProgress),
+    },
+  });
+}
 }
 
 module.exports = new MicroTaskController();

@@ -3,6 +3,7 @@ const DTUser = require("../models/dtUser.model");
 class ProfileController {
   // Get DTUser profile by userId
   static async getDTUserProfile(req, res) {
+    console.log("Fetching profile for userId:", req.params.userId);
     try {
       const result = await dtUserService.getDTUserProfile(req.params.userId);
 
@@ -19,6 +20,7 @@ class ProfileController {
         fullName: user.fullName,
         email: user.email,
         phone: user.phone,
+        date_of_birth: user.date_of_birth ?? null,
         userDomains: user.userDomains || [], // New structured domain relationships
         consent: user.consent,
         annotatorStatus: user.annotatorStatus,
@@ -108,6 +110,9 @@ class ProfileController {
   }
   // Update DTUser profile (PATCH endpoint)
   static async updateDTUserProfile(req, res) {
+
+    const { email } = req.user;
+
     try {
       const userResult = await dtUserService.getDTUserProfile(
         req.params.userId,
@@ -154,11 +159,43 @@ class ProfileController {
           .json({ success: false, message: "User not found" });
       }
 
-      res.status(200).json({
+      const response = await dtUserService.me(email);
+
+      const { user, token } = response;
+
+        res.status(200).json({
         success: true,
         message: "Profile updated successfully",
-        profile: result.updatedUser,
+         _usrinfo: { data: token },
+        token: token,
+        user: {
+          id: user._id,
+          fullName: user.fullName,
+          email: user.email,
+          phone: user.phone,
+          date_of_birth: user.date_of_birth ?? null,
+          role: user.role,
+          domains: user.domains,
+          country: user.personal_info?.country || "",
+          nativeLanguages: user.language_proficiency?.native_languages || [],
+          primaryLanguage: user.language_proficiency?.primary_language || "",
+          englishFluencyLevel: user.language_proficiency?.english_fluency_level || "",
+          otherLanguages: user.language_proficiency?.other_languages || [],
+          timeZone: user.personal_info?.time_zone || "",
+          socialsFollowed: user.socialsFollowed,
+          consent: user.consent,
+          isEmailVerified: user.isEmailVerified,
+          hasSetPassword: user.hasSetPassword,
+          annotatorStatus: user.annotatorStatus,
+          microTaskerStatus: user.microTaskerStatus,
+          qaStatus: user.qaStatus,
+          resultLink: user.resultLink,
+          isAssessmentSubmitted: Boolean(user.assessmentSubmission || false),
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+        },
       });
+
     } catch (error) {
       console.error("Error updating DTUser profile:", error);
       res.status(500).json({

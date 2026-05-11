@@ -128,7 +128,7 @@ router.post("/apply",
 
 
 router.post("/approve_or_reject_application",
-  authenticateToken,
+  authenticateAdmin,
   microTaskController.approveOrRejectApplication
 );
 router.post("/reject-image",
