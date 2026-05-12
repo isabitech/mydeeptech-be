@@ -275,7 +275,7 @@ class MicroTaskController {
         application.status = 'rejected';
         application.rejectedBy = userId;
         application.reviewedBy = userId;
-        application.rejectionMessage = rejectionMessage ?? "Your application has been rejected.";
+        application.rejectionMessage = rejectionMessage ?? "Login and retake your task submission";
         application.rejectedAt = new Date();
         
         // Send rejection email notification
@@ -284,7 +284,7 @@ class MicroTaskController {
             const taskData = {
               taskTitle: application.task?.taskTitle || 'Untitled Task',
               category: application.task?.category || 'General',
-              rejectionMessage: rejectionMessage ?? 'Bad image representation',
+              rejectionReason: rejectionMessage ?? "Login and retake your task submission",
               adminName: 'MyDeepTech Admin'
             };
 
