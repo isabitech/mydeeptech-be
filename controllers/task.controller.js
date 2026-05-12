@@ -269,10 +269,12 @@ class MicroTaskController {
       if (action === 'approve') {
         application.status = 'approved';
         application.approvedBy = userId;
+        application.reviewedBy = userId;
         application.approvedDate = new Date();
       } else {
         application.status = 'rejected';
         application.rejectedBy = userId;
+        application.reviewedBy = userId;
         application.rejectionMessage = rejectionMessage ?? "Your application has been rejected.";
         application.rejectedAt = new Date();
         
@@ -314,6 +316,59 @@ class MicroTaskController {
       });
     }
   }
+
+  async reviewTaskApplication(req, res) {
+
+    const { userId } = req.admin || {}; 
+
+    try {
+      const { applicationId, action = "reject", reviewNote } = req.body;
+      if (!applicationId || !action) {
+        return res.status(400).json({
+          success: false,
+          message: 'ApplicationId and Action are required.',
+        });
+      }
+      if (!['approve', 'reject'].includes(action)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid action!',
+        });
+      }
+      const application = await TaskApplication.findById(applicationId)
+        .populate('task', 'taskTitle category')
+        .populate('applicant', 'fullName email');
+      if (!application) {
+        return res.status(404).json({
+          success: false,
+          message: 'Application not found.',
+        });
+      }
+      if (action === 'approve') {
+        application.status = 'approved';
+        application.reviewedBy = userId;
+        application.reviewedAt = new Date();
+      } else {
+        application.status = 'rejected';
+        application.reviewedBy = userId;
+        application.reviewedAt = new Date();
+        application.reviewNote = reviewNote;
+      }
+      await application.save();
+      return res.status(200).json({ 
+        success: true,
+        message: `Application ${action}d successfully.`,
+        data: application,
+      });
+    } catch (error) {
+      console.error('Error in reviewTaskApplication:', error);    
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to process application.',
+      });
+    }
+  }
+
 
   async rejectTaskImage(req, res) {
     try {

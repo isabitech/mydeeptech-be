@@ -244,6 +244,8 @@ async getTasksByFilters(query = {}, userId = null) {
     search,
   } = query;
 
+  console.log("Filters received:", { status, category, createdBy, search, userId });
+
   const pageNumber = parseInt(page) || 1;
   const pageSize = parseInt(limit) || 10;
   const skip = (pageNumber - 1) * pageSize;
@@ -263,7 +265,7 @@ async getTasksByFilters(query = {}, userId = null) {
     {
       $match: {
           ...(userId && { applicant: new mongoose.Types.ObjectId(userId) }),
-          ...(createdBy && { createdBy: new mongoose.Types.ObjectId(createdBy) }),
+          // ...(createdBy && { createdBy: new mongoose.Types.ObjectId(createdBy) }),
           ...statusFilter,
       },
     },
@@ -355,9 +357,7 @@ async getTasksByFilters(query = {}, userId = null) {
     // Post-join filtering
     {
       $match: {
-        ...(category && category !== "all" && {
-          "task.category": category,
-        }),
+        ...(category && category !== "all" && { "task.category": category }),
         ...(search && {
           $or: [
             { "task.taskTitle": { $regex: search, $options: "i" } },

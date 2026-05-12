@@ -70,6 +70,10 @@ const TaskApplicationSchema = new mongoose.Schema({
     reviewNote: {
         type: String,
     },
+    reviewedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'DTUser',
+    },
     rejectedAt: {
         type: Date,
     },

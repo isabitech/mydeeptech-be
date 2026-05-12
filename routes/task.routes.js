@@ -119,6 +119,10 @@ router.get("/filters",
   microTaskController.getTasksByFilters
 );
 
+router.post("/review",
+  authenticateAdmin,
+  microTaskController.approveOrRejectApplication
+);
 
 // User routes - Apply for a task
 router.post("/apply",
