@@ -2,18 +2,24 @@ const mongoose = require("mongoose");
 
 const TaskImageUploadSchema = new mongoose.Schema(
     {
+        taskApplication: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "TaskApplication",
+            default: null,
+        },
         url: { type: String, required: true },
         publicId: { type: String, required: true },
         label: { type: String, required: true },
         dateTaken: { type: Date, default: null }, // For age_progression
         status: {
             type: String,
-            enum: ['pending', 'approved', 'rejected'],
+            enum: ['pending', 'approved', 'rejected', 'needs_replacement'],
             default: 'pending',
             required: true,
         },
         rejectionMessage: { type: String, default: null, trim: true },
-        reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+        qaNotes: { type: String, default: null, trim: true },
+        reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'DTUser', default: null },
         reviewedAt: { type: Date, default: null },
         metadata: {
             angle: { type: String, default: null },

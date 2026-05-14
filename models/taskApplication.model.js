@@ -43,7 +43,7 @@ const TaskApplicationSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['pending', 'ongoing', 'approved', 'processing', 'active', 'paused', 'completed', 'cancelled', "rejected"],
+        enum: ['pending', 'ongoing', 'approved', 'processing', 'active', 'paused', 'completed', 'under_review', 'partially_rejected', 'cancelled', "rejected"],
         default: 'ongoing',
     },
     isComplete: {
@@ -67,12 +67,44 @@ const TaskApplicationSchema = new mongoose.Schema({
     reviewedAt: {
         type: Date,
     },
+    qaScore: {
+        type: Number,
+        min: 0,
+        max: 100,
+        default: null,
+    },
     reviewNote: {
         type: String,
     },
     reviewedBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'DTUser',
+    },
+    exportAudit: {
+        type: [
+            {
+                exportedBy: {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: 'DTUser',
+                    required: true,
+                },
+                exportedAt: {
+                    type: Date,
+                    default: Date.now,
+                },
+                exportType: {
+                    type: String,
+                    enum: ['approved', 'rejected', 'partially_rejected'],
+                    required: true,
+                },
+                exportFileName: {
+                    type: String,
+                    required: true,
+                    trim: true,
+                },
+            },
+        ],
+        default: [],
     },
     rejectedAt: {
         type: Date,
@@ -166,6 +198,7 @@ TaskApplicationSchema.pre(
 
 // Prevent duplicate assignments of the same task to the same user
 TaskApplicationSchema.index({ task: 1, assignedTo: 1, applicant: 1 }, { unique: true });
+TaskApplicationSchema.index({ task: 1, status: 1, reviewedAt: -1, submittedAt: -1 });
 
 const TaskApplication = mongoose.model('TaskApplication', TaskApplicationSchema);
 module.exports = TaskApplication;

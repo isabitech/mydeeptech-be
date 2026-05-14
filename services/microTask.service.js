@@ -167,6 +167,22 @@ class MicroTaskService {
                 },
               },
 
+              under_review: {
+                $sum: {
+                  $map: {
+                    input: "$submissionStatsRaw",
+                    as: "s",
+                    in: {
+                      $cond: [
+                        { $eq: ["$$s._id", "under_review"] },
+                        "$$s.count",
+                        0,
+                      ],
+                    },
+                  },
+                },
+              },
+
               approved: {
                 $sum: {
                   $map: {
@@ -186,6 +202,22 @@ class MicroTaskService {
                     as: "s",
                     in: {
                       $cond: [{ $eq: ["$$s._id", "rejected"] }, "$$s.count", 0],
+                    },
+                  },
+                },
+              },
+
+              partially_rejected: {
+                $sum: {
+                  $map: {
+                    input: "$submissionStatsRaw",
+                    as: "s",
+                    in: {
+                      $cond: [
+                        { $eq: ["$$s._id", "partially_rejected"] },
+                        "$$s.count",
+                        0,
+                      ],
                     },
                   },
                 },
@@ -443,10 +475,8 @@ async getTasksByFilters(query = {}, userId = null) {
         throw new Error("Micro task not found");
       }
 
-
-      // Get submission statistics
-      const submissionStats = await MicroTaskSubmission.aggregate([
-        { $match: { taskId: task._id } },
+      const submissionStats = await TaskApplication.aggregate([
+        { $match: { task: task._id } },
         {
           $group: {
             _id: "$status",
@@ -457,15 +487,21 @@ async getTasksByFilters(query = {}, userId = null) {
 
       const stats = {
         total: 0,
+        pending: 0,
         in_progress: 0,
         completed: 0,
         under_review: 0,
         approved: 0,
+        partially_rejected: 0,
         rejected: 0
       };
 
       submissionStats.forEach(stat => {
-        stats[stat._id] = stat.count;
+        if (["ongoing", "processing", "active"].includes(stat._id)) {
+          stats.in_progress += stat.count;
+        } else if (Object.prototype.hasOwnProperty.call(stats, stat._id)) {
+          stats[stat._id] = stat.count;
+        }
         stats.total += stat.count;
       });
 
@@ -619,7 +655,7 @@ async getTasksByFilters(query = {}, userId = null) {
             }
           }
         ]),
-        MicroTaskSubmission.aggregate([
+        TaskApplication.aggregate([
           {
             $group: {
               _id: "$status",
@@ -640,10 +676,12 @@ async getTasksByFilters(query = {}, userId = null) {
 
       const submissions = {
         total: 0,
+        pending: 0,
         in_progress: 0,
         completed: 0,
         under_review: 0,
         approved: 0,
+        partially_rejected: 0,
         rejected: 0
       };
 
@@ -653,7 +691,11 @@ async getTasksByFilters(query = {}, userId = null) {
       });
 
       submissionStats.forEach(stat => {
-        submissions[stat._id] = stat.count;
+        if (["ongoing", "processing", "active"].includes(stat._id)) {
+          submissions.in_progress += stat.count;
+        } else if (Object.prototype.hasOwnProperty.call(submissions, stat._id)) {
+          submissions[stat._id] = stat.count;
+        }
         submissions.total += stat.count;
       });
 

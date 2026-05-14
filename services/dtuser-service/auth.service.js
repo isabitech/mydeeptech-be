@@ -19,6 +19,47 @@ class AuthService {
     this.domainToUserService = DomainToUserService;
   }
 
+  normalizeDateOfBirth(dateValue, fallbackValue = null) {
+    if (dateValue === undefined) {
+      return fallbackValue ?? null;
+    }
+
+    if (dateValue === null || dateValue === "") {
+      return null;
+    }
+
+    const parsedDate = new Date(dateValue);
+    if (Number.isNaN(parsedDate.getTime())) {
+      return fallbackValue ?? null;
+    }
+
+    return parsedDate;
+  }
+
+  calculateAgeFromDateOfBirth(dateOfBirth) {
+    if (!dateOfBirth) {
+      return null;
+    }
+
+    const birthDate = new Date(dateOfBirth);
+    if (Number.isNaN(birthDate.getTime())) {
+      return null;
+    }
+
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+
+    if (
+      monthDiff < 0 ||
+      (monthDiff === 0 && today.getDate() < birthDate.getDate())
+    ) {
+      age -= 1;
+    }
+
+    return age >= 0 ? age : null;
+  }
+
   withTimeout(promise, timeoutMs, timeoutMessage) {
     return Promise.race([
       promise,
@@ -381,20 +422,30 @@ class AuthService {
       };
     }
 
-    const updateData = {
-          date_of_birth:
-            body.personalInfo.date_of_birth !== undefined
-              ? body.personalInfo.date_of_birth
-              : user.personal_info?.date_of_birth,
-    };
+    const updateData = {};
 
     if (body.personalInfo) {
+      const incomingDateOfBirth =
+        body.personalInfo.dateOfBirth !== undefined
+          ? body.personalInfo.dateOfBirth
+          : body.personalInfo.date_of_birth;
+      const nextDateOfBirth = this.normalizeDateOfBirth(
+        incomingDateOfBirth,
+        user.personal_info?.date_of_birth || null,
+      );
+
       updateData.personal_info = {
         ...user.personal_info,
         country:
           body.personalInfo.country !== undefined
             ? body.personalInfo.country
             : user.personal_info?.country,
+        date_of_birth: nextDateOfBirth,
+        age: this.calculateAgeFromDateOfBirth(nextDateOfBirth),
+        gender:
+          body.personalInfo.gender !== undefined
+            ? body.personalInfo.gender
+            : user.personal_info?.gender,
         time_zone:
           body.personalInfo.timeZone !== undefined
             ? body.personalInfo.timeZone

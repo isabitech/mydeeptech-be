@@ -7,6 +7,7 @@ const TaskImageUpload = require("../models/imageUpload.model");
 const Task = require("../models/task.model");
 const TaskApplication = require("../models/taskApplication.model");
 const microTaskService = require("../services/microTask.service");
+const microTaskAdminService = require("../services/microTaskAdmin.service");
 const { validationResult } = require("express-validator");
 const cloudinary = require('cloudinary').v2;
 const ProjectMailService = require('../services/mail-service/project.service');
@@ -149,6 +150,149 @@ class MicroTaskController {
       message: "Micro tasks retrieved successfully",
       data: tasks
     });
+  }
+
+  async getReviewedSubmissionsForTask(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: "Validation failed",
+          errors: errors.array(),
+        });
+      }
+
+      const { taskId } = req.params;
+      const reviewedSubmissions =
+        await microTaskAdminService.getReviewedSubmissionsForTask(
+          taskId,
+          req.query,
+        );
+
+      return res.status(200).json({
+        success: true,
+        message: "Task reviewed submissions retrieved successfully",
+        data: reviewedSubmissions,
+      });
+    } catch (error) {
+      console.error("Error fetching reviewed task submissions:", error);
+      const statusCode =
+        error.message.includes("Micro task not found")
+          ? 404
+          : error.message.includes("Invalid admin review status filter")
+            ? 400
+            : 500;
+
+      return res.status(statusCode).json({
+        success: false,
+        message: error.message || "Failed to fetch reviewed task submissions",
+      });
+    }
+  }
+
+  async overrideReviewedSubmission(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: "Validation failed",
+          errors: errors.array(),
+        });
+      }
+
+      const { taskId, submissionId } = req.params;
+      const adminId = req.user?.userId || req.user?.id;
+      const submission = await microTaskAdminService.overrideSubmissionReview(
+        taskId,
+        submissionId,
+        adminId,
+        req.body,
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: "Submission review overridden successfully",
+        data: submission,
+      });
+    } catch (error) {
+      console.error("Error overriding reviewed submission:", error);
+      const statusCode =
+        error.message.includes("Submission not found")
+          ? 404
+          : error.message.includes("Invalid admin override status") ||
+              error.message.includes("sync_images") ||
+              error.message.includes("All images must be reviewed") ||
+              error.message.includes("cannot be approved") ||
+              error.message.includes("partial rejection requires")
+            ? 400
+            : 500;
+
+      return res.status(statusCode).json({
+        success: false,
+        message: error.message || "Failed to override submission review",
+      });
+    }
+  }
+
+  async exportTaskDataset(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: "Validation failed",
+          errors: errors.array(),
+        });
+      }
+
+      const { taskId } = req.params;
+      const exportResult = await microTaskAdminService.exportTaskDataset(
+        taskId,
+        {
+          status: req.query.status,
+          exportedBy: req.user?.userId || req.user?.id,
+        },
+      );
+
+      res.setHeader("X-Exported-Task-Id", exportResult.summary.taskId);
+      res.setHeader(
+        "X-Exported-Task-Status",
+        exportResult.summary.status,
+      );
+      res.setHeader(
+        "X-Exported-Submission-Count",
+        String(exportResult.summary.totalSubmissions),
+      );
+      res.setHeader(
+        "X-Exported-Image-Count",
+        String(exportResult.summary.totalImages),
+      );
+      res.setHeader(
+        "X-Exported-Failed-Image-Count",
+        String(exportResult.summary.failedImages),
+      );
+      res.setHeader("Content-Length", String(exportResult.buffer.length));
+      res.type(exportResult.contentType);
+      res.attachment(exportResult.fileName);
+
+      return res.status(200).send(exportResult.buffer);
+    } catch (error) {
+      console.error("Error exporting task dataset:", error);
+      const statusCode =
+        error.message.includes("Micro task not found") ||
+        error.message.includes("No submissions found")
+          ? 404
+          : error.message.includes("Invalid export status")
+            ? 400
+            : 500;
+
+      return res.status(statusCode).json({
+        success: false,
+        message: error.message || "Failed to export task dataset",
+      });
+    }
   }
 
   async getAllMicroTasksForUser(req, res) {
@@ -953,6 +1097,7 @@ async uploadTaskImages(req, res) {
                 };
                 
                 const image = await TaskImageUpload.create({
+                    taskApplication: taskSubmission._id,
                     url: cloudinaryResult.secure_url,
                     publicId: cloudinaryResult.public_id,
                     label: file.fieldname,
@@ -983,7 +1128,7 @@ async uploadTaskImages(req, res) {
 
         // Check completion status after saving
         if (taskSubmission.isComplete) {
-            taskSubmission.status = "completed";
+            taskSubmission.status = "under_review";
             taskSubmission.submittedAt = new Date();
             await taskSubmission.save();
         } else if (taskSubmission.status === "pending") {
@@ -994,7 +1139,7 @@ async uploadTaskImages(req, res) {
         return res.status(200).json({
             success: true,
             message: taskSubmission.isComplete
-                ? "All images uploaded successfully. Task submitted for review!"
+                ? "All images uploaded successfully. Task sent to the QA queue!"
                 : `${uploadedFiles.length} image(s) uploaded. Keep going!`,
             data: {
                 submissionId: taskSubmission._id,
@@ -1217,7 +1362,11 @@ async getTaskSubmissionByIdAndDeleteImage(req, res) {
   //   await TaskImageUpload.bulkWrite(bulkOps);
   // }
 
-  if ((taskSubmission.status === "processing" || taskSubmission.status === "completed")) {
+  if (
+    taskSubmission.status === "processing" ||
+    taskSubmission.status === "completed" ||
+    taskSubmission.status === "under_review"
+  ) {
     taskSubmission.status = "ongoing";
   }
 

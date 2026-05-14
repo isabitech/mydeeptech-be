@@ -224,6 +224,10 @@ const dtUserProfileUpdateSchema = Joi.object({
   personalInfo: Joi.object({
     country: Joi.string().max(50).allow(""),
     date_of_birth: Joi.string().allow(""),
+    dateOfBirth: Joi.string().allow(""),
+    gender: Joi.string()
+      .valid("male", "female", "other", "prefer_not_to_say", "")
+      .allow(""),
     timeZone: Joi.string().max(50).allow(""),
     availableHoursPerWeek: Joi.number().min(0).max(168),
     preferredCommunicationChannel: Joi.string()

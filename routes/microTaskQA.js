@@ -3,7 +3,10 @@ const router = express.Router();
 const microTaskQAController = require("../controllers/microTaskQA.controller");
 const { body, param } = require("express-validator");
 const { authenticateToken } = require("../middleware/auth");
-const { requireRole } = require("../middleware/permission-role.middleware");
+const {
+  requireRole,
+  requireApprovedQAOrAdmin,
+} = require("../middleware/permission-role.middleware");
 
 // Validation rules
 const submissionIdValidation = [
@@ -84,32 +87,32 @@ const assignReviewerValidation = [
 // QA Review routes
 router.get("/queue", 
   authenticateToken, 
-  requireRole("QA_REVIEWER", "ADMIN"), 
+  requireApprovedQAOrAdmin(),
   microTaskQAController.getSubmissionsPendingReview
 );
 
 router.get("/queue/summary", 
   authenticateToken, 
-  requireRole("QA_REVIEWER", "ADMIN"), 
+  requireApprovedQAOrAdmin(),
   microTaskQAController.getReviewQueueSummary
 );
 
 router.get("/statistics", 
   authenticateToken, 
-  requireRole("QA_REVIEWER", "ADMIN"), 
+  requireApprovedQAOrAdmin(),
   microTaskQAController.getReviewStatistics
 );
 
 router.get("/submissions/:submissionId", 
   authenticateToken, 
-  requireRole("QA_REVIEWER", "ADMIN"), 
+  requireApprovedQAOrAdmin(),
   submissionIdValidation, 
   microTaskQAController.getSubmissionForReview
 );
 
 router.post("/images/:imageId/review", 
   authenticateToken, 
-  requireRole("QA_REVIEWER", "ADMIN"), 
+  requireApprovedQAOrAdmin(),
   imageIdValidation, 
   imageReviewValidation, 
   microTaskQAController.reviewImage
@@ -117,7 +120,7 @@ router.post("/images/:imageId/review",
 
 router.post("/submissions/:submissionId/complete", 
   authenticateToken, 
-  requireRole("QA_REVIEWER", "ADMIN"), 
+  requireApprovedQAOrAdmin(),
   submissionIdValidation, 
   submissionReviewValidation, 
   microTaskQAController.completeSubmissionReview
@@ -125,7 +128,7 @@ router.post("/submissions/:submissionId/complete",
 
 router.post("/submissions/bulk-approve", 
   authenticateToken, 
-  requireRole("QA_REVIEWER", "ADMIN"), 
+  requireApprovedQAOrAdmin(),
   bulkApprovalValidation, 
   microTaskQAController.bulkApproveSubmissions
 );
@@ -140,7 +143,7 @@ router.post("/submissions/:submissionId/assign",
 
 router.get("/my-reviews", 
   authenticateToken, 
-  requireRole("QA_REVIEWER"), 
+  requireApprovedQAOrAdmin(),
   microTaskQAController.getReviewerSubmissions
 );
 
