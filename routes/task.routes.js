@@ -5,6 +5,7 @@ const { body, param, query } = require("express-validator");
 const { authenticateToken } = require("../middleware/auth");
 const { requireRole } = require("../middleware/permission-role.middleware");
 const { imageUpload, uploadMicroTaskImages } = require("../config/cloudinary");
+const { authenticateAdmin } = require("../middleware/adminAuth.js");
 
 // Validation rules
 const createTaskValidation = [
@@ -92,6 +93,60 @@ const taskIdValidation = [
     .withMessage("Invalid task ID")
 ];
 
+const submissionIdValidation = [
+  param("submissionId")
+    .isMongoId()
+    .withMessage("Invalid submission ID"),
+];
+
+const adminReviewedSubmissionsValidation = [
+  query("page")
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage("page must be a positive integer")
+    .toInt(),
+  query("limit")
+    .optional()
+    .isInt({ min: 1, max: 100 })
+    .withMessage("limit must be between 1 and 100")
+    .toInt(),
+  query("status")
+    .optional()
+    .isIn(["all", "under_review", "approved", "rejected", "partially_rejected"])
+    .withMessage("Invalid admin reviewed submissions status"),
+  query("sort")
+    .optional()
+    .isIn(["recently_reviewed", "oldest_reviewed", "newest_submitted", "oldest_submitted"])
+    .withMessage("Invalid sort option"),
+];
+
+const adminOverrideValidation = [
+  body("status")
+    .isIn(["approved", "rejected", "partially_rejected"])
+    .withMessage("Invalid override status"),
+  body("quality_score")
+    .optional({ nullable: true })
+    .isFloat({ min: 0, max: 100 })
+    .withMessage("quality_score must be between 0 and 100"),
+  body("review_notes")
+    .optional()
+    .isString()
+    .isLength({ max: 2000 })
+    .withMessage("review_notes must not exceed 2000 characters"),
+  body("sync_images")
+    .optional()
+    .isBoolean()
+    .withMessage("sync_images must be a boolean")
+    .toBoolean(),
+];
+
+const exportTaskDatasetValidation = [
+  query("status")
+    .optional()
+    .isIn(["approved", "rejected", "partially_rejected"])
+    .withMessage("Invalid export status"),
+];
+
 // Admin routes - Create Task
 router.post("/",
   authenticateToken,
@@ -127,8 +182,12 @@ router.post("/apply",
 
 
 router.post("/approve_or_reject_application",
-  authenticateToken,
+  authenticateAdmin,
   microTaskController.approveOrRejectApplication
+);
+router.post("/reject-image",
+    authenticateAdmin,
+  microTaskController.rejectTaskImage
 );
 
 // User routes - Task Statistics
@@ -136,6 +195,31 @@ router.get("/statistics",
   authenticateToken, 
   requireRole("admin", "super_admin", "QA_REVIEWER"), 
   microTaskController.getTaskStatistics
+);
+
+router.get("/:taskId/reviewed-submissions",
+  authenticateToken,
+  requireRole("admin", "super_admin"),
+  taskIdValidation,
+  adminReviewedSubmissionsValidation,
+  microTaskController.getReviewedSubmissionsForTask
+);
+
+router.post("/:taskId/reviewed-submissions/:submissionId/override",
+  authenticateToken,
+  requireRole("admin", "super_admin"),
+  taskIdValidation,
+  submissionIdValidation,
+  adminOverrideValidation,
+  microTaskController.overrideReviewedSubmission
+);
+
+router.get("/:taskId/export-dataset",
+  authenticateToken,
+  requireRole("admin", "super_admin"),
+  taskIdValidation,
+  exportTaskDatasetValidation,
+  microTaskController.exportTaskDataset
 );
 
 

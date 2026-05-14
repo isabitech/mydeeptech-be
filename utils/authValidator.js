@@ -10,9 +10,14 @@ const signupSchema = Joi.object({
     .min(7)
     .max(20)
     .required(),
-    country: Joi.string().min(2).max(100).optional(),
-    nativeLanguages: Joi.array().items(Joi.string().max(50)).optional(),
-    otherLanguages: Joi.array().items(Joi.string().max(50)).optional(),
+  country: Joi.string().min(2).max(100).optional(),
+  nativeLanguages: Joi.array().items(Joi.string().max(50)).optional(),
+  otherLanguages: Joi.array().items(Joi.string().max(50)).optional(),
+  primaryLanguage: Joi.string().max(50).allow("").optional(),
+  englishFluencyLevel: Joi.string()
+    .valid("basic", "intermediate", "advanced", "fluent", "native", "")
+    .allow("")
+    .optional(),
   domains: Joi.array()
     .items(
       Joi.object({
@@ -221,6 +226,11 @@ const dtUserProfileUpdateSchema = Joi.object({
   // Personal info updates
   personalInfo: Joi.object({
     country: Joi.string().max(50).allow(""),
+    date_of_birth: Joi.string().allow(""),
+    dateOfBirth: Joi.string().allow(""),
+    gender: Joi.string()
+      .valid("male", "female", "other", "prefer_not_to_say", "")
+      .allow(""),
     timeZone: Joi.string().max(50).allow(""),
     availableHoursPerWeek: Joi.number().min(0).max(168),
     preferredCommunicationChannel: Joi.string()

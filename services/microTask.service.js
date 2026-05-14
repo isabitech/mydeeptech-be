@@ -42,19 +42,19 @@ class MicroTaskService {
    */
   async getAllMicroTasks(query, userId) {
     try {
+
       const {
         page = 1,
         limit = 10,
         status,
         category,
         createdBy,
-        search
+        search,
       } = query;
 
     const pageNumber = parseInt(page) || 1;
     const pageSize = parseInt(limit) || 10;
     const skip = (pageNumber - 1) * pageSize;
-
 
     let matchStage = {};
 
@@ -167,6 +167,22 @@ class MicroTaskService {
                 },
               },
 
+              under_review: {
+                $sum: {
+                  $map: {
+                    input: "$submissionStatsRaw",
+                    as: "s",
+                    in: {
+                      $cond: [
+                        { $eq: ["$$s._id", "under_review"] },
+                        "$$s.count",
+                        0,
+                      ],
+                    },
+                  },
+                },
+              },
+
               approved: {
                 $sum: {
                   $map: {
@@ -186,6 +202,22 @@ class MicroTaskService {
                     as: "s",
                     in: {
                       $cond: [{ $eq: ["$$s._id", "rejected"] }, "$$s.count", 0],
+                    },
+                  },
+                },
+              },
+
+              partially_rejected: {
+                $sum: {
+                  $map: {
+                    input: "$submissionStatsRaw",
+                    as: "s",
+                    in: {
+                      $cond: [
+                        { $eq: ["$$s._id", "partially_rejected"] },
+                        "$$s.count",
+                        0,
+                      ],
                     },
                   },
                 },
@@ -233,127 +265,189 @@ class MicroTaskService {
     }
   }
 
-  async getTasksByFilters(query = {}, userId = null) {
 
-        const {
-        page = 1,
-        limit = 10,
-        status,
-        category,
-        createdBy,
-        search
-      } = query;
+async getTasksByFilters(query = {}, userId = null) {
+  const {
+    page = 1,
+    limit = 10,
+    status,
+    category,
+    createdBy,
+    search,
+  } = query;
 
-      console.log({
-       page,
-        limit,
-        status,
-        category,
-        createdBy,
-        search
-      })
+  console.log("Filters received:", { status, category, createdBy, search, userId });
 
+  const pageNumber = parseInt(page) || 1;
+  const pageSize = parseInt(limit) || 10;
+  const skip = (pageNumber - 1) * pageSize;
 
-      let filter = {
-          status: { $in: ['pending', 'ongoing', 'approved', 'processing', 'active', 'paused', 'completed', 'cancelled'] }
+    let statusFilter = {};
+
+    if (status && status === "ongoing") {
+      statusFilter = {
+        status: { $in: ["pending", "ongoing", "completed"] },
       };
+    } else if (status && status !== "all") {
+      statusFilter = { status };
+    }
 
-      if(userId) filter.applicant = userId;
-      if(createdBy) filter.createdBy = createdBy;
+  const result = await TaskApplication.aggregate([
+    //  Initial match
+    {
+      $match: {
+          ...(userId && { applicant: new mongoose.Types.ObjectId(userId) }),
+          // ...(createdBy && { createdBy: new mongoose.Types.ObjectId(createdBy) }),
+          ...statusFilter,
+      },
+    },
 
-      if(status && status.trim()) filter.status = status;
-      if(category && category.trim()) filter["task.category"] = category;
-
-      if(search && search.trim()) {
-        filter.$or = [
-          { "task.taskTitle": { $regex: search, $options: 'i' } },
-          { "task.category": { $regex: search, $options: 'i' } },
-          { "applicant.name": { $regex: search, $options: 'i' } },
-          { "applicant.email": { $regex: search, $options: 'i' } },
-        ]; 
-      }
-
-      if(status === "all")  delete filter.status;
-      if(category === "all") delete filter["task.category"];
-
-
-      const pageNumber = parseInt(page) || 1;
-      const pageSize = parseInt(limit) || 10;
-      const skip = (pageNumber - 1) * pageSize;
-
-      const result = await TaskApplication.aggregate([
-        {
-          $match: {
-            ...(userId && { applicant: new mongoose.Types.ObjectId(userId) }),
-            ...(createdBy && { createdBy: new mongoose.Types.ObjectId(createdBy) }),
-            ...(status && status !== "all" && { status }),
+    // Join task
+    {
+      $lookup: {
+        from: "tasks",
+        let: { taskId: "$task" },
+        pipeline: [
+          { $match: { $expr: { $eq: ["$_id", "$$taskId"] } } },
+          {
+            $project: {
+              taskTitle: 1,
+              category: 1,
+              status: 1,
+              description: 1,
+              payRate: 1,
+              currency: 1,
+              instructions: 1,
+              maxParticipants: 1,
+              dueDate: 1,
+              totalImagesRequired: 1,
+              isActive: 1,
+              taskLink: 1,
+            },
           },
-        },
+        ],
+        as: "task",
+      },
+    },
+    { $unwind: "$task" },
 
-        // Join task
-        {
-          $lookup: {
-            from: "tasks",
-            localField: "task",
-            foreignField: "_id",
-            as: "task",
+    // Join applicant (SAFE)
+    {
+      $lookup: {
+        from: "dtusers",
+        let: { applicantId: "$applicant" },
+        pipeline: [
+          { $match: { $expr: { $eq: ["$_id", "$$applicantId"] } } },
+          {
+            $project: {
+              fullName: 1,
+              email: 1,
+              phone: 1,
+            },
           },
-        },
-        { $unwind: "$task" },
+        ],
+        as: "applicant",
+      },
+    },
+    { $unwind: "$applicant" },
 
-        // Join applicant
-        {
-          $lookup: {
-            from: "dtusers",
-            localField: "applicant",
-            foreignField: "_id",
-            as: "applicant",
+    // Join images (NEW)
+    {
+      $lookup: {
+        from: "task_image_uploads", // confirm collection name
+        let: { imageIds: "$images" },
+        pipeline: [
+          {
+            $match: {
+              $expr: { $in: ["$_id", "$$imageIds"] },
+            },
           },
-        },
-        { $unwind: "$applicant" },
-
-        // Filtering AFTER joins
-        {
-          $match: {
-            ...(category && category !== "all" && { "task.category": category }),
-            ...(search && {
-              $or: [
-                { "task.taskTitle": { $regex: search, $options: "i" } },
-                { "task.category": { $regex: search, $options: "i" } },
-                { "applicant.fullName": { $regex: search, $options: "i" } },
-                { "applicant.email": { $regex: search, $options: "i" } },
-              ],
-            }),
+          {
+            $project: {
+              _id: 1,
+              url: 1,
+              label: 1,
+              publicId: 1,
+              uploadedAt: 1,
+              createdAt: 1,
+              updatedAt: 1,
+              metadata: 1,
+              status: 1,
+              rejectionMessage: 1,
+              reviewedBy: 1,
+              reviewedAt: 1,
+              status: 1,
+            },
           },
-        },
+          // optional: sort images
+          { $sort: { createdAt: -1 } },
+        ],
+        as: "images",
+      },
+    },
 
-        {
-          $facet: {
-            data: [
-              { $sort: { createdAt: -1 } },
-              { $skip: skip },
-              { $limit: pageSize },
-            ],
-            metadata: [
-              { $count: "total" }
-            ],
+    // Post-join filtering
+    {
+      $match: {
+        ...(category && category !== "all" && { "task.category": category }),
+        ...(search && {
+          $or: [
+            { "task.taskTitle": { $regex: search, $options: "i" } },
+            { "task.category": { $regex: search, $options: "i" } },
+            { "applicant.fullName": { $regex: search, $options: "i" } },
+            { "applicant.email": { $regex: search, $options: "i" } },
+          ],
+        }),
+      },
+    },
+
+    // Pagination + final shape
+    {
+      $facet: {
+        data: [
+          { $sort: { createdAt: -1 } },
+          { $skip: skip },
+          { $limit: pageSize },
+
+          {
+            $project: {
+              _id: 1,
+              status: 1,
+              createdAt: 1,
+              task: 1,
+              images: 1, // now populated
+              applicant: 1,
+              isComplete: 1,
+              uploadProgress: 1,
+              dueDate: 1,
+              approvedDate: 1,
+              submittedAt: 1,
+              reviewedAt: 1,
+              reviewNote: 1,
+              rejectedAt: 1,
+              rejectedBy: 1,
+              rejectionMessage: 1,
+            },
           },
-        },
-      ]);
+        ],
+        metadata: [{ $count: "total" }],
+      },
+    },
+  ]);
 
-      const tasks = result[0].data;
-      const total = result[0].metadata[0]?.total || 0;
+  const tasks = result[0]?.data || [];
+  const total = result[0]?.metadata[0]?.total || 0;
 
-      return {
-        tasks,
-        pagination: {
-          current_page: pageNumber,
-          per_page: pageSize,
-          total_items: total,
-          total_pages: Math.ceil(total / pageSize),
-        },
-      };
-  } 
+  return {
+    tasks,
+    pagination: {
+      current_page: pageNumber,
+      per_page: pageSize,
+      total_items: total,
+      total_pages: Math.ceil(total / pageSize),
+    },
+  };
+}
 
 
   async getTaskApplicationForUser(taskId, userId){
@@ -363,7 +457,7 @@ class MicroTaskService {
       })
       .populate('task', 'taskTitle category description currency payRate totalImagesRequired')
       .populate('applicant', 'fullName email')
-      .populate('images', 'url publicId label');
+      .populate('images', 'url publicId label status rejectionMessage dateTaken metadata');
       return taskApplication || null;
   }
 
@@ -381,10 +475,8 @@ class MicroTaskService {
         throw new Error("Micro task not found");
       }
 
-
-      // Get submission statistics
-      const submissionStats = await MicroTaskSubmission.aggregate([
-        { $match: { taskId: task._id } },
+      const submissionStats = await TaskApplication.aggregate([
+        { $match: { task: task._id } },
         {
           $group: {
             _id: "$status",
@@ -395,15 +487,21 @@ class MicroTaskService {
 
       const stats = {
         total: 0,
+        pending: 0,
         in_progress: 0,
         completed: 0,
         under_review: 0,
         approved: 0,
+        partially_rejected: 0,
         rejected: 0
       };
 
       submissionStats.forEach(stat => {
-        stats[stat._id] = stat.count;
+        if (["ongoing", "processing", "active"].includes(stat._id)) {
+          stats.in_progress += stat.count;
+        } else if (Object.prototype.hasOwnProperty.call(stats, stat._id)) {
+          stats[stat._id] = stat.count;
+        }
         stats.total += stat.count;
       });
 
@@ -557,7 +655,7 @@ class MicroTaskService {
             }
           }
         ]),
-        MicroTaskSubmission.aggregate([
+        TaskApplication.aggregate([
           {
             $group: {
               _id: "$status",
@@ -578,10 +676,12 @@ class MicroTaskService {
 
       const submissions = {
         total: 0,
+        pending: 0,
         in_progress: 0,
         completed: 0,
         under_review: 0,
         approved: 0,
+        partially_rejected: 0,
         rejected: 0
       };
 
@@ -591,7 +691,11 @@ class MicroTaskService {
       });
 
       submissionStats.forEach(stat => {
-        submissions[stat._id] = stat.count;
+        if (["ongoing", "processing", "active"].includes(stat._id)) {
+          submissions.in_progress += stat.count;
+        } else if (Object.prototype.hasOwnProperty.call(submissions, stat._id)) {
+          submissions[stat._id] = stat.count;
+        }
         submissions.total += stat.count;
       });
 

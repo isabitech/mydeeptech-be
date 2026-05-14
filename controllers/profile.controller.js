@@ -1,8 +1,134 @@
 const dtUserService = require("../services/dtUser.service");
 const DTUser = require("../models/dtUser.model");
+
+const getProfileDateOfBirth = (user) =>
+  user?.personal_info?.date_of_birth || user?.date_of_birth || null;
+
+const calculateAgeFromDateOfBirth = (dateOfBirth, fallbackAge = null) => {
+  if (!dateOfBirth) {
+    return fallbackAge ?? null;
+  }
+
+  const birthDate = new Date(dateOfBirth);
+  if (Number.isNaN(birthDate.getTime())) {
+    return fallbackAge ?? null;
+  }
+
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+
+  if (
+    monthDiff < 0 ||
+    (monthDiff === 0 && today.getDate() < birthDate.getDate())
+  ) {
+    age -= 1;
+  }
+
+  return age >= 0 ? age : fallbackAge ?? null;
+};
+
+const getProfileGender = (user) =>
+  user?.personal_info?.gender || user?.gender || "";
+
+const buildProfileData = (user) => {
+  const resolvedDateOfBirth = getProfileDateOfBirth(user);
+  const resolvedAge = calculateAgeFromDateOfBirth(
+    resolvedDateOfBirth,
+    user?.personal_info?.age,
+  );
+  const resolvedGender = getProfileGender(user);
+
+  return {
+    id: user._id,
+    fullName: user.fullName,
+    email: user.email,
+    phone: user.phone,
+    date_of_birth: resolvedDateOfBirth,
+    age: resolvedAge,
+    gender: resolvedGender,
+    userDomains: user.userDomains || [],
+    consent: user.consent,
+    annotatorStatus: user.annotatorStatus,
+    microTaskerStatus: user.microTaskerStatus,
+    qaStatus: user.qaStatus,
+    isEmailVerified: user.isEmailVerified,
+    hasSetPassword: user.hasSetPassword,
+    resultLink: user.resultLink,
+    personalInfo: {
+      fullName: user.fullName,
+      email: user.email,
+      phoneNumber: user.phone,
+      country: user.personal_info?.country || "",
+      dateOfBirth: resolvedDateOfBirth,
+      date_of_birth: resolvedDateOfBirth,
+      age: resolvedAge,
+      gender: resolvedGender,
+      timeZone: user.personal_info?.time_zone || "",
+      availableHoursPerWeek:
+        user.personal_info?.available_hours_per_week || 0,
+      preferredCommunicationChannel:
+        user.personal_info?.preferred_communication_channel || "",
+    },
+    paymentInfo: {
+      accountName: user.payment_info?.account_name || "",
+      accountNumber: user.payment_info?.account_number || "",
+      bankName: user.payment_info?.bank_name || "",
+      bankCode: user.payment_info?.bank_code || "",
+      bank_slug: user.payment_info?.bank_slug || "",
+      paymentMethod: user.payment_info?.payment_method || "",
+      paymentCurrency: user.payment_info?.payment_currency || "",
+    },
+    professionalBackground: {
+      educationField: user.professional_background?.education_field || "",
+      yearsOfExperience:
+        user.professional_background?.years_of_experience || 0,
+      annotationExperienceTypes:
+        user.professional_background?.annotation_experience_types || [],
+    },
+    toolExperience: user.tool_experience || [],
+    annotationSkills: user.annotation_skills || [],
+    languageProficiency: {
+      primaryLanguage: user.language_proficiency?.primary_language || "",
+      nativeLanguages: user.language_proficiency?.native_languages || [],
+      otherLanguages: user.language_proficiency?.other_languages || [],
+      englishFluencyLevel:
+        user.language_proficiency?.english_fluency_level || "",
+    },
+    systemInfo: {
+      deviceType: user.system_info?.device_type || "",
+      operatingSystem: user.system_info?.operating_system || "",
+      internetSpeedMbps: user.system_info?.internet_speed_mbps || 0,
+      powerBackup: user.system_info?.power_backup || false,
+      hasWebcam: user.system_info?.has_webcam || false,
+      hasMicrophone: user.system_info?.has_microphone || false,
+    },
+    projectPreferences: {
+      domainsOfInterest:
+        user.project_preferences?.domains_of_interest || user.domains || [],
+      availabilityType: user.project_preferences?.availability_type || "",
+      ndaSigned: user.project_preferences?.nda_signed || false,
+    },
+    attachments: {
+      resumeUrl: user.attachments?.resume_url || "",
+      idDocumentUrl: user.attachments?.id_document_url || "",
+      workSamplesUrl: user.attachments?.work_samples_url || [],
+    },
+    accountMetadata: {
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      status: user.annotatorStatus,
+      isEmailVerified: user.isEmailVerified,
+      hasSetPassword: user.hasSetPassword,
+      isAssessmentSubmitted: Boolean(user.assessmentSubmission || false),
+    },
+  };
+};
+
 class ProfileController {
   // Get DTUser profile by userId
   static async getDTUserProfile(req, res) {
+    console.log("Fetching profile for userId:", req.params.userId);
     try {
       const result = await dtUserService.getDTUserProfile(req.params.userId);
 
@@ -13,84 +139,7 @@ class ProfileController {
       }
 
       const { user } = result;
-
-      const profileData = {
-        id: user._id,
-        fullName: user.fullName,
-        email: user.email,
-        phone: user.phone,
-        userDomains: user.userDomains || [], // New structured domain relationships
-        consent: user.consent,
-        annotatorStatus: user.annotatorStatus,
-        microTaskerStatus: user.microTaskerStatus,
-        qaStatus: user.qaStatus,
-        isEmailVerified: user.isEmailVerified,
-        hasSetPassword: user.hasSetPassword,
-        resultLink: user.resultLink,
-        personalInfo: {
-          fullName: user.fullName,
-          email: user.email,
-          phoneNumber: user.phone,
-          country: user.personal_info?.country || "",
-          timeZone: user.personal_info?.time_zone || "",
-          availableHoursPerWeek:
-            user.personal_info?.available_hours_per_week || 0,
-          preferredCommunicationChannel:
-            user.personal_info?.preferred_communication_channel || "",
-        },
-        paymentInfo: {
-          accountName: user.payment_info?.account_name || "",
-          accountNumber: user.payment_info?.account_number || "",
-          bankName: user.payment_info?.bank_name || "",
-          bankCode: user.payment_info?.bank_code || "",
-          bank_slug: user.payment_info?.bank_slug || "",
-          paymentMethod: user.payment_info?.payment_method || "",
-          paymentCurrency: user.payment_info?.payment_currency || "",
-        },
-        professionalBackground: {
-          educationField: user.professional_background?.education_field || "",
-          yearsOfExperience:
-            user.professional_background?.years_of_experience || 0,
-          annotationExperienceTypes:
-            user.professional_background?.annotation_experience_types || [],
-        },
-        toolExperience: user.tool_experience || [],
-        annotationSkills: user.annotation_skills || [],
-        languageProficiency: {
-          primaryLanguage: user.language_proficiency?.primary_language || "",
-          nativeLanguages: user.language_proficiency?.native_languages || [],
-          otherLanguages: user.language_proficiency?.other_languages || [],
-          englishFluencyLevel:
-            user.language_proficiency?.english_fluency_level || "",
-        },
-        systemInfo: {
-          deviceType: user.system_info?.device_type || "",
-          operatingSystem: user.system_info?.operating_system || "",
-          internetSpeedMbps: user.system_info?.internet_speed_mbps || 0,
-          powerBackup: user.system_info?.power_backup || false,
-          hasWebcam: user.system_info?.has_webcam || false,
-          hasMicrophone: user.system_info?.has_microphone || false,
-        },
-        projectPreferences: {
-          domainsOfInterest:
-            user.project_preferences?.domains_of_interest || user.domains || [],
-          availabilityType: user.project_preferences?.availability_type || "",
-          ndaSigned: user.project_preferences?.nda_signed || false,
-        },
-        attachments: {
-          resumeUrl: user.attachments?.resume_url || "",
-          idDocumentUrl: user.attachments?.id_document_url || "",
-          workSamplesUrl: user.attachments?.work_samples_url || [],
-        },
-        accountMetadata: {
-          createdAt: user.createdAt,
-          updatedAt: user.updatedAt,
-          status: user.annotatorStatus,
-          isEmailVerified: user.isEmailVerified,
-          hasSetPassword: user.hasSetPassword,
-          isAssessmentSubmitted: Boolean(user.assessmentSubmission || false),
-        },
-      };
+      const profileData = buildProfileData(user);
 
       res.status(200).json({
         success: true,
@@ -108,6 +157,9 @@ class ProfileController {
   }
   // Update DTUser profile (PATCH endpoint)
   static async updateDTUserProfile(req, res) {
+
+    const { email } = req.user;
+
     try {
       const userResult = await dtUserService.getDTUserProfile(
         req.params.userId,
@@ -154,11 +206,51 @@ class ProfileController {
           .json({ success: false, message: "User not found" });
       }
 
-      res.status(200).json({
+      const response = await dtUserService.me(email);
+
+      const { user, token } = response;
+      const resolvedDateOfBirth = getProfileDateOfBirth(user);
+      const resolvedAge = calculateAgeFromDateOfBirth(
+        resolvedDateOfBirth,
+        user?.personal_info?.age,
+      );
+      const resolvedGender = getProfileGender(user);
+
+        res.status(200).json({
         success: true,
         message: "Profile updated successfully",
-        profile: result.updatedUser,
+         _usrinfo: { data: token },
+        token: token,
+        user: {
+          id: user._id,
+          fullName: user.fullName,
+          email: user.email,
+          phone: user.phone,
+          date_of_birth: resolvedDateOfBirth,
+          age: resolvedAge,
+          gender: resolvedGender,
+          role: user.role,
+          domains: user.domains,
+          country: user.personal_info?.country || "",
+          nativeLanguages: user.language_proficiency?.native_languages || [],
+          primaryLanguage: user.language_proficiency?.primary_language || "",
+          englishFluencyLevel: user.language_proficiency?.english_fluency_level || "",
+          otherLanguages: user.language_proficiency?.other_languages || [],
+          timeZone: user.personal_info?.time_zone || "",
+          socialsFollowed: user.socialsFollowed,
+          consent: user.consent,
+          isEmailVerified: user.isEmailVerified,
+          hasSetPassword: user.hasSetPassword,
+          annotatorStatus: user.annotatorStatus,
+          microTaskerStatus: user.microTaskerStatus,
+          qaStatus: user.qaStatus,
+          resultLink: user.resultLink,
+          isAssessmentSubmitted: Boolean(user.assessmentSubmission || false),
+          createdAt: user.createdAt,
+          updatedAt: user.updatedAt,
+        },
       });
+
     } catch (error) {
       console.error("Error updating DTUser profile:", error);
       res.status(500).json({

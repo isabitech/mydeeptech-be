@@ -1,3 +1,5 @@
+const path = require('path');
+const fs = require('fs');
 const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const multer = require('multer');
@@ -210,10 +212,25 @@ const resultFileUpload = multer({
   }
 });
 
+const uploadDir = 'uploads/';
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const storageDisk = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, uploadDir)
+    },
+    filename: function (req, file, cb) {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + path.extname(file.originalname));
+    }
+});
+
 
 const VALID_LABELS = ['View 1', 'View 2', 'View 3', 'View 4'];
 const uploadMicroTaskImages = multer({
-   storage: imageStorage,
+   storage: storageDisk, // Using disk storage for temporary files before uploading to Cloudinary
      limits: {
     fileSize: 10 * 1024 * 1024 // 10MB limit for resumes
   },
@@ -223,7 +240,7 @@ const uploadMicroTaskImages = multer({
       }
       cb(null, true);
   },
-}).fields(VALID_LABELS.map((label) => ({ name: label, maxCount: 4 })));
+}).fields(VALID_LABELS.map((label) => ({ name: label, maxCount: 5 })));
 
 // Helper functions for file operations
 const deleteCloudinaryFile = async (publicId) => {

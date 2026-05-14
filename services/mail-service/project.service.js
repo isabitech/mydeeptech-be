@@ -256,6 +256,41 @@ class ProjectMailService extends BaseMailService {
         });
     }
 
+    static async sendTaskImageRejectionNotification(recipientEmail, recipientName, taskData) {
+        
+        let htmlTemplate = this.getMailTemplate('sendTaskImageRejectionNotification');
+        
+        const message = `
+            Task Image Rejected
+            
+            We regret to inform you that one of your submitted images for the task has been rejected by our review team.
+            
+            Task: ${taskData.taskTitle}
+            Category: ${taskData.category || 'General'}
+            Rejection Message: ${taskData.rejectionMessage}
+            
+            Please review the feedback and resubmit a new image that meets our quality standards.
+        `;
+
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{applicantName}}', recipientName);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{taskTitle}}', taskData.taskTitle);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{category}}', taskData.category || 'General');
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{rejectionMessage}}', taskData.rejectionMessage || 'Quality standards not met');
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{adminName}}', taskData.adminName || 'Admin Team');
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{supportEmail}}', envConfig.email.senders.support?.email || 'support@mydeeptech.com');
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{imageId}}', taskData.imageId || 'N/A');
+
+        return await this.sendMail({
+            recipientEmail,
+            recipientName,
+            subject: 'Task Image Rejected - Action Required - MyDeepTech',
+            message,
+            htmlTemplate,
+            senderEmail: envConfig.email.senders.projects.email,
+            senderName: envConfig.email.senders.projects.name
+        });
+    }
+
 }
 
 module.exports = ProjectMailService;
