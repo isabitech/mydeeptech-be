@@ -45,7 +45,19 @@ class DtUserService {
    * Create DTUser and send verification email with timeout.
    */
   async createDTUser(payload) {
-    const { fullName, phone, email, country, domains, socialsFollowed, consent, nativeLanguages, otherLanguages, primaryLanguage, englishFluencyLevel } = payload;
+    const {
+      fullName,
+      phone,
+      email,
+      country,
+      domains,
+      socialsFollowed,
+      consent,
+      nativeLanguages,
+      otherLanguages,
+      primaryLanguage,
+      englishFluencyLevel,
+    } = payload;
     return this.authService.createDTUser(
       fullName,
       phone,

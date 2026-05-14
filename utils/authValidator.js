@@ -10,11 +10,14 @@ const signupSchema = Joi.object({
     .min(7)
     .max(20)
     .required(),
-    country: Joi.string().min(2).max(100).optional(),
-    nativeLanguages: Joi.array().items(Joi.string().max(50)).optional(),
-    otherLanguages: Joi.array().items(Joi.string().max(50)).optional(),
-    primaryLanguage: Joi.string().valid("").optional(),
-    englishFluencyLevel: Joi.string().valid("").optional(),
+  country: Joi.string().min(2).max(100).optional(),
+  nativeLanguages: Joi.array().items(Joi.string().max(50)).optional(),
+  otherLanguages: Joi.array().items(Joi.string().max(50)).optional(),
+  primaryLanguage: Joi.string().max(50).allow("").optional(),
+  englishFluencyLevel: Joi.string()
+    .valid("basic", "intermediate", "advanced", "fluent", "native", "")
+    .allow("")
+    .optional(),
   domains: Joi.array()
     .items(
       Joi.object({
