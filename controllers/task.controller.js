@@ -109,7 +109,9 @@ class MicroTaskController {
         createdBy: req.user.userId
       };
 
-      const task = await microTaskService.createMicroTask(taskData);
+      const task = await microTaskService.createMicroTask(taskData, {
+        uploadedIllustrationFiles: Array.isArray(req.files) ? req.files : [],
+      });
 
       res.status(201).json({
         success: true,
@@ -119,7 +121,7 @@ class MicroTaskController {
 
     } catch (error) {
       console.error("Error creating micro task:", error);
-      res.status(500).json({
+      res.status(error.status || 500).json({
         success: false,
         message: error.message || "Failed to create micro task"
       });
@@ -208,7 +210,11 @@ class MicroTaskController {
         taskId,
         submissionId,
         adminId,
-        req.body,
+        {
+          ...req.body,
+          actor_name: req.user?.fullName || req.user?.userDoc?.fullName || "",
+          actor_role: req.user?.role || req.user?.userDoc?.role || "admin",
+        },
       );
 
       return res.status(200).json({
@@ -637,7 +643,9 @@ class MicroTaskController {
       }
 
       const { taskId } = req.params;
-      const task = await microTaskService.updateMicroTask(taskId, req.body);
+      const task = await microTaskService.updateMicroTask(taskId, req.body, {
+        uploadedIllustrationFiles: Array.isArray(req.files) ? req.files : [],
+      });
 
       res.status(200).json({
         success: true,
@@ -647,7 +655,7 @@ class MicroTaskController {
 
     } catch (error) {
       console.error("Error updating micro task:", error);
-      res.status(500).json({
+      res.status(error.status || 500).json({
         success: false,
         message: error.message || "Failed to update micro task"
       });

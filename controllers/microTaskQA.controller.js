@@ -113,6 +113,8 @@ class MicroTaskQAController {
         {
           ...req.body,
           allow_override: isAdminActor(req),
+          actor_name: req.user?.fullName || req.user?.userDoc?.fullName || "",
+          actor_role: getActorRole(req),
         },
       );
 

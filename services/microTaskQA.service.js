@@ -2,6 +2,7 @@ const TaskApplication = require("../models/taskApplication.model");
 const TaskImageUpload = require("../models/imageUpload.model");
 const Task = require("../models/task.model");
 const DTUser = require("../models/dtUser.model");
+const ProjectMailService = require("./mail-service/project.service");
 
 class MicroTaskQAService {
   getQueueStatuses() {
@@ -104,6 +105,7 @@ class MicroTaskQAService {
       currency: task.currency || task.payRateCurrency || "USD",
       totalImagesRequired: task.totalImagesRequired || task.required_count || 0,
       dueDate: task.dueDate || task.deadline || null,
+      illustrationImages: task.illustrationImages || [],
     };
   }
 
@@ -117,6 +119,65 @@ class MicroTaskQAService {
       fullName: user.fullName || "",
       email: user.email || "",
     };
+  }
+
+  getReviewerRoleLabel(actorRole = "") {
+    const normalizedRole = String(actorRole || "")
+      .trim()
+      .toLowerCase();
+
+    if (["admin", "super_admin"].includes(normalizedRole)) {
+      return "Admin";
+    }
+
+    return "QA Reviewer";
+  }
+
+  async sendSubmissionRejectionEmail(submission, reviewData = {}) {
+    const reviewStatus = submission?.status;
+
+    if (!["rejected", "partially_rejected"].includes(reviewStatus)) {
+      return;
+    }
+
+    const recipientEmail = submission?.applicant?.email;
+    if (!recipientEmail) {
+      return;
+    }
+
+    const recipientName = submission?.applicant?.fullName || "Applicant";
+    const reviewedByRole = this.getReviewerRoleLabel(reviewData.actor_role);
+    const reviewedByName =
+      reviewData.actor_name ||
+      submission?.reviewedBy?.fullName ||
+      "MyDeepTech Review Team";
+
+    try {
+      await ProjectMailService.sendTaskSubmissionRejectionNotification(
+        recipientEmail,
+        recipientName,
+        {
+          taskTitle:
+            submission?.task?.taskTitle || submission?.task?.title || "Untitled Task",
+          category: submission?.task?.category || "General",
+          reviewStatus,
+          reviewNotes:
+            submission?.rejectionMessage ||
+            submission?.reviewNote ||
+            reviewData.review_notes ||
+            "",
+          qualityScore:
+            submission?.qaScore ?? reviewData.quality_score ?? null,
+          reviewedByRole,
+          reviewedByName,
+        },
+      );
+    } catch (emailError) {
+      console.error(
+        `Failed to send task submission rejection email to ${recipientEmail}:`,
+        emailError,
+      );
+    }
   }
 
   formatImage(image, { detailed = false } = {}) {
@@ -272,7 +333,7 @@ class MicroTaskQAService {
 
       const [submissions, total] = await Promise.all([
         TaskApplication.find(filter)
-          .populate("task", "taskTitle category payRate currency totalImagesRequired dueDate")
+          .populate("task", "taskTitle category payRate currency totalImagesRequired dueDate illustrationImages")
           .populate("applicant", "fullName email personal_info phone phoneNumber qaStatus")
           .populate("reviewedBy", "fullName email")
           .populate("images", "url publicId label status rejectionMessage qaNotes metadata reviewedBy reviewedAt createdAt")
@@ -301,7 +362,7 @@ class MicroTaskQAService {
 
   async getSubmissionById(submissionId) {
     return TaskApplication.findById(submissionId)
-      .populate("task", "taskTitle category payRate currency totalImagesRequired dueDate instructions quality_guidelines")
+      .populate("task", "taskTitle category payRate currency totalImagesRequired dueDate instructions quality_guidelines illustrationImages")
       .populate("applicant", "fullName email personal_info phone phoneNumber qaStatus date_of_birth gender")
       .populate("reviewedBy", "fullName email")
       .populate({
@@ -448,6 +509,7 @@ class MicroTaskQAService {
       }
 
       await submission.save();
+      await this.sendSubmissionRejectionEmail(submission, reviewData);
 
       return this.getSubmissionForReview(submissionId, { allowAnyStatus: true });
     } catch (error) {
@@ -784,7 +846,7 @@ class MicroTaskQAService {
 
       const [submissions, total] = await Promise.all([
         TaskApplication.find(filter)
-          .populate("task", "taskTitle category payRate currency totalImagesRequired")
+          .populate("task", "taskTitle category payRate currency totalImagesRequired illustrationImages")
           .populate("applicant", "fullName email personal_info phone phoneNumber")
           .populate("reviewedBy", "fullName email")
           .populate("images", "url publicId label status rejectionMessage qaNotes metadata reviewedBy reviewedAt createdAt")
