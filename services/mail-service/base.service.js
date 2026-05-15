@@ -90,37 +90,46 @@ class BaseMailService {
           message, 
           htmlTemplate,
           senderEmail,
-          senderName 
+          senderName,
+          mailjetMessageOptions = {},
       } = options || {};
   
       if (!recipientEmail || !subject) {
           throw new AppError({ message: 'Recipient email and subject are required', statusCode: 400 });
       }
 
+      if (!mailJet) {
+          throw new AppError({ message: 'Mailjet is not configured', statusCode: 500 });
+      }
+
       // Use provided sender details or fall back to default
       const fromEmail = senderEmail || envConfig.email.mailjet.MAILJET_SENDER_EMAIL;
       const fromName = senderName || envConfig.email.mailjet.MAILJET_SENDER_NAME || "MyDeepTech";
+
+      const messagePayload = {
+          From: {
+              Email: fromEmail,
+              Name: fromName
+          },
+          To: [
+              {
+                  Email: recipientEmail,
+                  Name: recipientName,
+              },
+          ],
+          Subject: subject,
+          HTMLPart: htmlTemplate,
+          TextPart: message,
+          ...mailjetMessageOptions,
+      };
   
           try {
              const infoMail =  await mailJet
               .post('send', { version: 'v3.1' })
               .request({
+                  AdvanceErrorHandling: true,
                   Messages: [
-                      {
-                          From: {
-                              Email: fromEmail,
-                              Name: fromName
-                          },
-                          To: [
-                              {
-                                  Email: recipientEmail,
-                                  Name: recipientName,
-                              },
-                          ],
-                          Subject: subject,
-                          HTMLPart: htmlTemplate,
-                          TextPart: message,
-                      },
+                      messagePayload,
                   ],
               });
             //   console.log('Email sent successfully via MailJet:', {

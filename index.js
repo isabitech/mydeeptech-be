@@ -23,6 +23,7 @@ const route = require("./routes/auth");
 const taskRoute = require("./routes/task");
 const adminRoute = require("./routes/admin");
 const adminEmailTrackingRoute = require("./routes/adminEmailTracking.routes");
+const marketingRoute = require("./routes/marketing.routes");
 const debugEmailRoute = require("./routes/debugEmail.routes");
 const mediaRoute = require("./routes/media");
 const notificationRoute = require("./routes/notifications");
@@ -49,7 +50,10 @@ const hvncRoutes = require("./routes/hvnc.routes");
 const assessmentReviewRoute = require("./routes/assessmentreview.routes");
 const resourceRoutes = require("./routes/resource.routes");
 const { healthCheck } = require("./controllers/health-check.controller");
-const { corsOptions } = require("./utils/cors-options.utils");
+const {
+  corsOptions,
+  corsPreflightHeaders,
+} = require("./utils/cors-options.utils");
 const errorMiddleware = require("./middleware/error.middleware");
 const notFoundMiddleware = require("./middleware/notfound-middleware");
 const SchedulerService = require("./services/scheduler.service");
@@ -73,6 +77,7 @@ app.get("/", (_req, res) => {
 app.get("/health", healthCheck);
 
 // Middleware
+app.use(corsPreflightHeaders);
 app.use(cors(corsOptions));
 
 // Add detailed Socket.IO request debugging before other middleware
@@ -125,6 +130,7 @@ app.use("/api/admin/ai-interviews", adminAiInterviewRoute);
 app.use("/api/ai-recommendations", aiRecommendationRoute);
 app.use("/api/admin", adminRoute);
 app.use("/api/admin/email-tracking", adminEmailTrackingRoute);
+app.use("/api/admin/marketing", marketingRoute);
 app.use("/api/debug/email", debugEmailRoute);
 app.use("/api/media", rateLimiters.upload, mediaRoute); // Upload rate limiting
 app.use("/api/notifications", notificationRoute);

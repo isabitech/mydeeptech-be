@@ -1,16 +1,285 @@
-const MicroTaskSubmission = require("../models/microTaskSubmission.model");
-const SubmissionImage = require("../models/submissionImage.model");
-const TaskSlot = require("../models/taskSlot.model");
-const MicroTask = require("../models/microTask.model");
+const TaskApplication = require("../models/taskApplication.model");
+const TaskImageUpload = require("../models/imageUpload.model");
+const Task = require("../models/task.model");
 const DTUser = require("../models/dtUser.model");
+const ProjectMailService = require("./mail-service/project.service");
 
 class MicroTaskQAService {
+  getQueueStatuses() {
+    return ["under_review", "completed"];
+  }
 
-  /**
-   * Get submissions pending review with filters
-   * @param {Object} query - Query filters and pagination
-   * @returns {Object} Submissions pending review
-   */
+  getReviewableStatuses(allowOverride = false) {
+    const baseStatuses = ["under_review", "completed"];
+
+    if (allowOverride) {
+      return [...baseStatuses, "approved", "rejected", "partially_rejected"];
+    }
+
+    return baseStatuses;
+  }
+
+  getImageIdsFromSubmission(submission) {
+    return (submission.images || []).map((image) =>
+      image?._id ? image._id : image,
+    );
+  }
+
+  sortImages(images = []) {
+    return [...images].sort((left, right) => {
+      const leftSequence = left?.metadata?.imageSequence ?? Number.MAX_SAFE_INTEGER;
+      const rightSequence =
+        right?.metadata?.imageSequence ?? Number.MAX_SAFE_INTEGER;
+
+      if (leftSequence !== rightSequence) {
+        return leftSequence - rightSequence;
+      }
+
+      return new Date(left.createdAt || 0) - new Date(right.createdAt || 0);
+    });
+  }
+
+  buildImageStats(images = []) {
+    const stats = {
+      total: images.length,
+      pending: 0,
+      approved: 0,
+      rejected: 0,
+      needs_replacement: 0,
+    };
+
+    images.forEach((image) => {
+      const status = image?.status || "pending";
+      if (Object.prototype.hasOwnProperty.call(stats, status)) {
+        stats[status] += 1;
+      }
+    });
+
+    return stats;
+  }
+
+  buildProgress(submission, images = []) {
+    const uploaded =
+      submission?.uploadProgress?.total ?? submission?.images?.length ?? images.length;
+    const total =
+      submission?.task?.totalImagesRequired ||
+      submission?.task?.required_count ||
+      uploaded ||
+      0;
+    const percentage = total > 0 ? Math.round((uploaded / total) * 100) : 0;
+
+    return {
+      uploaded,
+      total,
+      percentage,
+      isComplete: submission?.isComplete === true || percentage >= 100,
+    };
+  }
+
+  formatUser(user) {
+    if (!user) {
+      return null;
+    }
+
+    return {
+      _id: user._id,
+      fullName: user.fullName || "",
+      email: user.email || "",
+      qaStatus: user.qaStatus || null,
+      country:
+        user.personal_info?.country || user.country || user.personalInfo?.country || "",
+      phone: user.phone || user.phoneNumber || "",
+    };
+  }
+
+  formatTask(task) {
+    if (!task) {
+      return null;
+    }
+
+    return {
+      _id: task._id,
+      taskTitle: task.taskTitle || task.title || "",
+      category: task.category || "",
+      payRate: task.payRate || 0,
+      currency: task.currency || task.payRateCurrency || "USD",
+      totalImagesRequired: task.totalImagesRequired || task.required_count || 0,
+      dueDate: task.dueDate || task.deadline || null,
+      illustrationImages: task.illustrationImages || [],
+    };
+  }
+
+  formatReviewer(user) {
+    if (!user) {
+      return null;
+    }
+
+    return {
+      _id: user._id,
+      fullName: user.fullName || "",
+      email: user.email || "",
+    };
+  }
+
+  getReviewerRoleLabel(actorRole = "") {
+    const normalizedRole = String(actorRole || "")
+      .trim()
+      .toLowerCase();
+
+    if (["admin", "super_admin"].includes(normalizedRole)) {
+      return "Admin";
+    }
+
+    return "QA Reviewer";
+  }
+
+  async sendSubmissionRejectionEmail(submission, reviewData = {}) {
+    const reviewStatus = submission?.status;
+
+    if (!["rejected", "partially_rejected"].includes(reviewStatus)) {
+      return;
+    }
+
+    const recipientEmail = submission?.applicant?.email;
+    if (!recipientEmail) {
+      return;
+    }
+
+    const recipientName = submission?.applicant?.fullName || "Applicant";
+    const reviewedByRole = this.getReviewerRoleLabel(reviewData.actor_role);
+    const reviewedByName =
+      reviewData.actor_name ||
+      submission?.reviewedBy?.fullName ||
+      "MyDeepTech Review Team";
+
+    try {
+      await ProjectMailService.sendTaskSubmissionRejectionNotification(
+        recipientEmail,
+        recipientName,
+        {
+          taskTitle:
+            submission?.task?.taskTitle || submission?.task?.title || "Untitled Task",
+          category: submission?.task?.category || "General",
+          reviewStatus,
+          reviewNotes:
+            submission?.rejectionMessage ||
+            submission?.reviewNote ||
+            reviewData.review_notes ||
+            "",
+          qualityScore:
+            submission?.qaScore ?? reviewData.quality_score ?? null,
+          reviewedByRole,
+          reviewedByName,
+        },
+      );
+    } catch (emailError) {
+      console.error(
+        `Failed to send task submission rejection email to ${recipientEmail}:`,
+        emailError,
+      );
+    }
+  }
+
+  formatImage(image, { detailed = false } = {}) {
+    if (!image) {
+      return null;
+    }
+
+    const resolution = image.metadata?.resolution || null;
+
+    return {
+      _id: image._id,
+      url: image.url,
+      publicId: image.publicId,
+      label: image.label,
+      status: image.status,
+      rejectionMessage: image.rejectionMessage || "",
+      qaNotes: image.qaNotes || "",
+      reviewedAt: image.reviewedAt || null,
+      reviewedBy: this.formatReviewer(image.reviewedBy),
+      metadata: {
+        angle: image.metadata?.angle || image.label || null,
+        taskCategory: image.metadata?.taskCategory || null,
+        imageSequence: image.metadata?.imageSequence || null,
+        uploadTimestamp: image.metadata?.uploadTimestamp || image.createdAt || null,
+        fileSize: image.metadata?.fileSize || null,
+        resolution: resolution
+          ? {
+              width: resolution.width ?? null,
+              height: resolution.height ?? null,
+            }
+          : null,
+        fileUrl: image.metadata?.fileUrl || image.url,
+        fileName: detailed ? image.metadata?.fileName || null : undefined,
+        fileType: detailed ? image.metadata?.fileType || null : undefined,
+        dateTaken:
+          detailed ? image.metadata?.dateTaken || image.dateTaken || null : undefined,
+      },
+    };
+  }
+
+  formatSubmissionSummary(submission) {
+    const images = this.sortImages(submission.images || []);
+    const formattedImages = images.map((image) => this.formatImage(image));
+    const imageStats = this.buildImageStats(images);
+    const progress = this.buildProgress(submission, images);
+    const submittedAt = submission.submittedAt || submission.createdAt || null;
+    const daysPending = submittedAt
+      ? Math.max(
+          0,
+          Math.floor(
+            (Date.now() - new Date(submittedAt).getTime()) /
+              (1000 * 60 * 60 * 24),
+          ),
+        )
+      : 0;
+
+    return {
+      _id: submission._id,
+      status: submission.status,
+      submittedAt,
+      reviewedAt: submission.reviewedAt || null,
+      reviewNote: submission.reviewNote || "",
+      qaScore: submission.qaScore ?? null,
+      task: this.formatTask(submission.task),
+      applicant: this.formatUser(submission.applicant),
+      reviewer: this.formatReviewer(submission.reviewedBy),
+      progress,
+      imageStats,
+      images: formattedImages,
+      reviewPriority: {
+        daysPending,
+        score: daysPending + ((submission.task?.payRate || 0) * 0.1),
+      },
+    };
+  }
+
+  formatSubmissionDetail(submission) {
+    const images = this.sortImages(submission.images || []);
+    const formattedImages = images.map((image) =>
+      this.formatImage(image, { detailed: true }),
+    );
+    const imageStats = this.buildImageStats(images);
+    const progress = this.buildProgress(submission, images);
+
+    return {
+      _id: submission._id,
+      status: submission.status,
+      isComplete: submission.isComplete === true,
+      submittedAt: submission.submittedAt || submission.createdAt || null,
+      reviewedAt: submission.reviewedAt || null,
+      reviewNote: submission.reviewNote || "",
+      qaScore: submission.qaScore ?? null,
+      task: this.formatTask(submission.task),
+      applicant: this.formatUser(submission.applicant),
+      reviewer: this.formatReviewer(submission.reviewedBy),
+      progress,
+      imageStats,
+      images: formattedImages,
+      allImagesReviewed: imageStats.pending === 0,
+    };
+  }
+
   async getSubmissionsPendingReview(query = {}) {
     try {
       const {
@@ -18,167 +287,118 @@ class MicroTaskQAService {
         limit = 10,
         taskId,
         category,
-        priority = "oldest_first"
+        priority = "oldest_first",
       } = query;
 
-      const filter = { status: "under_review" };
-      if (taskId) filter.taskId = taskId;
-
-      // Sort options
-      let sort = { submission_date: 1 }; // Default: oldest first
-      if (priority === "newest_first") sort = { submission_date: -1 };
-
-      const skip = (page - 1) * limit;
-
-      let submissions = await MicroTaskSubmission.find(filter)
-        .populate("taskId", "title category payRate payRateCurrency")
-        .populate("userId", "fullName email personal_info.country")
-        .populate("reviewedBy", "fullName email")
-        .sort(sort)
-        .skip(skip)
-        .limit(parseInt(limit));
-
-      // Filter by category if specified
-      if (category) {
-        submissions = submissions.filter(sub => sub.taskId.category === category);
-      }
-
-      // Get image counts and quality info for each submission
-      const submissionsWithDetails = await Promise.all(
-        submissions.map(async (submission) => {
-          const imageStats = await SubmissionImage.aggregate([
-            { $match: { submissionId: submission._id } },
-            {
-              $group: {
-                _id: "$review_status",
-                count: { $sum: 1 }
-              }
-            }
-          ]);
-
-          const stats = {
-            total: 0,
-            pending: 0,
-            approved: 0,
-            rejected: 0,
-            needs_replacement: 0
-          };
-
-          imageStats.forEach(stat => {
-            stats[stat._id] = stat.count;
-            stats.total += stat.count;
-          });
-
-          // Calculate review priority score
-          const daysSinceSubmission = Math.floor(
-            (new Date() - new Date(submission.submission_date)) / (1000 * 60 * 60 * 24)
-          );
-
-          return {
-            ...submission.toJSON(),
-            imageStats: stats,
-            reviewPriority: {
-              daysPending: daysSinceSubmission,
-              score: daysSinceSubmission + (submission.taskId.payRate * 0.1) // Higher pay = higher priority
-            }
-          };
-        })
-      );
-
-      const total = await MicroTaskSubmission.countDocuments(filter);
-
-      return {
-        submissions: submissionsWithDetails,
-        pagination: {
-          current_page: parseInt(page),
-          per_page: parseInt(limit),
-          total_items: total,
-          total_pages: Math.ceil(total / limit)
-        },
-        statistics: await this.getReviewStatistics()
+      const pageNumber = Math.max(1, parseInt(page, 10) || 1);
+      const pageSize = Math.max(1, parseInt(limit, 10) || 10);
+      const skip = (pageNumber - 1) * pageSize;
+      const filter = {
+        status: { $in: this.getQueueStatuses() },
       };
 
+      if (taskId) {
+        filter.task = taskId;
+      }
+
+      if (category) {
+        const matchingTaskIds = await Task.find({ category }).distinct("_id");
+
+        if (filter.task) {
+          const isMatchingTask = matchingTaskIds.some(
+            (id) => id.toString() === String(filter.task),
+          );
+
+          if (!isMatchingTask) {
+            return {
+              submissions: [],
+              pagination: {
+                current_page: pageNumber,
+                per_page: pageSize,
+                total_items: 0,
+                total_pages: 0,
+              },
+              statistics: await this.getReviewStatistics(),
+            };
+          }
+        } else {
+          filter.task = { $in: matchingTaskIds };
+        }
+      }
+
+      const sort =
+        priority === "newest_first"
+          ? { submittedAt: -1, createdAt: -1 }
+          : { submittedAt: 1, createdAt: 1 };
+
+      const [submissions, total] = await Promise.all([
+        TaskApplication.find(filter)
+          .populate("task", "taskTitle category payRate currency totalImagesRequired dueDate illustrationImages")
+          .populate("applicant", "fullName email personal_info phone phoneNumber qaStatus")
+          .populate("reviewedBy", "fullName email")
+          .populate("images", "url publicId label status rejectionMessage qaNotes metadata reviewedBy reviewedAt createdAt")
+          .sort(sort)
+          .skip(skip)
+          .limit(pageSize),
+        TaskApplication.countDocuments(filter),
+      ]);
+
+      return {
+        submissions: submissions.map((submission) =>
+          this.formatSubmissionSummary(submission),
+        ),
+        pagination: {
+          current_page: pageNumber,
+          per_page: pageSize,
+          total_items: total,
+          total_pages: Math.ceil(total / pageSize),
+        },
+        statistics: await this.getReviewStatistics(),
+      };
     } catch (error) {
       throw new Error(`Error fetching submissions for review: ${error.message}`);
     }
   }
 
-  /**
-   * Get detailed submission for review
-   * @param {String} submissionId - Submission ID
-   * @returns {Object} Complete submission data for review
-   */
-  async getSubmissionForReview(submissionId) {
+  async getSubmissionById(submissionId) {
+    return TaskApplication.findById(submissionId)
+      .populate("task", "taskTitle category payRate currency totalImagesRequired dueDate instructions quality_guidelines illustrationImages")
+      .populate("applicant", "fullName email personal_info phone phoneNumber qaStatus date_of_birth gender")
+      .populate("reviewedBy", "fullName email")
+      .populate({
+        path: "images",
+        select:
+          "url publicId label status rejectionMessage qaNotes metadata reviewedBy reviewedAt createdAt dateTaken",
+        populate: {
+          path: "reviewedBy",
+          select: "fullName email",
+        },
+      });
+  }
+
+  async getSubmissionForReview(submissionId, options = {}) {
     try {
-      const submission = await MicroTaskSubmission.findById(submissionId)
-        .populate("taskId")
-        .populate("userId")
-        .populate("reviewedBy", "fullName email");
+      const { allowAnyStatus = false } = options;
+      const submission = await this.getSubmissionById(submissionId);
 
       if (!submission) {
         throw new Error("Submission not found");
       }
 
-      if (submission.status !== "under_review") {
-        throw new Error("Submission is not under review");
+      const allowedStatuses = allowAnyStatus
+        ? null
+        : this.getQueueStatuses();
+
+      if (allowedStatuses && !allowedStatuses.includes(submission.status)) {
+        throw new Error("Submission is not in the QA queue");
       }
 
-      // Get all images with slot information
-      const images = await SubmissionImage.find({ submissionId })
-        .populate("slotId")
-        .sort({ "slotId.sequence": 1 });
-
-      // Get task slots for reference
-      const allSlots = await TaskSlot.find({ taskId: submission.taskId._id })
-        .sort({ sequence: 1 });
-
-      // Map images to slots for review interface
-      const reviewSlots = allSlots.map(slot => {
-        const image = images.find(img => 
-          img.slotId._id.toString() === slot._id.toString()
-        );
-
-        return {
-          slot: {
-            _id: slot._id,
-            slot_name: slot.slot_name,
-            sequence: slot.sequence,
-            metadata: slot.metadata,
-            validation_rules: slot.validation_rules,
-            slot_instructions: slot.slot_instructions
-          },
-          image: image ? {
-            _id: image._id,
-            cloudinary_data: image.cloudinary_data,
-            image_metadata: image.image_metadata,
-            quality_check: image.quality_check,
-            review_status: image.review_status,
-            rejection_reason: image.rejection_reason
-          } : null,
-          status: image ? image.review_status : "missing"
-        };
-      });
-
-      return {
-        ...submission.toJSON(),
-        reviewSlots,
-        totalImages: images.length,
-        requiredImages: allSlots.length,
-        completionPercentage: submission.progress_percentage
-      };
-
+      return this.formatSubmissionDetail(submission);
     } catch (error) {
       throw new Error(`Error fetching submission for review: ${error.message}`);
     }
   }
 
-  /**
-   * Review individual image
-   * @param {String} imageId - Image ID
-   * @param {String} reviewerId - Reviewer ID
-   * @param {Object} reviewData - Review decision and notes
-   * @returns {Object} Updated image
-   */
   async reviewImage(imageId, reviewerId, reviewData) {
     try {
       const { status, rejection_reason, quality_notes } = reviewData;
@@ -187,303 +407,466 @@ class MicroTaskQAService {
         throw new Error("Invalid review status");
       }
 
-      const image = await SubmissionImage.findById(imageId);
+      const image = await TaskImageUpload.findById(imageId);
+
       if (!image) {
         throw new Error("Image not found");
       }
 
-      // Update image review
-      image.review_status = status;
-      image.rejection_reason = rejection_reason || "";
+      image.status = status;
+      image.rejectionMessage = rejection_reason || "";
+      image.qaNotes = quality_notes || "";
       image.reviewedBy = reviewerId;
-      image.review_date = new Date();
-
-      // Update quality check notes
-      if (quality_notes) {
-        image.quality_check.validation_notes = quality_notes;
-      }
+      image.reviewedAt = new Date();
 
       await image.save();
 
-      return await SubmissionImage.findById(imageId).populate("slotId reviewedBy");
+      const submission = await TaskApplication.findOne({ images: image._id });
+      if (submission && submission.status === "completed") {
+        submission.status = "under_review";
+        await submission.save();
+      }
 
+      return TaskImageUpload.findById(imageId).populate(
+        "reviewedBy",
+        "fullName email",
+      );
     } catch (error) {
       throw new Error(`Error reviewing image: ${error.message}`);
     }
   }
 
-  /**
-   * Complete submission review
-   * @param {String} submissionId - Submission ID
-   * @param {String} reviewerId - Reviewer ID
-   * @param {Object} reviewData - Overall review decision
-   * @returns {Object} Updated submission
-   */
   async completeSubmissionReview(submissionId, reviewerId, reviewData) {
     try {
-      const { 
-        status, // "approved", "rejected", "partially_rejected"
+      const {
+        status,
         quality_score,
         review_notes,
-        rejected_slots = []
+        allow_override = false,
       } = reviewData;
 
       if (!["approved", "rejected", "partially_rejected"].includes(status)) {
         throw new Error("Invalid review status");
       }
 
-      const submission = await MicroTaskSubmission.findById(submissionId);
+      const submission = await this.getSubmissionById(submissionId);
+
       if (!submission) {
         throw new Error("Submission not found");
       }
 
-      if (submission.status !== "under_review") {
-        throw new Error("Submission is not under review");
+      const reviewableStatuses = this.getReviewableStatuses(allow_override);
+      if (!reviewableStatuses.includes(submission.status)) {
+        throw new Error("Submission cannot be reviewed in its current state");
       }
 
-      // Validate all images have been reviewed
-      const pendingImages = await SubmissionImage.countDocuments({
-        submissionId,
-        review_status: "pending"
-      });
+      const imageIds = this.getImageIdsFromSubmission(submission);
+      const images = await TaskImageUpload.find({ _id: { $in: imageIds } });
+      const pendingImages = images.filter((image) => image.status === "pending");
+      const rejectedImages = images.filter((image) =>
+        ["rejected", "needs_replacement"].includes(image.status),
+      );
 
-      if (pendingImages > 0) {
-        throw new Error("All images must be reviewed before completing submission review");
+      if (pendingImages.length > 0) {
+        throw new Error(
+          "All images must be reviewed before completing submission review",
+        );
       }
 
-      // Update submission
+      if (status === "approved" && rejectedImages.length > 0) {
+        throw new Error(
+          "A submission cannot be approved while one or more images are rejected",
+        );
+      }
+
+      if (status === "partially_rejected" && rejectedImages.length === 0) {
+        throw new Error(
+          "A partial rejection requires at least one rejected image",
+        );
+      }
+
       submission.status = status;
       submission.reviewedBy = reviewerId;
-      submission.review_date = new Date();
-      submission.quality_score = quality_score || null;
-      submission.review_notes = review_notes || "";
+      submission.reviewedAt = new Date();
+      submission.reviewNote = review_notes || "";
+      submission.qaScore =
+        quality_score === undefined || quality_score === null
+          ? null
+          : Number(quality_score);
 
-      // Handle partial rejections
-      if (status === "partially_rejected" && rejected_slots.length > 0) {
-        submission.rejected_slots = rejected_slots.map(slot => ({
-          slotId: slot.slotId,
-          reason: slot.reason,
-          rejection_date: new Date()
-        }));
+      if (status === "approved") {
+        submission.approvedBy = reviewerId;
+        submission.approvedDate = new Date();
+        submission.rejectedBy = null;
+        submission.rejectedAt = null;
+        submission.rejectionMessage = null;
       }
 
-      // Set approval date for approved submissions
-      if (status === "approved") {
-        submission.approval_date = new Date();
-        submission.payment_status = "approved";
+      if (status === "rejected" || status === "partially_rejected") {
+        submission.rejectedBy = reviewerId;
+        submission.rejectedAt = new Date();
+        submission.rejectionMessage = review_notes || "";
       }
 
       await submission.save();
+      await this.sendSubmissionRejectionEmail(submission, reviewData);
 
-      // If partially rejected, reset submission to in_progress
-      if (status === "partially_rejected") {
-        submission.status = "in_progress";
-        await submission.save();
-      }
-
-      return await this.getSubmissionForReview(submissionId);
-
+      return this.getSubmissionForReview(submissionId, { allowAnyStatus: true });
     } catch (error) {
       throw new Error(`Error completing submission review: ${error.message}`);
     }
   }
 
-  /**
-   * Bulk approve multiple submissions
-   * @param {Array} submissionIds - Array of submission IDs
-   * @param {String} reviewerId - Reviewer ID
-   * @returns {Object} Bulk approval result
-   */
   async bulkApproveSubmissions(submissionIds, reviewerId) {
     try {
       const results = {
         approved: [],
         failed: [],
-        total: submissionIds.length
+        total: submissionIds.length,
       };
 
       for (const submissionId of submissionIds) {
         try {
-          // First approve all images
-          await SubmissionImage.updateMany(
-            { submissionId, review_status: "pending" },
-            { 
-              review_status: "approved", 
-              reviewedBy: reviewerId,
-              review_date: new Date()
-            }
+          const submission = await this.getSubmissionById(submissionId);
+
+          if (!submission) {
+            throw new Error("Submission not found");
+          }
+
+          const imageIds = this.getImageIdsFromSubmission(submission);
+
+          await TaskImageUpload.updateMany(
+            { _id: { $in: imageIds }, status: { $ne: "approved" } },
+            {
+              $set: {
+                status: "approved",
+                rejectionMessage: "",
+                qaNotes: "Bulk approved",
+                reviewedBy: reviewerId,
+                reviewedAt: new Date(),
+              },
+            },
           );
 
-          // Then approve submission
-          const submission = await this.completeSubmissionReview(submissionId, reviewerId, {
-            status: "approved",
-            quality_score: 85, // Default good quality score for bulk approval
-            review_notes: "Bulk approved - met quality standards"
-          });
+          const reviewedSubmission = await this.completeSubmissionReview(
+            submissionId,
+            reviewerId,
+            {
+              status: "approved",
+              quality_score: 85,
+              review_notes: "Bulk approved - met quality standards",
+            },
+          );
 
           results.approved.push({
             submissionId,
-            taskTitle: submission.taskId.title,
-            userName: submission.userId.fullName
+            taskTitle: reviewedSubmission.task?.taskTitle || "Unknown Task",
+            userName: reviewedSubmission.applicant?.fullName || "Unknown User",
           });
-
         } catch (error) {
           results.failed.push({
             submissionId,
-            error: error.message
+            error: error.message,
           });
         }
       }
 
       return results;
-
     } catch (error) {
       throw new Error(`Error in bulk approval: ${error.message}`);
     }
   }
 
-  /**
-   * Get review statistics for dashboard
-   * @returns {Object} Review statistics
-   */
-  async getReviewStatistics() {
+  async getReviewQueueSummary() {
     try {
-      const [submissionStats, imageStats, reviewerStats] = await Promise.all([
-        // Submission statistics
-        MicroTaskSubmission.aggregate([
-          {
-            $group: {
-              _id: "$status",
-              count: { $sum: 1 },
-              avgQualityScore: { $avg: "$quality_score" }
-            }
+      const submissions = await TaskApplication.find({
+        status: { $in: this.getQueueStatuses() },
+      })
+        .populate("task", "taskTitle category")
+        .populate("applicant", "fullName")
+        .populate("images", "status");
+
+      const queueByTaskMap = new Map();
+      let totalPendingImages = 0;
+
+      submissions.forEach((submission) => {
+        const taskId = submission.task?._id?.toString();
+        if (!taskId) {
+          return;
+        }
+
+        const submittedAt = submission.submittedAt || submission.createdAt || new Date();
+        const daysPending = Math.max(
+          0,
+          Math.floor(
+            (Date.now() - new Date(submittedAt).getTime()) / (1000 * 60 * 60 * 24),
+          ),
+        );
+
+        if (!queueByTaskMap.has(taskId)) {
+          queueByTaskMap.set(taskId, {
+            taskId,
+            taskTitle: submission.task.taskTitle || "",
+            category: submission.task.category || "",
+            pendingCount: 0,
+            totalPendingDays: 0,
+          });
+        }
+
+        const taskSummary = queueByTaskMap.get(taskId);
+        taskSummary.pendingCount += 1;
+        taskSummary.totalPendingDays += daysPending;
+
+        (submission.images || []).forEach((image) => {
+          if (image.status === "pending") {
+            totalPendingImages += 1;
           }
-        ]),
+        });
+      });
 
-        // Image statistics
-        SubmissionImage.aggregate([
-          {
-            $group: {
-              _id: "$review_status",
-              count: { $sum: 1 }
-            }
-          }
-        ]),
+      const queueByTask = Array.from(queueByTaskMap.values()).map((item) => ({
+        taskId: item.taskId,
+        taskTitle: item.taskTitle,
+        category: item.category,
+        pendingCount: item.pendingCount,
+        avgDaysPending:
+          item.pendingCount > 0
+            ? Math.round((item.totalPendingDays / item.pendingCount) * 10) / 10
+            : 0,
+      }));
 
-        // Reviewer productivity
-        MicroTaskSubmission.aggregate([
-          {
-            $match: { 
-              reviewedBy: { $ne: null },
-              review_date: { 
-                $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) // Last 7 days
-              }
-            }
-          },
-          {
-            $group: {
-              _id: "$reviewedBy",
-              reviewsCompleted: { $sum: 1 },
-              avgQualityScore: { $avg: "$quality_score" }
-            }
-          },
-          {
-            $lookup: {
-              from: "dtusers",
-              localField: "_id",
-              foreignField: "_id",
-              as: "reviewer"
-            }
-          },
-          { $unwind: "$reviewer" },
-          {
-            $project: {
-              reviewerName: "$reviewer.fullName",
-              reviewsCompleted: 1,
-              avgQualityScore: 1
-            }
-          }
-        ])
-      ]);
-
-      // Calculate review turnaround time
-      const pendingReviews = await MicroTaskSubmission.find({
-        status: "under_review"
-      }).select("submission_date");
-
-      const avgTurnaroundTime = pendingReviews.length > 0 ? 
-        pendingReviews.reduce((acc, sub) => {
-          const daysPending = Math.floor(
-            (new Date() - new Date(sub.submission_date)) / (1000 * 60 * 60 * 24)
+      const urgentReviews = submissions
+        .map((submission) => {
+          const submittedAt = submission.submittedAt || submission.createdAt || new Date();
+          const daysPending = Math.max(
+            0,
+            Math.floor(
+              (Date.now() - new Date(submittedAt).getTime()) /
+                (1000 * 60 * 60 * 24),
+            ),
           );
-          return acc + daysPending;
-        }, 0) / pendingReviews.length : 0;
+
+          return {
+            id: submission._id,
+            taskTitle: submission.task?.taskTitle || "",
+            category: submission.task?.category || "",
+            userName: submission.applicant?.fullName || "",
+            daysPending,
+          };
+        })
+        .filter((submission) => submission.daysPending >= 3)
+        .sort((left, right) => right.daysPending - left.daysPending);
+
+      const averagePendingDays =
+        queueByTask.length > 0
+          ? Math.round(
+              (queueByTask.reduce(
+                (total, item) => total + item.avgDaysPending,
+                0,
+              ) /
+                queueByTask.length) *
+                10,
+            ) / 10
+          : 0;
 
       return {
-        submissions: {
-          total: submissionStats.reduce((acc, stat) => acc + stat.count, 0),
-          under_review: submissionStats.find(s => s._id === "under_review")?.count || 0,
-          approved: submissionStats.find(s => s._id === "approved")?.count || 0,
-          rejected: submissionStats.find(s => s._id === "rejected")?.count || 0,
-          partially_rejected: submissionStats.find(s => s._id === "partially_rejected")?.count || 0
+        queueByTask,
+        totalPendingImages,
+        urgentReviews,
+        summary: {
+          totalSubmissionsPending: submissions.length,
+          totalImagesPending: totalPendingImages,
+          urgentReviewsCount: urgentReviews.length,
+          averagePendingDays,
         },
-        images: {
-          total: imageStats.reduce((acc, stat) => acc + stat.count, 0),
-          pending: imageStats.find(s => s._id === "pending")?.count || 0,
-          approved: imageStats.find(s => s._id === "approved")?.count || 0,
-          rejected: imageStats.find(s => s._id === "rejected")?.count || 0,
-          needs_replacement: imageStats.find(s => s._id === "needs_replacement")?.count || 0
-        },
-        review_performance: {
-          avg_turnaround_days: Math.round(avgTurnaroundTime * 10) / 10,
-          active_reviewers: reviewerStats.length,
-          total_reviews_this_week: reviewerStats.reduce((acc, stat) => acc + stat.reviewsCompleted, 0),
-          avg_quality_score: reviewerStats.length > 0 ? 
-            Math.round(reviewerStats.reduce((acc, stat) => acc + stat.avgQualityScore, 0) / reviewerStats.length) : 0
-        },
-        top_reviewers: reviewerStats.slice(0, 5)
+      };
+    } catch (error) {
+      throw new Error(`Error fetching review queue summary: ${error.message}`);
+    }
+  }
+
+  async getReviewStatistics() {
+    try {
+      const [submissions, images] = await Promise.all([
+        TaskApplication.find({})
+          .select("status qaScore reviewedBy reviewedAt submittedAt")
+          .lean(),
+        TaskImageUpload.find({})
+          .select("status")
+          .lean(),
+      ]);
+
+      const submissionStats = {
+        total: submissions.length,
+        under_review: 0,
+        approved: 0,
+        rejected: 0,
+        partially_rejected: 0,
       };
 
+      submissions.forEach((submission) => {
+        if (Object.prototype.hasOwnProperty.call(submissionStats, submission.status)) {
+          submissionStats[submission.status] += 1;
+        }
+      });
+
+      const imageStats = {
+        total: images.length,
+        pending: 0,
+        approved: 0,
+        rejected: 0,
+        needs_replacement: 0,
+      };
+
+      images.forEach((image) => {
+        if (Object.prototype.hasOwnProperty.call(imageStats, image.status)) {
+          imageStats[image.status] += 1;
+        }
+      });
+
+      const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      const reviewerMap = new Map();
+
+      submissions
+        .filter(
+          (submission) =>
+            submission.reviewedBy &&
+            submission.reviewedAt &&
+            new Date(submission.reviewedAt) >= oneWeekAgo,
+        )
+        .forEach((submission) => {
+          const reviewerId = submission.reviewedBy.toString();
+
+          if (!reviewerMap.has(reviewerId)) {
+            reviewerMap.set(reviewerId, {
+              reviewsCompleted: 0,
+              totalQaScore: 0,
+              qaScoreCount: 0,
+            });
+          }
+
+          const reviewerSummary = reviewerMap.get(reviewerId);
+          reviewerSummary.reviewsCompleted += 1;
+
+          if (typeof submission.qaScore === "number") {
+            reviewerSummary.totalQaScore += submission.qaScore;
+            reviewerSummary.qaScoreCount += 1;
+          }
+        });
+
+      const reviewerIds = Array.from(reviewerMap.keys());
+      const reviewers =
+        reviewerIds.length > 0
+          ? await DTUser.find({ _id: { $in: reviewerIds } })
+              .select("fullName")
+              .lean()
+          : [];
+      const reviewerNameMap = new Map(
+        reviewers.map((reviewer) => [reviewer._id.toString(), reviewer.fullName || "Unknown"]),
+      );
+
+      const topReviewers = reviewerIds
+        .map((reviewerId) => {
+          const reviewerSummary = reviewerMap.get(reviewerId);
+          const averageQaScore =
+            reviewerSummary.qaScoreCount > 0
+              ? Math.round(
+                  reviewerSummary.totalQaScore / reviewerSummary.qaScoreCount,
+                )
+              : 0;
+
+          return {
+            reviewerId,
+            reviewerName: reviewerNameMap.get(reviewerId) || "Unknown",
+            reviewsCompleted: reviewerSummary.reviewsCompleted,
+            avgQualityScore: averageQaScore,
+          };
+        })
+        .sort((left, right) => right.reviewsCompleted - left.reviewsCompleted)
+        .slice(0, 5);
+
+      const pendingReviews = submissions.filter((submission) =>
+        this.getQueueStatuses().includes(submission.status),
+      );
+
+      const avgTurnaroundTime =
+        pendingReviews.length > 0
+          ? pendingReviews.reduce((total, submission) => {
+              const submittedAt = submission.submittedAt || submission.reviewedAt || new Date();
+              const daysPending = Math.max(
+                0,
+                Math.floor(
+                  (Date.now() - new Date(submittedAt).getTime()) /
+                    (1000 * 60 * 60 * 24),
+                ),
+              );
+
+              return total + daysPending;
+            }, 0) / pendingReviews.length
+          : 0;
+
+      return {
+        submissions: submissionStats,
+        images: imageStats,
+        review_performance: {
+          avg_turnaround_days: Math.round(avgTurnaroundTime * 10) / 10,
+          active_reviewers: reviewerIds.length,
+          total_reviews_this_week: topReviewers.reduce(
+            (total, reviewer) => total + reviewer.reviewsCompleted,
+            0,
+          ),
+          avg_quality_score:
+            topReviewers.length > 0
+              ? Math.round(
+                  topReviewers.reduce(
+                    (total, reviewer) => total + reviewer.avgQualityScore,
+                    0,
+                  ) / topReviewers.length,
+                )
+              : 0,
+        },
+        top_reviewers: topReviewers,
+      };
     } catch (error) {
       throw new Error(`Error fetching review statistics: ${error.message}`);
     }
   }
 
-  /**
-   * Get submissions by reviewer
-   * @param {String} reviewerId - Reviewer ID
-   * @param {Object} query - Query options
-   * @returns {Object} Reviewer's submissions
-   */
   async getReviewerSubmissions(reviewerId, query = {}) {
     try {
       const { page = 1, limit = 10, status } = query;
+      const pageNumber = Math.max(1, parseInt(page, 10) || 1);
+      const pageSize = Math.max(1, parseInt(limit, 10) || 10);
+      const skip = (pageNumber - 1) * pageSize;
       const filter = { reviewedBy: reviewerId };
 
-      if (status) filter.status = status;
-
-      const skip = (page - 1) * limit;
+      if (status) {
+        filter.status = status;
+      }
 
       const [submissions, total] = await Promise.all([
-        MicroTaskSubmission.find(filter)
-          .populate("taskId", "title category")
-          .populate("userId", "fullName email")
-          .sort({ review_date: -1 })
+        TaskApplication.find(filter)
+          .populate("task", "taskTitle category payRate currency totalImagesRequired illustrationImages")
+          .populate("applicant", "fullName email personal_info phone phoneNumber")
+          .populate("reviewedBy", "fullName email")
+          .populate("images", "url publicId label status rejectionMessage qaNotes metadata reviewedBy reviewedAt createdAt")
+          .sort({ reviewedAt: -1, updatedAt: -1 })
           .skip(skip)
-          .limit(parseInt(limit)),
-        MicroTaskSubmission.countDocuments(filter)
+          .limit(pageSize),
+        TaskApplication.countDocuments(filter),
       ]);
 
       return {
-        submissions,
+        submissions: submissions.map((submission) =>
+          this.formatSubmissionSummary(submission),
+        ),
         pagination: {
-          current_page: parseInt(page),
-          per_page: parseInt(limit),
+          current_page: pageNumber,
+          per_page: pageSize,
           total_items: total,
-          total_pages: Math.ceil(total / limit)
-        }
+          total_pages: Math.ceil(total / pageSize),
+        },
       };
-
     } catch (error) {
       throw new Error(`Error fetching reviewer submissions: ${error.message}`);
     }

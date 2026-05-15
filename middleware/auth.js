@@ -26,7 +26,14 @@ const authenticateToken = async (req, res, next) => {
     const decoded = jwt.verify(token, envConfig.jwt.JWT_SECRET || 'your-secret-key');
 
     // Optional: Check if user still exists and is active
-    const user = await DTUser.findById(decoded.userId);
+    const user = await DTUser.findById(decoded.userId).populate({
+      path: "role_permission",
+      select: "name isActive permissions",
+      populate: {
+        path: "permissions",
+        select: "resource action",
+      },
+    });
     
     if (!user) {
       return res.status(401).json({
@@ -46,10 +53,16 @@ const authenticateToken = async (req, res, next) => {
 
     // Add user info to request object
     req.user = {
+      id: user._id.toString(),
       userId: decoded.userId,
       email: decoded.email,
       fullName: decoded.fullName,
-      userDoc: user // Full user document if needed
+      role: user.role,
+      qaStatus: user.qaStatus,
+      annotatorStatus: user.annotatorStatus,
+      microTaskerStatus: user.microTaskerStatus,
+      role_permission: user.role_permission || null,
+      userDoc: user, // Full user document if needed
     };
 
     next();

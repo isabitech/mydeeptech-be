@@ -470,7 +470,9 @@ router.post("/admin/:submissionId/review",
         feedback: req.body.feedback,
         quality_score: req.body.quality_score,
         slot_reviews: req.body.slot_reviews,
-        reviewer_id: req.user.userId
+        reviewer_id: req.user.userId,
+        reviewer_name: req.user?.fullName || req.user?.userDoc?.fullName || "",
+        reviewer_role: req.user?.role || req.user?.userDoc?.role || "",
       };
 
       const result = await microTaskSubmissionService.reviewSubmission(req.params.submissionId, reviewData);

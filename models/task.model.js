@@ -86,6 +86,57 @@ const TaskSchema = new mongoose.Schema({
         type: Number,
         default: 20,
     },
+    illustrationImages: {
+        type: [
+            {
+                url: {
+                    type: String,
+                    required: true,
+                    trim: true,
+                },
+                publicId: {
+                    type: String,
+                    default: "",
+                    trim: true,
+                },
+                thumbnail: {
+                    type: String,
+                    default: "",
+                    trim: true,
+                },
+                optimizedUrl: {
+                    type: String,
+                    default: "",
+                    trim: true,
+                },
+                originalName: {
+                    type: String,
+                    default: "",
+                    trim: true,
+                },
+                format: {
+                    type: String,
+                    default: "",
+                    trim: true,
+                },
+                resourceType: {
+                    type: String,
+                    default: "image",
+                    trim: true,
+                },
+                size: {
+                    type: Number,
+                    default: 0,
+                    min: 0,
+                },
+                uploadedAt: {
+                    type: Date,
+                    default: Date.now,
+                },
+            },
+        ],
+        default: [],
+    },
     isActive: {
         type: Boolean,
         default: true,

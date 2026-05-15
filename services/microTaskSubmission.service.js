@@ -7,6 +7,68 @@ const Task = require("../models/task.model");
 const TaskApplication = require("../models/taskApplication.model");
 const cloudinary = require("../config/cloudinary");
 const mongoose = require("mongoose");
+const ProjectMailService = require("./mail-service/project.service");
+
+const getReviewerRoleLabel = (role = "") => {
+  const normalizedRole = String(role || "")
+    .trim()
+    .toLowerCase();
+
+  if (["admin", "super_admin"].includes(normalizedRole)) {
+    return "Admin";
+  }
+
+  return "QA Reviewer";
+};
+
+const sendLegacySubmissionRejectionEmail = async (
+  submission,
+  reviewData = {},
+) => {
+  if (!submission || !["rejected", "partially_rejected"].includes(submission.status)) {
+    return;
+  }
+
+  const recipientEmail =
+    submission.user_metadata?.contact_info?.email || submission.userId?.email;
+  if (!recipientEmail) {
+    return;
+  }
+
+  const recipientName =
+    submission.user_metadata?.full_name ||
+    submission.userId?.fullName ||
+    "Applicant";
+
+  try {
+    await ProjectMailService.sendTaskSubmissionRejectionNotification(
+      recipientEmail,
+      recipientName,
+      {
+        taskTitle:
+          submission.taskId?.taskTitle ||
+          submission.taskId?.title ||
+          "Untitled Task",
+        category:
+          submission.taskId?.category ||
+          submission.system_metadata?.task_category ||
+          "General",
+        reviewStatus: submission.status,
+        reviewNotes:
+          submission.reviewer_feedback || reviewData.feedback || "",
+        qualityScore:
+          submission.quality_score ?? reviewData.quality_score ?? null,
+        reviewedByRole: getReviewerRoleLabel(reviewData.reviewer_role),
+        reviewedByName: reviewData.reviewer_name || "MyDeepTech Review Team",
+      },
+    );
+  } catch (emailError) {
+    console.error(
+      `Failed to send legacy task submission rejection email to ${recipientEmail}:`,
+      emailError,
+    );
+  }
+};
 
 /**
  * Get user's submissions with pagination
@@ -633,15 +695,17 @@ const reviewSubmission = async (submissionId, reviewData) => {
     await session.commitTransaction();
 
     // Return updated submission with populated data
-    const updatedSubmission = await MicroTaskSubmission.findById(submissionId)
+      const updatedSubmission = await MicroTaskSubmission.findById(submissionId)
       .populate({
         path: "taskId",
         select: "title category payRate payRateCurrency"
       })
       .populate({
         path: "userId",
-        select: "first_name last_name email"
+        select: "fullName email"
       });
+
+    await sendLegacySubmissionRejectionEmail(updatedSubmission, reviewData);
 
     return updatedSubmission;
   } catch (error) {

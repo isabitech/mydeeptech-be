@@ -6,6 +6,352 @@ const SubmissionImage = require("../models/submissionImage.model");
 const Task = require("../models/task.model");
 const TaskApplication = require("../models/taskApplication.model");
 const TaskSubmission = require("../models/task-submission.model");
+const {
+  getPendingTaskApplicationMatch,
+  getRawTaskApplicationStatus,
+  getTaskApplicationBucketStatus,
+} = require("../utils/taskApplicationStatus");
+const {
+  cloudinary,
+  generateThumbnail,
+  generateOptimizedUrl,
+} = require("../config/cloudinary");
+
+function createBadRequestError(message) {
+  const error = new Error(message);
+  error.status = 400;
+  return error;
+}
+
+function isProvided(value) {
+  return value !== undefined && value !== null;
+}
+
+function maybeParseJson(value, fieldName) {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return value;
+  }
+
+  if (!trimmed.startsWith("[") && !trimmed.startsWith("{")) {
+    return value;
+  }
+
+  try {
+    return JSON.parse(trimmed);
+  } catch (_error) {
+    throw createBadRequestError(`Invalid ${fieldName} JSON payload.`);
+  }
+}
+
+function normalizeNumericValue(value) {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const parsed = Number(trimmed);
+  return Number.isNaN(parsed) ? value : parsed;
+}
+
+function normalizeBooleanValue(value) {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  const trimmed = value.trim().toLowerCase();
+  if (trimmed === "true") {
+    return true;
+  }
+
+  if (trimmed === "false") {
+    return false;
+  }
+
+  return value;
+}
+
+function normalizeDateValue(value) {
+  if (!isProvided(value) || value === "") {
+    return null;
+  }
+
+  if (value instanceof Date) {
+    return value;
+  }
+
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed;
+}
+
+function normalizeIllustrationImageEntry(entry) {
+  if (typeof entry === "string") {
+    const url = entry.trim();
+    if (!url) {
+      return [];
+    }
+
+    return [
+      {
+        url,
+        publicId: "",
+        thumbnail: "",
+        optimizedUrl: "",
+        originalName: "",
+        format: "",
+        resourceType: "image",
+        size: 0,
+        uploadedAt: new Date(),
+      },
+    ];
+  }
+
+  if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+    throw createBadRequestError(
+      "Each illustration image must be a URL string or an object with a url field.",
+    );
+  }
+
+  const url = typeof entry.url === "string" ? entry.url.trim() : "";
+  if (!url) {
+    throw createBadRequestError(
+      "Each illustration image must include a non-empty url field.",
+    );
+  }
+
+  return [
+    {
+      url,
+      publicId:
+        typeof entry.publicId === "string"
+          ? entry.publicId
+          : typeof entry.public_id === "string"
+            ? entry.public_id
+            : "",
+      thumbnail: typeof entry.thumbnail === "string" ? entry.thumbnail : "",
+      optimizedUrl:
+        typeof entry.optimizedUrl === "string"
+          ? entry.optimizedUrl
+          : typeof entry.optimized_url === "string"
+            ? entry.optimized_url
+            : "",
+      originalName:
+        typeof entry.originalName === "string"
+          ? entry.originalName
+          : typeof entry.original_name === "string"
+            ? entry.original_name
+            : "",
+      format: typeof entry.format === "string" ? entry.format : "",
+      resourceType:
+        typeof entry.resourceType === "string"
+          ? entry.resourceType
+          : typeof entry.resource_type === "string"
+            ? entry.resource_type
+            : "image",
+      size:
+        Number.isFinite(Number(entry.size)) && entry.size !== ""
+          ? Number(entry.size)
+          : 0,
+      uploadedAt: entry.uploadedAt || entry.uploaded_at || new Date(),
+    },
+  ];
+}
+
+function normalizeIllustrationImages(value, fieldName = "illustrationImages") {
+  if (!isProvided(value) || value === "") {
+    return [];
+  }
+
+  const parsed = maybeParseJson(value, fieldName);
+
+  if (Array.isArray(parsed)) {
+    return parsed.flatMap((entry) =>
+      normalizeIllustrationImages(entry, fieldName),
+    );
+  }
+
+  if (typeof parsed === "string") {
+    const reparsed = maybeParseJson(parsed, fieldName);
+    if (reparsed !== parsed) {
+      return normalizeIllustrationImages(reparsed, fieldName);
+    }
+  }
+
+  return normalizeIllustrationImageEntry(parsed);
+}
+
+function buildIllustrationImageFromUploadResult(file, uploadResult) {
+  return {
+    url: uploadResult.secure_url,
+    publicId: uploadResult.public_id,
+    thumbnail: generateThumbnail(uploadResult.public_id, 200),
+    optimizedUrl: generateOptimizedUrl(uploadResult.public_id, {
+      width: 1200,
+      height: 1200,
+      crop: "limit",
+    }),
+    originalName: file.originalname || uploadResult.original_filename || "",
+    format: uploadResult.format || "",
+    resourceType: uploadResult.resource_type || "image",
+    size: uploadResult.bytes || file.size || 0,
+    uploadedAt: new Date(),
+  };
+}
+
+async function uploadIllustrationFiles(files = []) {
+  if (!Array.isArray(files) || files.length === 0) {
+    return [];
+  }
+
+  const uploadedImages = [];
+
+  try {
+    for (const file of files) {
+      const uploadResult = await new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          {
+            folder: "mydeeptech/micro_task_illustrations",
+            resource_type: "image",
+          },
+          (error, result) => {
+            if (error) {
+              reject(error);
+              return;
+            }
+
+            resolve(result);
+          },
+        );
+
+        uploadStream.end(file.buffer);
+      });
+
+      uploadedImages.push(
+        buildIllustrationImageFromUploadResult(file, uploadResult),
+      );
+    }
+
+    return uploadedImages;
+  } catch (error) {
+    await destroyIllustrationImages(uploadedImages);
+    throw new Error(
+      `Failed to upload illustration images to Cloudinary: ${error.message}`,
+    );
+  }
+}
+
+async function destroyIllustrationImage(image) {
+  const publicId = image?.publicId;
+  if (!publicId) {
+    return;
+  }
+
+  try {
+    await cloudinary.uploader.destroy(publicId, { resource_type: "image" });
+  } catch (error) {
+    console.warn(
+      `Failed to delete illustration image from Cloudinary (${publicId}): ${error.message}`,
+    );
+  }
+}
+
+async function destroyIllustrationImages(images = []) {
+  await Promise.all(
+    (images || []).map((image) => destroyIllustrationImage(image)),
+  );
+}
+
+function getIllustrationImageKeys(image = {}) {
+  return [image.publicId, image.url].filter(Boolean);
+}
+
+async function destroyIllustrationImagesIfUnreferenced(taskId, images = []) {
+  for (const image of images || []) {
+    const publicId = image?.publicId;
+    if (!publicId) {
+      continue;
+    }
+
+    const isReferencedElsewhere = await Task.exists({
+      _id: { $ne: taskId },
+      "illustrationImages.publicId": publicId,
+    });
+
+    if (!isReferencedElsewhere) {
+      await destroyIllustrationImage(image);
+    }
+  }
+}
+
+function normalizeTaskData(taskData = {}) {
+  const normalized = { ...taskData };
+
+  if (isProvided(normalized.title) && !isProvided(normalized.taskTitle)) {
+    normalized.taskTitle = normalized.title;
+  }
+
+  if (
+    isProvided(normalized.payRateCurrency) &&
+    !isProvided(normalized.currency)
+  ) {
+    normalized.currency = normalized.payRateCurrency;
+  }
+
+  if (isProvided(normalized.deadline) && !isProvided(normalized.dueDate)) {
+    normalized.dueDate = normalized.deadline;
+  }
+
+  delete normalized.title;
+  delete normalized.payRateCurrency;
+  delete normalized.deadline;
+
+  if (isProvided(normalized.payRate)) {
+    normalized.payRate = normalizeNumericValue(normalized.payRate);
+  }
+
+  if (isProvided(normalized.maxParticipants)) {
+    normalized.maxParticipants = normalizeNumericValue(
+      normalized.maxParticipants,
+    );
+  }
+
+  if (isProvided(normalized.totalImagesRequired)) {
+    normalized.totalImagesRequired = normalizeNumericValue(
+      normalized.totalImagesRequired,
+    );
+  }
+
+  if (isProvided(normalized.isActive)) {
+    normalized.isActive = normalizeBooleanValue(normalized.isActive);
+  }
+
+  if (isProvided(normalized.dueDate)) {
+    normalized.dueDate = normalizeDateValue(normalized.dueDate);
+  }
+
+  if (isProvided(normalized.imageRequirements)) {
+    normalized.imageRequirements = maybeParseJson(
+      normalized.imageRequirements,
+      "imageRequirements",
+    );
+  }
+
+  if (isProvided(normalized.illustrationImages)) {
+    normalized.illustrationImages = normalizeIllustrationImages(
+      normalized.illustrationImages,
+    );
+  }
+
+  return normalized;
+}
 
 class MicroTaskService {
   
@@ -14,23 +360,44 @@ class MicroTaskService {
    * @param {Object} taskData - Task creation data
    * @returns {Object} Created task with generated slots
    */
-  async createMicroTask(taskData) {
+  async createMicroTask(taskData, options = {}) {
     try {
+      const normalizedTaskData = normalizeTaskData(taskData);
+      const uploadedIllustrationImages = await uploadIllustrationFiles(
+        options.uploadedIllustrationFiles || [],
+      );
+
       // Validate and set required count based on category
-      if (taskData.category === "mask_collection") {
-        taskData.required_count = 20;
-      } else if (taskData.category === "age_progression") {
-        taskData.required_count = 15;
+      if (normalizedTaskData.category === "mask_collection") {
+        normalizedTaskData.required_count = 20;
+      } else if (normalizedTaskData.category === "age_progression") {
+        normalizedTaskData.required_count = 15;
       }
 
+      normalizedTaskData.illustrationImages = [
+        ...(normalizedTaskData.illustrationImages || []),
+        ...uploadedIllustrationImages,
+      ];
+
       // Create the task
-      const task = new Task(taskData);
-      const savedTask = await task.save();
+      const task = new Task(normalizedTaskData);
+      let savedTask;
+
+      try {
+        savedTask = await task.save();
+      } catch (error) {
+        await destroyIllustrationImages(uploadedIllustrationImages);
+        throw error;
+      }
 
       // Return task with slots
       return await this.getMicroTaskById(savedTask._id);
       
     } catch (error) {
+      if (error.status) {
+        throw error;
+      }
+
       throw new Error(`Error creating micro task: ${error.message}`);
     }
   }
@@ -167,6 +534,22 @@ class MicroTaskService {
                 },
               },
 
+              under_review: {
+                $sum: {
+                  $map: {
+                    input: "$submissionStatsRaw",
+                    as: "s",
+                    in: {
+                      $cond: [
+                        { $eq: ["$$s._id", "under_review"] },
+                        "$$s.count",
+                        0,
+                      ],
+                    },
+                  },
+                },
+              },
+
               approved: {
                 $sum: {
                   $map: {
@@ -186,6 +569,22 @@ class MicroTaskService {
                     as: "s",
                     in: {
                       $cond: [{ $eq: ["$$s._id", "rejected"] }, "$$s.count", 0],
+                    },
+                  },
+                },
+              },
+
+              partially_rejected: {
+                $sum: {
+                  $map: {
+                    input: "$submissionStatsRaw",
+                    as: "s",
+                    in: {
+                      $cond: [
+                        { $eq: ["$$s._id", "partially_rejected"] },
+                        "$$s.count",
+                        0,
+                      ],
                     },
                   },
                 },
@@ -244,13 +643,17 @@ async getTasksByFilters(query = {}, userId = null) {
     search,
   } = query;
 
+  console.log("Filters received:", { status, category, createdBy, search, userId });
+
   const pageNumber = parseInt(page) || 1;
   const pageSize = parseInt(limit) || 10;
   const skip = (pageNumber - 1) * pageSize;
 
     let statusFilter = {};
 
-    if (status && status === "ongoing") {
+    if (status === "pending") {
+      statusFilter = getPendingTaskApplicationMatch();
+    } else if (status && status === "ongoing") {
       statusFilter = {
         status: { $in: ["pending", "ongoing", "completed"] },
       };
@@ -263,7 +666,7 @@ async getTasksByFilters(query = {}, userId = null) {
     {
       $match: {
           ...(userId && { applicant: new mongoose.Types.ObjectId(userId) }),
-          ...(createdBy && { createdBy: new mongoose.Types.ObjectId(createdBy) }),
+          // ...(createdBy && { createdBy: new mongoose.Types.ObjectId(createdBy) }),
           ...statusFilter,
       },
     },
@@ -283,6 +686,7 @@ async getTasksByFilters(query = {}, userId = null) {
               description: 1,
               payRate: 1,
               currency: 1,
+              illustrationImages: 1,
               instructions: 1,
               maxParticipants: 1,
               dueDate: 1,
@@ -355,9 +759,7 @@ async getTasksByFilters(query = {}, userId = null) {
     // Post-join filtering
     {
       $match: {
-        ...(category && category !== "all" && {
-          "task.category": category,
-        }),
+        ...(category && category !== "all" && { "task.category": category }),
         ...(search && {
           $or: [
             { "task.taskTitle": { $regex: search, $options: "i" } },
@@ -403,7 +805,20 @@ async getTasksByFilters(query = {}, userId = null) {
     },
   ]);
 
-  const tasks = result[0]?.data || [];
+  const shouldNormalizeStatusForResponse =
+    !status || status === "all" || status === "pending";
+
+  const tasks = (result[0]?.data || []).map((task) => {
+    const workflowStatus = getRawTaskApplicationStatus(task);
+    const bucketStatus = getTaskApplicationBucketStatus(task);
+
+    return {
+      ...task,
+      status: shouldNormalizeStatusForResponse ? bucketStatus : workflowStatus,
+      workflowStatus,
+      bucketStatus,
+    };
+  });
   const total = result[0]?.metadata[0]?.total || 0;
 
   return {
@@ -423,7 +838,7 @@ async getTasksByFilters(query = {}, userId = null) {
         task: taskId,
         applicant: userId,
       })
-      .populate('task', 'taskTitle category description currency payRate totalImagesRequired')
+      .populate('task', 'taskTitle category description currency payRate totalImagesRequired illustrationImages')
       .populate('applicant', 'fullName email')
       .populate('images', 'url publicId label status rejectionMessage dateTaken metadata');
       return taskApplication || null;
@@ -443,10 +858,8 @@ async getTasksByFilters(query = {}, userId = null) {
         throw new Error("Micro task not found");
       }
 
-
-      // Get submission statistics
-      const submissionStats = await MicroTaskSubmission.aggregate([
-        { $match: { taskId: task._id } },
+      const submissionStats = await TaskApplication.aggregate([
+        { $match: { task: task._id } },
         {
           $group: {
             _id: "$status",
@@ -457,15 +870,21 @@ async getTasksByFilters(query = {}, userId = null) {
 
       const stats = {
         total: 0,
+        pending: 0,
         in_progress: 0,
         completed: 0,
         under_review: 0,
         approved: 0,
+        partially_rejected: 0,
         rejected: 0
       };
 
       submissionStats.forEach(stat => {
-        stats[stat._id] = stat.count;
+        if (["ongoing", "processing", "active"].includes(stat._id)) {
+          stats.in_progress += stat.count;
+        } else if (Object.prototype.hasOwnProperty.call(stats, stat._id)) {
+          stats[stat._id] = stat.count;
+        }
         stats.total += stat.count;
       });
 
@@ -486,21 +905,72 @@ async getTasksByFilters(query = {}, userId = null) {
    * @returns {Object} Updated task
    */
   
-  async updateMicroTask(taskId, updateData) {
+  async updateMicroTask(taskId, updateData, options = {}) {
     try {
-      const task = await Task.findByIdAndUpdate(
+      const existingTask = await Task.findById(taskId);
+
+      if (!existingTask) {
+        throw new Error("Micro task not found");
+      }
+
+      const normalizedUpdateData = normalizeTaskData(updateData);
+      const uploadedIllustrationImages = await uploadIllustrationFiles(
+        options.uploadedIllustrationFiles || [],
+      );
+      const hasIllustrationImagesField = Object.prototype.hasOwnProperty.call(
+        updateData || {},
+        "illustrationImages",
+      );
+
+      if (hasIllustrationImagesField) {
+        normalizedUpdateData.illustrationImages = [
+          ...(normalizedUpdateData.illustrationImages || []),
+          ...uploadedIllustrationImages,
+        ];
+      } else if (uploadedIllustrationImages.length > 0) {
+        normalizedUpdateData.illustrationImages = [
+          ...(existingTask.illustrationImages || []),
+          ...uploadedIllustrationImages,
+        ];
+      }
+
+      let task;
+
+      try {
+        task = await Task.findByIdAndUpdate(
         taskId,
-        updateData,
+        normalizedUpdateData,
         { new: true, runValidators: true }
       ).populate("createdBy", "fullName email");
+      } catch (error) {
+        await destroyIllustrationImages(uploadedIllustrationImages);
+        throw error;
+      }
 
       if (!task) {
         throw new Error("Micro task not found");
       }
 
+      if (hasIllustrationImagesField) {
+        const nextIllustrationImages = normalizedUpdateData.illustrationImages || [];
+        const nextImageKeys = new Set(
+          nextIllustrationImages.flatMap((image) => getIllustrationImageKeys(image)),
+        );
+        const removedImages = (existingTask.illustrationImages || []).filter(
+          (image) =>
+            !getIllustrationImageKeys(image).some((key) => nextImageKeys.has(key)),
+        );
+
+        await destroyIllustrationImagesIfUnreferenced(taskId, removedImages);
+      }
+
       return task;
 
     } catch (error) {
+      if (error.status) {
+        throw error;
+      }
+
       throw new Error(`Error updating micro task: ${error.message}`);
     }
   }
@@ -528,6 +998,10 @@ async getTasksByFilters(query = {}, userId = null) {
     );
 
     await Task.findByIdAndDelete(taskId);
+    await destroyIllustrationImagesIfUnreferenced(
+      taskId,
+      task.illustrationImages || [],
+    );
 
     return {
       success: true,
@@ -619,7 +1093,7 @@ async getTasksByFilters(query = {}, userId = null) {
             }
           }
         ]),
-        MicroTaskSubmission.aggregate([
+        TaskApplication.aggregate([
           {
             $group: {
               _id: "$status",
@@ -640,10 +1114,12 @@ async getTasksByFilters(query = {}, userId = null) {
 
       const submissions = {
         total: 0,
+        pending: 0,
         in_progress: 0,
         completed: 0,
         under_review: 0,
         approved: 0,
+        partially_rejected: 0,
         rejected: 0
       };
 
@@ -653,7 +1129,11 @@ async getTasksByFilters(query = {}, userId = null) {
       });
 
       submissionStats.forEach(stat => {
-        submissions[stat._id] = stat.count;
+        if (["ongoing", "processing", "active"].includes(stat._id)) {
+          submissions.in_progress += stat.count;
+        } else if (Object.prototype.hasOwnProperty.call(submissions, stat._id)) {
+          submissions[stat._id] = stat.count;
+        }
         submissions.total += stat.count;
       });
 

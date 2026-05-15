@@ -1,6 +1,65 @@
 const mongoose = require("mongoose");
 const { RoleType } = require("../utils/role");
-const { boolean } = require("joi");
+
+function applyVerifiedMicroTaskerApproval(doc) {
+  if (!doc) {
+    return;
+  }
+
+  if (doc.isEmailVerified && (doc.isNew || doc.isModified("isEmailVerified"))) {
+    doc.microTaskerStatus = "approved";
+  }
+}
+
+function updateSetsEmailVerified(update) {
+  if (!update) {
+    return false;
+  }
+
+  if (Array.isArray(update)) {
+    return update.some((stage) => {
+      const stageSet = stage?.$set || stage?.$addFields;
+      return stageSet?.isEmailVerified === true;
+    });
+  }
+
+  return (
+    update.isEmailVerified === true ||
+    update.$set?.isEmailVerified === true ||
+    update.$setOnInsert?.isEmailVerified === true
+  );
+}
+
+function applyVerifiedMicroTaskerApprovalToUpdate(update) {
+  if (!update || !updateSetsEmailVerified(update)) {
+    return update;
+  }
+
+  if (Array.isArray(update)) {
+    const setStage = update.find((stage) => stage?.$set && !Array.isArray(stage.$set));
+
+    if (setStage) {
+      setStage.$set.microTaskerStatus = "approved";
+      return update;
+    }
+
+    update.push({ $set: { microTaskerStatus: "approved" } });
+    return update;
+  }
+
+  const hasAtomicOperators = Object.keys(update).some((key) => key.startsWith("$"));
+
+  if (hasAtomicOperators) {
+    update.$set = {
+      ...(update.$set || {}),
+      microTaskerStatus: "approved",
+    };
+    return update;
+  }
+
+  update.microTaskerStatus = "approved";
+  return update;
+}
 
 const dtUserSchema = new mongoose.Schema(
   {
@@ -329,8 +388,11 @@ const dtUserSchema = new mongoose.Schema(
   dtUserSchema.set("toObject", { virtuals: true });
   dtUserSchema.set("toJSON", { virtuals: true });
 
+  // Automatically approve microtaskers when email verification succeeds.
   // Pre-save middleware to calculate age from date of birth
   dtUserSchema.pre("save", function(next) {
+    applyVerifiedMicroTaskerApproval(this);
+
     if (this.personal_info.date_of_birth) {
       const today = new Date();
       const birthDate = new Date(this.personal_info.date_of_birth);
@@ -344,6 +406,14 @@ const dtUserSchema = new mongoose.Schema(
       this.personal_info.age = age;
     }
     next();
+  });
+
+  ["findOneAndUpdate", "updateOne", "updateMany", "update"].forEach((hook) => {
+    dtUserSchema.pre(hook, function(next) {
+      const update = this.getUpdate();
+      this.setUpdate(applyVerifiedMicroTaskerApprovalToUpdate(update));
+      next();
+    });
   });
 
   // Method to check if profile is complete for micro tasks
