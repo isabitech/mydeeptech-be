@@ -194,9 +194,10 @@ class ProfileController {
         if (result.reason === "not_verified") {
           return res.status(403).json({
             success: false,
-            message: "Profile updates are only allowed for verified annotators",
-            code: "NOT_VERIFIED",
-            currentStatus: result.currentStatus,
+            message:
+              "Email verification is required before updating your profile.",
+            code: "EMAIL_NOT_VERIFIED",
+            isEmailVerified: false,
           });
         }
       }

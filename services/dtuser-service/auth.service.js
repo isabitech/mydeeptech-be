@@ -411,14 +411,11 @@ class AuthService {
       return { status: 404, reason: "not_found" };
     }
 
-    if (
-      user.annotatorStatus !== "verified" &&
-      user.annotatorStatus !== "approved"
-    ) {
+    if (!user.isEmailVerified) {
       return {
         status: 403,
         reason: "not_verified",
-        currentStatus: user.annotatorStatus,
+        isEmailVerified: false,
       };
     }
 
