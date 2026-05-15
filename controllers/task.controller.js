@@ -252,6 +252,76 @@ function serializeTaskApplicationForResponse(taskApplication) {
 }
 
 class MicroTaskController {
+  constructor() {
+    this.applyTaskDatasetExportHeaders =
+      this.applyTaskDatasetExportHeaders.bind(this);
+    this.streamTaskDatasetExportResponse =
+      this.streamTaskDatasetExportResponse.bind(this);
+    this.getTaskDatasetExportStatusCode =
+      this.getTaskDatasetExportStatusCode.bind(this);
+    this.exportTaskDataset = this.exportTaskDataset.bind(this);
+    this.exportSingleTaskSubmissionDataset =
+      this.exportSingleTaskSubmissionDataset.bind(this);
+  }
+
+  applyTaskDatasetExportHeaders(res, exportContext) {
+    res.setHeader("X-Exported-Task-Id", exportContext.summary.taskId);
+    res.setHeader(
+      "X-Exported-Task-Status",
+      exportContext.summary.status,
+    );
+    res.setHeader(
+      "X-Exported-Submission-Count",
+      String(exportContext.summary.totalSubmissions),
+    );
+    res.setHeader(
+      "X-Exported-Image-Count",
+      String(exportContext.summary.totalImages),
+    );
+
+    if (exportContext.summary.submissionId) {
+      res.setHeader(
+        "X-Exported-Submission-Id",
+        exportContext.summary.submissionId,
+      );
+    }
+  }
+
+  async streamTaskDatasetExportResponse(res, exportContext) {
+    this.applyTaskDatasetExportHeaders(res, exportContext);
+    res.setHeader("X-Export-Mode", "stream");
+    res.status(200);
+    res.type(exportContext.contentType);
+    res.attachment(exportContext.fileName);
+    if (typeof res.flushHeaders === "function") {
+      res.flushHeaders();
+    }
+
+    await microTaskAdminService.streamPreparedTaskDatasetExport(
+      exportContext,
+      res,
+    );
+  }
+
+  getTaskDatasetExportStatusCode(error) {
+    if (
+      error.message.includes("Micro task not found") ||
+      error.message.includes("No submissions found") ||
+      error.message.includes("Submission not found")
+    ) {
+      return 404;
+    }
+
+    if (
+      error.message.includes("Invalid export status") ||
+      error.message.includes("Submission status is not exportable")
+    ) {
+      return 400;
+    }
+
+    return 500;
+  }
+
   /**
    * Create a new micro task (Admin only)
    */
@@ -425,31 +495,7 @@ class MicroTaskController {
         },
       );
 
-      res.setHeader("X-Exported-Task-Id", exportContext.summary.taskId);
-      res.setHeader(
-        "X-Exported-Task-Status",
-        exportContext.summary.status,
-      );
-      res.setHeader(
-        "X-Exported-Submission-Count",
-        String(exportContext.summary.totalSubmissions),
-      );
-      res.setHeader(
-        "X-Exported-Image-Count",
-        String(exportContext.summary.totalImages),
-      );
-      res.setHeader("X-Export-Mode", "stream");
-      res.status(200);
-      res.type(exportContext.contentType);
-      res.attachment(exportContext.fileName);
-      if (typeof res.flushHeaders === "function") {
-        res.flushHeaders();
-      }
-
-      await microTaskAdminService.streamPreparedTaskDatasetExport(
-        exportContext,
-        res,
-      );
+      await this.streamTaskDatasetExportResponse(res, exportContext);
       return;
     } catch (error) {
       console.error("Error exporting task dataset:", error);
@@ -461,17 +507,53 @@ class MicroTaskController {
         return;
       }
 
-      const statusCode =
-        error.message.includes("Micro task not found") ||
-        error.message.includes("No submissions found")
-          ? 404
-          : error.message.includes("Invalid export status")
-            ? 400
-            : 500;
+      const statusCode = this.getTaskDatasetExportStatusCode(error);
 
       return res.status(statusCode).json({
         success: false,
         message: error.message || "Failed to export task dataset",
+      });
+    }
+  }
+
+  async exportSingleTaskSubmissionDataset(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: "Validation failed",
+          errors: errors.array(),
+        });
+      }
+
+      const { taskId, submissionId } = req.params;
+      const exportContext =
+        await microTaskAdminService.prepareSingleTaskSubmissionDatasetExport(
+          taskId,
+          submissionId,
+          {
+            exportedBy: req.user?.userId || req.user?.id,
+          },
+        );
+
+      await this.streamTaskDatasetExportResponse(res, exportContext);
+      return;
+    } catch (error) {
+      console.error("Error exporting single task submission dataset:", error);
+
+      if (res.headersSent) {
+        if (typeof res.destroy === "function" && res.destroyed !== true) {
+          res.destroy(error);
+        }
+        return;
+      }
+
+      const statusCode = this.getTaskDatasetExportStatusCode(error);
+
+      return res.status(statusCode).json({
+        success: false,
+        message: error.message || "Failed to export single task submission dataset",
       });
     }
   }

@@ -300,6 +300,14 @@ router.post("/:taskId/reviewed-submissions/:submissionId/override",
   microTaskController.overrideReviewedSubmission
 );
 
+router.get("/:taskId/reviewed-submissions/:submissionId/export-dataset",
+  authenticateToken,
+  requireRole("admin", "super_admin"),
+  taskIdValidation,
+  submissionIdValidation,
+  microTaskController.exportSingleTaskSubmissionDataset
+);
+
 router.get("/:taskId/export-dataset",
   authenticateToken,
   requireRole("admin", "super_admin"),
