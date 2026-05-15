@@ -11,6 +11,10 @@ const microTaskAdminService = require("../services/microTaskAdmin.service");
 const { validationResult } = require("express-validator");
 const cloudinary = require('cloudinary').v2;
 const ProjectMailService = require('../services/mail-service/project.service');
+const {
+  getRawTaskApplicationStatus,
+  getTaskApplicationBucketStatus,
+} = require("../utils/taskApplicationStatus");
 
 const VALID_LABELS = ['View 1', 'View 2', 'View 3', 'View 4'];
 const REQUIRED_PER_LABEL = 4;
@@ -86,6 +90,25 @@ function buildRemainingBreakdown(progress) {
         acc[label] = Math.max(0, REQUIRED_PER_LABEL - (progress[label] || 0));
         return acc;
     }, {});
+}
+
+function serializeTaskApplicationForResponse(taskApplication) {
+  if (!taskApplication) {
+    return taskApplication;
+  }
+
+  const serializedTaskApplication =
+    typeof taskApplication.toObject === "function"
+      ? taskApplication.toObject()
+      : taskApplication;
+
+  const workflowStatus = getRawTaskApplicationStatus(serializedTaskApplication);
+
+  return {
+    ...serializedTaskApplication,
+    workflowStatus,
+    status: getTaskApplicationBucketStatus(serializedTaskApplication),
+  };
 }
 
 class MicroTaskController {
@@ -367,6 +390,7 @@ class MicroTaskController {
       applicant: userId,
       assignedBy: null,
       dueDate: task.dueDate,
+      status: "pending",
     });
 
     const savedAssignment = await newAssignment.save();
@@ -381,7 +405,7 @@ class MicroTaskController {
     return res.status(201).json({
       success: true,
       message: 'Applied for task successfully. Awaiting admin review.',
-      data: savedAssignment,
+      data: serializeTaskApplicationForResponse(savedAssignment),
     });
   }
 
@@ -624,7 +648,7 @@ class MicroTaskController {
     res.status(200).json({
       success: true,
       message: "Micro task retrieved successfully",
-      data: taskApplication
+      data: serializeTaskApplicationForResponse(taskApplication)
     });
   }
 
@@ -1151,7 +1175,8 @@ async uploadTaskImages(req, res) {
                 : `${uploadedFiles.length} image(s) uploaded. Keep going!`,
             data: {
                 submissionId: taskSubmission._id,
-                assignmentStatus: taskSubmission.status,
+                assignmentStatus: getTaskApplicationBucketStatus(taskSubmission),
+                workflowStatus: getRawTaskApplicationStatus(taskSubmission),
                 isComplete: taskSubmission.isComplete,
                 uploadProgress: taskSubmission.uploadProgress,
                 remaining: buildRemainingBreakdown(taskSubmission.uploadProgress),
@@ -1294,7 +1319,8 @@ async uploadTaskImages(req, res) {
       message: "Image deleted successfully",
       data: {
         submissionId: taskSubmission._id,
-        assignmentStatus: assignment.status,
+        assignmentStatus: getTaskApplicationBucketStatus(assignment),
+        workflowStatus: getRawTaskApplicationStatus(assignment),
         remainingImages: taskSubmission.images.length,
         uploadProgress: taskSubmission.uploadProgress,
         remaining: buildRemainingBreakdown(taskSubmission.uploadProgress),
@@ -1387,7 +1413,8 @@ async getTaskSubmissionByIdAndDeleteImage(req, res) {
     message: "Image deleted successfully.",
     data: {
       taskApplicationId: taskSubmission._id,
-      assignmentStatus: refreshed.status,
+      assignmentStatus: getTaskApplicationBucketStatus(refreshed),
+      workflowStatus: getRawTaskApplicationStatus(refreshed),
       isComplete: refreshed.isComplete,
       remainingImages: refreshed.images.length,
       uploadProgress: refreshed.uploadProgress,

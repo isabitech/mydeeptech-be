@@ -2,6 +2,7 @@ const DTUser = require("../models/dtUser.model");
 const MarketingCampaign = require("../models/marketingCampaign.model");
 const BaseMailService = require("./mail-service/base.service");
 const envConfig = require("../config/envConfig");
+const AppError = require("../utils/app-error");
 
 class MarketingService {
   constructor() {
@@ -24,8 +25,42 @@ class MarketingService {
     });
   }
 
+  countRecipientsByStatus(recipients = [], status = "") {
+    return recipients.filter((recipient) => recipient?.status === status).length;
+  }
+
+  updateCampaignDeliveryCounts(campaign) {
+    campaign.sentCount = this.countRecipientsByStatus(campaign.recipients, "sent");
+    campaign.failedCount = this.countRecipientsByStatus(
+      campaign.recipients,
+      "failed",
+    );
+  }
+
+  queueCampaignProcessing(campaignId) {
+    setImmediate(() => {
+      this.processCampaign(campaignId).catch((error) => {
+        console.error("Error processing marketing campaign:", error);
+      });
+    });
+  }
+
   normalizeEmail(email = "") {
     return String(email || "").trim().toLowerCase();
+  }
+
+  normalizeRecipientEmailList(recipientEmails = []) {
+    if (!Array.isArray(recipientEmails)) {
+      return [];
+    }
+
+    return Array.from(
+      new Set(
+        recipientEmails
+          .map((email) => this.normalizeEmail(email))
+          .filter(Boolean),
+      ),
+    );
   }
 
   normalizeFilterValue(value = "") {
@@ -478,7 +513,21 @@ class MarketingService {
 
     return {
       provider: "mailjet",
-      messageId: messageInfo?.MessageUUID || messageInfo?.MessageID || "",
+      messageId: messageInfo?.MessageID || messageInfo?.MessageUUID || "",
+    };
+  }
+
+  buildMailjetCampaignMetadata(campaign, recipient = {}) {
+    const campaignId = campaign?._id?.toString?.() || "";
+    const normalizedRecipientEmail = this.normalizeEmail(recipient?.email);
+
+    return {
+      CustomCampaign: campaignId ? `marketing-${campaignId}` : "marketing",
+      DeduplicateCampaign: true,
+      CustomID: ["marketing", campaignId, normalizedRecipientEmail]
+        .filter(Boolean)
+        .join(":")
+        .slice(0, 255),
     };
   }
 
@@ -494,6 +543,10 @@ class MarketingService {
       htmlTemplate: content.htmlContent,
       senderEmail: sender.email,
       senderName: sender.name,
+      mailjetMessageOptions: this.buildMailjetCampaignMetadata(
+        campaign,
+        recipient,
+      ),
     };
 
     const result = await BaseMailService.sendMailWithMailJet(mailOptions);
@@ -631,15 +684,88 @@ class MarketingService {
       lastError: "",
     });
 
-    setImmediate(() => {
-      this.processCampaign(campaign._id.toString()).catch((error) => {
-        console.error("Error processing marketing campaign:", error);
-      });
-    });
+    this.queueCampaignProcessing(campaign._id.toString());
 
     return this.formatCampaignSummary(campaign.toObject(), {
       includeSampleRecipients: true,
     });
+  }
+
+  async retryCampaign(campaignId, payload = {}) {
+    const normalizedCampaignId = String(campaignId || "").trim();
+    const campaign = await MarketingCampaign.findById(normalizedCampaignId);
+
+    if (!campaign) {
+      throw new AppError({
+        message: "Marketing campaign not found",
+        statusCode: 404,
+      });
+    }
+
+    if (
+      campaign.status === "sending" ||
+      this.activeCampaignIds.has(normalizedCampaignId)
+    ) {
+      throw new AppError({
+        message: "Marketing campaign is currently sending and cannot be retried",
+        statusCode: 409,
+      });
+    }
+
+    const recipientEmails = this.normalizeRecipientEmailList(
+      payload?.recipientEmails,
+    );
+    const recipientEmailSet = recipientEmails.length
+      ? new Set(recipientEmails)
+      : null;
+
+    let retriedRecipientCount = 0;
+
+    campaign.recipients.forEach((recipient) => {
+      if (!recipient || recipient.status !== "failed") {
+        return;
+      }
+
+      const normalizedRecipientEmail = this.normalizeEmail(recipient.email);
+
+      if (
+        recipientEmailSet &&
+        !recipientEmailSet.has(normalizedRecipientEmail)
+      ) {
+        return;
+      }
+
+      recipient.status = "pending";
+      recipient.providerMessageId = "";
+      recipient.errorMessage = "";
+      recipient.sentAt = null;
+      retriedRecipientCount += 1;
+    });
+
+    if (retriedRecipientCount === 0) {
+      throw new AppError({
+        message: recipientEmailSet
+          ? "No failed recipients matched the requested recipientEmails"
+          : "No failed recipients are available to retry",
+        statusCode: 400,
+      });
+    }
+
+    this.updateCampaignDeliveryCounts(campaign);
+    campaign.status = "queued";
+    campaign.completedAt = null;
+    campaign.lastError = "";
+    campaign.markModified("recipients");
+    await campaign.save();
+
+    this.queueCampaignProcessing(normalizedCampaignId);
+
+    return {
+      retriedRecipientCount,
+      campaign: this.formatCampaignSummary(campaign.toObject(), {
+        includeSampleRecipients: true,
+      }),
+    };
   }
 
   async processCampaign(campaignId) {
@@ -695,7 +821,7 @@ class MarketingService {
         for (let recipientIndex = batchStartIndex; recipientIndex < batchEndIndex; recipientIndex += 1) {
           const recipient = campaign.recipients[recipientIndex];
 
-          if (!recipient || recipient.status === "sent") {
+          if (!recipient || recipient.status !== "pending") {
             continue;
           }
 
@@ -724,13 +850,7 @@ class MarketingService {
           }
         }
 
-        campaign.sentCount = campaign.recipients.filter(
-          (recipient) => recipient.status === "sent",
-        ).length;
-        campaign.failedCount = campaign.recipients.filter(
-          (recipient) => recipient.status === "failed",
-        ).length;
-
+        this.updateCampaignDeliveryCounts(campaign);
         campaign.markModified("recipients");
         await campaign.save();
 
@@ -742,12 +862,7 @@ class MarketingService {
         }
       }
 
-      campaign.sentCount = campaign.recipients.filter(
-        (recipient) => recipient.status === "sent",
-      ).length;
-      campaign.failedCount = campaign.recipients.filter(
-        (recipient) => recipient.status === "failed",
-      ).length;
+      this.updateCampaignDeliveryCounts(campaign);
       campaign.completedAt = new Date();
       campaign.status =
         campaign.failedCount > 0

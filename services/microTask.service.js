@@ -7,6 +7,11 @@ const Task = require("../models/task.model");
 const TaskApplication = require("../models/taskApplication.model");
 const TaskSubmission = require("../models/task-submission.model");
 const {
+  getPendingTaskApplicationMatch,
+  getRawTaskApplicationStatus,
+  getTaskApplicationBucketStatus,
+} = require("../utils/taskApplicationStatus");
+const {
   cloudinary,
   generateThumbnail,
   generateOptimizedUrl,
@@ -646,7 +651,9 @@ async getTasksByFilters(query = {}, userId = null) {
 
     let statusFilter = {};
 
-    if (status && status === "ongoing") {
+    if (status === "pending") {
+      statusFilter = getPendingTaskApplicationMatch();
+    } else if (status && status === "ongoing") {
       statusFilter = {
         status: { $in: ["pending", "ongoing", "completed"] },
       };
@@ -798,7 +805,20 @@ async getTasksByFilters(query = {}, userId = null) {
     },
   ]);
 
-  const tasks = result[0]?.data || [];
+  const shouldNormalizeStatusForResponse =
+    !status || status === "all" || status === "pending";
+
+  const tasks = (result[0]?.data || []).map((task) => {
+    const workflowStatus = getRawTaskApplicationStatus(task);
+    const bucketStatus = getTaskApplicationBucketStatus(task);
+
+    return {
+      ...task,
+      status: shouldNormalizeStatusForResponse ? bucketStatus : workflowStatus,
+      workflowStatus,
+      bucketStatus,
+    };
+  });
   const total = result[0]?.metadata[0]?.total || 0;
 
   return {

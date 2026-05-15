@@ -2,6 +2,29 @@ const Task = require('../models/task.model');
 const TaskApplication = require('../models/taskApplication.model');
 const { taskAssignmentSchema, createTaskValidator} = require('../utils/authValidator');
 const DTUser = require('../models/dtUser.model');
+const {
+    getRawTaskApplicationStatus,
+    getTaskApplicationBucketStatus,
+} = require('../utils/taskApplicationStatus');
+
+const serializeAssignmentForResponse = (assignment) => {
+    const serializedAssignment =
+        typeof assignment?.toObject === 'function'
+            ? assignment.toObject()
+            : assignment;
+
+    if (!serializedAssignment) {
+        return serializedAssignment;
+    }
+
+    const workflowStatus = getRawTaskApplicationStatus(serializedAssignment);
+
+    return {
+        ...serializedAssignment,
+        workflowStatus,
+        status: getTaskApplicationBucketStatus(serializedAssignment),
+    };
+};
 
 const createTask = async (req, res) =>  {
 
@@ -333,18 +356,23 @@ const getMyTasks = async (req, res) => {
     const { page = 1, limit = 20 } = req.query;
 
     const { userId } = req.user
-    const assignments = await TaskApplication.find({ assignedTo: userId })
+    const assignmentFilter = {
+        $or: [{ assignedTo: userId }, { applicant: userId }],
+    };
+
+    const assignments = await TaskApplication.find(assignmentFilter)
         .populate('task', 'taskTitle description dueDate createdBy payRate currency category')
         .populate('assignedBy', 'fullName email')
+        .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit);
 
-    const total = await TaskApplication.countDocuments({ assignedTo: userId });
+    const total = await TaskApplication.countDocuments(assignmentFilter);
 
     res.status(200).json({
         success: true,
         message: 'My assigned tasks fetched successfully',
-        data: assignments,
+        data: assignments.map(serializeAssignmentForResponse),
         pagination: {
             total,
             page: Number(page),
