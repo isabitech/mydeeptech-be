@@ -4,15 +4,92 @@ const microTaskController = require("../controllers/task.controller");
 const { body, param, query } = require("express-validator");
 const { authenticateToken } = require("../middleware/auth");
 const { requireRole } = require("../middleware/permission-role.middleware");
-const { imageUpload, uploadMicroTaskImages } = require("../config/cloudinary");
+const {
+  uploadMicroTaskIllustrations,
+  uploadMicroTaskImages,
+} = require("../config/cloudinary");
 const { authenticateAdmin } = require("../middleware/adminAuth.js");
+
+const getFirstBodyValue = (bodyPayload, fieldNames = []) => {
+  for (const fieldName of fieldNames) {
+    if (bodyPayload?.[fieldName] !== undefined) {
+      return bodyPayload[fieldName];
+    }
+  }
+
+  return undefined;
+};
+
+const validateTaskStringField = ({
+  fieldNames,
+  label,
+  min,
+  max,
+  required = false,
+}) =>
+  body().custom((_, { req }) => {
+    const rawValue = getFirstBodyValue(req.body, fieldNames);
+
+    if (
+      !required &&
+      (rawValue === undefined || rawValue === null || rawValue === "")
+    ) {
+      return true;
+    }
+
+    if (typeof rawValue !== "string") {
+      throw new Error(`${label} must be a string`);
+    }
+
+    const trimmedValue = rawValue.trim();
+
+    if (trimmedValue.length < min || trimmedValue.length > max) {
+      throw new Error(`${label} must be between ${min} and ${max} characters`);
+    }
+
+    return true;
+  });
+
+const validateTaskEnumField = ({ fieldNames, label, allowedValues }) =>
+  body().custom((_, { req }) => {
+    const rawValue = getFirstBodyValue(req.body, fieldNames);
+
+    if (rawValue === undefined || rawValue === null || rawValue === "") {
+      return true;
+    }
+
+    if (!allowedValues.includes(rawValue)) {
+      throw new Error(`Invalid ${label.toLowerCase()}`);
+    }
+
+    return true;
+  });
+
+const validateTaskDateField = ({ fieldNames, label }) =>
+  body().custom((_, { req }) => {
+    const rawValue = getFirstBodyValue(req.body, fieldNames);
+
+    if (rawValue === undefined || rawValue === null || rawValue === "") {
+      return true;
+    }
+
+    const parsedDate = new Date(rawValue);
+    if (Number.isNaN(parsedDate.getTime())) {
+      throw new Error(`${label} must be a valid date`);
+    }
+
+    return true;
+  });
 
 // Validation rules
 const createTaskValidation = [
-  body("title")
-    .trim()
-    .isLength({ min: 3, max: 200 })
-    .withMessage("Title must be between 3 and 200 characters"),
+  validateTaskStringField({
+    fieldNames: ["title", "taskTitle"],
+    label: "Title",
+    min: 3,
+    max: 200,
+    required: true,
+  }),
   
   body("description")
     .trim()
@@ -27,20 +104,21 @@ const createTaskValidation = [
     .isFloat({ min: 0 })
     .withMessage("Pay rate must be a positive number"),
   
-  body("payRateCurrency")
-    .optional()
-    .isIn(["USD", "EUR", "GBP", "NGN", "KES", "GHS"])
-    .withMessage("Invalid currency"),
+  validateTaskEnumField({
+    fieldNames: ["payRateCurrency", "currency"],
+    label: "currency",
+    allowedValues: ["USD", "EUR", "GBP", "NGN", "KES", "GHS"],
+  }),
   
   body("maxParticipants")
     .optional()
     .isInt({ min: 1 })
     .withMessage("Max participants must be a positive integer"),
   
-  body("deadline")
-    .optional()
-    .isISO8601()
-    .withMessage("Deadline must be a valid date"),
+  validateTaskDateField({
+    fieldNames: ["deadline", "dueDate"],
+    label: "Deadline",
+  }),
   
   body("instructions")
     .optional()
@@ -54,11 +132,12 @@ const createTaskValidation = [
 ];
 
 const updateTaskValidation = [
-  body("title")
-    .optional()
-    .trim()
-    .isLength({ min: 3, max: 200 })
-    .withMessage("Title must be between 3 and 200 characters"),
+  validateTaskStringField({
+    fieldNames: ["title", "taskTitle"],
+    label: "Title",
+    min: 3,
+    max: 200,
+  }),
   
   body("description")
     .optional()
@@ -70,16 +149,22 @@ const updateTaskValidation = [
     .optional()
     .isFloat({ min: 0 })
     .withMessage("Pay rate must be a positive number"),
+
+  validateTaskEnumField({
+    fieldNames: ["payRateCurrency", "currency"],
+    label: "currency",
+    allowedValues: ["USD", "EUR", "GBP", "NGN", "KES", "GHS"],
+  }),
   
   body("maxParticipants")
     .optional()
     .isInt({ min: 1 })
     .withMessage("Max participants must be a positive integer"),
   
-  body("deadline")
-    .optional()
-    .isISO8601()
-    .withMessage("Deadline must be a valid date"),
+  validateTaskDateField({
+    fieldNames: ["deadline", "dueDate"],
+    label: "Deadline",
+  }),
   
   body("status")
     .optional()
@@ -151,6 +236,7 @@ const exportTaskDatasetValidation = [
 router.post("/",
   authenticateToken,
   requireRole("admin", "super_admin", "QA_REVIEWER"),
+  uploadMicroTaskIllustrations,
   createTaskValidation, 
   microTaskController.createMicroTask
 );
@@ -235,6 +321,7 @@ router.get("/:taskId",
 router.put("/:taskId",
   authenticateToken,
   requireRole("admin", "super_admin", "QA_REVIEWER"),
+  uploadMicroTaskIllustrations,
   taskIdValidation, 
   updateTaskValidation, 
   microTaskController.updateMicroTask

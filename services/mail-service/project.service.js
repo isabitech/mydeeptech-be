@@ -291,6 +291,68 @@ class ProjectMailService extends BaseMailService {
         });
     }
 
+    static async sendTaskSubmissionRejectionNotification(recipientEmail, recipientName, taskData) {
+        let htmlTemplate = this.getMailTemplate('sendTaskSubmissionRejectionNotification');
+
+        const isPartialRejection = taskData.reviewStatus === 'partially_rejected';
+        const reviewStatusLabel = isPartialRejection ? 'Partially Rejected' : 'Rejected';
+        const introMessage = isPartialRejection
+            ? 'Your task submission needs corrections before it can be accepted.'
+            : 'We regret to inform you that your task submission was not approved during review.';
+        const actionMessage = isPartialRejection
+            ? 'Please log back in to your microtasks, review the feedback below, replace the bad images, and submit the updated work again.'
+            : 'Please log back in to your microtasks, review the feedback below, replace the bad images or other flagged items, and submit again where applicable.';
+
+        const qualityScoreSection =
+            taskData.qualityScore === undefined || taskData.qualityScore === null || taskData.qualityScore === ""
+                ? ""
+                : `<section class="detail-card" aria-labelledby="quality-score-heading">
+                    <h2 id="quality-score-heading" class="section-title">Quality Score</h2>
+                    <p class="detail-text">${taskData.qualityScore}/100</p>
+                </section>`;
+
+        const reviewNotesSection = taskData.reviewNotes
+            ? `<section class="detail-card" aria-labelledby="review-notes-heading">
+                <h2 id="review-notes-heading" class="section-title">Reviewer Notes</h2>
+                <p class="detail-text">${taskData.reviewNotes}</p>
+            </section>`
+            : "";
+
+        const message = `
+            Task Submission Review Update
+            
+            Task: ${taskData.taskTitle}
+            Category: ${taskData.category || 'General'}
+            Review Status: ${reviewStatusLabel}
+            Reviewed By: ${taskData.reviewedByRole || 'Review Team'}${taskData.reviewedByName ? ` - ${taskData.reviewedByName}` : ''}
+            ${taskData.reviewNotes ? `Review Notes: ${taskData.reviewNotes}` : ''}
+            ${taskData.qualityScore !== undefined && taskData.qualityScore !== null ? `Quality Score: ${taskData.qualityScore}/100` : ''}
+            Next Steps: ${actionMessage}
+        `;
+
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{applicantName}}', recipientName);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{taskTitle}}', taskData.taskTitle);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{category}}', taskData.category || 'General');
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{reviewStatusLabel}}', reviewStatusLabel);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{reviewStatusMessage}}', introMessage);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{reviewedByRole}}', taskData.reviewedByRole || 'Review Team');
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{reviewedByName}}', taskData.reviewedByName || 'MyDeepTech Team');
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{qualityScoreSection}}', qualityScoreSection);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{reviewNotesSection}}', reviewNotesSection);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{actionMessage}}', actionMessage);
+        htmlTemplate = this.replaceTemplatePlaceholders(htmlTemplate, '{{supportEmail}}', envConfig.email.senders.support?.email || 'support@mydeeptech.ng');
+
+        return await this.sendMail({
+            recipientEmail,
+            recipientName,
+            subject: `Task Submission ${reviewStatusLabel} - MyDeepTech`,
+            message,
+            htmlTemplate,
+            senderEmail: envConfig.email.senders.projects.email,
+            senderName: envConfig.email.senders.projects.name
+        });
+    }
+
 }
 
 module.exports = ProjectMailService;

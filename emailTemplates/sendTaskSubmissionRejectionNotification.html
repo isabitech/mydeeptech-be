@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Submission Review Update</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            background-color: #f4f7fa;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #dc3545 0%, #f6921e 100%);
+            color: #ffffff;
+            text-align: center;
+            padding: 30px 20px;
+        }
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .message {
+            font-size: 16px;
+            margin-bottom: 20px;
+        }
+        .status-banner {
+            background-color: #fff5f5;
+            border-left: 4px solid #dc3545;
+            border-radius: 8px;
+            padding: 18px 20px;
+            margin: 24px 0;
+        }
+        .status-label {
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #b42318;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .status-message {
+            color: #7a271a;
+            font-weight: 500;
+        }
+        .task-details,
+        .detail-card {
+            background-color: #fff8f0;
+            border-left: 4px solid #f6921e;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 24px 0;
+        }
+        .detail-row {
+            margin-bottom: 10px;
+        }
+        .detail-row:last-child {
+            margin-bottom: 0;
+        }
+        .label {
+            font-weight: 600;
+            color: #333333;
+        }
+        .section-title {
+            font-size: 16px;
+            margin-bottom: 10px;
+            color: #333333;
+        }
+        .detail-text {
+            color: #5c6670;
+        }
+        .next-steps {
+            background-color: #f0f8ff;
+            border-left: 4px solid #0b6bcb;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 24px 0;
+        }
+        .next-steps h2 {
+            font-size: 18px;
+            color: #0b6bcb;
+            margin-bottom: 10px;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            text-align: center;
+            padding: 20px;
+            border-top: 1px solid #e9ecef;
+            font-size: 14px;
+            color: #6c757d;
+        }
+        .brand {
+            color: #f6921e;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>Task Submission Review Update</h1>
+        </header>
+
+        <main class="content" role="main">
+            <p class="message">Hello {{applicantName}},</p>
+            <p class="message">Your submitted task has been reviewed by our team.</p>
+
+            <section class="status-banner" aria-labelledby="review-status-heading">
+                <div id="review-status-heading" class="status-label">{{reviewStatusLabel}}</div>
+                <p class="status-message">{{reviewStatusMessage}}</p>
+            </section>
+
+            <section class="task-details" aria-labelledby="task-info-heading">
+                <h2 id="task-info-heading" class="section-title">Submission Details</h2>
+                <div class="detail-row">
+                    <span class="label">Task:</span> {{taskTitle}}
+                </div>
+                <div class="detail-row">
+                    <span class="label">Category:</span> {{category}}
+                </div>
+                <div class="detail-row">
+                    <span class="label">Reviewed By:</span> {{reviewedByRole}} - {{reviewedByName}}
+                </div>
+            </section>
+
+            {{qualityScoreSection}}
+            {{reviewNotesSection}}
+
+            <section class="next-steps" aria-labelledby="next-steps-heading">
+                <h2 id="next-steps-heading">Next Steps</h2>
+                <p>{{actionMessage}}</p>
+            </section>
+
+            <p class="message">If you need help understanding the review feedback, contact our support team at {{supportEmail}}.</p>
+        </main>
+
+        <footer class="footer">
+            <p>Thank you for being part of the <span class="brand">MyDeepTech</span> community.</p>
+            <p>Best regards,<br>The MyDeepTech Team</p>
+        </footer>
+    </div>
+</body>
+</html>

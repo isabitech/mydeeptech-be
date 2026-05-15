@@ -41,6 +41,8 @@
     "hvnc:tester": "echo 'Open hvnc-websocket-tester.html in your browser for interactive testing'",
     "test:ai-interview": "node tests/verify-ai-interview-module.js",
     "walkthrough:ai-interview": "node scripts/aiInterviewWalkthrough.js",
+    "microtasker-status:check": "node scripts/fixVerifiedMicroTaskerStatus.js check",
+    "microtasker-status:fix": "node scripts/fixVerifiedMicroTaskerStatus.js fix",
     "domain:verify": "node scripts/verify-domain-state.js",
     "domain:migrate": "node scripts/migrate-domains-of-interest.js",
     "domain:migrate-live": "node scripts/migrate-domains-of-interest.js --live",

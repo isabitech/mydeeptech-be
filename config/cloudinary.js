@@ -53,6 +53,14 @@ const createCloudinaryStorage = (folder, allowedFormats = ['jpg', 'jpeg', 'png',
 // Image storage (for profile pictures, project images, etc.)
 const imageStorage = createCloudinaryStorage('images', ['jpg', 'jpeg', 'png', 'gif', 'webp'], 'image');
 
+const imageOnlyFileFilter = (req, file, cb) => {
+  if (file.mimetype.startsWith('image/')) {
+    cb(null, true);
+  } else {
+    cb(new Error('Only image files are allowed for image upload'), false);
+  }
+};
+
 // Document storage (for PDFs, docs, etc.) - using raw resource type
 const documentStorage = createCloudinaryStorage('documents', ['pdf', 'doc', 'docx', 'txt'], 'raw');
 
@@ -75,14 +83,17 @@ const imageUpload = multer({
   limits: {
     fileSize: 5 * 1024 * 1024 // 5MB limit for images
   },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only image files are allowed for image upload'), false);
-    }
-  }
+  fileFilter: imageOnlyFileFilter
 });
+
+const uploadMicroTaskIllustrations = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+    files: 10,
+  },
+  fileFilter: imageOnlyFileFilter,
+}).array("illustrationImages", 10);
 
 const documentUpload = multer({
   storage: documentStorage,
@@ -310,6 +321,7 @@ module.exports = {
   resultFileUpload,
   idDocumentUpload,
   resumeUpload,
+  uploadMicroTaskIllustrations,
   
   // Helper functions
   deleteCloudinaryFile,

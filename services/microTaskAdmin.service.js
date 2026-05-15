@@ -460,7 +460,7 @@ class MicroTaskAdminService {
 
       const [submissions, total, statusCounts] = await Promise.all([
         TaskApplication.find(baseFilter)
-          .populate("task", "taskTitle category payRate currency totalImagesRequired dueDate createdBy")
+          .populate("task", "taskTitle category payRate currency totalImagesRequired dueDate createdBy illustrationImages")
           .populate("applicant", "fullName email phone phoneNumber personal_info qaStatus date_of_birth gender")
           .populate("reviewedBy", "fullName email")
           .populate("exportAudit.exportedBy", "fullName email")
@@ -571,6 +571,8 @@ class MicroTaskAdminService {
         quality_score = null,
         review_notes = "",
         sync_images,
+        actor_name = "",
+        actor_role = "admin",
       } = reviewData;
 
       if (!adminId) {
@@ -585,7 +587,7 @@ class MicroTaskAdminService {
         _id: submissionId,
         task: taskId,
       })
-        .populate("task", "taskTitle category payRate currency totalImagesRequired dueDate")
+        .populate("task", "taskTitle category payRate currency totalImagesRequired dueDate illustrationImages")
         .populate("applicant", "fullName email phone phoneNumber personal_info qaStatus date_of_birth gender")
         .populate("reviewedBy", "fullName email")
         .populate({
@@ -634,6 +636,8 @@ class MicroTaskAdminService {
         quality_score,
         review_notes: mergedReviewNote,
         allow_override: true,
+        actor_name,
+        actor_role,
       });
     } catch (error) {
       throw new Error(`Error overriding submission review: ${error.message}`);
