@@ -191,6 +191,7 @@ Zip contents:
 Notes:
 - final `downloadedImages` and `failedImages` counts are written into `task-summary.json`
 - the backend records export audit metadata only after the stream completes successfully
+- image files are downloaded one at a time through temporary storage before being added to the zip, so large files do not need to sit fully in server memory
 
 Export audit:
 - each exported `TaskApplication` gets an `exportAudit` entry with:

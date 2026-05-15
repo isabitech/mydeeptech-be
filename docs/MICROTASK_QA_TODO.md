@@ -19,6 +19,7 @@
   - `task-summary.json`
   - `download-errors.json` when any image download fails
 - Export delivery now streams the zip to the client instead of buffering the full archive in memory first.
+- Export image handling now spools one file at a time through temp storage before zipping, which is safer for very large image files.
 - Export rows are generated from `task_image_upload.metadata` plus participant `DTUser` profile fields.
 - Exported submissions are now marked with `exportAudit` metadata:
   - `exportedBy`

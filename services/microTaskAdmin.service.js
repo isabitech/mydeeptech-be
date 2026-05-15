@@ -1,8 +1,11 @@
+const fs = require("fs");
+const fsPromises = require("fs/promises");
+const os = require("os");
 const path = require("path");
 const mongoose = require("mongoose");
 const axios = require("axios");
 const archiver = require("archiver");
-const { finished } = require("stream/promises");
+const { finished, pipeline } = require("stream/promises");
 const Task = require("../models/task.model");
 const TaskApplication = require("../models/taskApplication.model");
 const TaskImageUpload = require("../models/imageUpload.model");
@@ -150,6 +153,56 @@ class MicroTaskAdminService {
     }
 
     throw new Error("Unsupported archiver module export shape");
+  }
+
+  async createExportTempDirectory() {
+    return fsPromises.mkdtemp(
+      path.join(os.tmpdir(), "mydeeptech-microtask-export-"),
+    );
+  }
+
+  buildTempImagePath(tempDirectory, submission, image) {
+    const sequence = String(image?.metadata?.imageSequence || 0).padStart(3, "0");
+    const imageSegment = this.sanitizeSegment(image?._id || "image", "image");
+    const submissionSegment = this.sanitizeSegment(
+      submission?._id || "submission",
+      "submission",
+    );
+    const extension = this.getFileExtension(image);
+
+    return path.join(
+      tempDirectory,
+      `${submissionSegment}-${sequence}-${imageSegment}${extension}`,
+    );
+  }
+
+  async removeTempFile(filePath) {
+    if (!filePath) {
+      return;
+    }
+
+    try {
+      await fsPromises.unlink(filePath);
+    } catch (error) {
+      if (error?.code !== "ENOENT") {
+        console.warn(`Failed to remove temp export file ${filePath}:`, error);
+      }
+    }
+  }
+
+  async removeTempDirectory(directoryPath) {
+    if (!directoryPath) {
+      return;
+    }
+
+    try {
+      await fsPromises.rm(directoryPath, { recursive: true, force: true });
+    } catch (error) {
+      console.warn(
+        `Failed to remove temp export directory ${directoryPath}:`,
+        error,
+      );
+    }
   }
 
   buildCsv(rows = []) {
@@ -698,13 +751,35 @@ class MicroTaskAdminService {
     }
   }
 
-  async downloadImageBuffer(url) {
+  async downloadImageToFile(url, filePath) {
     const response = await axios.get(url, {
-      responseType: "arraybuffer",
+      responseType: "stream",
       timeout: 30000,
+      maxBodyLength: Infinity,
+      maxContentLength: Infinity,
     });
 
-    return Buffer.from(response.data);
+    try {
+      await pipeline(response.data, fs.createWriteStream(filePath));
+    } catch (error) {
+      if (typeof response.data?.destroy === "function") {
+        response.data.destroy(error);
+      }
+
+      throw error;
+    }
+  }
+
+  async appendTempFileToArchive(
+    archive,
+    filePath,
+    zipPath,
+    outputStream,
+  ) {
+    this.assertWritableExportStream(outputStream);
+    const fileStream = fs.createReadStream(filePath);
+    archive.append(fileStream, { name: zipPath });
+    await finished(fileStream);
   }
 
   buildCsvRow(task, submission, image) {
@@ -835,6 +910,7 @@ class MicroTaskAdminService {
     });
     const csvLines = [CSV_HEADERS.join(",")];
     const downloadErrors = [];
+    const tempDirectory = await this.createExportTempDirectory();
     let downloadedImages = 0;
     let archiveError = null;
 
@@ -870,22 +946,36 @@ class MicroTaskAdminService {
           csvLines.push(this.buildCsvLine(this.buildCsvRow(task, submission, image)));
 
           const zipPath = this.buildZipImagePath(submission, image);
+          const sourceUrl = image?.metadata?.fileUrl || image?.url;
+          const tempFilePath = this.buildTempImagePath(
+            tempDirectory,
+            submission,
+            image,
+          );
 
           try {
-            const imageBuffer = await this.downloadImageBuffer(
-              image?.metadata?.fileUrl || image?.url,
-            );
-
-            this.assertWritableExportStream(outputStream);
-            archive.append(imageBuffer, { name: zipPath });
-            downloadedImages += 1;
+            await this.downloadImageToFile(sourceUrl, tempFilePath);
           } catch (error) {
             downloadErrors.push({
               submissionId: String(submission._id),
               imageId: String(image?._id || ""),
-              fileUrl: image?.metadata?.fileUrl || image?.url || "",
+              fileUrl: sourceUrl || "",
               error: error.message,
             });
+            await this.removeTempFile(tempFilePath);
+            continue;
+          }
+
+          try {
+            await this.appendTempFileToArchive(
+              archive,
+              tempFilePath,
+              zipPath,
+              outputStream,
+            );
+            downloadedImages += 1;
+          } finally {
+            await this.removeTempFile(tempFilePath);
           }
         }
       }
@@ -942,6 +1032,8 @@ class MicroTaskAdminService {
       }
 
       throw error;
+    } finally {
+      await this.removeTempDirectory(tempDirectory);
     }
 
     try {
