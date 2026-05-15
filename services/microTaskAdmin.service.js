@@ -1,7 +1,8 @@
 const path = require("path");
 const mongoose = require("mongoose");
 const axios = require("axios");
-const JSZip = require("jszip");
+const archiver = require("archiver");
+const { finished } = require("stream/promises");
 const Task = require("../models/task.model");
 const TaskApplication = require("../models/taskApplication.model");
 const TaskImageUpload = require("../models/imageUpload.model");
@@ -96,15 +97,52 @@ class MicroTaskAdminService {
     return normalized;
   }
 
+  buildCsvLine(row = {}) {
+    return CSV_HEADERS.map((header) => this.csvEscape(row[header])).join(",");
+  }
+
+  buildCsvContent(lines = []) {
+    return `\uFEFF${lines.join("\r\n")}`;
+  }
+
+  buildTaskSummaryFile(task, exportDetails = {}) {
+    return JSON.stringify(
+      {
+        task: {
+          _id: task._id,
+          taskTitle: task.taskTitle || "",
+          category: task.category || "",
+          payRate: task.payRate || 0,
+          currency: task.currency || "USD",
+          totalImagesRequired: task.totalImagesRequired || 0,
+        },
+        export: exportDetails,
+      },
+      null,
+      2,
+    );
+  }
+
+  assertWritableExportStream(outputStream) {
+    const streamClosedEarly =
+      !outputStream ||
+      outputStream.destroyed === true ||
+      (outputStream.closed === true && outputStream.writableFinished !== true);
+
+    if (streamClosedEarly) {
+      const error = new Error("Export stream was interrupted before completion");
+      error.code = "EXPORT_STREAM_INTERRUPTED";
+      throw error;
+    }
+  }
+
   buildCsv(rows = []) {
     const lines = [
       CSV_HEADERS.join(","),
-      ...rows.map((row) =>
-        CSV_HEADERS.map((header) => this.csvEscape(row[header])).join(","),
-      ),
+      ...rows.map((row) => this.buildCsvLine(row)),
     ];
 
-    return `\uFEFF${lines.join("\r\n")}`;
+    return this.buildCsvContent(lines);
   }
 
   buildStatusCounts(rawCounts = []) {
@@ -685,7 +723,7 @@ class MicroTaskAdminService {
     };
   }
 
-  async exportTaskDataset(taskId, options = {}) {
+  async prepareTaskDatasetExport(taskId, options = {}) {
     try {
       const {
         status = "approved",
@@ -712,7 +750,8 @@ class MicroTaskAdminService {
           path: "images",
           select:
             "url publicId label status rejectionMessage qaNotes reviewedBy reviewedAt metadata createdAt",
-        });
+        })
+        .lean();
 
       if (!submissions.length) {
         throw new Error("No submissions found for the requested export status");
@@ -725,21 +764,94 @@ class MicroTaskAdminService {
         normalizedStatus,
         timestampLabel,
       );
-      const zip = new JSZip();
-      const csvRows = [];
-      const downloadErrors = [];
-      const submissionIds = [];
-      const imagesFolder = zip.folder("images");
-      let totalImages = 0;
-      let downloadedImages = 0;
+      const submissionIds = submissions.map((submission) => submission._id);
+      const totalImages = submissions.reduce((count, submission) => {
+        return count + (submission.images?.length || 0);
+      }, 0);
 
+      const exportAuditEntry = {
+        exportedBy,
+        exportedAt: exportTimestamp,
+        exportType: normalizedStatus,
+        exportFileName: fileName,
+      };
+
+      return {
+        fileName,
+        contentType: "application/zip",
+        summary: {
+          taskId: String(task._id),
+          taskTitle: task.taskTitle || "",
+          status: normalizedStatus,
+          totalSubmissions: submissions.length,
+          totalImages,
+          downloadedImages: 0,
+          failedImages: 0,
+        },
+        task,
+        submissions,
+        normalizedStatus,
+        exportTimestamp,
+        submissionIds,
+        exportAuditEntry,
+      };
+    } catch (error) {
+      throw new Error(`Error preparing task dataset export: ${error.message}`);
+    }
+  }
+
+  async streamPreparedTaskDatasetExport(exportContext, outputStream) {
+    const {
+      task,
+      submissions,
+      normalizedStatus,
+      fileName,
+      exportTimestamp,
+      submissionIds,
+      exportAuditEntry,
+      summary,
+    } = exportContext;
+
+    const archive = archiver("zip", {
+      zlib: {
+        level: 6,
+      },
+    });
+    const csvLines = [CSV_HEADERS.join(",")];
+    const downloadErrors = [];
+    let downloadedImages = 0;
+    let archiveError = null;
+
+    archive.on("warning", (error) => {
+      if (error?.code === "ENOENT") {
+        console.warn("Archive warning:", error.message);
+        return;
+      }
+
+      archive.emit("error", error);
+    });
+
+    archive.on("error", (error) => {
+      archiveError = error;
+      if (
+        typeof outputStream.destroy === "function" &&
+        outputStream.destroyed !== true
+      ) {
+        outputStream.destroy(error);
+      }
+    });
+
+    this.assertWritableExportStream(outputStream);
+    archive.pipe(outputStream);
+
+    try {
       for (const submission of submissions) {
-        submissionIds.push(submission._id);
+        this.assertWritableExportStream(outputStream);
         const images = microTaskQAService.sortImages(submission.images || []);
 
         for (const image of images) {
-          totalImages += 1;
-          csvRows.push(this.buildCsvRow(task, submission, image));
+          this.assertWritableExportStream(outputStream);
+          csvLines.push(this.buildCsvLine(this.buildCsvRow(task, submission, image)));
 
           const zipPath = this.buildZipImagePath(submission, image);
 
@@ -747,7 +859,9 @@ class MicroTaskAdminService {
             const imageBuffer = await this.downloadImageBuffer(
               image?.metadata?.fileUrl || image?.url,
             );
-            imagesFolder.file(zipPath.replace(/^images\//, ""), imageBuffer);
+
+            this.assertWritableExportStream(outputStream);
+            archive.append(imageBuffer, { name: zipPath });
             downloadedImages += 1;
           } catch (error) {
             downloadErrors.push({
@@ -760,57 +874,61 @@ class MicroTaskAdminService {
         }
       }
 
-      zip.file("metadata.csv", this.buildCsv(csvRows));
-      zip.file(
-        "task-summary.json",
-        JSON.stringify(
-          {
-            task: {
-              _id: task._id,
-              taskTitle: task.taskTitle || "",
-              category: task.category || "",
-              payRate: task.payRate || 0,
-              currency: task.currency || "USD",
-              totalImagesRequired: task.totalImagesRequired || 0,
-            },
-            export: {
-              type: normalizedStatus,
-              fileName,
-              exportedAt: exportTimestamp.toISOString(),
-              exportedBy: exportedBy || null,
-              totalSubmissions: submissions.length,
-              totalImages,
-              downloadedImages,
-              failedImages: downloadErrors.length,
-            },
-          },
-          null,
-          2,
-        ),
+      this.assertWritableExportStream(outputStream);
+      archive.append(this.buildCsvContent(csvLines), { name: "metadata.csv" });
+      archive.append(
+        this.buildTaskSummaryFile(task, {
+          type: normalizedStatus,
+          fileName,
+          exportedAt: exportTimestamp.toISOString(),
+          exportedBy: exportAuditEntry.exportedBy || null,
+          totalSubmissions: submissions.length,
+          totalImages: summary.totalImages,
+          downloadedImages,
+          failedImages: downloadErrors.length,
+        }),
+        { name: "task-summary.json" },
       );
 
       if (downloadErrors.length > 0) {
-        zip.file(
-          "download-errors.json",
-          JSON.stringify(downloadErrors, null, 2),
-        );
+        archive.append(JSON.stringify(downloadErrors, null, 2), {
+          name: "download-errors.json",
+        });
       }
 
-      const buffer = await zip.generateAsync({
-        type: "nodebuffer",
-        compression: "DEFLATE",
-        compressionOptions: {
-          level: 6,
-        },
-      });
+      await archive.finalize();
 
-      const exportAuditEntry = {
-        exportedBy,
-        exportedAt: exportTimestamp,
-        exportType: normalizedStatus,
-        exportFileName: fileName,
-      };
+      try {
+        await finished(outputStream);
+      } catch (error) {
+        if (archiveError) {
+          throw archiveError;
+        }
 
+        const streamError = new Error(
+          error?.code === "ERR_STREAM_PREMATURE_CLOSE"
+            ? "Export stream was interrupted before completion"
+            : `Export stream failed: ${error.message}`,
+        );
+        streamError.code = error?.code || "EXPORT_STREAM_FAILED";
+        throw streamError;
+      }
+
+      if (archiveError) {
+        throw archiveError;
+      }
+    } catch (error) {
+      if (
+        typeof archive.destroy === "function" &&
+        archive.destroyed !== true
+      ) {
+        archive.destroy(error);
+      }
+
+      throw error;
+    }
+
+    try {
       await TaskApplication.updateMany(
         { _id: { $in: submissionIds } },
         {
@@ -819,24 +937,32 @@ class MicroTaskAdminService {
           },
         },
       );
-
-      return {
-        fileName,
-        buffer,
-        contentType: "application/zip",
-        summary: {
-          taskId: String(task._id),
-          taskTitle: task.taskTitle || "",
-          status: normalizedStatus,
-          totalSubmissions: submissions.length,
-          totalImages,
-          downloadedImages,
-          failedImages: downloadErrors.length,
-        },
-      };
     } catch (error) {
-      throw new Error(`Error exporting task dataset: ${error.message}`);
+      console.error(
+        `Error recording export audit for task ${summary.taskId}:`,
+        error,
+      );
     }
+
+    return {
+      ...summary,
+      downloadedImages,
+      failedImages: downloadErrors.length,
+    };
+  }
+
+  async exportTaskDataset(taskId, outputStream, options = {}) {
+    const exportContext = await this.prepareTaskDatasetExport(taskId, options);
+    const finalSummary = await this.streamPreparedTaskDatasetExport(
+      exportContext,
+      outputStream,
+    );
+
+    return {
+      fileName: exportContext.fileName,
+      contentType: exportContext.contentType,
+      summary: finalSummary,
+    };
   }
 }
 

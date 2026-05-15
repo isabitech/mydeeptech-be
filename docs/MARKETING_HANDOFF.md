@@ -44,6 +44,7 @@
 Use this when frontend wants backend to resolve recipients from the DTUser database.
 
 Supported filters:
+
 - `verifiedOnly`
 - `dtUserIds`
 - `filters.annotatorStatus`
@@ -52,6 +53,7 @@ Supported filters:
 - `filters.country`
 
 Allowed values:
+
 - `annotatorStatus`: `pending | submitted | verified | approved | rejected`
 - `microTaskerStatus`: `pending | submitted | verified | approved | rejected`
 - `qaStatus`: `pending | approved | rejected`
@@ -61,6 +63,7 @@ Allowed values:
   - any specific country name like `Nigeria`, `Ghana`, `Kenya`
 
 Country source of truth:
+
 - backend filters against `DTUser.personal_info.country`
 - `unknown` matches:
   - missing country field
@@ -73,6 +76,7 @@ Country source of truth:
 Use this when frontend already has the recipient list.
 
 `audience.customRecipients` accepts:
+
 - plain email strings
 - objects like:
 
@@ -90,9 +94,11 @@ Backend deduplicates by email automatically.
 Marketing campaigns use `Mailjet` only.
 
 Allowed `delivery.provider` value:
+
 - `mailjet`
 
 Notes:
+
 - Frontend can omit `delivery.provider` and the backend will still use Mailjet.
 - Frontend should not expose Brevo or a provider toggle for Marketing campaigns.
 - Backend attaches Mailjet campaign metadata per marketing send so failed recipients can be retried against the same campaign context.
@@ -100,6 +106,7 @@ Notes:
 ## Personalization Tokens
 
 Backend replaces these automatically per recipient:
+
 - `FIRST_NAME`
 - `FULL_NAME`
 - `EMAIL`
@@ -116,12 +123,14 @@ Backend replaces these automatically per recipient:
 - `GET /api/admin/marketing/audience/countries`
 
 Optional query:
+
 - `verifiedOnly=true|false`
 - `annotatorStatus=pending|submitted|verified|approved|rejected|all`
 - `microTaskerStatus=pending|submitted|verified|approved|rejected|all`
 - `qaStatus=pending|approved|rejected|all`
 
 Purpose:
+
 - lets frontend populate the country dropdown for the `dtusers` audience filter
 - returns special options first:
   - `all`
@@ -174,6 +183,7 @@ Success response:
 ```
 
 Notes:
+
 - `count` is the number of DTUsers matching each option under the current query filters.
 - Frontend can call this on page load and again whenever the other audience filters change.
 
@@ -241,6 +251,7 @@ Success response:
 ```
 
 Notes:
+
 - `sampleRecipients` is capped at 10.
 - Preview does not create a campaign.
 
@@ -249,6 +260,7 @@ Notes:
 - `POST /api/admin/marketing/campaigns/send`
 
 Minimum requirements:
+
 - `name`
 - `subject`
 - either `htmlContent` or `textContent`
@@ -282,9 +294,11 @@ Example payload:
 ```
 
 If frontend only sends `textContent`:
+
 - backend generates a basic HTML wrapper automatically
 
 If frontend only sends `htmlContent`:
+
 - backend generates a text fallback by stripping the HTML
 
 Success response:
@@ -349,6 +363,7 @@ Success response:
 ```
 
 Notes:
+
 - Response status is `202`.
 - Campaign sending continues after the response returns.
 
@@ -357,11 +372,13 @@ Notes:
 - `GET /api/admin/marketing/campaigns`
 
 Optional query:
+
 - `page`
 - `limit`
 - `status`
 
 Allowed `status` filter values:
+
 - `draft`
 - `queued`
 - `sending`
@@ -433,6 +450,7 @@ Success response shape:
 - `GET /api/admin/marketing/campaigns/:campaignId`
 
 Success response highlights:
+
 - all campaign summary fields
 - `htmlContent`
 - `textContent`
@@ -456,6 +474,7 @@ Recipient shape:
 ```
 
 Recipient status values:
+
 - `pending`
 - `sent`
 - `failed`
@@ -466,10 +485,12 @@ Recipient status values:
 - `POST /api/admin/marketing/campaigns/:campaignId/retry`
 
 Purpose:
+
 - re-queue failed recipients from an existing campaign
 - useful for transient delivery errors like Mailjet connection resets
 
 Body:
+
 - empty body to retry all failed recipients
 - optional `recipientEmails` array to retry only specific failed recipients
 
@@ -477,10 +498,7 @@ Example request:
 
 ```json
 {
-  "recipientEmails": [
-    "user@example.com",
-    "second@example.com"
-  ]
+  "recipientEmails": ["user@example.com", "second@example.com"]
 }
 ```
 
@@ -549,6 +567,7 @@ Success response:
 ```
 
 Validation and behavior notes:
+
 - Returns `404` if the campaign does not exist.
 - Returns `409` if the campaign is currently in `sending` state.
 - Returns `400` if there are no failed recipients to retry.

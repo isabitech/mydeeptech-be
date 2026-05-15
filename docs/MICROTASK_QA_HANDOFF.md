@@ -178,12 +178,19 @@ Allowed `status` values:
 Response:
 - file download
 - content type: `application/zip`
+- response is streamed directly from the backend
+- response header `X-Export-Mode` is `stream`
+- `Content-Length` may be omitted because the zip is not buffered fully in memory first
 
 Zip contents:
 - `metadata.csv`
 - `task-summary.json`
 - `download-errors.json` only when one or more image downloads fail during export
 - `images/...` folders containing the downloaded Cloudinary files
+
+Notes:
+- final `downloadedImages` and `failedImages` counts are written into `task-summary.json`
+- the backend records export audit metadata only after the stream completes successfully
 
 Export audit:
 - each exported `TaskApplication` gets an `exportAudit` entry with:
