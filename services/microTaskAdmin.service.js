@@ -136,6 +136,22 @@ class MicroTaskAdminService {
     }
   }
 
+  createZipArchive(options = {}) {
+    if (typeof archiver === "function") {
+      return archiver("zip", options);
+    }
+
+    if (typeof archiver?.ZipArchive === "function") {
+      return new archiver.ZipArchive(options);
+    }
+
+    if (typeof archiver?.default === "function") {
+      return archiver.default("zip", options);
+    }
+
+    throw new Error("Unsupported archiver module export shape");
+  }
+
   buildCsv(rows = []) {
     const lines = [
       CSV_HEADERS.join(","),
@@ -812,7 +828,7 @@ class MicroTaskAdminService {
       summary,
     } = exportContext;
 
-    const archive = archiver("zip", {
+    const archive = this.createZipArchive({
       zlib: {
         level: 6,
       },
