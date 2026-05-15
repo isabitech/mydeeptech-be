@@ -23,6 +23,7 @@ const route = require("./routes/auth");
 const taskRoute = require("./routes/task");
 const adminRoute = require("./routes/admin");
 const adminEmailTrackingRoute = require("./routes/adminEmailTracking.routes");
+const marketingRoute = require("./routes/marketing.routes");
 const debugEmailRoute = require("./routes/debugEmail.routes");
 const mediaRoute = require("./routes/media");
 const notificationRoute = require("./routes/notifications");
@@ -125,6 +126,7 @@ app.use("/api/admin/ai-interviews", adminAiInterviewRoute);
 app.use("/api/ai-recommendations", aiRecommendationRoute);
 app.use("/api/admin", adminRoute);
 app.use("/api/admin/email-tracking", adminEmailTrackingRoute);
+app.use("/api/admin/marketing", marketingRoute);
 app.use("/api/debug/email", debugEmailRoute);
 app.use("/api/media", rateLimiters.upload, mediaRoute); // Upload rate limiting
 app.use("/api/notifications", notificationRoute);
