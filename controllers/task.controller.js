@@ -17,8 +17,9 @@ const {
 } = require("../utils/taskApplicationStatus");
 
 const VALID_LABELS = ['View 1', 'View 2', 'View 3', 'View 4'];
-const REQUIRED_PER_LABEL = 4;
-const TOTAL_REQUIRED = 16;
+const MASK_COLLECTION_PER_LABEL_LIMIT = 5;
+const MASK_COLLECTION_TOTAL_REQUIRED = 20;
+const AGE_PROGRESSION_TOTAL_REQUIRED = 15;
 
 // Helper function to extract image metadata
 async function extractImageMetadata(filePath) {
@@ -84,10 +85,149 @@ async function extractImageMetadata(filePath) {
     }
 }
 
+async function getTaskApplicationImageState(taskApplication) {
+    const rawImageIds = Array.isArray(taskApplication?.images)
+        ? taskApplication.images
+              .map((image) => image?._id || image)
+              .filter(Boolean)
+        : [];
+
+    const imageIds = rawImageIds.filter((imageId, index, allImageIds) => {
+        return allImageIds.findIndex(
+            (candidateId) => candidateId.toString() === imageId.toString()
+        ) === index;
+    });
+
+    const imageDocuments = imageIds.length
+        ? await TaskImageUpload.find(
+              { _id: { $in: imageIds } },
+              "label"
+          ).lean()
+        : [];
+
+    const labelCounts = {
+        "View 1": 0,
+        "View 2": 0,
+        "View 3": 0,
+        "View 4": 0,
+    };
+
+    imageDocuments.forEach((image) => {
+        if (labelCounts[image.label] !== undefined) {
+            labelCounts[image.label] += 1;
+        }
+    });
+
+    return {
+        rawImageIds,
+        imageIds,
+        imageDocuments,
+        labelCounts,
+        total: imageDocuments.length,
+        hasReferenceMismatch: rawImageIds.length !== imageIds.length,
+    };
+}
+
+function getUploadRules(category) {
+    if (category === 'age_progression') {
+        return {
+            maxImages: AGE_PROGRESSION_TOTAL_REQUIRED,
+            perLabel: false,
+            perLabelLimit: AGE_PROGRESSION_TOTAL_REQUIRED,
+            requireDate: true,
+            allowedLabels: ['View 1'],
+        };
+    }
+
+    return {
+        maxImages: MASK_COLLECTION_TOTAL_REQUIRED,
+        perLabel: true,
+        perLabelLimit: MASK_COLLECTION_PER_LABEL_LIMIT,
+        requireDate: false,
+        allowedLabels: VALID_LABELS,
+    };
+}
+
+function countIncomingFilesByLabel(files = []) {
+    return files.reduce((counts, file) => {
+        if (!file?.fieldname) {
+            return counts;
+        }
+
+        counts[file.fieldname] = (counts[file.fieldname] || 0) + 1;
+        return counts;
+    }, {});
+}
+
+function buildExpectedUploadProgress(category, imageState) {
+    if (category === 'age_progression') {
+        return {
+            'View 1': imageState.labelCounts['View 1'] || 0,
+            total: imageState.total,
+        };
+    }
+
+    return {
+        ...imageState.labelCounts,
+        total: imageState.total,
+    };
+}
+
+function hasProgressMismatch(storedProgress = {}, expectedProgress = {}) {
+    const keys = new Set([
+        ...Object.keys(storedProgress || {}),
+        ...Object.keys(expectedProgress || {}),
+    ]);
+
+    for (const key of keys) {
+        if ((storedProgress?.[key] || 0) !== (expectedProgress?.[key] || 0)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+async function cleanupCreatedTaskUploads(createdUploads = []) {
+    for (const createdUpload of createdUploads) {
+        if (!createdUpload) {
+            continue;
+        }
+
+        if (createdUpload.imageId) {
+            await TaskImageUpload.findByIdAndDelete(createdUpload.imageId).catch((error) => {
+                console.error(
+                    `Failed to rollback task image document ${createdUpload.imageId}:`,
+                    error
+                );
+            });
+        }
+
+        if (createdUpload.publicId) {
+            await cloudinary.uploader.destroy(createdUpload.publicId).catch((error) => {
+                console.error(
+                    `Failed to rollback Cloudinary asset ${createdUpload.publicId}:`,
+                    error
+                );
+            });
+        }
+    }
+}
+
 // Helper function to build remaining breakdown
-function buildRemainingBreakdown(progress) {
+function buildRemainingBreakdown(progress, category = 'mask_collection') {
+    if (category === 'age_progression') {
+        const view1Count = progress['View 1'] || progress.total || 0;
+        return {
+            'View 1': Math.max(0, AGE_PROGRESSION_TOTAL_REQUIRED - view1Count),
+            'View 2': 0,
+            'View 3': 0,
+            'View 4': 0,
+        };
+    }
+
     return VALID_LABELS.reduce((acc, label) => {
-        acc[label] = Math.max(0, REQUIRED_PER_LABEL - (progress[label] || 0));
+        acc[label] = Math.max(0, MASK_COLLECTION_PER_LABEL_LIMIT - (progress[label] || 0));
         return acc;
     }, {});
 }
@@ -902,18 +1042,13 @@ async uploadTaskImages(req, res) {
         }
 
         const category = task.category;
-        let maxImages = 20;
-        let perLabel = true;
-        let perLabelLimit = 5; // 5 images per label for mask collection
-        let requireDate = false;
-        let allowedLabels = VALID_LABELS;
-        
-        if (category === 'age_progression') {
-            maxImages = 15;
-            perLabel = false;
-            requireDate = true;
-            allowedLabels = ['View 1']; // Only allow View 1 for age progression
-        }
+        const {
+            maxImages,
+            perLabel,
+            perLabelLimit,
+            requireDate,
+            allowedLabels,
+        } = getUploadRules(category);
 
         const invalidFiles = uploadedFiles.filter((file) => !allowedLabels.includes(file.fieldname));
         if (invalidFiles.length > 0) {
@@ -961,8 +1096,21 @@ async uploadTaskImages(req, res) {
             });
         }
 
+        const currentImageState = await getTaskApplicationImageState(taskSubmission);
+        const expectedProgress = buildExpectedUploadProgress(category, currentImageState);
+        taskSubmission.images = currentImageState.imageIds;
+
+        if (
+            hasProgressMismatch(taskSubmission.uploadProgress, expectedProgress) ||
+            currentImageState.hasReferenceMismatch ||
+            currentImageState.rawImageIds.length !== currentImageState.total
+        ) {
+            taskSubmission.markModified('images');
+            await taskSubmission.save();
+        }
+
         // Check total limit first to prevent exceeding
-        const currentTotal = taskSubmission.images.length;
+        const currentTotal = currentImageState.total;
         const incomingCount = uploadedFiles.length;
         const projectedTotal = currentTotal + incomingCount;
         
@@ -977,12 +1125,12 @@ async uploadTaskImages(req, res) {
         if (perLabel) {
             // For mask_collection: validate per-label limits (5 per label)
             const errors = [];
-            const currentCounts = { ...taskSubmission.uploadProgress };
+            const currentCounts = { ...currentImageState.labelCounts };
+            const incomingCounts = countIncomingFilesByLabel(uploadedFiles);
             
-            for (const file of uploadedFiles) {
-                const label = file.fieldname;
+            for (const label of Object.keys(incomingCounts)) {
                 const currentForLabel = currentCounts[label] || 0;
-                const incomingForLabel = uploadedFiles.filter((f) => f.fieldname === label).length;
+                const incomingForLabel = incomingCounts[label];
                 const projectedCount = currentForLabel + incomingForLabel;
                 
                 if (projectedCount > perLabelLimit) {
@@ -993,17 +1141,15 @@ async uploadTaskImages(req, res) {
             if (errors.length > 0) {
                 return res.status(400).json({
                     success: false,
-                    message: "Upload exceeds allowed image count for one or more labels.",
-                    details: [...new Set(errors)],
+                    message: errors[0],
+                    code: "LABEL_LIMIT_EXCEEDED",
+                    details: errors,
+                    currentCounts,
+                    incomingCounts,
+                    perLabelLimit,
                 });
             }
             
-            // Update progress counts for mask_collection
-            for (const file of uploadedFiles) {
-                const label = file.fieldname;
-                taskSubmission.uploadProgress[label] = (taskSubmission.uploadProgress[label] || 0) + 1;
-                taskSubmission.uploadProgress.total = (taskSubmission.uploadProgress.total || 0) + 1;
-            }
         } else {
             // For age_progression: validate total limit and label
             for (const file of uploadedFiles) {
@@ -1018,7 +1164,7 @@ async uploadTaskImages(req, res) {
                 }
                 
                 // Check individual View 1 limit
-                const currentView1Count = taskSubmission.uploadProgress['View 1'] || 0;
+                const currentView1Count = currentImageState.labelCounts['View 1'] || 0;
                 if (currentView1Count + 1 > maxImages) {
                     return res.status(400).json({
                         success: false,
@@ -1027,17 +1173,13 @@ async uploadTaskImages(req, res) {
                 }
             }
             
-            // Update progress counts for age_progression
-            for (const file of uploadedFiles) {
-                const label = file.fieldname;
-                taskSubmission.uploadProgress[label] = (taskSubmission.uploadProgress[label] || 0) + 1;
-                taskSubmission.uploadProgress.total = (taskSubmission.uploadProgress.total || 0) + 1;
-            }
         }
 
         const imageIds = [];
+        const createdUploads = [];
 
         for (const [index, file] of uploadedFiles.entries()) {
+            let uploadedPublicId = null;
             try {
                 // IMPORTANT: Extract metadata from LOCAL file BEFORE Cloudinary upload
                 const imageMetadata = await extractImageMetadata(file.path);
@@ -1059,6 +1201,7 @@ async uploadTaskImages(req, res) {
                         if (file.path && await fs.access(file.path).catch(() => false)) {
                             await fs.unlink(file.path).catch(console.error);
                         }
+                        await cleanupCreatedTaskUploads(createdUploads);
                         return res.status(400).json({
                             success: false,
                             message: "Missing dateTaken for age_progression image.",
@@ -1099,11 +1242,13 @@ async uploadTaskImages(req, res) {
                         folder: 'mydeeptech/images',
                         resource_type: 'auto',
                     });
+                    uploadedPublicId = cloudinaryResult.public_id;
                 } catch (cloudinaryError) {
                     console.error(`[Cloudinary Upload] Failed for ${file.originalname}:`, cloudinaryError);
                     if (file.path && await fs.access(file.path).catch(() => false)) {
                         await fs.unlink(file.path).catch(console.error);
                     }
+                    await cleanupCreatedTaskUploads(createdUploads);
                     return res.status(500).json({
                         success: false,
                         message: `Failed to upload ${file.originalname} to cloud storage.`,
@@ -1138,6 +1283,10 @@ async uploadTaskImages(req, res) {
                 });
 
                 imageIds.push(image._id);
+                createdUploads.push({
+                    imageId: image._id,
+                    publicId: cloudinaryResult.public_id,
+                });
                 
                 // Clean up local temp file
                 if (file.path && !file.path.includes('cloudinary')) {
@@ -1148,6 +1297,15 @@ async uploadTaskImages(req, res) {
                 if (file.path && await fs.access(file.path).catch(() => false)) {
                     await fs.unlink(file.path).catch(console.error);
                 }
+                if (uploadedPublicId) {
+                    await cloudinary.uploader.destroy(uploadedPublicId).catch((error) => {
+                        console.error(
+                            `Failed to rollback current Cloudinary asset ${uploadedPublicId}:`,
+                            error
+                        );
+                    });
+                }
+                await cleanupCreatedTaskUploads(createdUploads);
                 return res.status(500).json({
                     success: false,
                     message: `Error processing file ${file.originalname}: ${fileError.message}`,
@@ -1155,8 +1313,15 @@ async uploadTaskImages(req, res) {
             }
         }
 
-        taskSubmission.images.push(...imageIds);
-        await taskSubmission.save();
+        taskSubmission.images = [...currentImageState.imageIds, ...imageIds];
+        taskSubmission.markModified('images');
+
+        try {
+            await taskSubmission.save();
+        } catch (saveError) {
+            await cleanupCreatedTaskUploads(createdUploads);
+            throw saveError;
+        }
 
         // Check completion status after saving
         if (taskSubmission.isComplete) {
@@ -1179,7 +1344,7 @@ async uploadTaskImages(req, res) {
                 workflowStatus: getRawTaskApplicationStatus(taskSubmission),
                 isComplete: taskSubmission.isComplete,
                 uploadProgress: taskSubmission.uploadProgress,
-                remaining: buildRemainingBreakdown(taskSubmission.uploadProgress),
+                remaining: buildRemainingBreakdown(taskSubmission.uploadProgress, category),
             },
         });
     } catch (error) {
@@ -1218,7 +1383,7 @@ async uploadTaskImages(req, res) {
       ...taskSubmission.toObject(),
       totalImages: taskSubmission.images?.length || 0,
       progress,
-      remaining: buildRemainingBreakdown(progress),
+      remaining: buildRemainingBreakdown(progress, taskSubmission.task?.category),
     };
 
     return res.status(200).json({
@@ -1323,7 +1488,10 @@ async uploadTaskImages(req, res) {
         workflowStatus: getRawTaskApplicationStatus(assignment),
         remainingImages: taskSubmission.images.length,
         uploadProgress: taskSubmission.uploadProgress,
-        remaining: buildRemainingBreakdown(taskSubmission.uploadProgress),
+        remaining: buildRemainingBreakdown(
+          taskSubmission.uploadProgress,
+          assignment.task?.category
+        ),
         task: taskSubmission.task || null,
       },
     });
@@ -1381,9 +1549,9 @@ async getTaskSubmissionByIdAndDeleteImage(req, res) {
 
   await TaskImageUpload.findByIdAndDelete(imageDoc._id);
 
-  taskSubmission.images = taskSubmission.images.filter(
-    (img) => img._id.toString() !== imageId
-  );
+  taskSubmission.images = taskSubmission.images
+    .filter((img) => img._id.toString() !== imageId)
+    .map((img) => img._id);
 
   // REMOVE THIS ENTIRE BLOCK - DO NOT RE-SEQUENCE IMAGES
   // if (taskSubmission.images.length > 0) {
@@ -1404,6 +1572,7 @@ async getTaskSubmissionByIdAndDeleteImage(req, res) {
     taskSubmission.status = "ongoing";
   }
 
+  taskSubmission.markModified("images");
   await taskSubmission.save();
 
   const refreshed = await TaskApplication.findById(taskApplicationId);
@@ -1418,7 +1587,10 @@ async getTaskSubmissionByIdAndDeleteImage(req, res) {
       isComplete: refreshed.isComplete,
       remainingImages: refreshed.images.length,
       uploadProgress: refreshed.uploadProgress,
-      remaining: buildRemainingBreakdown(refreshed.uploadProgress),
+      remaining: buildRemainingBreakdown(
+        refreshed.uploadProgress,
+        taskSubmission.task?.category
+      ),
     },
   });
 }
