@@ -50,7 +50,10 @@ const hvncRoutes = require("./routes/hvnc.routes");
 const assessmentReviewRoute = require("./routes/assessmentreview.routes");
 const resourceRoutes = require("./routes/resource.routes");
 const { healthCheck } = require("./controllers/health-check.controller");
-const { corsOptions } = require("./utils/cors-options.utils");
+const {
+  corsOptions,
+  corsPreflightHeaders,
+} = require("./utils/cors-options.utils");
 const errorMiddleware = require("./middleware/error.middleware");
 const notFoundMiddleware = require("./middleware/notfound-middleware");
 const SchedulerService = require("./services/scheduler.service");
@@ -74,6 +77,7 @@ app.get("/", (_req, res) => {
 app.get("/health", healthCheck);
 
 // Middleware
+app.use(corsPreflightHeaders);
 app.use(cors(corsOptions));
 
 // Add detailed Socket.IO request debugging before other middleware

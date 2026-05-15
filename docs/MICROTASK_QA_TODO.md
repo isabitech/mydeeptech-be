@@ -18,6 +18,7 @@
   - `metadata.csv`
   - `task-summary.json`
   - `download-errors.json` when any image download fails
+- Export delivery now streams the zip to the client instead of buffering the full archive in memory first.
 - Export rows are generated from `task_image_upload.metadata` plus participant `DTUser` profile fields.
 - Exported submissions are now marked with `exportAudit` metadata:
   - `exportedBy`

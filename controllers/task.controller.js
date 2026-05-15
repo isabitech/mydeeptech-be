@@ -417,7 +417,7 @@ class MicroTaskController {
       }
 
       const { taskId } = req.params;
-      const exportResult = await microTaskAdminService.exportTaskDataset(
+      const exportContext = await microTaskAdminService.prepareTaskDatasetExport(
         taskId,
         {
           status: req.query.status,
@@ -425,30 +425,42 @@ class MicroTaskController {
         },
       );
 
-      res.setHeader("X-Exported-Task-Id", exportResult.summary.taskId);
+      res.setHeader("X-Exported-Task-Id", exportContext.summary.taskId);
       res.setHeader(
         "X-Exported-Task-Status",
-        exportResult.summary.status,
+        exportContext.summary.status,
       );
       res.setHeader(
         "X-Exported-Submission-Count",
-        String(exportResult.summary.totalSubmissions),
+        String(exportContext.summary.totalSubmissions),
       );
       res.setHeader(
         "X-Exported-Image-Count",
-        String(exportResult.summary.totalImages),
+        String(exportContext.summary.totalImages),
       );
-      res.setHeader(
-        "X-Exported-Failed-Image-Count",
-        String(exportResult.summary.failedImages),
-      );
-      res.setHeader("Content-Length", String(exportResult.buffer.length));
-      res.type(exportResult.contentType);
-      res.attachment(exportResult.fileName);
+      res.setHeader("X-Export-Mode", "stream");
+      res.status(200);
+      res.type(exportContext.contentType);
+      res.attachment(exportContext.fileName);
+      if (typeof res.flushHeaders === "function") {
+        res.flushHeaders();
+      }
 
-      return res.status(200).send(exportResult.buffer);
+      await microTaskAdminService.streamPreparedTaskDatasetExport(
+        exportContext,
+        res,
+      );
+      return;
     } catch (error) {
       console.error("Error exporting task dataset:", error);
+
+      if (res.headersSent) {
+        if (typeof res.destroy === "function" && res.destroyed !== true) {
+          res.destroy(error);
+        }
+        return;
+      }
+
       const statusCode =
         error.message.includes("Micro task not found") ||
         error.message.includes("No submissions found")
