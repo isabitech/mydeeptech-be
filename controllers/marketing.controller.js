@@ -3,6 +3,10 @@ const marketingService = require("../services/marketing.service");
 
 class MarketingController {
   getErrorStatusCode(error) {
+    if (error?.statusCode) {
+      return error.statusCode;
+    }
+
     const errorMessage = String(error?.message || "").toLowerCase();
 
     if (
@@ -148,6 +152,36 @@ class MarketingController {
       return res.status(this.getErrorStatusCode(error)).json({
         success: false,
         message: error.message || "Failed to fetch marketing campaign",
+      });
+    }
+  }
+
+  async retryCampaign(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: "Validation failed",
+          errors: errors.array(),
+        });
+      }
+
+      const retryResult = await marketingService.retryCampaign(
+        req.params.campaignId,
+        req.body,
+      );
+
+      return res.status(202).json({
+        success: true,
+        message: "Marketing campaign retry queued successfully",
+        data: retryResult,
+      });
+    } catch (error) {
+      console.error("Error retrying marketing campaign:", error);
+      return res.status(this.getErrorStatusCode(error)).json({
+        success: false,
+        message: error.message || "Failed to retry marketing campaign",
       });
     }
   }

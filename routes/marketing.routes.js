@@ -211,6 +211,19 @@ const campaignIdValidation = [
     .withMessage("campaignId must be a valid Mongo ID"),
 ];
 
+const retryCampaignValidation = [
+  ...campaignIdValidation,
+  body("recipientEmails")
+    .optional()
+    .isArray({ min: 1 })
+    .withMessage("recipientEmails must be a non-empty array when provided"),
+  body("recipientEmails.*")
+    .optional()
+    .trim()
+    .isEmail()
+    .withMessage("Each recipientEmails value must be a valid email"),
+];
+
 router.use(authenticateAdmin);
 router.use(rateLimiters.api);
 
@@ -221,6 +234,11 @@ router.get(
 );
 router.post("/campaigns/preview", audienceValidation, marketingController.previewAudience);
 router.post("/campaigns/send", sendCampaignValidation, marketingController.sendCampaign);
+router.post(
+  "/campaigns/:campaignId/retry",
+  retryCampaignValidation,
+  marketingController.retryCampaign,
+);
 router.get("/campaigns", marketingController.getCampaigns);
 router.get(
   "/campaigns/:campaignId",

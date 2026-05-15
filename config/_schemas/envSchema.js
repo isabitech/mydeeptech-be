@@ -23,6 +23,7 @@ const Joi = require("joi");
     Joi.string().allow('')
   ).default(''),
   MAILJET_SENDER_NAME: Joi.string().allow('').default('MyDeepTech'),
+  MAILJET_TIMEOUT_MS: Joi.number().integer().min(1000).max(120000).optional(),
 
   // Brevo Email API
   BREVO_API_KEY: Joi.string().required(),

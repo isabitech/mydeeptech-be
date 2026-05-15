@@ -34,6 +34,8 @@
 6. Frontend can poll:
    - `GET /campaigns`
    - `GET /campaigns/:campaignId`
+7. If some recipients fail, frontend can re-queue the failed recipients with:
+   - `POST /campaigns/:campaignId/retry`
 
 ## Audience Types
 
@@ -93,6 +95,7 @@ Allowed `delivery.provider` value:
 Notes:
 - Frontend can omit `delivery.provider` and the backend will still use Mailjet.
 - Frontend should not expose Brevo or a provider toggle for Marketing campaigns.
+- Backend attaches Mailjet campaign metadata per marketing send so failed recipients can be retried against the same campaign context.
 
 ## Personalization Tokens
 
@@ -458,6 +461,100 @@ Recipient status values:
 - `failed`
 - `skipped`
 
+### Retry Failed Deliveries
+
+- `POST /api/admin/marketing/campaigns/:campaignId/retry`
+
+Purpose:
+- re-queue failed recipients from an existing campaign
+- useful for transient delivery errors like Mailjet connection resets
+
+Body:
+- empty body to retry all failed recipients
+- optional `recipientEmails` array to retry only specific failed recipients
+
+Example request:
+
+```json
+{
+  "recipientEmails": [
+    "user@example.com",
+    "second@example.com"
+  ]
+}
+```
+
+Success response:
+
+```json
+{
+  "success": true,
+  "message": "Marketing campaign retry queued successfully",
+  "data": {
+    "retriedRecipientCount": 2,
+    "campaign": {
+      "id": "6825f4a5f2d0fc1c9d8b1234",
+      "name": "MicroTasks Launch",
+      "subject": "Start Earning with MyDeepTech",
+      "sender": {
+        "email": "support@mydeeptech.ng",
+        "name": "MyDeepTech Team"
+      },
+      "audience": {
+        "type": "dtusers",
+        "verifiedOnly": true,
+        "dtUserIds": [],
+        "filters": {
+          "annotatorStatus": "",
+          "microTaskerStatus": "approved",
+          "qaStatus": "",
+          "country": "all"
+        },
+        "requestedRecipientCount": 120
+      },
+      "delivery": {
+        "provider": "mailjet",
+        "batchSize": 50,
+        "delayBetweenBatchesMs": 1000
+      },
+      "status": "queued",
+      "totalRecipients": 120,
+      "sentCount": 118,
+      "failedCount": 0,
+      "createdBy": {
+        "id": "681111111111111111111111"
+      },
+      "createdAt": "2026-05-15T10:00:00.000Z",
+      "updatedAt": "2026-05-15T10:06:00.000Z",
+      "startedAt": "2026-05-15T10:00:02.000Z",
+      "completedAt": null,
+      "lastError": "",
+      "sampleRecipients": [
+        {
+          "dtUserId": "680000000000000000000001",
+          "email": "user@example.com",
+          "fullName": "Example User",
+          "firstName": "Example",
+          "status": "pending",
+          "deliveryProvider": "mailjet",
+          "providerMessageId": "",
+          "errorMessage": "",
+          "lastAttemptAt": "2026-05-15T10:05:06.000Z",
+          "sentAt": null
+        }
+      ]
+    }
+  }
+}
+```
+
+Validation and behavior notes:
+- Returns `404` if the campaign does not exist.
+- Returns `409` if the campaign is currently in `sending` state.
+- Returns `400` if there are no failed recipients to retry.
+- Retry response status is `202`.
+- After retry is queued, frontend should resume polling campaign detail until the status settles again.
+
 ## Recommended Frontend Flow
 
 1. Build campaign form.
@@ -477,6 +574,7 @@ Recipient status values:
    - `completed`
    - `completed_with_errors`
    - `failed`
+9. If status is `completed_with_errors` or `failed`, show a retry action for all failed recipients or selected failed recipient emails.
 
 ## Suggested UI Sections
 
@@ -532,7 +630,6 @@ Recipient status values:
 
 - No edit campaign endpoint yet.
 - No delete campaign endpoint yet.
-- No retry endpoint yet.
 - No schedule-for-later feature yet.
 - No cancel-in-progress endpoint yet.
 - `GET /campaigns/:campaignId` returns the full recipients array with no recipient pagination yet.
