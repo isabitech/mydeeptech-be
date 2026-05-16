@@ -13,6 +13,7 @@
   - `approved`
   - `rejected`
   - `partially_rejected`
+- Added single-submission dataset export as a safer fallback for very large task exports.
 - Export output now includes:
   - a zip file of images downloaded from stored file URLs
   - `metadata.csv`

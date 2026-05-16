@@ -32,6 +32,7 @@ const DEFAULT_EXPOSED_HEADERS = [
   "X-Exported-Failed-Image-Count",
   "X-Exported-Image-Count",
   "X-Exported-Submission-Count",
+  "X-Exported-Submission-Id",
   "X-Exported-Task-Id",
   "X-Exported-Task-Status",
 ];

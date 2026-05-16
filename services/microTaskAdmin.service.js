@@ -431,6 +431,85 @@ class MicroTaskAdminService {
     return `${taskTitle}-${status}-dataset-${timestampLabel}.zip`;
   }
 
+  buildSingleSubmissionExportFileName(task, submission, timestampLabel) {
+    const taskTitle = this.sanitizeSegment(
+      task?.taskTitle || task?.title,
+      "task",
+    );
+    const status = this.sanitizeSegment(
+      submission?.status || "submission",
+      "submission",
+    );
+    const submissionSegment = this.sanitizeSegment(
+      submission?._id ? String(submission._id) : "submission",
+      "submission",
+    );
+
+    return `${taskTitle}-${status}-submission-${submissionSegment}-dataset-${timestampLabel}.zip`;
+  }
+
+  getTaskDatasetExportPopulate() {
+    return [
+      {
+        path: "applicant",
+        select:
+          "fullName email phone phoneNumber personal_info date_of_birth gender",
+      },
+      {
+        path: "reviewedBy",
+        select: "fullName email",
+      },
+      {
+        path: "images",
+        select:
+          "url publicId label status rejectionMessage qaNotes reviewedBy reviewedAt metadata createdAt",
+      },
+    ];
+  }
+
+  buildPreparedTaskDatasetExportContext({
+    task,
+    submissions,
+    normalizedStatus,
+    fileName,
+    exportTimestamp,
+    exportedBy,
+    summaryOverrides = {},
+  }) {
+    const submissionIds = submissions.map((submission) => submission._id);
+    const totalImages = submissions.reduce((count, submission) => {
+      return count + (submission.images?.length || 0);
+    }, 0);
+
+    const exportAuditEntry = {
+      exportedBy,
+      exportedAt: exportTimestamp,
+      exportType: normalizedStatus,
+      exportFileName: fileName,
+    };
+
+    return {
+      fileName,
+      contentType: "application/zip",
+      summary: {
+        taskId: String(task._id),
+        taskTitle: task.taskTitle || "",
+        status: normalizedStatus,
+        totalSubmissions: submissions.length,
+        totalImages,
+        downloadedImages: 0,
+        failedImages: 0,
+        ...summaryOverrides,
+      },
+      task,
+      submissions,
+      normalizedStatus,
+      exportTimestamp,
+      submissionIds,
+      exportAuditEntry,
+    };
+  }
+
   getSortOption(sortBy, status) {
     const normalizedSort = String(sortBy || "")
       .trim()
@@ -991,39 +1070,73 @@ class MicroTaskAdminService {
         normalizedStatus,
         timestampLabel,
       );
-      const submissionIds = submissions.map((submission) => submission._id);
-      const totalImages = submissions.reduce((count, submission) => {
-        return count + (submission.images?.length || 0);
-      }, 0);
-
-      const exportAuditEntry = {
-        exportedBy,
-        exportedAt: exportTimestamp,
-        exportType: normalizedStatus,
-        exportFileName: fileName,
-      };
-
-      return {
-        fileName,
-        contentType: "application/zip",
-        summary: {
-          taskId: String(task._id),
-          taskTitle: task.taskTitle || "",
-          status: normalizedStatus,
-          totalSubmissions: submissions.length,
-          totalImages,
-          downloadedImages: 0,
-          failedImages: 0,
-        },
+      return this.buildPreparedTaskDatasetExportContext({
         task,
         submissions,
         normalizedStatus,
+        fileName,
         exportTimestamp,
-        submissionIds,
-        exportAuditEntry,
-      };
+        exportedBy,
+      });
     } catch (error) {
       throw new Error(`Error preparing task dataset export: ${error.message}`);
+    }
+  }
+
+  async prepareSingleTaskSubmissionDatasetExport(
+    taskId,
+    submissionId,
+    options = {},
+  ) {
+    try {
+      const { exportedBy } = options;
+
+      if (!exportedBy) {
+        throw new Error("Exported by user id is required");
+      }
+
+      const task = await this.getTaskOrThrow(taskId);
+      const submission = await TaskApplication.findOne({
+        _id: submissionId,
+        task: task._id,
+      })
+        .populate(this.getTaskDatasetExportPopulate())
+        .lean();
+
+      if (!submission) {
+        throw new Error("Submission not found for this task");
+      }
+
+      const normalizedStatus = String(submission.status || "")
+        .trim()
+        .toLowerCase();
+      if (!this.getExportableStatuses().includes(normalizedStatus)) {
+        throw new Error("Submission status is not exportable");
+      }
+
+      const exportTimestamp = new Date();
+      const timestampLabel = this.buildTimestampLabel(exportTimestamp);
+      const fileName = this.buildSingleSubmissionExportFileName(
+        task,
+        submission,
+        timestampLabel,
+      );
+
+      return this.buildPreparedTaskDatasetExportContext({
+        task,
+        submissions: [submission],
+        normalizedStatus,
+        fileName,
+        exportTimestamp,
+        exportedBy,
+        summaryOverrides: {
+          submissionId: String(submission._id),
+        },
+      });
+    } catch (error) {
+      throw new Error(
+        `Error preparing single task dataset export: ${error.message}`,
+      );
     }
   }
 

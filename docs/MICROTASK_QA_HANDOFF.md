@@ -200,6 +200,26 @@ Export audit:
   - `exportType`
   - `exportFileName`
 
+### Single Submission Dataset Export
+
+- `GET /api/micro-tasks/:taskId/reviewed-submissions/:submissionId/export-dataset`
+
+Purpose:
+- exports exactly one reviewed submission at a time
+- safer fallback for very large tasks or when retrying a single participant package
+
+Rules:
+- the submission must belong to the task in the route
+- the submission's current status must already be one of:
+  - `approved`
+  - `rejected`
+  - `partially_rejected`
+
+Response:
+- same streamed zip structure as the task-level dataset export
+- response header `X-Exported-Submission-Id` contains the exported `TaskApplication._id`
+- `X-Exported-Submission-Count` will be `1`
+
 ### Export CSV Columns
 
 - `Angle`
