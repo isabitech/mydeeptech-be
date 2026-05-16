@@ -57,12 +57,14 @@ class MicroTaskAdminService {
   }
 
   sanitizeSegment(value, fallback = "item") {
-    return String(value || fallback)
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 80) || fallback;
+    return (
+      String(value || fallback)
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 80) || fallback
+    );
   }
 
   buildTimestampLabel(date = new Date()) {
@@ -130,10 +132,13 @@ class MicroTaskAdminService {
     const streamClosedEarly =
       !outputStream ||
       outputStream.destroyed === true ||
+      outputStream.writableEnded === true ||
       (outputStream.closed === true && outputStream.writableFinished !== true);
 
     if (streamClosedEarly) {
-      const error = new Error("Export stream was interrupted before completion");
+      const error = new Error(
+        "Export stream was interrupted before completion",
+      );
       error.code = "EXPORT_STREAM_INTERRUPTED";
       throw error;
     }
@@ -162,7 +167,10 @@ class MicroTaskAdminService {
   }
 
   buildTempImagePath(tempDirectory, submission, image) {
-    const sequence = String(image?.metadata?.imageSequence || 0).padStart(3, "0");
+    const sequence = String(image?.metadata?.imageSequence || 0).padStart(
+      3,
+      "0",
+    );
     const imageSegment = this.sanitizeSegment(image?._id || "image", "image");
     const submissionSegment = this.sanitizeSegment(
       submission?._id || "submission",
@@ -271,11 +279,7 @@ class MicroTaskAdminService {
   }
 
   getUserDateOfBirth(user) {
-    return (
-      user?.personal_info?.date_of_birth ||
-      user?.date_of_birth ||
-      null
-    );
+    return user?.personal_info?.date_of_birth || user?.date_of_birth || null;
   }
 
   calculateAgeFromDateOfBirth(dateOfBirth) {
@@ -304,10 +308,7 @@ class MicroTaskAdminService {
 
   getUserGender(user, baseMetadata = {}) {
     return (
-      baseMetadata.gender ||
-      user?.personal_info?.gender ||
-      user?.gender ||
-      ""
+      baseMetadata.gender || user?.personal_info?.gender || user?.gender || ""
     );
   }
 
@@ -352,9 +353,7 @@ class MicroTaskAdminService {
       fullName: baseMetadata.full_name || user.fullName || "",
       userId: baseMetadata.user_id || (user._id ? String(user._id) : ""),
       countryOfResidence:
-        baseMetadata.country_of_residence ||
-        user.personal_info?.country ||
-        "",
+        baseMetadata.country_of_residence || user.personal_info?.country || "",
       countryOfOrigin:
         baseMetadata.country_of_origin ||
         user.personal_info?.country_of_origin ||
@@ -367,13 +366,9 @@ class MicroTaskAdminService {
             : storedAge,
       gender: this.getUserGender(user, baseMetadata),
       recruiterName:
-        baseMetadata.recruiter_name ||
-        user.personal_info?.recruiter_name ||
-        "",
-      contactEmail:
-        baseMetadata.contact_info?.email || user.email || "",
-      contactPhone:
-        baseMetadata.contact_info?.phone || user.phone || "",
+        baseMetadata.recruiter_name || user.personal_info?.recruiter_name || "",
+      contactEmail: baseMetadata.contact_info?.email || user.email || "",
+      contactPhone: baseMetadata.contact_info?.phone || user.phone || "",
     };
   }
 
@@ -410,7 +405,10 @@ class MicroTaskAdminService {
   }
 
   buildZipImagePath(submission, image) {
-    const sequence = String(image?.metadata?.imageSequence || 0).padStart(3, "0");
+    const sequence = String(image?.metadata?.imageSequence || 0).padStart(
+      3,
+      "0",
+    );
     const angle = this.sanitizeSegment(
       image?.metadata?.angle || image?.label || "image",
       "image",
@@ -426,13 +424,22 @@ class MicroTaskAdminService {
   }
 
   buildExportFileName(task, status, timestampLabel) {
-    const taskTitle = this.sanitizeSegment(task?.taskTitle || task?.title, "task");
+    const taskTitle = this.sanitizeSegment(
+      task?.taskTitle || task?.title,
+      "task",
+    );
     return `${taskTitle}-${status}-dataset-${timestampLabel}.zip`;
   }
 
   buildSingleSubmissionExportFileName(task, submission, timestampLabel) {
-    const taskTitle = this.sanitizeSegment(task?.taskTitle || task?.title, "task");
-    const status = this.sanitizeSegment(submission?.status || "submission", "submission");
+    const taskTitle = this.sanitizeSegment(
+      task?.taskTitle || task?.title,
+      "task",
+    );
+    const status = this.sanitizeSegment(
+      submission?.status || "submission",
+      "submission",
+    );
     const submissionSegment = this.sanitizeSegment(
       submission?._id ? String(submission._id) : "submission",
       "submission",
@@ -445,7 +452,8 @@ class MicroTaskAdminService {
     return [
       {
         path: "applicant",
-        select: "fullName email phone phoneNumber personal_info date_of_birth gender",
+        select:
+          "fullName email phone phoneNumber personal_info date_of_birth gender",
       },
       {
         path: "reviewedBy",
@@ -503,7 +511,9 @@ class MicroTaskAdminService {
   }
 
   getSortOption(sortBy, status) {
-    const normalizedSort = String(sortBy || "").trim().toLowerCase();
+    const normalizedSort = String(sortBy || "")
+      .trim()
+      .toLowerCase();
 
     if (normalizedSort === "oldest_submitted") {
       return { submittedAt: 1, createdAt: 1 };
@@ -527,7 +537,10 @@ class MicroTaskAdminService {
   }
 
   async getTaskOrThrow(taskId) {
-    const task = await Task.findById(taskId).populate("createdBy", "fullName email");
+    const task = await Task.findById(taskId).populate(
+      "createdBy",
+      "fullName email",
+    );
 
     if (!task) {
       throw new Error("Micro task not found");
@@ -554,7 +567,9 @@ class MicroTaskAdminService {
       orConditions.push({ _id: trimmedSearch });
     }
 
-    const matchingUsers = await DTUser.find({ $or: orConditions }).select("_id").lean();
+    const matchingUsers = await DTUser.find({ $or: orConditions })
+      .select("_id")
+      .lean();
     return matchingUsers.map((user) => user._id);
   }
 
@@ -579,7 +594,9 @@ class MicroTaskAdminService {
       const pageSize = Math.max(1, parseInt(limit, 10) || 10);
       const skip = (pageNumber - 1) * pageSize;
       const allowedStatuses = this.getAdminViewStatuses();
-      const normalizedStatus = String(status || "all").trim().toLowerCase();
+      const normalizedStatus = String(status || "all")
+        .trim()
+        .toLowerCase();
 
       if (
         normalizedStatus !== "all" &&
@@ -639,8 +656,14 @@ class MicroTaskAdminService {
 
       const [submissions, total, statusCounts] = await Promise.all([
         TaskApplication.find(baseFilter)
-          .populate("task", "taskTitle category payRate currency totalImagesRequired dueDate createdBy illustrationImages")
-          .populate("applicant", "fullName email phone phoneNumber personal_info qaStatus date_of_birth gender")
+          .populate(
+            "task",
+            "taskTitle category payRate currency totalImagesRequired dueDate createdBy illustrationImages",
+          )
+          .populate(
+            "applicant",
+            "fullName email phone phoneNumber personal_info qaStatus date_of_birth gender",
+          )
           .populate("reviewedBy", "fullName email")
           .populate("exportAudit.exportedBy", "fullName email")
           .populate({
@@ -737,13 +760,20 @@ class MicroTaskAdminService {
     }
 
     if (String(submission.reviewNote || "").trim()) {
-      noteParts.push(`Previous review note: ${String(submission.reviewNote).trim()}`);
+      noteParts.push(
+        `Previous review note: ${String(submission.reviewNote).trim()}`,
+      );
     }
 
     return noteParts.join(" | ");
   }
 
-  async overrideSubmissionReview(taskId, submissionId, adminId, reviewData = {}) {
+  async overrideSubmissionReview(
+    taskId,
+    submissionId,
+    adminId,
+    reviewData = {},
+  ) {
     try {
       const {
         status,
@@ -766,8 +796,14 @@ class MicroTaskAdminService {
         _id: submissionId,
         task: taskId,
       })
-        .populate("task", "taskTitle category payRate currency totalImagesRequired dueDate illustrationImages")
-        .populate("applicant", "fullName email phone phoneNumber personal_info qaStatus date_of_birth gender")
+        .populate(
+          "task",
+          "taskTitle category payRate currency totalImagesRequired dueDate illustrationImages",
+        )
+        .populate(
+          "applicant",
+          "fullName email phone phoneNumber personal_info qaStatus date_of_birth gender",
+        )
         .populate("reviewedBy", "fullName email")
         .populate({
           path: "images",
@@ -810,14 +846,18 @@ class MicroTaskAdminService {
         review_notes,
       );
 
-      return microTaskQAService.completeSubmissionReview(submissionId, adminId, {
-        status,
-        quality_score,
-        review_notes: mergedReviewNote,
-        allow_override: true,
-        actor_name,
-        actor_role,
-      });
+      return microTaskQAService.completeSubmissionReview(
+        submissionId,
+        adminId,
+        {
+          status,
+          quality_score,
+          review_notes: mergedReviewNote,
+          allow_override: true,
+          actor_name,
+          actor_role,
+        },
+      );
     } catch (error) {
       throw new Error(`Error overriding submission review: ${error.message}`);
     }
@@ -842,16 +882,118 @@ class MicroTaskAdminService {
     }
   }
 
-  async appendTempFileToArchive(
-    archive,
-    filePath,
-    zipPath,
-    outputStream,
-  ) {
+  async appendTempFileToArchive(archive, filePath, zipPath, outputStream) {
     this.assertWritableExportStream(outputStream);
     const fileStream = fs.createReadStream(filePath);
     archive.append(fileStream, { name: zipPath });
     await finished(fileStream);
+  }
+
+  async downloadImageStream(imageUrl, timeout = 30000) {
+    try {
+      const response = await axios.get(imageUrl, {
+        responseType: "stream",
+        timeout,
+        maxBodyLength: Infinity,
+        maxContentLength: Infinity,
+      });
+      return { stream: response.data, error: null };
+    } catch (error) {
+      return { stream: null, error };
+    }
+  }
+
+  async appendImagesToArchiveWithConcurrency(
+    childArchive,
+    images,
+    task,
+    submission,
+    submissionFolder,
+    tempDirectory,
+    csvLines,
+    downloadErrors,
+    outputStream,
+    maxConcurrency = 5,
+  ) {
+    let downloadedCount = 0;
+    const imageQueue = images.map((image, index) => ({ image, index }));
+
+    for (let i = 0; i < imageQueue.length; i += maxConcurrency) {
+      this.assertWritableExportStream(outputStream);
+      const batch = imageQueue.slice(i, i + maxConcurrency);
+      const batchNum = i / maxConcurrency + 1;
+      const totalBatches = Math.ceil(imageQueue.length / maxConcurrency);
+
+      const downloadedBatch = await Promise.all(
+        batch.map(async ({ image, index }) => {
+          this.assertWritableExportStream(outputStream);
+          const sequence = String(image?.metadata?.imageSequence || 0).padStart(
+            3,
+            "0",
+          );
+          const angle = this.sanitizeSegment(
+            image?.metadata?.angle || image?.label || "image",
+            "image",
+          );
+          const extension = this.getFileExtension(image);
+          const imageFileName = `${sequence}-${angle}${extension}`;
+          const sourceUrl = image?.metadata?.fileUrl || image?.url;
+          const tempFilePath = this.buildTempImagePath(
+            tempDirectory,
+            submission,
+            image,
+          );
+
+          csvLines.push(
+            this.buildCsvLine(this.buildCsvRow(task, submission, image)),
+          );
+
+          try {
+            await this.downloadImageToFile(sourceUrl, tempFilePath);
+            return { success: true, tempFilePath, imageFileName, image, index };
+          } catch (error) {
+            await this.removeTempFile(tempFilePath);
+            return {
+              success: false,
+              error,
+              sourceUrl,
+              image,
+              index,
+            };
+          }
+        }),
+      );
+
+      const orderedBatch = downloadedBatch.sort((a, b) => a.index - b.index);
+      let successCount = 0;
+
+      for (const item of orderedBatch) {
+        this.assertWritableExportStream(outputStream);
+        if (!item.success) {
+          downloadErrors.push({
+            submissionId: String(submission._id),
+            imageId: String(item.image?._id || ""),
+            fileUrl: item.sourceUrl || "",
+            error: item.error?.message || "Unknown download error",
+          });
+          continue;
+        }
+
+        try {
+          const fileStream = fs.createReadStream(item.tempFilePath);
+          childArchive.append(fileStream, {
+            name: `${submissionFolder}/images/${item.imageFileName}`,
+          });
+          await finished(fileStream);
+          successCount += 1;
+          downloadedCount += 1;
+        } finally {
+          await this.removeTempFile(item.tempFilePath);
+        }
+      }
+    }
+
+    return downloadedCount;
   }
 
   buildCsvRow(task, submission, image) {
@@ -861,8 +1003,7 @@ class MicroTaskAdminService {
 
     return {
       Angle: image?.metadata?.angle || image?.label || "",
-      "Task Category":
-        image?.metadata?.taskCategory || task?.category || "",
+      "Task Category": image?.metadata?.taskCategory || task?.category || "",
       "Image Sequence": image?.metadata?.imageSequence || "",
       "Upload Timestamp": uploadTimestamp
         ? new Date(uploadTimestamp).toISOString()
@@ -888,16 +1029,15 @@ class MicroTaskAdminService {
 
   async prepareTaskDatasetExport(taskId, options = {}) {
     try {
-      const {
-        status = "approved",
-        exportedBy,
-      } = options;
+      const { status = "approved", exportedBy } = options;
 
       if (!exportedBy) {
         throw new Error("Exported by user id is required");
       }
 
-      const normalizedStatus = String(status || "approved").trim().toLowerCase();
+      const normalizedStatus = String(status || "approved")
+        .trim()
+        .toLowerCase();
       if (!this.getExportableStatuses().includes(normalizedStatus)) {
         throw new Error("Invalid export status");
       }
@@ -907,7 +1047,16 @@ class MicroTaskAdminService {
         task: task._id,
         status: normalizedStatus,
       })
-        .populate(this.getTaskDatasetExportPopulate())
+        .populate(
+          "applicant",
+          "fullName email phone phoneNumber personal_info date_of_birth gender",
+        )
+        .populate("reviewedBy", "fullName email")
+        .populate({
+          path: "images",
+          select:
+            "url publicId label status rejectionMessage qaNotes reviewedBy reviewedAt metadata createdAt",
+        })
         .lean();
 
       if (!submissions.length) {
@@ -958,7 +1107,9 @@ class MicroTaskAdminService {
         throw new Error("Submission not found for this task");
       }
 
-      const normalizedStatus = String(submission.status || "").trim().toLowerCase();
+      const normalizedStatus = String(submission.status || "")
+        .trim()
+        .toLowerCase();
       if (!this.getExportableStatuses().includes(normalizedStatus)) {
         throw new Error("Submission status is not exportable");
       }
@@ -1001,23 +1152,31 @@ class MicroTaskAdminService {
       summary,
     } = exportContext;
 
-    const archive = this.createZipArchive({
-      zlib: {
-        level: 6,
-      },
-    });
-    const csvLines = [CSV_HEADERS.join(",")];
+    const archive = this.createZipArchive({ zlib: { level: 6 } });
     const downloadErrors = [];
     const tempDirectory = await this.createExportTempDirectory();
     let downloadedImages = 0;
     let archiveError = null;
+    let clientClosedEarly = false;
+
+    outputStream.on("close", () => {
+      if (outputStream.writableFinished !== true) {
+        clientClosedEarly = true;
+        console.warn(
+          "⚠️  Export client connection closed before stream finished.",
+        );
+      }
+    });
+
+    outputStream.on("finish", () => {
+      console.log("✅ Output stream finished sending response.");
+    });
 
     archive.on("warning", (error) => {
       if (error?.code === "ENOENT") {
         console.warn("Archive warning:", error.message);
         return;
       }
-
       archive.emit("error", error);
     });
 
@@ -1034,52 +1193,53 @@ class MicroTaskAdminService {
     this.assertWritableExportStream(outputStream);
     archive.pipe(outputStream);
 
+    let submissionCount = 0;
+
     try {
+      // Stream each submission directly into the parent ZIP, one submission at a time.
       for (const submission of submissions) {
         this.assertWritableExportStream(outputStream);
+        submissionCount += 1;
         const images = microTaskQAService.sortImages(submission.images || []);
-
-        for (const image of images) {
-          this.assertWritableExportStream(outputStream);
-          csvLines.push(this.buildCsvLine(this.buildCsvRow(task, submission, image)));
-
-          const zipPath = this.buildZipImagePath(submission, image);
-          const sourceUrl = image?.metadata?.fileUrl || image?.url;
-          const tempFilePath = this.buildTempImagePath(
-            tempDirectory,
+        const submissionFolder = `submission-${String(submission._id)}`;
+        const csvLines = [CSV_HEADERS.join(",")];
+        // Download images with parallel concurrency (5 at a time) for faster processing
+        const downloadStartTime = Date.now();
+        const downloadedInSubmission =
+          await this.appendImagesToArchiveWithConcurrency(
+            archive,
+            images,
+            task,
             submission,
-            image,
+            submissionFolder,
+            tempDirectory,
+            csvLines,
+            downloadErrors,
+            outputStream,
+            3,
           );
-
-          try {
-            await this.downloadImageToFile(sourceUrl, tempFilePath);
-          } catch (error) {
-            downloadErrors.push({
+        const downloadDuration = (
+          (Date.now() - downloadStartTime) /
+          1000
+        ).toFixed(2);
+        downloadedImages += downloadedInSubmission;
+        archive.append(this.buildCsvContent(csvLines), {
+          name: `${submissionFolder}/metadata.csv`,
+        });
+        archive.append(
+          JSON.stringify(
+            {
               submissionId: String(submission._id),
-              imageId: String(image?._id || ""),
-              fileUrl: sourceUrl || "",
-              error: error.message,
-            });
-            await this.removeTempFile(tempFilePath);
-            continue;
-          }
-
-          try {
-            await this.appendTempFileToArchive(
-              archive,
-              tempFilePath,
-              zipPath,
-              outputStream,
-            );
-            downloadedImages += 1;
-          } finally {
-            await this.removeTempFile(tempFilePath);
-          }
-        }
+              applicant: submission.applicant || null,
+              status: submission.status || null,
+            },
+            null,
+            2,
+          ),
+          { name: `${submissionFolder}/submission-summary.json` },
+        );
       }
-
       this.assertWritableExportStream(outputStream);
-      archive.append(this.buildCsvContent(csvLines), { name: "metadata.csv" });
       archive.append(
         this.buildTaskSummaryFile(task, {
           type: normalizedStatus,
@@ -1105,10 +1265,7 @@ class MicroTaskAdminService {
       try {
         await finished(outputStream);
       } catch (error) {
-        if (archiveError) {
-          throw archiveError;
-        }
-
+        if (archiveError) throw archiveError;
         const streamError = new Error(
           error?.code === "ERR_STREAM_PREMATURE_CLOSE"
             ? "Export stream was interrupted before completion"
@@ -1118,17 +1275,17 @@ class MicroTaskAdminService {
         throw streamError;
       }
 
-      if (archiveError) {
-        throw archiveError;
+      if (archiveError) throw archiveError;
+      if (clientClosedEarly) {
+        throw new Error("Client disconnected before export completed");
       }
+      if (downloadErrors.length > 0) {
+        console.log(`   ⚠️  Failed Images: ${downloadErrors.length}`);
+      }
+      console.log(`   Output: ${fileName}\n`);
     } catch (error) {
-      if (
-        typeof archive.destroy === "function" &&
-        archive.destroyed !== true
-      ) {
+      if (typeof archive.destroy === "function" && archive.destroyed !== true)
         archive.destroy(error);
-      }
-
       throw error;
     } finally {
       await this.removeTempDirectory(tempDirectory);
@@ -1137,11 +1294,7 @@ class MicroTaskAdminService {
     try {
       await TaskApplication.updateMany(
         { _id: { $in: submissionIds } },
-        {
-          $push: {
-            exportAudit: exportAuditEntry,
-          },
-        },
+        { $push: { exportAudit: exportAuditEntry } },
       );
     } catch (error) {
       console.error(
